@@ -1,0 +1,81 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# IDE and editor files
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+.idea/
+*.swp
+*.swo
+*~
+
+# Compiled files
+*.obj
+*.o
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+
+# SPIR-V compiled shaders (generated from source)
+*.spv
+
+# Shader cache
+cache/
+*.cache
+
+# Coverage reports
+coverage_report/
+*.xml
+!assets/**/*.xml
+
+# Dependency directories (fetched by CMake)
+_deps/
+
+# Package manager
+vcpkg_installed/
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Visual Studio
+*.vcxproj
+*.vcxproj.filters
+*.sln
+Debug/
+Release/
+x64/
+x86/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
