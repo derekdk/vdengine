@@ -1,0 +1,290 @@
+#pragma once
+
+/**
+ * @file Game.h
+ * @brief Main game class for VDE
+ * 
+ * Provides the central Game class that manages the game loop,
+ * scenes, input, and all engine subsystems.
+ */
+
+#include "GameSettings.h"
+#include "Scene.h"
+#include "InputHandler.h"
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <functional>
+
+namespace vde {
+
+// Forward declarations
+class Window;
+class VulkanContext;
+
+/**
+ * @brief Main game class that manages the game loop and scenes.
+ * 
+ * The Game class is the entry point for VDE-based games. It handles:
+ * - Engine initialization and shutdown
+ * - The main game loop
+ * - Scene management
+ * - Input dispatching
+ * - Frame timing
+ * 
+ * @example
+ * @code
+ * #include <vde/api/Game.h>
+ * 
+ * int main() {
+ *     vde::Game game;
+ *     vde::GameSettings settings;
+ *     settings.gameName = "My Game";
+ *     settings.display.windowWidth = 1280;
+ *     settings.display.windowHeight = 720;
+ *     
+ *     game.initialize(settings);
+ *     game.addScene("main", new MainScene());
+ *     game.setActiveScene("main");
+ *     game.run();
+ *     
+ *     return 0;
+ * }
+ * @endcode
+ */
+class Game {
+public:
+    Game();
+    virtual ~Game();
+
+    // Non-copyable, non-movable
+    Game(const Game&) = delete;
+    Game& operator=(const Game&) = delete;
+    Game(Game&&) = delete;
+    Game& operator=(Game&&) = delete;
+
+    // Initialization
+
+    /**
+     * @brief Initialize the game engine.
+     * @param settings Game configuration
+     * @return true if initialization succeeded
+     */
+    bool initialize(const GameSettings& settings);
+
+    /**
+     * @brief Shutdown the game engine and release resources.
+     */
+    void shutdown();
+
+    /**
+     * @brief Check if the game is initialized.
+     */
+    bool isInitialized() const { return m_initialized; }
+
+    // Game loop
+
+    /**
+     * @brief Run the main game loop.
+     * 
+     * This method blocks until the game exits.
+     */
+    void run();
+
+    /**
+     * @brief Request the game to exit.
+     */
+    void quit();
+
+    /**
+     * @brief Check if the game is running.
+     */
+    bool isRunning() const { return m_running; }
+
+    // Scene management
+
+    /**
+     * @brief Add a scene to the game.
+     * @param name Unique name for the scene
+     * @param scene The scene to add (Game takes ownership)
+     */
+    void addScene(const std::string& name, Scene* scene);
+    void addScene(const std::string& name, std::unique_ptr<Scene> scene);
+
+    /**
+     * @brief Remove a scene by name.
+     * @param name Name of the scene to remove
+     */
+    void removeScene(const std::string& name);
+
+    /**
+     * @brief Get a scene by name.
+     * @param name Scene name
+     * @return Pointer to scene, or nullptr if not found
+     */
+    Scene* getScene(const std::string& name);
+
+    /**
+     * @brief Set the active scene.
+     * @param name Name of the scene to activate
+     */
+    void setActiveScene(const std::string& name);
+
+    /**
+     * @brief Get the currently active scene.
+     */
+    Scene* getActiveScene() { return m_activeScene; }
+    const Scene* getActiveScene() const { return m_activeScene; }
+
+    /**
+     * @brief Push a scene onto the scene stack.
+     * 
+     * The current scene is paused and the new scene becomes active.
+     * Use popScene() to return to the previous scene.
+     * 
+     * @param name Name of the scene to push
+     */
+    void pushScene(const std::string& name);
+
+    /**
+     * @brief Pop the current scene and return to the previous one.
+     */
+    void popScene();
+
+    // Input handling
+
+    /**
+     * @brief Set the global input handler.
+     * @param handler Input handler (Game does NOT take ownership)
+     */
+    void setInputHandler(InputHandler* handler) { m_inputHandler = handler; }
+
+    /**
+     * @brief Get the global input handler.
+     */
+    InputHandler* getInputHandler() { return m_inputHandler; }
+    const InputHandler* getInputHandler() const { return m_inputHandler; }
+
+    // Timing
+
+    /**
+     * @brief Get the time since the last frame in seconds.
+     */
+    float getDeltaTime() const { return m_deltaTime; }
+
+    /**
+     * @brief Get the total time since game start in seconds.
+     */
+    double getTotalTime() const { return m_totalTime; }
+
+    /**
+     * @brief Get the current frames per second.
+     */
+    float getFPS() const { return m_fps; }
+
+    /**
+     * @brief Get the current frame number.
+     */
+    uint64_t getFrameCount() const { return m_frameCount; }
+
+    // Window access
+
+    /**
+     * @brief Get the game window.
+     */
+    Window* getWindow() { return m_window.get(); }
+    const Window* getWindow() const { return m_window.get(); }
+
+    // Settings
+
+    /**
+     * @brief Get the current game settings.
+     */
+    const GameSettings& getSettings() const { return m_settings; }
+
+    /**
+     * @brief Apply new display settings.
+     */
+    void applyDisplaySettings(const DisplaySettings& settings);
+
+    /**
+     * @brief Apply new graphics settings.
+     */
+    void applyGraphicsSettings(const GraphicsSettings& settings);
+
+    // Events/callbacks
+
+    /**
+     * @brief Set callback for window resize.
+     */
+    void setResizeCallback(std::function<void(uint32_t, uint32_t)> callback);
+
+    /**
+     * @brief Set callback for window focus change.
+     */
+    void setFocusCallback(std::function<void(bool)> callback);
+
+protected:
+    // Virtual methods for subclassing
+
+    /**
+     * @brief Called once before the game loop starts.
+     */
+    virtual void onStart() {}
+
+    /**
+     * @brief Called every frame before scene update.
+     */
+    virtual void onUpdate(float deltaTime) {}
+
+    /**
+     * @brief Called every frame after scene render.
+     */
+    virtual void onRender() {}
+
+    /**
+     * @brief Called when the game is shutting down.
+     */
+    virtual void onShutdown() {}
+
+private:
+    // Initialization
+    bool m_initialized = false;
+    bool m_running = false;
+    GameSettings m_settings;
+
+    // Core systems
+    std::unique_ptr<Window> m_window;
+    std::unique_ptr<VulkanContext> m_vulkanContext;
+
+    // Scene management
+    std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
+    Scene* m_activeScene = nullptr;
+    std::vector<std::string> m_sceneStack;
+    std::string m_pendingScene;
+    bool m_sceneSwitchPending = false;
+
+    // Input
+    InputHandler* m_inputHandler = nullptr;
+
+    // Timing
+    float m_deltaTime = 0.0f;
+    double m_totalTime = 0.0;
+    float m_fps = 0.0f;
+    uint64_t m_frameCount = 0;
+    double m_lastFrameTime = 0.0;
+    double m_fpsAccumulator = 0.0;
+    int m_fpsFrameCount = 0;
+
+    // Callbacks
+    std::function<void(uint32_t, uint32_t)> m_resizeCallback;
+    std::function<void(bool)> m_focusCallback;
+
+    // Internal methods
+    void processInput();
+    void updateTiming();
+    void processPendingSceneChange();
+    void setupInputCallbacks();
+};
+
+} // namespace vde
