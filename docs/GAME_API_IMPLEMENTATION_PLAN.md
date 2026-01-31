@@ -263,35 +263,277 @@ src/
 ├── BufferUtils.cpp
 ├── Camera.cpp
 ├── ... (existing files)
+
+tests/
+├── api/
+│   ├── Entity_test.cpp      (Phase 1)
+│   ├── GameCamera_test.cpp  (Phase 1)
+│   ├── LightBox_test.cpp    (Phase 1)
+│   ├── Scene_test.cpp       (Phase 1)
+│   ├── Game_test.cpp        (Phase 1)
+│   ├── Mesh_test.cpp        (Phase 2)
+│   └── MeshEntity_test.cpp  (Phase 2)
+├── Camera_test.cpp
+├── ... (existing tests)
 ```
+
+---
+
+## Unit Testing Strategy
+
+Tests validate implementation correctness at each phase. Run tests after implementing each file.
+
+### Phase 1 Tests
+
+#### Entity_test.cpp (~60 lines)
+```cpp
+class EntityTest : public ::testing::Test {
+    // Test Entity base functionality (no Vulkan required)
+};
+
+TEST_F(EntityTest, DefaultConstructorGeneratesUniqueId)
+TEST_F(EntityTest, SetPositionFloat3Works)
+TEST_F(EntityTest, SetPositionStructWorks)
+TEST_F(EntityTest, SetPositionVec3Works)
+TEST_F(EntityTest, SetRotationWorks)
+TEST_F(EntityTest, SetScaleUniformWorks)
+TEST_F(EntityTest, SetScaleNonUniformWorks)
+TEST_F(EntityTest, GetModelMatrixIdentityAtOrigin)
+TEST_F(EntityTest, GetModelMatrixWithTranslation)
+TEST_F(EntityTest, GetModelMatrixWithRotation)
+TEST_F(EntityTest, GetModelMatrixWithScale)
+TEST_F(EntityTest, GetModelMatrixCombined)  // TRS order
+TEST_F(EntityTest, VisibilityDefaultTrue)
+TEST_F(EntityTest, SetVisibleWorks)
+```
+
+#### GameCamera_test.cpp (~100 lines)
+```cpp
+class SimpleCameraTest : public ::testing::Test {};
+class OrbitCameraTest : public ::testing::Test {};
+class Camera2DTest : public ::testing::Test {};
+
+// SimpleCamera
+TEST_F(SimpleCameraTest, DefaultConstructor)
+TEST_F(SimpleCameraTest, SetPositionUpdatesViewMatrix)
+TEST_F(SimpleCameraTest, SetDirectionUpdatesViewMatrix)
+TEST_F(SimpleCameraTest, SetFieldOfView)
+TEST_F(SimpleCameraTest, MoveAddsToPosition)
+TEST_F(SimpleCameraTest, RotateChangesPitchYaw)
+
+// OrbitCamera
+TEST_F(OrbitCameraTest, ConstructorWithTarget)
+TEST_F(OrbitCameraTest, SetDistanceClampsToLimits)
+TEST_F(OrbitCameraTest, SetPitchClampsToLimits)
+TEST_F(OrbitCameraTest, SetYawWrapsAround)
+TEST_F(OrbitCameraTest, RotateUpdatesPitchYaw)
+TEST_F(OrbitCameraTest, ZoomChangesDistance)
+TEST_F(OrbitCameraTest, PanMovesTarget)
+TEST_F(OrbitCameraTest, CameraPositionCalculatedFromSpherical)
+
+// Camera2D
+TEST_F(Camera2DTest, DefaultConstructor)
+TEST_F(Camera2DTest, SetPositionWorks)
+TEST_F(Camera2DTest, SetZoomWorks)
+TEST_F(Camera2DTest, SetRotationWorks)
+TEST_F(Camera2DTest, ProjectionIsOrthographic)
+```
+
+#### LightBox_test.cpp (~40 lines)
+```cpp
+class LightBoxTest : public ::testing::Test {};
+
+TEST_F(LightBoxTest, DefaultAmbientColor)
+TEST_F(LightBoxTest, SetAmbientColor)
+TEST_F(LightBoxTest, SetAmbientIntensity)
+TEST_F(LightBoxTest, AddLightReturnsIndex)
+TEST_F(LightBoxTest, RemoveLightWorks)
+TEST_F(LightBoxTest, GetLightByIndex)
+TEST_F(LightBoxTest, ClearLightsRemovesAll)
+TEST_F(LightBoxTest, SimpleColorLightBoxConstructor)
+TEST_F(LightBoxTest, ThreePointLightBoxHasThreeLights)
+```
+
+#### Scene_test.cpp (~80 lines)
+```cpp
+class SceneTest : public ::testing::Test {
+    // Mock or minimal Game for testing
+};
+
+TEST_F(SceneTest, DefaultConstructor)
+TEST_F(SceneTest, AddEntityReturnsPtr)
+TEST_F(SceneTest, AddEntityIncrementsCount)
+TEST_F(SceneTest, GetEntityById)
+TEST_F(SceneTest, GetEntityByIdNotFound)
+TEST_F(SceneTest, GetEntityByName)
+TEST_F(SceneTest, RemoveEntityById)
+TEST_F(SceneTest, ClearEntitiesRemovesAll)
+TEST_F(SceneTest, SetCameraRawPointer)
+TEST_F(SceneTest, SetCameraUniquePtr)
+TEST_F(SceneTest, SetLightBoxRawPointer)
+TEST_F(SceneTest, GetEffectiveLightingReturnsDefault)
+TEST_F(SceneTest, GetEffectiveLightingReturnsCustom)
+TEST_F(SceneTest, SetBackgroundColor)
+TEST_F(SceneTest, UpdateCallsEntityUpdate)
+TEST_F(SceneTest, SetInputHandler)
+```
+
+#### Game_test.cpp (~60 lines)
+```cpp
+class GameTest : public ::testing::Test {
+    // Tests that don't require full Vulkan init
+};
+
+TEST_F(GameTest, DefaultConstructorNotInitialized)
+TEST_F(GameTest, AddSceneStoresScene)
+TEST_F(GameTest, AddSceneWithUniquePtr)
+TEST_F(GameTest, GetSceneByName)
+TEST_F(GameTest, GetSceneNotFound)
+TEST_F(GameTest, RemoveSceneWorks)
+TEST_F(GameTest, SetActiveSceneWorks)
+TEST_F(GameTest, SetInputHandler)
+TEST_F(GameTest, QuitSetsRunningFalse)
+// Note: initialize() and run() require Vulkan, tested in integration
+```
+
+### Phase 1 Integration Test
+
+#### GameIntegration_test.cpp (~40 lines)
+```cpp
+// Requires Vulkan-capable environment
+class GameIntegrationTest : public ::testing::Test {
+    // Skip if no Vulkan available
+};
+
+TEST_F(GameIntegrationTest, InitializeCreatesWindow)
+TEST_F(GameIntegrationTest, InitializeWithSettings)
+TEST_F(GameIntegrationTest, ShutdownCleansUp)
+TEST_F(GameIntegrationTest, SceneLifecycleOnEnterCalled)
+TEST_F(GameIntegrationTest, SceneLifecycleOnExitCalled)
+TEST_F(GameIntegrationTest, SceneSwitchWorks)
+```
+
+### Phase 2 Tests
+
+#### Mesh_test.cpp (~50 lines)
+```cpp
+class MeshTest : public ::testing::Test {};
+
+TEST_F(MeshTest, DefaultConstructor)
+TEST_F(MeshTest, SetDataStoresVertices)
+TEST_F(MeshTest, SetDataStoresIndices)
+TEST_F(MeshTest, SetDataCalculatesBounds)
+TEST_F(MeshTest, CreateCubeHas36Indices)  // 6 faces * 2 tris * 3 verts
+TEST_F(MeshTest, CreateCubeBoundsCorrect)
+TEST_F(MeshTest, CreateSphereHasCorrectVertexCount)
+TEST_F(MeshTest, CreatePlaneHas6Indices)
+TEST_F(MeshTest, LoadFromFileOBJ)  // Simple cube.obj test file
+```
+
+#### MeshEntity_test.cpp (~30 lines)
+```cpp
+class MeshEntityTest : public ::testing::Test {};
+
+TEST_F(MeshEntityTest, DefaultConstructor)
+TEST_F(MeshEntityTest, SetMeshDirectPtr)
+TEST_F(MeshEntityTest, SetMeshId)
+TEST_F(MeshEntityTest, SetTextureDirectPtr)
+TEST_F(MeshEntityTest, SetTextureId)
+TEST_F(MeshEntityTest, SetColor)
+TEST_F(MeshEntityTest, InheritsFromEntity)
+```
+
+---
+
+## Test Execution Plan
+
+Run tests incrementally as each file is implemented:
+
+```
+# After Entity.cpp
+ctest -R Entity_test --output-on-failure
+
+# After GameCamera.cpp
+ctest -R "Camera_test|GameCamera_test" --output-on-failure
+
+# After LightBox.cpp
+ctest -R LightBox_test --output-on-failure
+
+# After Scene.cpp
+ctest -R Scene_test --output-on-failure
+
+# After Game.cpp (Phase 1 complete)
+ctest -R "Entity_test|GameCamera_test|LightBox_test|Scene_test|Game_test" --output-on-failure
+
+# Full test suite
+ctest --output-on-failure
+```
+
+### Test File Updates to CMakeLists.txt
+
+Add to `tests/CMakeLists.txt`:
+```cmake
+# Game API Tests (Phase 1)
+set(VDE_API_TEST_SOURCES
+    api/Entity_test.cpp
+    api/GameCamera_test.cpp
+    api/LightBox_test.cpp
+    api/Scene_test.cpp
+    api/Game_test.cpp
+)
+
+# Append to VDE_TEST_SOURCES
+list(APPEND VDE_TEST_SOURCES ${VDE_API_TEST_SOURCES})
+```
+
+---
+
+## Test Success Criteria
+
+| Phase | Milestone | Tests Passing |
+|-------|-----------|---------------|
+| 1.1 | Entity.cpp done | Entity_test: 14/14 |
+| 1.2 | GameCamera.cpp done | GameCamera_test: 18/18 |
+| 1.3 | LightBox.cpp done | LightBox_test: 9/9 |
+| 1.4 | Scene.cpp done | Scene_test: 17/17 |
+| 1.5 | Game.cpp done | Game_test: 9/9, all Phase 1: 67/67 |
+| 1.6 | simple_game links | Example runs, shows window |
+| 2.1 | Mesh.cpp done | Mesh_test: 9/9 |
+| 2.2 | MeshEntity.cpp done | MeshEntity_test: 7/7 |
+| 2.3 | simple_game renders | Spinning cube visible |
 
 ---
 
 ## Implementation Order (Recommended)
 
+Each step includes implementing the source file AND its corresponding test file:
+
 ```
-1. Entity.cpp          (~80 lines)  - Transform math
-2. GameCamera.cpp      (~180 lines) - Camera wrappers  
-3. LightBox.cpp        (~40 lines)  - Light management
-4. Scene.cpp           (~120 lines) - Entity container + lifecycle
-5. MeshEntity.cpp      (~30 lines)  - Stub for Phase 1
-6. Game.cpp            (~250 lines) - Main loop + initialization
+1. Entity.cpp + Entity_test.cpp        (~80+60 lines)  - Transform math
+2. GameCamera.cpp + GameCamera_test.cpp (~180+100 lines) - Camera wrappers  
+3. LightBox.cpp + LightBox_test.cpp    (~40+40 lines)  - Light management
+4. Scene.cpp + Scene_test.cpp          (~120+80 lines) - Entity container + lifecycle
+5. MeshEntity.cpp (stub)               (~30 lines)     - Stub for Phase 1
+6. Game.cpp + Game_test.cpp            (~250+60 lines) - Main loop + initialization
+7. Update CMakeLists.txt               - Add sources and tests
 --- At this point, simple_game compiles and shows a window ---
-7. Mesh.cpp            (~200 lines) - Geometry + GPU buffers
-8. MeshEntity.cpp full (~70 lines)  - 3D rendering
-9. Default pipeline    (~150 lines) - Shaders + pipeline creation
+--- All Phase 1 tests pass (67 tests) ---
+8. Mesh.cpp + Mesh_test.cpp            (~200+50 lines) - Geometry + GPU buffers
+9. MeshEntity.cpp full + test          (~70+30 lines)  - 3D rendering
+10. Default pipeline                   (~150 lines)    - Shaders + pipeline creation
 --- At this point, simple_game shows a spinning cube ---
+--- All Phase 2 tests pass (83 tests total) ---
 ```
 
 ---
 
 ## Estimated Effort
 
-| Phase | Files | Lines of Code | Complexity |
-|-------|-------|---------------|------------|
-| Phase 1 | 6 | ~700 | Medium |
-| Phase 2 | 2+ | ~400 | Medium-High |
-| Phase 3 | 3+ | ~1000+ | High |
+| Phase | Files | Lines of Code | Test Lines | Complexity |
+|-------|-------|---------------|------------|------------|
+| Phase 1 | 6 src + 5 test | ~700 | ~340 | Medium |
+| Phase 2 | 2+ src + 2 test | ~400 | ~80 | Medium-High |
+| Phase 3 | 3+ src + tests | ~1000+ | ~200+ | High |
 
 **Phase 1 alone** is sufficient to prove the API design works and have a running window.
 
@@ -314,8 +556,14 @@ src/
 1. ✅ Update API headers with simplifications
 2. ✅ Update simple_game example  
 3. ✅ Test compile (19 linker errors as expected)
-4. Create `src/api/` directory
-5. Implement Phase 1 files in order
-6. Update CMakeLists.txt
-7. Build and iterate until simple_game runs
-8. Add unit tests for new classes
+4. ✅ Add unit testing strategy to plan
+5. Create `src/api/` and `tests/api/` directories
+6. Implement Entity.cpp + Entity_test.cpp, run tests
+7. Implement GameCamera.cpp + GameCamera_test.cpp, run tests
+8. Implement LightBox.cpp + LightBox_test.cpp, run tests
+9. Implement Scene.cpp + Scene_test.cpp, run tests
+10. Implement MeshEntity.cpp (stub)
+11. Implement Game.cpp + Game_test.cpp, run tests
+12. Update CMakeLists.txt with new sources
+13. Build simple_game - verify it runs and shows window
+14. Run full test suite - verify 67 Phase 1 tests pass
