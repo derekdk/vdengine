@@ -3,8 +3,10 @@
  * @brief Implementation of Entity base class and MeshEntity
  */
 
-#include <vde/api/Entity.h>
-#include <glm/gtc/matrix_transform.hpp>
+#include <vde/api/Entity.h>#include <vde/api/Scene.h>
+#include <vde/api/Game.h>
+#include <vde/api/Mesh.h>
+#include <vde/VulkanContext.h>#include <glm/gtc/matrix_transform.hpp>
 
 namespace vde {
 
@@ -89,12 +91,87 @@ MeshEntity::MeshEntity()
 }
 
 void MeshEntity::render() {
-    // Phase 1 stub: No actual rendering yet
-    // Phase 2 will implement:
-    // - Get mesh from m_mesh or look up by m_meshId in scene
-    // - Bind vertex/index buffers
-    // - Push model matrix as push constant
-    // - Draw indexed
+    // Get the mesh (either direct or via resource ID)
+    std::shared_ptr<Mesh> mesh = m_mesh;
+    if (!mesh && m_scene && m_meshId != INVALID_RESOURCE_ID) {
+        // TODO: Get mesh from scene resources when resource management is implemented
+        // For now, only direct mesh references work
+        return;
+    }
+    
+    if (!mesh || !m_scene) {
+        return;
+    }
+    
+    // Get Game and Vulkan context
+    Game* game = m_scene->getGame();
+    if (!game) {
+        return;
+    }
+    
+    VulkanContext* context = game->getVulkanContext();
+    if (!context) {
+        return;
+    }
+    
+    // Upload mesh to GPU if needed
+    if (!mesh->isOnGPU()) {
+        mesh->uploadToGPU(context);
+    }
+    
+    // Get current command buffer
+    VkCommandBuffer cmd = context->getCurrentCommandBuffer();
+    if (cmd == VK_NULL_HANDLE) {
+        return;
+    }
+    
+    // Get pipeline
+    VkPipeline pipeline = game->getMeshPipeline();
+    VkPipelineLayout pipelineLayout = game->getMeshPipelineLayout();
+    if (pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
+        return;
+    }
+    
+    // Bind pipeline
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    
+    // Set viewport and scissor (dynamic state)
+    VkExtent2D extent = context->getSwapChainExtent();
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = extent;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+    
+    // Bind UBO descriptor set (set 0)
+    VkDescriptorSet uboDescriptorSet = context->getCurrentUBODescriptorSet();
+    if (uboDescriptorSet != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                               pipelineLayout, 0, 1, &uboDescriptorSet, 0, nullptr);
+    }
+    
+    // Push model matrix as push constant
+    glm::mat4 modelMatrix = getModelMatrix();
+    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                       0, sizeof(glm::mat4), &modelMatrix);
+    
+    // Bind mesh buffers
+    mesh->bind(cmd);
+    
+    // Draw
+    if (mesh->getIndexCount() > 0) {
+        vkCmdDrawIndexed(cmd, static_cast<uint32_t>(mesh->getIndexCount()), 1, 0, 0, 0);
+    } else if (mesh->getVertexCount() > 0) {
+        vkCmdDraw(cmd, static_cast<uint32_t>(mesh->getVertexCount()), 1, 0, 0);
+    }
 }
 
 // ============================================================================

@@ -230,9 +230,10 @@ public:
 
     /**
      * @brief Get the input handler.
+     * Returns the scene's input handler if set, otherwise falls back to the game's input handler.
      */
-    InputHandler* getInputHandler() { return m_inputHandler; }
-    const InputHandler* getInputHandler() const { return m_inputHandler; }
+    InputHandler* getInputHandler();
+    const InputHandler* getInputHandler() const;
 
     // Game reference
 

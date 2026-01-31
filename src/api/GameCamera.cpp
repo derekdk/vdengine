@@ -19,15 +19,14 @@ void GameCamera::applyTo(VulkanContext& context) {
     // Copy view and projection matrices to the context's camera
     Camera& cam = context.getCamera();
     
-    // The context camera uses setFromPitchYaw or setPosition/setTarget
-    // We need to copy our computed matrices to it
-    // Since Camera stores position/target internally, we'll set those
-    
-    // For now, we set the projection parameters
+    // Set projection parameters
     cam.setPerspective(60.0f, m_aspectRatio, m_nearPlane, m_farPlane);
     
-    // The actual view matrix will be handled by the derived classes
-    // which update m_camera directly
+    // Copy position and target from our internal camera
+    // This ensures the VulkanContext's camera has the correct view matrix
+    cam.setPosition(m_camera.getPosition());
+    cam.setTarget(m_camera.getTarget());
+    cam.setUp(m_camera.getUp());
 }
 
 // ============================================================================

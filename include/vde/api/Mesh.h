@@ -11,10 +11,14 @@
 #include "Resource.h"
 #include "GameTypes.h"
 #include <vde/Types.h>
+#include <vulkan/vulkan.h>
 #include <vector>
 #include <string>
 
 namespace vde {
+
+// Forward declarations
+class VulkanContext;
 
 /**
  * @brief Represents a 3D mesh resource.
@@ -118,11 +122,42 @@ public:
                                             float height = 1.0f,
                                             int segments = 32);
 
+    // GPU buffer management
+
+    /**
+     * @brief Upload mesh data to GPU.
+     * @param context Vulkan context for buffer creation
+     */
+    void uploadToGPU(VulkanContext* context);
+
+    /**
+     * @brief Free GPU buffers.
+     * @param device Vulkan device for cleanup
+     */
+    void freeGPUBuffers(VkDevice device);
+
+    /**
+     * @brief Check if mesh has been uploaded to GPU.
+     */
+    bool isOnGPU() const { return m_vertexBuffer != VK_NULL_HANDLE; }
+
+    /**
+     * @brief Bind vertex and index buffers for rendering.
+     * @param commandBuffer Command buffer to bind to
+     */
+    void bind(VkCommandBuffer commandBuffer) const;
+
 protected:
     std::vector<Vertex> m_vertices;
     std::vector<uint32_t> m_indices;
     glm::vec3 m_boundsMin{0.0f};
     glm::vec3 m_boundsMax{0.0f};
+
+    // GPU buffers (VK_NULL_HANDLE if not uploaded)
+    VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
+    VkBuffer m_indexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
 
     void calculateBounds();
 };

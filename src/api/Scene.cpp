@@ -152,4 +152,26 @@ void Scene::removeResource(ResourceId id) {
     m_resources.erase(id);
 }
 
+InputHandler* Scene::getInputHandler() {
+    // Return scene's input handler if set, otherwise fall back to game's
+    if (m_inputHandler) {
+        return m_inputHandler;
+    }
+    if (m_game) {
+        return m_game->getInputHandler();
+    }
+    return nullptr;
+}
+
+const InputHandler* Scene::getInputHandler() const {
+    // Return scene's input handler if set, otherwise fall back to game's
+    if (m_inputHandler) {
+        return m_inputHandler;
+    }
+    if (m_game) {
+        return m_game->getInputHandler();
+    }
+    return nullptr;
+}
+
 } // namespace vde

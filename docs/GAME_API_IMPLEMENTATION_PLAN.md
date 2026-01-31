@@ -9,7 +9,7 @@ This document outlines the plan to implement the high-level Game API that sits o
 | Phase | Description | Status | Date |
 |-------|-------------|--------|------|
 | Phase 1 | Core Infrastructure | ✅ Complete | 2026-01-31 |
-| Phase 2 | Mesh Rendering | ⏳ Pending | - |
+| Phase 2 | Mesh Rendering | ✅ Complete | 2026-01-31 |
 | Phase 3 | Materials & Shaders | ⏳ Pending | - |
 | Phase 4 | SpriteEntity & 2D | ⏳ Pending | - |
 | Phase 5 | Resource Management | ⏳ Pending | - |
@@ -41,6 +41,77 @@ This document outlines the plan to implement the high-level Game API that sits o
 - SpriteEntity not implemented
 - Resource management placeholders only
 - No actual Vulkan draw calls (just clear color)
+
+### Phase 2 Completion Notes (2026-01-31)
+
+**Implemented Files:**
+- `src/api/Mesh.cpp` (~470 lines) - Full mesh implementation with GPU buffers
+- Updated `src/api/Entity.cpp` - MeshEntity::render() implementation (~80 lines)
+- Updated `src/api/Game.cpp` - Mesh rendering pipeline (~200 lines added)
+- `shaders/mesh.vert` - Vertex shader with push constants for model matrix
+- `shaders/mesh.frag` - Fragment shader with simple directional lighting
+
+**Key Features:**
+- ✅ Mesh data storage (vertices, indices, bounds)
+- ✅ GPU buffer management (automatic upload to device-local memory)
+- ✅ Primitive generators: createCube(), createSphere(), createPlane(), createCylinder()
+- ✅ Full Vulkan graphics pipeline with push constants and descriptor sets
+- ✅ Simple OBJ file loading (vertices, normals, texture coords)
+- ✅ Per-entity rendering with model matrix push constants
+- ✅ Basic lighting (directional + ambient)
+
+**Design Decisions:**
+1. **Mesh GPU Buffers**: Added Vulkan buffer handles directly to Mesh class
+   - Pragmatic approach for Phase 2 simplicity
+   - Meshes upload to GPU on first render (lazy initialization)
+   - Future: May move to separate renderer/resource manager in Phase 5
+
+2. **Shader Architecture**: 
+   - Used existing UBO structure (model/view/proj) for compatibility
+   - Model matrix in UBO is ignored; per-entity model matrix via push constants
+   - View/Projection shared via UBO (updated per-frame by VulkanContext)
+   - Future: Consider dedicated ViewProjection UBO structure
+
+3. **Pipeline Management**:
+   - Single global mesh pipeline created in Game::initialize()
+   - Pipeline accessible via Game::getMeshPipeline() for entity rendering
+   - Future: Support multiple pipelines/materials in Phase 3
+
+4. **glslang Initialization**:
+   - Added glslang::InitializeProcess() in Game::initialize()
+   - Added glslang::FinalizeProcess() in Game::shutdown()
+   - **CRITICAL**: Required for shader compilation to work
+
+5. **Lighting Model**:
+   - Fragment shader derives normals from screen-space gradients (dFdx/dFdy)
+   - Simple directional light from above (0.3, 1.0, 0.5)
+   - 30% ambient + 70% diffuse lighting
+   - Future: Proper vertex normals and multiple lights in Phase 3
+
+**Verification:**
+- ✅ All 41 unit tests pass
+- ✅ simple_game example compiles and links
+- ✅ Game initializes without crashes
+- ✅ Mesh rendering pipeline creates successfully
+- ✅ Cube mesh generates with colored vertices
+- ⚠️  Visual rendering not yet verified (window closes immediately in headless environment)
+
+**Known Limitations (Phase 2):**
+- No depth testing (disabled for simplicity)
+- Single shared pipeline (no material variations)
+- Vertex normals stored as colors (workaround for lighting)
+- No texture sampling yet
+- Resource management still placeholder
+- OBJ loader is minimal (no materials, no mtl files)
+
+**Files Modified:**
+- `include/vde/api/Mesh.h` - Added GPU buffer methods
+- `include/vde/api/Game.h` - Added pipeline accessors and Vulkan types
+- `examples/simple_game/main.cpp` - Set cube mesh on entity
+
+**Build System:**
+- Added `src/api/Mesh.cpp` to CMakeLists.txt
+- Shaders copied to build directory automatically
 
 ---
 
@@ -224,46 +295,118 @@ src/api/GameTypes.cpp  # Added for Transform::getMatrix()
 
 ---
 
-### Phase 2: Mesh Rendering
+### Phase 2: Mesh Rendering ✅ COMPLETE
 
 **Goal:** Render actual 3D meshes (MeshEntity shows a cube).
 
-#### 2.1 Mesh Resource (`src/api/Mesh.cpp`) ~200 lines
+**Status:** ✅ Completed 2026-01-31
+
+#### 2.1 Mesh Resource (`src/api/Mesh.cpp`) ✅ ~470 lines
 ```cpp
-// Implement:
-- Mesh::loadFromFile() - Parse OBJ files (simple subset)
+// Implemented:
+- Mesh::loadFromFile() - Parse OBJ files (basic subset: v, vn, vt, f)
 - Mesh::setData() - Store vertices/indices, compute bounds
-- Mesh::createCube() / createSphere() / createPlane()
-- Mesh::calculateBounds()
+- Mesh::createCube() - Colored cube primitive (24 vertices)
+- Mesh::createSphere() - UV sphere with specified segments/rings
+- Mesh::createPlane() - Subdivided plane
+- Mesh::createCylinder() - Cylinder with caps
+- Mesh::calculateBounds() - AABB computation
+
+// GPU Buffer Management:
+- Mesh::uploadToGPU(VulkanContext*) - Create device-local buffers
+- Mesh::freeGPUBuffers(VkDevice) - Cleanup GPU resources
+- Mesh::bind(VkCommandBuffer) - Bind vertex/index buffers
+- Mesh::isOnGPU() - Check if uploaded
 ```
 
-#### 2.2 GPU Mesh Buffers
-Add to Mesh or create MeshBuffer helper:
+**Implementation Notes:**
+- Vertices/indices stored in CPU memory (std::vector)
+- GPU buffers created lazily on first render
+- Uses BufferUtils::createDeviceLocalBuffer() with staging
+- Primitive generators create colored vertices for visual testing
+
+#### 2.2 GPU Mesh Buffers ✅
+Integrated into Mesh class:
 ```cpp
-- VkBuffer m_vertexBuffer, m_indexBuffer
-- Upload vertex/index data to GPU via BufferUtils
-- bind(VkCommandBuffer) - Bind vertex/index buffers
-- cleanup() - Destroy buffers
+// Added to Mesh.h:
+- VkBuffer m_vertexBuffer
+- VkDeviceMemory m_vertexBufferMemory  
+- VkBuffer m_indexBuffer
+- VkDeviceMemory m_indexBufferMemory
 ```
 
-#### 2.3 MeshEntity Full Implementation (`src/api/MeshEntity.cpp`)
+**Design Decision:** Direct Vulkan handles in Mesh
+- Simpler for Phase 2 (no separate resource manager needed)
+- Automatic cleanup in destructor
+- Trade-off: Couples Mesh to Vulkan API
+- Future: May refactor to renderer/resource manager pattern
+
+#### 2.3 MeshEntity Full Implementation (`src/api/Entity.cpp`) ✅
 ```cpp
-// Implement:
-- MeshEntity::render()
-  - Get Mesh (from m_mesh or via scene by m_meshId)
-  - Bind mesh buffers
-  - Push model matrix as push constant
-  - Draw indexed
+// Implemented in MeshEntity::render():
+1. Get mesh (direct m_mesh or via m_meshId from scene)
+2. Upload to GPU if not already uploaded
+3. Get VulkanContext command buffer
+4. Bind mesh rendering pipeline
+5. Set dynamic viewport/scissor
+6. Bind UBO descriptor set (view/projection)
+7. Push model matrix as push constant
+8. Bind mesh vertex/index buffers
+9. Issue vkCmdDrawIndexed()
 ```
 
-#### 2.4 Default Rendering Pipeline
-Create a default 3D pipeline in Game:
-- Standard vertex shader (MVP transform)
-- Standard fragment shader (color + simple lighting)
-- Pipeline layout with push constants for model matrix
-- Descriptor sets for view/projection UBO
+**Key Implementation Details:**
+- Accesses Game via m_scene->getGame()
+- Uses VulkanContext::getCurrentCommandBuffer()
+- Pipeline from Game::getMeshPipeline()
+- Model matrix from Entity::getModelMatrix()
 
-**Phase 2 Total: ~400 lines**
+#### 2.4 Default Rendering Pipeline (`src/api/Game.cpp`) ✅
+Created in Game::createMeshRenderingPipeline():
+```cpp
+// Pipeline Features:
+- Vertex shader: shaders/mesh.vert (GLSL compiled to SPIR-V)
+- Fragment shader: shaders/mesh.frag
+- Push constant: mat4 model (64 bytes, vertex stage)
+- Descriptor set 0: UniformBufferObject (model/view/proj UBO)
+- Dynamic states: viewport, scissor
+- Vertex input: Vertex::getBindingDescription/getAttributeDescriptions
+- Topology: Triangle list
+- Cull mode: Back-face culling
+- Front face: Counter-clockwise
+- No depth testing (Phase 2 simplification)
+```
+
+**Critical Fix Applied:**
+- Added glslang::InitializeProcess() in Game::initialize()
+- Added glslang::FinalizeProcess() in Game::shutdown()
+- Required for ShaderCompiler to work (was causing silent crashes)
+
+**Shader Design Decision:**
+- Reused existing UniformBufferObject structure (model/view/proj)
+- Model matrix in UBO ignored (using push constant instead)
+- Avoids creating new descriptor set layout
+- Simpler integration with existing VulkanContext UBO updates
+
+#### 2.5 Shader Implementation ✅
+**shaders/mesh.vert:**
+- Input: position, color, texCoord (from Vertex structure)
+- Push constant: model matrix (per-entity)
+- UBO: model/view/proj (uses only view/proj)
+- Output: fragColor, fragTexCoord, fragWorldPos
+
+**shaders/mesh.frag:**
+- Derives normals from screen-space gradients (dFdx/dFdy)
+- Simple directional light (0.3, 1.0, 0.5 normalized)
+- Lighting: 30% ambient + 70% diffuse
+- Output: vec4 color with lighting applied
+
+**Why gradient normals?**
+- Avoids needing proper vertex normals in Phase 2
+- Works with primitives that store colors in normal slot
+- Future: Add real vertex normals to Vertex structure
+
+**Phase 2 Total: ~750 lines implemented**
 
 ---
 

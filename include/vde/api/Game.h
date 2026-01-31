@@ -11,6 +11,7 @@
 #include "GameSettings.h"
 #include "Scene.h"
 #include "InputHandler.h"
+#include <vulkan/vulkan.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -203,6 +204,12 @@ public:
     const GameSettings& getSettings() const { return m_settings; }
 
     /**
+     * @brief Get the Vulkan context (for advanced rendering).
+     */
+    VulkanContext* getVulkanContext() { return m_vulkanContext.get(); }
+    const VulkanContext* getVulkanContext() const { return m_vulkanContext.get(); }
+
+    /**
      * @brief Apply new display settings.
      */
     void applyDisplaySettings(const DisplaySettings& settings);
@@ -223,6 +230,18 @@ public:
      * @brief Set callback for window focus change.
      */
     void setFocusCallback(std::function<void(bool)> callback);
+
+    // Public accessors for rendering (used by MeshEntity)
+    
+    /**
+     * @brief Get the mesh rendering pipeline.
+     */
+    VkPipeline getMeshPipeline() const { return m_meshPipeline; }
+    
+    /**
+     * @brief Get the mesh pipeline layout.
+     */
+    VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
 
 protected:
     // Virtual methods for subclassing
@@ -257,6 +276,11 @@ private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<VulkanContext> m_vulkanContext;
 
+    // Rendering infrastructure (Phase 2)
+    VkPipelineLayout m_meshPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_meshPipeline = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+
     // Scene management
     std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
     Scene* m_activeScene = nullptr;
@@ -285,6 +309,9 @@ private:
     void updateTiming();
     void processPendingSceneChange();
     void setupInputCallbacks();
+    void createMeshRenderingPipeline();
+    void destroyMeshRenderingPipeline();
+
 };
 
 } // namespace vde

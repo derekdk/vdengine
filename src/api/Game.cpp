@@ -6,10 +6,14 @@
 #include <vde/api/Game.h>
 #include <vde/Window.h>
 #include <vde/VulkanContext.h>
+#include <vde/ShaderCompiler.h>
+#include <vde/Types.h>
 
 #include <GLFW/glfw3.h>
+#include <glslang/Public/ShaderLang.h>
 #include <chrono>
 #include <stdexcept>
+#include <iostream>
 
 namespace vde {
 
@@ -49,6 +53,9 @@ bool Game::initialize(const GameSettings& settings) {
     
     m_settings = settings;
     
+    // Initialize glslang for shader compilation
+    glslang::InitializeProcess();
+    
     try {
         // Create window
         m_window = std::make_unique<Window>(
@@ -64,6 +71,9 @@ bool Game::initialize(const GameSettings& settings) {
         // Create and initialize Vulkan context
         m_vulkanContext = std::make_unique<VulkanContext>();
         m_vulkanContext->initialize(m_window.get());
+        
+        // Create mesh rendering pipeline
+        createMeshRenderingPipeline();
         
         // Setup input callbacks
         setupInputCallbacks();
@@ -90,6 +100,7 @@ bool Game::initialize(const GameSettings& settings) {
         
     } catch (const std::exception& e) {
         // Clean up on failure
+        std::cerr << "Game initialization failed: " << e.what() << std::endl;
         m_vulkanContext.reset();
         m_window.reset();
         throw;
@@ -114,6 +125,9 @@ void Game::shutdown() {
     m_scenes.clear();
     m_sceneStack.clear();
     
+    // Cleanup rendering pipeline
+    destroyMeshRenderingPipeline();
+    
     // Cleanup Vulkan
     if (m_vulkanContext) {
         m_vulkanContext->cleanup();
@@ -122,6 +136,9 @@ void Game::shutdown() {
     
     // Destroy window
     m_window.reset();
+    
+    // Finalize glslang
+    glslang::FinalizeProcess();
     
     m_initialized = false;
 }
@@ -466,6 +483,213 @@ void Game::setupInputCallbacks() {
             game->m_focusCallback(focused != 0);
         }
     });
+}
+
+void Game::createMeshRenderingPipeline() {
+    std::cout << "Creating mesh rendering pipeline..." << std::endl;
+    
+    if (!m_vulkanContext) {
+        std::cout << "No Vulkan context!" << std::endl;
+        return;
+    }
+
+    VkDevice device = m_vulkanContext->getDevice();
+    std::cout << "Got device" << std::endl;
+    
+    // Compile shaders
+    ShaderCompiler compiler;
+    std::vector<uint32_t> vertSpv, fragSpv;
+    
+    std::cout << "Compiling vertex shader..." << std::endl;
+    auto vertResult = compiler.compileFile("shaders/mesh.vert", ShaderStage::Vertex);
+    if (!vertResult.success) {
+        std::cerr << "Vertex shader compilation failed: " << vertResult.errorLog << std::endl;
+        throw std::runtime_error("Failed to compile mesh vertex shader: " + vertResult.errorLog);
+    }
+    vertSpv = vertResult.spirv;
+    std::cout << "Vertex shader compiled successfully (" << vertSpv.size() << " words)" << std::endl;
+    
+    auto fragResult = compiler.compileFile("shaders/mesh.frag", ShaderStage::Fragment);
+    if (!fragResult.success) {
+        throw std::runtime_error("Failed to compile mesh fragment shader: " + fragResult.errorLog);
+    }
+    fragSpv = fragResult.spirv;
+    
+    // Create shader modules
+    VkShaderModule vertShaderModule = m_vulkanContext->createShaderModule(
+        std::vector<char>(reinterpret_cast<char*>(vertSpv.data()),
+                         reinterpret_cast<char*>(vertSpv.data()) + vertSpv.size() * sizeof(uint32_t))
+    );
+    VkShaderModule fragShaderModule = m_vulkanContext->createShaderModule(
+        std::vector<char>(reinterpret_cast<char*>(fragSpv.data()),
+                         reinterpret_cast<char*>(fragSpv.data()) + fragSpv.size() * sizeof(uint32_t))
+    );
+    
+    // Shader stage creation
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName = "main";
+    
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName = "main";
+    
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+    
+    // Vertex input
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+    
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    
+    // Input assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+    
+    // Viewport and scissor (dynamic)
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+    
+    // Rasterizer
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+    
+    // Multisampling
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    
+    // Depth/stencil (no depth test for Phase 2)
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_FALSE;
+    depthStencil.depthWriteEnable = VK_FALSE;
+    
+    // Color blending
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+    
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+    
+    // Dynamic state
+    std::vector<VkDynamicState> dynamicStates = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+    
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+    
+    // Descriptor set layout (for view/projection UBO)
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+    
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_meshDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh descriptor set layout");
+    }
+    
+    // Push constant range (for model matrix)
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(glm::mat4);  // Model matrix
+    
+    // Pipeline layout
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &m_meshDescriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+    
+    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_meshPipelineLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh pipeline layout");
+    }
+    
+    // Create graphics pipeline
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_meshPipelineLayout;
+    pipelineInfo.renderPass = m_vulkanContext->getRenderPass();
+    pipelineInfo.subpass = 0;
+    
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_meshPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh graphics pipeline");
+    }
+    
+    // Cleanup shader modules
+    vkDestroyShaderModule(device, fragShaderModule, nullptr);
+    vkDestroyShaderModule(device, vertShaderModule, nullptr);
+}
+
+void Game::destroyMeshRenderingPipeline() {
+    if (!m_vulkanContext) {
+        return;
+    }
+    
+    VkDevice device = m_vulkanContext->getDevice();
+    
+    if (m_meshPipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device, m_meshPipeline, nullptr);
+        m_meshPipeline = VK_NULL_HANDLE;
+    }
+    
+    if (m_meshPipelineLayout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(device, m_meshPipelineLayout, nullptr);
+        m_meshPipelineLayout = VK_NULL_HANDLE;
+    }
+    
+    if (m_meshDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_meshDescriptorSetLayout, nullptr);
+        m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+    }
 }
 
 } // namespace vde

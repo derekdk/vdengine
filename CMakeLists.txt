@@ -109,6 +109,7 @@ set(VDE_SOURCES
     src/api/GameTypes.cpp
     src/api/LightBox.cpp
     src/api/Scene.cpp
+    src/api/Mesh.cpp
 )
 
 # Public headers

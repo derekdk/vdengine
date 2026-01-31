@@ -50,7 +50,7 @@ public:
     }
     
     // Query methods
-    bool isEscapePressed() { 
+    bool isEscapePressed() {
         bool val = m_escapePressed;
         m_escapePressed = false;
         return val;
@@ -135,8 +135,8 @@ public:
         m_cube->setColor(vde::Color::fromHex(0x4a90d9));
         m_cube->setRotationSpeed(30.0f);
         
-        // Optionally set a mesh directly (built-in primitives don't require resource loading)
-        // m_cube->setMesh(vde::Mesh::createCube(1.0f));
+        // Set a cube mesh
+        m_cube->setMesh(vde::Mesh::createCube(1.0f));
     }
     
     void onExit() override {
@@ -217,50 +217,62 @@ public:
  * @brief Main entry point.
  */
 int main() {
-    // Create game instance
-    vde::Game game;
-    
-    // Configure game settings
-    vde::GameSettings settings;
-    settings.gameName = "VDE Simple Game Example";
-    settings.setWindowSize(1280, 720);
-    settings.display.resizable = true;
-    settings.display.vsync = vde::VSyncMode::On;
-    settings.graphics.quality = vde::GraphicsQuality::Medium;
-    settings.debug.enableValidation = true;
-    settings.debug.showFPS = true;
-    
-    // Initialize the game
-    if (!game.initialize(settings)) {
-        std::cerr << "Failed to initialize game!" << std::endl;
+    std::cout << "Starting VDE Simple Game..." << std::endl;
+    try {
+        // Create game instance
+        vde::Game game;
+        
+        std::cout << "Game instance created" << std::endl;
+        
+        // Configure game settings
+        vde::GameSettings settings;
+        settings.gameName = "VDE Simple Game Example";
+        settings.setWindowSize(1280, 720);
+        settings.display.resizable = true;
+        settings.display.vsync = vde::VSyncMode::On;
+        settings.graphics.quality = vde::GraphicsQuality::Medium;
+        settings.debug.enableValidation = false;  // Disable validation layers for testing
+        settings.debug.showFPS = true;
+        
+        std::cout << "Initializing game..." << std::endl;
+        
+        // Initialize the game
+        if (!game.initialize(settings)) {
+            std::cerr << "Failed to initialize game!" << std::endl;
+            return 1;
+        }
+        
+        std::cout << "Game initialized successfully" << std::endl;
+        
+        std::cout << "VDE Simple Game Example" << std::endl;
+        std::cout << "=======================" << std::endl;
+        std::cout << "Controls:" << std::endl;
+        std::cout << "  SPACE - Start game / Toggle rotation speed" << std::endl;
+        std::cout << "  SCROLL - Zoom camera in/out" << std::endl;
+        std::cout << "  ESC - Quit" << std::endl;
+        std::cout << std::endl;
+        
+        // Create input handler
+        GameInputHandler inputHandler;
+        game.setInputHandler(&inputHandler);
+        
+        // Add scenes
+        game.addScene("menu", new MenuScene());
+        game.addScene("main", new MainScene());
+        
+        // Start with menu scene
+        game.setActiveScene("menu");
+        
+        // Run the game loop
+        game.run();
+        
+        // Cleanup
+        game.shutdown();
+        
+        std::cout << "Game ended. Goodbye!" << std::endl;
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Exception: " << e.what() << std::endl;
         return 1;
     }
-    
-    std::cout << "VDE Simple Game Example" << std::endl;
-    std::cout << "=======================" << std::endl;
-    std::cout << "Controls:" << std::endl;
-    std::cout << "  SPACE - Start game / Toggle rotation speed" << std::endl;
-    std::cout << "  SCROLL - Zoom camera in/out" << std::endl;
-    std::cout << "  ESC - Quit" << std::endl;
-    std::cout << std::endl;
-    
-    // Create input handler
-    GameInputHandler inputHandler;
-    game.setInputHandler(&inputHandler);
-    
-    // Add scenes
-    game.addScene("menu", new MenuScene());
-    game.addScene("main", new MainScene());
-    
-    // Start with menu scene
-    game.setActiveScene("menu");
-    
-    // Run the game loop
-    game.run();
-    
-    // Cleanup
-    game.shutdown();
-    
-    std::cout << "Game ended. Goodbye!" << std::endl;
-    return 0;
 }
