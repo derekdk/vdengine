@@ -318,9 +318,7 @@ void Camera2D::updateProjection() {
 }
 
 void Camera2D::updateCamera() {
-    // Calculate orthographic bounds based on zoom
-    float halfWidth = (m_viewportWidth / 2.0f) / m_zoom;
-    float halfHeight = (m_viewportHeight / 2.0f) / m_zoom;
+    // Calculate orthographic bounds based on zoom (values computed when needed)
     
     // Set camera for 2D rendering
     // Position camera looking down the -Z axis

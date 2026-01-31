@@ -29,7 +29,7 @@ class VulkanContext;
 class Mesh : public Resource {
 public:
     Mesh() = default;
-    virtual ~Mesh() = default;
+    virtual ~Mesh();
 
     /**
      * @brief Load mesh from a file.
@@ -158,6 +158,9 @@ protected:
     VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
     VkBuffer m_indexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
+    
+    // Device used for GPU buffer creation (needed for cleanup in destructor)
+    VkDevice m_device = VK_NULL_HANDLE;
 
     void calculateBounds();
 };

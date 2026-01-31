@@ -19,6 +19,7 @@ set(VDE_TEST_SOURCES
     HexGeometry_test.cpp
     ShaderCache_test.cpp
     Types_test.cpp
+    Mesh_test.cpp
 )
 
 # Create test executable

@@ -14,6 +14,13 @@
 
 namespace vde {
 
+Mesh::~Mesh() {
+    // Clean up GPU resources if they were allocated
+    if (m_device != VK_NULL_HANDLE) {
+        freeGPUBuffers(m_device);
+    }
+}
+
 bool Mesh::loadFromFile(const std::string& path) {
     // Simple OBJ loader (supports only vertices, normals, and texture coords)
     std::ifstream file(path);
@@ -388,6 +395,9 @@ void Mesh::uploadToGPU(VulkanContext* context) {
     if (m_vertexBuffer != VK_NULL_HANDLE) {
         freeGPUBuffers(context->getDevice());
     }
+    
+    // Store the device for cleanup in destructor
+    m_device = context->getDevice();
 
     // Ensure BufferUtils is initialized
     if (!BufferUtils::isInitialized()) {
@@ -439,6 +449,9 @@ void Mesh::freeGPUBuffers(VkDevice device) {
         vkFreeMemory(device, m_indexBufferMemory, nullptr);
         m_indexBufferMemory = VK_NULL_HANDLE;
     }
+    
+    // Reset device handle since we've cleaned up
+    m_device = VK_NULL_HANDLE;
 }
 
 void Mesh::bind(VkCommandBuffer commandBuffer) const {
