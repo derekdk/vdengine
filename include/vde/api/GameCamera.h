@@ -14,10 +14,15 @@
 
 namespace vde {
 
+// Forward declaration
+class VulkanContext;
+
 /**
  * @brief Base class for game cameras.
  * 
  * Provides a simplified interface for camera control in games.
+ * GameCamera wraps the low-level Camera class and provides game-friendly
+ * interfaces like OrbitCamera, SimpleCamera, and Camera2D.
  */
 class GameCamera {
 public:
@@ -48,6 +53,11 @@ public:
      * @brief Set the camera's aspect ratio.
      */
     void setAspectRatio(float aspect) { m_aspectRatio = aspect; updateProjection(); }
+    
+    /**
+     * @brief Get the camera's aspect ratio.
+     */
+    float getAspectRatio() const { return m_aspectRatio; }
 
     /**
      * @brief Set the near clipping plane.
@@ -62,7 +72,17 @@ public:
     /**
      * @brief Update camera (called once per frame).
      */
-    virtual void update(float deltaTime) {}
+    virtual void update(float deltaTime) { (void)deltaTime; }
+    
+    /**
+     * @brief Apply this camera's matrices to a VulkanContext.
+     * 
+     * Copies the view and projection matrices to the context's camera,
+     * making this camera active for rendering.
+     * 
+     * @param context The VulkanContext to apply to
+     */
+    void applyTo(VulkanContext& context);
 
 protected:
     Camera m_camera;

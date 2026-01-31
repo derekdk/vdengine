@@ -148,20 +148,34 @@ private:
 
 /**
  * @brief Entity that renders a 3D mesh.
+ * 
+ * MeshEntity can hold either a direct mesh reference or a resource ID.
+ * For simple cases (primitives), use setMesh(shared_ptr<Mesh>).
+ * For resource-managed meshes, use setMeshId(ResourceId).
  */
 class MeshEntity : public Entity {
 public:
     using Ref = std::shared_ptr<MeshEntity>;
 
     MeshEntity();
-    MeshEntity(ResourceId meshId);
     virtual ~MeshEntity() = default;
 
     /**
-     * @brief Set the mesh to render.
+     * @brief Set the mesh directly (takes shared ownership).
+     * @param mesh The mesh to render
+     */
+    void setMesh(std::shared_ptr<Mesh> mesh) { m_mesh = std::move(mesh); }
+
+    /**
+     * @brief Get the mesh.
+     */
+    std::shared_ptr<Mesh> getMesh() const { return m_mesh; }
+
+    /**
+     * @brief Set the mesh by resource ID (loaded via Scene).
      * @param meshId Resource ID of the mesh
      */
-    void setMesh(ResourceId meshId) { m_meshId = meshId; }
+    void setMeshId(ResourceId meshId) { m_meshId = meshId; }
 
     /**
      * @brief Get the mesh resource ID.
@@ -169,10 +183,21 @@ public:
     ResourceId getMeshId() const { return m_meshId; }
 
     /**
-     * @brief Set the texture for this mesh.
+     * @brief Set the texture directly (takes shared ownership).
+     * @param texture The texture to use
+     */
+    void setTexture(std::shared_ptr<Texture> texture) { m_texture = std::move(texture); }
+
+    /**
+     * @brief Get the texture.
+     */
+    std::shared_ptr<Texture> getTexture() const { return m_texture; }
+
+    /**
+     * @brief Set the texture by resource ID.
      * @param textureId Resource ID of the texture
      */
-    void setTexture(ResourceId textureId) { m_textureId = textureId; }
+    void setTextureId(ResourceId textureId) { m_textureId = textureId; }
 
     /**
      * @brief Get the texture resource ID.
@@ -192,8 +217,14 @@ public:
     void render() override;
 
 protected:
+    // Direct references (preferred for simplicity)
+    std::shared_ptr<Mesh> m_mesh;
+    std::shared_ptr<Texture> m_texture;
+    
+    // Resource IDs (for Scene-managed resources)
     ResourceId m_meshId = INVALID_RESOURCE_ID;
     ResourceId m_textureId = INVALID_RESOURCE_ID;
+    
     Color m_color = Color::white();
 };
 

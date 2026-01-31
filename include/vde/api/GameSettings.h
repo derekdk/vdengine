@@ -137,8 +137,8 @@ struct GameSettings {
     /**
      * @brief Set fullscreen mode.
      */
-    GameSettings& setFullscreen(bool fullscreen) {
-        display.fullscreen = fullscreen;
+    GameSettings& setFullscreen(bool fs) {
+        display.fullscreen = fs;
         return *this;
     }
 

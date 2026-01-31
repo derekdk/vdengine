@@ -45,7 +45,7 @@ public:
         m_mouseY = y;
     }
     
-    void onMouseScroll(double xOffset, double yOffset) override {
+    void onMouseScroll(double /* xOffset */, double yOffset) override {
         m_scrollDelta = static_cast<float>(yOffset);
     }
     
@@ -120,12 +120,10 @@ public:
         std::cout << "MainScene: onEnter" << std::endl;
         
         // Set up an orbit camera looking at the origin
-        auto camera = new vde::OrbitCamera(vde::Position(0, 0, 0), 5.0f, 20.0f, 45.0f); // target, dist, pitch, yaw
-        setCamera(camera);
+        setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 5.0f, 20.0f, 45.0f));
         
-        // Set up simple lighting
-        auto lightBox = new vde::SimpleColorLightBox(vde::Color::white());
-        setLightBox(lightBox);
+        // LightBox is optional - if not set, default white ambient is used
+        // Uncomment to customize: setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
         
         // Set background color to dark blue
         setBackgroundColor(vde::Color::fromHex(0x1a1a2e));
@@ -136,6 +134,9 @@ public:
         m_cube->setPosition(0.0f, 0.0f, 0.0f);
         m_cube->setColor(vde::Color::fromHex(0x4a90d9));
         m_cube->setRotationSpeed(30.0f);
+        
+        // Optionally set a mesh directly (built-in primitives don't require resource loading)
+        // m_cube->setMesh(vde::Mesh::createCube(1.0f));
     }
     
     void onExit() override {
@@ -194,9 +195,10 @@ public:
     void onEnter() override {
         std::cout << "MenuScene: Press SPACE to start the game" << std::endl;
         setBackgroundColor(vde::Color::fromHex(0x0f0f23));
+        // No camera or lightbox needed for menu - defaults are fine
     }
     
-    void update(float deltaTime) override {
+    void update(float /* deltaTime */) override {
         auto* input = dynamic_cast<GameInputHandler*>(getInputHandler());
         if (input) {
             if (input->isEscapePressed()) {

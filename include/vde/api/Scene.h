@@ -185,27 +185,37 @@ public:
     /**
      * @brief Set the scene's lighting configuration.
      * @param lightBox The lighting setup to use
+     * @note If no LightBox is set, a default SimpleColorLightBox with white ambient light is used.
      */
     void setLightBox(std::unique_ptr<LightBox> lightBox);
     void setLightBox(LightBox* lightBox); // Takes ownership
 
     /**
      * @brief Get the scene's lighting configuration.
+     * @return The LightBox, or nullptr if using default lighting.
      */
     LightBox* getLightBox() { return m_lightBox.get(); }
     const LightBox* getLightBox() const { return m_lightBox.get(); }
+    
+    /**
+     * @brief Get the effective lighting (returns default if none set).
+     * @return The LightBox to use for rendering.
+     */
+    const LightBox& getEffectiveLighting() const;
 
     // Camera
 
     /**
      * @brief Set the scene's camera.
      * @param camera The camera to use
+     * @note If no camera is set, a default perspective camera is created.
      */
     void setCamera(std::unique_ptr<GameCamera> camera);
     void setCamera(GameCamera* camera); // Takes ownership
 
     /**
      * @brief Get the scene's camera.
+     * @return The camera, or nullptr if using default.
      */
     GameCamera* getCamera() { return m_camera.get(); }
     const GameCamera* getCamera() const { return m_camera.get(); }
