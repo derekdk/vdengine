@@ -11,7 +11,7 @@ option(VDE_SHARED_LIBS "Build as shared library" OFF)
 
 # Compiler options
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /FS)
     add_compile_definitions(
         _CRT_SECURE_NO_WARNINGS
         NOMINMAX
@@ -102,6 +102,13 @@ set(VDE_SOURCES
     src/stb_impl.cpp
     src/HexGeometry.cpp
     src/HexPrismMesh.cpp
+    # Game API
+    src/api/Entity.cpp
+    src/api/Game.cpp
+    src/api/GameCamera.cpp
+    src/api/GameTypes.cpp
+    src/api/LightBox.cpp
+    src/api/Scene.cpp
 )
 
 # Public headers
@@ -123,6 +130,19 @@ set(VDE_PUBLIC_HEADERS
     include/vde/HexPrismMesh.h
     include/vde/QueueFamilyIndices.h
     include/vde/SwapChainSupportDetails.h
+    # Game API headers
+    include/vde/api/GameAPI.h
+    include/vde/api/Game.h
+    include/vde/api/GameSettings.h
+    include/vde/api/GameTypes.h
+    include/vde/api/GameCamera.h
+    include/vde/api/Entity.h
+    include/vde/api/Scene.h
+    include/vde/api/LightBox.h
+    include/vde/api/Mesh.h
+    include/vde/api/Resource.h
+    include/vde/api/InputHandler.h
+    include/vde/api/KeyCodes.h
 )
 
 # Create library
