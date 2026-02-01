@@ -3,15 +3,53 @@
  * @brief Implementation of Entity base class and MeshEntity
  */
 
-#include <vde/api/Entity.h>#include <vde/api/Scene.h>
+#include <vde/api/Entity.h>
+#include <vde/api/Scene.h>
 #include <vde/api/Game.h>
 #include <vde/api/Mesh.h>
-#include <vde/VulkanContext.h>#include <glm/gtc/matrix_transform.hpp>
+#include <vde/VulkanContext.h>
+#include <vde/Texture.h>
+#include <vde/DescriptorManager.h>
+#include <glm/gtc/matrix_transform.hpp>
+#include <unordered_map>
 
 namespace vde {
 
 // Static member initialization
 EntityId Entity::s_nextId = 1;
+
+// Static sprite quad mesh (shared by all SpriteEntity instances)
+static std::shared_ptr<Mesh> s_spriteQuad = nullptr;
+
+// Descriptor set cache for textures per frame (maps {frame, texture} to descriptor set)
+// We need per-frame caching because the UBO buffer changes each frame
+static constexpr uint32_t MAX_FRAMES = 2;
+static std::unordered_map<Texture*, VkDescriptorSet> s_textureDescriptorSets[MAX_FRAMES];
+
+// Helper to get or create the sprite quad mesh
+static std::shared_ptr<Mesh> getSpriteQuadMesh() {
+    if (!s_spriteQuad) {
+        s_spriteQuad = std::make_shared<Mesh>();
+        
+        // Create a unit quad centered at origin
+        // Vertices: position, color (unused), texCoord
+        std::vector<Vertex> vertices = {
+            // Position             Color (unused)      TexCoord
+            {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},  // bottom-left
+            {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},  // bottom-right
+            {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},  // top-right
+            {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // top-left
+        };
+        
+        std::vector<uint32_t> indices = {
+            0, 1, 2,  // first triangle
+            2, 3, 0   // second triangle
+        };
+        
+        s_spriteQuad->setData(vertices, indices);
+    }
+    return s_spriteQuad;
+}
 
 // ============================================================================
 // Entity Implementation
@@ -175,11 +213,12 @@ void MeshEntity::render() {
 }
 
 // ============================================================================
-// SpriteEntity Implementation (stub for Phase 3)
+// SpriteEntity Implementation (Phase 3)
 // ============================================================================
 
 SpriteEntity::SpriteEntity()
     : Entity()
+    , m_texture(nullptr)
     , m_textureId(INVALID_RESOURCE_ID)
     , m_color(Color::white())
     , m_uvX(0.0f)
@@ -193,6 +232,7 @@ SpriteEntity::SpriteEntity()
 
 SpriteEntity::SpriteEntity(ResourceId textureId)
     : Entity()
+    , m_texture(nullptr)
     , m_textureId(textureId)
     , m_color(Color::white())
     , m_uvX(0.0f)
@@ -212,7 +252,128 @@ void SpriteEntity::setUVRect(float u, float v, float width, float height) {
 }
 
 void SpriteEntity::render() {
-    // Phase 3 stub: No actual rendering yet
+    // Get the texture (either direct or via resource ID)
+    std::shared_ptr<Texture> texture = m_texture;
+    if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
+        // TODO: Get texture from scene resources when resource management is implemented
+        return;
+    }
+    
+    // Get Game and Vulkan context
+    Game* game = m_scene ? m_scene->getGame() : nullptr;
+    if (!game) {
+        return;
+    }
+    
+    VulkanContext* context = game->getVulkanContext();
+    if (!context) {
+        return;
+    }
+    
+    // Use default white texture if no texture is assigned (for solid color sprites)
+    Texture* texturePtr = texture ? texture.get() : game->getDefaultWhiteTexture();
+    if (!texturePtr || !texturePtr->isValid()) {
+        return;
+    }
+    
+    // Get or create sprite quad mesh
+    auto quadMesh = getSpriteQuadMesh();
+    if (!quadMesh) {
+        return;
+    }
+    
+    // Upload mesh to GPU if needed
+    if (!quadMesh->isOnGPU()) {
+        quadMesh->uploadToGPU(context);
+    }
+    
+    // Get current command buffer
+    VkCommandBuffer cmd = context->getCurrentCommandBuffer();
+    if (cmd == VK_NULL_HANDLE) {
+        return;
+    }
+    
+    // Get pipeline
+    VkPipeline pipeline = game->getSpritePipeline();
+    VkPipelineLayout pipelineLayout = game->getSpritePipelineLayout();
+    if (pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
+        return;
+    }
+    
+    // Get current frame index for per-frame descriptor set caching
+    uint32_t currentFrame = context->getCurrentFrame();
+    if (currentFrame >= MAX_FRAMES) {
+        currentFrame = 0;
+    }
+    
+    // Get or create combined sprite descriptor set for this texture (per-frame)
+    // The descriptor set contains both UBO (binding 0) and texture (binding 1)
+    VkDescriptorSet spriteDescSet = VK_NULL_HANDLE;
+    auto& frameCache = s_textureDescriptorSets[currentFrame];
+    auto it = frameCache.find(texturePtr);
+    if (it != frameCache.end()) {
+        spriteDescSet = it->second;
+    } else {
+        // Allocate new combined sprite descriptor set
+        spriteDescSet = game->allocateSpriteDescriptorSet();
+        if (spriteDescSet == VK_NULL_HANDLE) {
+            return;
+        }
+        
+        // Update descriptor with UBO and texture info
+        VkBuffer uboBuffer = context->getCurrentUniformBuffer();
+        game->updateSpriteDescriptor(spriteDescSet, uboBuffer, 192,  // sizeof(UniformBufferObject)
+                                     texturePtr->getImageView(), texturePtr->getSampler());
+        
+        // Cache it for this frame
+        frameCache[texturePtr] = spriteDescSet;
+    }
+    
+    // Bind pipeline
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    
+    // Set viewport and scissor (dynamic state)
+    VkExtent2D extent = context->getSwapChainExtent();
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = extent;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+    
+    // Bind combined sprite descriptor set (contains both UBO and texture)
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                           pipelineLayout, 0, 1, &spriteDescSet, 0, nullptr);
+    
+    // Push constants: model matrix (64 bytes) + tint (16 bytes) + uvRect (16 bytes)
+    struct SpritePushConstants {
+        glm::mat4 model;
+        glm::vec4 tint;
+        glm::vec4 uvRect;
+    } pushData;
+    
+    // Apply anchor offset to model matrix
+    glm::mat4 anchorOffset = glm::translate(glm::mat4(1.0f), 
+        glm::vec3(0.5f - m_anchorX, 0.5f - m_anchorY, 0.0f));
+    pushData.model = getModelMatrix() * anchorOffset;
+    pushData.tint = glm::vec4(m_color.r, m_color.g, m_color.b, m_color.a);
+    pushData.uvRect = glm::vec4(m_uvX, m_uvY, m_uvWidth, m_uvHeight);
+    
+    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                       0, sizeof(SpritePushConstants), &pushData);
+    
+    // Bind quad mesh buffers
+    quadMesh->bind(cmd);
+    
+    // Draw
+    vkCmdDrawIndexed(cmd, static_cast<uint32_t>(quadMesh->getIndexCount()), 1, 0, 0, 0);
 }
 
 } // namespace vde

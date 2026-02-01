@@ -127,6 +127,7 @@ public:
     Camera& getCamera() { return m_camera; }
     const Camera& getCamera() const { return m_camera; }
     
+    DescriptorManager& getDescriptorManager() { return m_descriptorManager; }
     const DescriptorManager& getDescriptorManager() const { return m_descriptorManager; }
     
     /**
@@ -256,6 +257,21 @@ protected:
     
     // Clear color (can be set by subclasses)
     glm::vec4 m_clearColor{0.1f, 0.1f, 0.15f, 1.0f};
+    
+public:
+    /**
+     * @brief Set the clear color for the render pass.
+     * @param color RGBA clear color
+     */
+    void setClearColor(const glm::vec4& color) { m_clearColor = color; }
+    
+    /**
+     * @brief Get the current clear color.
+     * @return RGBA clear color
+     */
+    const glm::vec4& getClearColor() const { return m_clearColor; }
+    
+protected:
     
     // =========================================================================
     // Configuration

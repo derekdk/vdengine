@@ -123,6 +123,23 @@ public:
     void setPerspective(float fov, float aspectRatio, float nearPlane, float farPlane);
     
     /**
+     * @brief Set orthographic projection parameters.
+     * @param left Left edge of the view volume
+     * @param right Right edge of the view volume
+     * @param bottom Bottom edge of the view volume
+     * @param top Top edge of the view volume
+     * @param nearPlane Near clipping plane distance
+     * @param farPlane Far clipping plane distance
+     */
+    void setOrthographic(float left, float right, float bottom, float top, float nearPlane, float farPlane);
+    
+    /**
+     * @brief Check if using orthographic projection.
+     * @return true if orthographic, false if perspective
+     */
+    bool isOrthographic() const { return m_orthographic; }
+    
+    /**
      * @brief Update aspect ratio (e.g., on window resize).
      * @param aspectRatio Width / height ratio
      */
@@ -192,6 +209,13 @@ private:
     float m_aspectRatio = 16.0f / 9.0f;
     float m_nearPlane = 0.1f;
     float m_farPlane = 200.0f;
+    
+    // Orthographic projection parameters
+    bool m_orthographic = false;
+    float m_orthoLeft = -1.0f;
+    float m_orthoRight = 1.0f;
+    float m_orthoBottom = -1.0f;
+    float m_orthoTop = 1.0f;
     
     /**
      * @brief Update position from orbital parameters.

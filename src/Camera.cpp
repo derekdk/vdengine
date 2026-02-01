@@ -107,13 +107,29 @@ void Camera::setFOV(float fov) {
     m_fov = glm::clamp(fov, 10.0f, 120.0f);
 }
 
+void Camera::setOrthographic(float left, float right, float bottom, float top, float nearPlane, float farPlane) {
+    m_orthographic = true;
+    m_orthoLeft = left;
+    m_orthoRight = right;
+    m_orthoBottom = bottom;
+    m_orthoTop = top;
+    m_nearPlane = nearPlane;
+    m_farPlane = farPlane;
+}
+
 glm::mat4 Camera::getProjectionMatrix() const {
-    glm::mat4 proj = glm::perspective(
-        glm::radians(m_fov),
-        m_aspectRatio,
-        m_nearPlane,
-        m_farPlane
-    );
+    glm::mat4 proj;
+    
+    if (m_orthographic) {
+        proj = glm::ortho(m_orthoLeft, m_orthoRight, m_orthoBottom, m_orthoTop, m_nearPlane, m_farPlane);
+    } else {
+        proj = glm::perspective(
+            glm::radians(m_fov),
+            m_aspectRatio,
+            m_nearPlane,
+            m_farPlane
+        );
+    }
     
     // Vulkan Y-flip: Vulkan has Y pointing down, unlike OpenGL
     proj[1][1] *= -1;

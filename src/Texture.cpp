@@ -133,6 +133,76 @@ bool Texture::loadFromFile(const std::string& filepath,
     return true;
 }
 
+bool Texture::createFromData(const uint8_t* pixels,
+                             uint32_t width,
+                             uint32_t height,
+                             VkDevice device,
+                             VkPhysicalDevice physicalDevice,
+                             VkCommandPool commandPool,
+                             VkQueue graphicsQueue) {
+    if (!pixels || width == 0 || height == 0) {
+        return false;
+    }
+    
+    m_device = device;
+    m_physicalDevice = physicalDevice;
+    m_commandPool = commandPool;
+    m_graphicsQueue = graphicsQueue;
+    m_width = width;
+    m_height = height;
+    
+    VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;  // RGBA
+    
+    // Initialize BufferUtils if not already done
+    if (!BufferUtils::isInitialized()) {
+        BufferUtils::init(device, physicalDevice, commandPool, graphicsQueue);
+    }
+    
+    // Create staging buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    BufferUtils::createBuffer(imageSize,
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                              stagingBuffer, stagingMemory);
+    
+    // Copy pixel data to staging buffer
+    void* data;
+    vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingMemory);
+    
+    // Create Vulkan image
+    createImage(m_width, m_height, VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    
+    // Transition to transfer destination
+    transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    
+    // Copy from staging buffer
+    copyBufferToImage(stagingBuffer, m_width, m_height);
+    
+    // Transition to shader read
+    transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    
+    // Cleanup staging buffer
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingMemory, nullptr);
+    
+    // Create image view
+    createImageView(VK_FORMAT_R8G8B8A8_SRGB);
+    
+    // Create sampler
+    createSampler();
+    
+    return true;
+}
+
 void Texture::cleanup() {
     if (m_device != VK_NULL_HANDLE) {
         if (m_sampler != VK_NULL_HANDLE) {

@@ -240,10 +240,21 @@ public:
     virtual ~SpriteEntity() = default;
 
     /**
-     * @brief Set the sprite texture.
+     * @brief Set the sprite texture directly (takes shared ownership).
+     * @param texture The texture to render
+     */
+    void setTexture(std::shared_ptr<Texture> texture) { m_texture = std::move(texture); }
+
+    /**
+     * @brief Get the texture.
+     */
+    std::shared_ptr<Texture> getTexture() const { return m_texture; }
+
+    /**
+     * @brief Set the sprite texture by resource ID.
      * @param textureId Resource ID of the texture
      */
-    void setTexture(ResourceId textureId) { m_textureId = textureId; }
+    void setTextureId(ResourceId textureId) { m_textureId = textureId; }
 
     /**
      * @brief Get the texture resource ID.
@@ -274,10 +285,25 @@ public:
      */
     void setAnchor(float x, float y) { m_anchorX = x; m_anchorY = y; }
 
+    /**
+     * @brief Get the sprite anchor point X.
+     */
+    float getAnchorX() const { return m_anchorX; }
+
+    /**
+     * @brief Get the sprite anchor point Y.
+     */
+    float getAnchorY() const { return m_anchorY; }
+
     void render() override;
 
 protected:
+    // Direct texture reference (preferred for simplicity)
+    std::shared_ptr<Texture> m_texture;
+    
+    // Resource ID (for Scene-managed resources)
     ResourceId m_textureId = INVALID_RESOURCE_ID;
+    
     Color m_color = Color::white();
     float m_uvX = 0.0f, m_uvY = 0.0f;
     float m_uvWidth = 1.0f, m_uvHeight = 1.0f;

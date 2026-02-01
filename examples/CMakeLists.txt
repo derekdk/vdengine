@@ -29,3 +29,18 @@ add_custom_command(TARGET vde_simple_game_example POST_BUILD
     $<TARGET_FILE_DIR:vde_simple_game_example>/shaders
     COMMENT "Copying shader files..."
 )
+
+# Sprite demo example demonstrating SpriteEntity
+add_executable(vde_sprite_demo
+    sprite_demo/main.cpp
+)
+
+target_link_libraries(vde_sprite_demo PRIVATE vde)
+
+# Copy shader files for sprite_demo example
+add_custom_command(TARGET vde_sprite_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_sprite_demo>/shaders
+    COMMENT "Copying shader files..."
+)

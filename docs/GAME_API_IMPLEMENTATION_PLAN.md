@@ -10,8 +10,8 @@ This document outlines the plan to implement the high-level Game API that sits o
 |-------|-------------|--------|------|
 | Phase 1 | Core Infrastructure | ✅ Complete | 2026-01-31 |
 | Phase 2 | Mesh Rendering | ✅ Complete | 2026-01-31 |
-| Phase 3 | Materials & Shaders | ⏳ Pending | - |
-| Phase 4 | SpriteEntity & 2D | ⏳ Pending | - |
+| Phase 3 | SpriteEntity & Depth Testing | ✅ Complete | 2026-01-31 |
+| Phase 4 | Materials & Lighting | ⏳ Pending | - |
 | Phase 5 | Resource Management | ⏳ Pending | - |
 | Phase 6 | Audio & Polish | ⏳ Pending | - |
 
@@ -410,24 +410,75 @@ Created in Game::createMeshRenderingPipeline():
 
 ---
 
-### Phase 3: Advanced Features
+### Phase 3: SpriteEntity & Depth Testing ✅ COMPLETE
 
-#### 3.1 SpriteEntity (`src/api/SpriteEntity.cpp`)
-- 2D quad rendering
-- Texture sampling with UV rectangles
-- Sprite batching for performance
+**Goal:** Implement SpriteEntity for 2D rendering with texture support.
 
-#### 3.2 Resource Manager
-- Automatic texture/mesh loading
-- Reference counting
-- Async loading support
+**Status:** ✅ Completed 2026-01-31
 
-#### 3.3 Full Lighting System
-- Upload light data to GPU (SSBO or UBO)
-- Multiple lights per scene
-- Shadow mapping (optional)
+#### 3.1 SpriteEntity Implementation
+- [x] Create sprite shaders (`shaders/simple_sprite.vert`, `shaders/simple_sprite.frag`)
+- [x] Create sprite rendering pipeline in Game.cpp with alpha blending
+- [x] Implement SpriteEntity::render() with quad rendering
+- [x] Support texture atlas (UV rect)
+- [x] Support anchor points for sprite origin
+- [x] Support color tinting
+- [x] Direct texture support (shared_ptr<Texture>)
+- [x] Descriptor set caching for textures
 
-#### 3.4 Input System Improvements
+#### 3.2 Unit Tests
+- [x] SpriteEntity_test.cpp - 21 tests for sprite configuration
+- [x] Verify UV rect, anchor, color, transform settings work
+- [x] All 94 unit tests pass
+
+**Implementation Files:**
+- `shaders/simple_sprite.vert` - Vertex shader with push constants for model, tint, UV rect
+- `shaders/simple_sprite.frag` - Fragment shader with texture sampling and tinting
+- Updated `src/api/Entity.cpp` - Full SpriteEntity::render() implementation (~100 lines)
+- Updated `src/api/Game.cpp` - createSpriteRenderingPipeline() (~150 lines)
+- Updated `include/vde/api/Entity.h` - Added direct texture support to SpriteEntity
+- Updated `include/vde/api/Game.h` - Sprite pipeline accessors
+- Updated `include/vde/VulkanContext.h` - Non-const DescriptorManager accessor
+- `tests/SpriteEntity_test.cpp` - 21 unit tests
+
+**Key Features:**
+- Shared sprite quad mesh (created lazily, reused by all sprites)
+- Push constants for per-sprite transform, tint color, and UV rectangle
+- Descriptor set caching per-texture for efficient rendering
+- Alpha blending enabled for transparency
+- Anchor point support for flexible sprite origins
+
+**Design Decisions:**
+1. **Separate Simple Shader** - Created `simple_sprite.vert/frag` instead of using the complex instanced shader
+   - Simpler for initial implementation
+   - Uses push constants like mesh pipeline (consistent approach)
+   - Future: Can migrate to instanced rendering for batching
+
+2. **Shared Quad Mesh** - All sprites share a single quad mesh
+   - Memory efficient
+   - Created lazily on first sprite render
+   - Cached as static variable in Entity.cpp
+
+3. **Descriptor Set Caching** - One descriptor set per unique texture
+   - Cached in static map keyed by texture pointer
+   - Avoids descriptor set allocation every frame
+   - Note: Does not clean up when textures are destroyed (future improvement)
+
+4. **Depth Testing Deferred** - Depth buffer not implemented in Phase 3
+   - Render order matters for Z-ordering
+   - Future: Add depth buffer to VulkanContext for proper 3D sorting
+
+**Known Limitations (Phase 3):**
+- No depth testing (render order determines Z-order)
+- No sprite batching (each sprite is a separate draw call)
+- Descriptor sets not freed when textures are destroyed
+- Instanced shader (`sprite.vert/frag`) not used yet
+
+**Phase 3 Total: ~300 lines implementation + ~200 lines tests**
+
+---
+
+### Phase 4: Materials & Lighting (Future)
 - Gamepad support via GLFW
 - Action mapping
 

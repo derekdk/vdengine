@@ -11,6 +11,7 @@
 #include "GameSettings.h"
 #include "Scene.h"
 #include "InputHandler.h"
+#include <vde/Texture.h>
 #include <vulkan/vulkan.h>
 #include <memory>
 #include <string>
@@ -243,6 +244,48 @@ public:
      */
     VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
 
+    /**
+     * @brief Get the sprite rendering pipeline.
+     */
+    VkPipeline getSpritePipeline() const { return m_spritePipeline; }
+    
+    /**
+     * @brief Get the sprite pipeline layout.
+     */
+    VkPipelineLayout getSpritePipelineLayout() const { return m_spritePipelineLayout; }
+
+    /**
+     * @brief Get the sprite sampler.
+     */
+    VkSampler getSpriteSampler() const { return m_spriteSampler; }
+
+    /**
+     * @brief Get the default white texture for sprites without textures.
+     */
+    Texture* getDefaultWhiteTexture() const { return m_defaultWhiteTexture.get(); }
+
+    /**
+     * @brief Get the sprite descriptor set layout.
+     */
+    VkDescriptorSetLayout getSpriteDescriptorSetLayout() const { return m_spriteDescriptorSetLayout; }
+
+    /**
+     * @brief Allocate a sprite descriptor set with both UBO and texture.
+     */
+    VkDescriptorSet allocateSpriteDescriptorSet();
+
+    /**
+     * @brief Update a sprite descriptor set with UBO and texture bindings.
+     * @param descriptorSet The descriptor set to update
+     * @param uboBuffer The uniform buffer for view/projection matrices
+     * @param uboSize Size of the UBO
+     * @param imageView The texture image view
+     * @param sampler The texture sampler
+     */
+    void updateSpriteDescriptor(VkDescriptorSet descriptorSet, 
+                                VkBuffer uboBuffer, VkDeviceSize uboSize,
+                                VkImageView imageView, VkSampler sampler);
+
 protected:
     // Virtual methods for subclassing
 
@@ -281,6 +324,14 @@ private:
     VkPipeline m_meshPipeline = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_meshDescriptorSetLayout = VK_NULL_HANDLE;
 
+    // Sprite rendering infrastructure (Phase 3)
+    VkPipelineLayout m_spritePipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_spritePipeline = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_spriteDescriptorSetLayout = VK_NULL_HANDLE;
+    VkSampler m_spriteSampler = VK_NULL_HANDLE;
+    VkDescriptorPool m_spriteDescriptorPool = VK_NULL_HANDLE;
+    std::unique_ptr<Texture> m_defaultWhiteTexture;  // 1x1 white texture for untextured sprites
+
     // Scene management
     std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
     Scene* m_activeScene = nullptr;
@@ -311,6 +362,8 @@ private:
     void setupInputCallbacks();
     void createMeshRenderingPipeline();
     void destroyMeshRenderingPipeline();
+    void createSpriteRenderingPipeline();
+    void destroySpriteRenderingPipeline();
 
 };
 

@@ -318,17 +318,23 @@ void Camera2D::updateProjection() {
 }
 
 void Camera2D::updateCamera() {
-    // Calculate orthographic bounds based on zoom (values computed when needed)
-    
     // Set camera for 2D rendering
     // Position camera looking down the -Z axis
     m_camera.setPosition(glm::vec3(m_position.x, m_position.y, 10.0f));
     m_camera.setTarget(glm::vec3(m_position.x, m_position.y, 0.0f));
     
-    // Note: For proper 2D camera, we'd need orthographic projection
-    // For now, use a very narrow FOV perspective as approximation
-    // A true orthographic implementation would require Camera class changes
-    m_camera.setPerspective(1.0f, m_aspectRatio, 0.1f, 100.0f);
+    // Use orthographic projection for proper 2D rendering
+    float halfWidth = (m_viewportWidth * 0.5f) / m_zoom;
+    float halfHeight = (m_viewportHeight * 0.5f) / m_zoom;
+    
+    m_camera.setOrthographic(
+        -halfWidth,   // left
+        halfWidth,    // right
+        -halfHeight,  // bottom
+        halfHeight,   // top
+        0.1f,         // near
+        100.0f        // far
+    );
 }
 
 } // namespace vde

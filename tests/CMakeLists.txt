@@ -20,6 +20,7 @@ set(VDE_TEST_SOURCES
     ShaderCache_test.cpp
     Types_test.cpp
     Mesh_test.cpp
+    SpriteEntity_test.cpp
 )
 
 # Create test executable

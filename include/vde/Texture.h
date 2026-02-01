@@ -56,6 +56,28 @@ public:
                       VkQueue graphicsQueue);
     
     /**
+     * @brief Create a texture from raw pixel data.
+     * 
+     * Creates a texture from RGBA pixel data in memory.
+     * 
+     * @param pixels Pointer to RGBA pixel data (4 bytes per pixel)
+     * @param width Width of the image in pixels
+     * @param height Height of the image in pixels
+     * @param device Logical device handle
+     * @param physicalDevice Physical device handle (for memory allocation)
+     * @param commandPool Command pool for transfer operations
+     * @param graphicsQueue Queue for submitting transfer commands
+     * @return true if successful, false on failure
+     */
+    bool createFromData(const uint8_t* pixels,
+                        uint32_t width,
+                        uint32_t height,
+                        VkDevice device,
+                        VkPhysicalDevice physicalDevice,
+                        VkCommandPool commandPool,
+                        VkQueue graphicsQueue);
+    
+    /**
      * @brief Clean up all Vulkan resources.
      * 
      * Destroys sampler, image view, image, and frees memory.
