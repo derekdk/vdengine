@@ -10,6 +10,7 @@ This document outlines the plan to implement the high-level Game API that sits o
 |-------|-------------|--------|------|
 | Phase 1 | Core Infrastructure | ✅ Complete | 2026-01-31 |
 | Phase 2 | Mesh Rendering | ✅ Complete | 2026-01-31 |
+| Phase 2.5 | World Coordinates & Bounds | ✅ Complete | 2026-02-01 |
 | Phase 3 | SpriteEntity & Depth Testing | ✅ Complete | 2026-01-31 |
 | Phase 4 | Materials & Lighting | ⏳ Pending | - |
 | Phase 5 | Resource Management | ⏳ Pending | - |
@@ -112,6 +113,115 @@ This document outlines the plan to implement the high-level Game API that sits o
 **Build System:**
 - Added `src/api/Mesh.cpp` to CMakeLists.txt
 - Shaders copied to build directory automatically
+
+---
+
+### Phase 2.5 Completion Notes (2026-02-01)
+
+**Goal:** Make world coordinates explicit with units (meters) and cardinal direction mapping (N/S/E/W/Up/Down).
+
+**Implemented Files:**
+- `include/vde/api/WorldUnits.h` (~220 lines) - Type-safe units and coordinate system
+- `include/vde/api/WorldBounds.h` (~290 lines) - Scene/world boundary definitions
+- `include/vde/api/CameraBounds.h` (~320 lines) - 2D camera with pixel-to-world mapping
+- `src/api/CameraBounds.cpp` (~180 lines) - CameraBounds2D implementation
+
+**Key Features:**
+
+1. **Type-Safe Distance Units (Meters)**
+   - `Meters` struct with implicit float conversion
+   - User-defined literals: `100_m`, `50.5_m`
+   - Full arithmetic operators (+, -, *, /, comparisons)
+   
+2. **Coordinate System Definition**
+   - `CoordinateSystem` struct maps cardinal directions to axes
+   - Default Y-up: North=+Z, East=+X, Up=+Y
+   - Alternative Z-up preset for CAD/GIS compatibility
+   
+3. **World Points & Extents**
+   - `WorldPoint` with directional constructors
+   - `WorldExtent` for 3D sizes with width/height/depth
+   - Support for 2D (flat) extents
+   
+4. **World Bounds**
+   - `WorldBounds` - 3D AABB with cardinal direction accessors
+   - `WorldBounds2D` - Simplified 2D bounds for flat games
+   - Factory methods: `fromDirectionalLimits()`, `fromCenterAndExtent()`, `flat()`
+   - Helper functions: `south(100_m)`, `west(100_m)`, `down(10_m)` for readable negative values
+   
+5. **Pixel-to-World Coordinate Mapping**
+   - `Pixels` type-safe wrapper with `_px` literal
+   - `ScreenSize` for viewport dimensions
+   - `PixelToWorldMapping` for conversion ratios
+   - Factory methods: `fromPixelsPerMeter()`, `fitWidth()`, `fitHeight()`
+   
+6. **2D Camera Bounds**
+   - `CameraBounds2D` class for 2D games
+   - Screen-to-world and world-to-screen coordinate conversion
+   - Zoom support (affects visible world size)
+   - Optional constraint bounds to limit camera movement
+   - Visibility testing for points and rectangles
+
+**Scene Integration:**
+- Added `setWorldBounds()` / `getWorldBounds()` to Scene
+- Added `setCameraBounds2D()` / `getCameraBounds2D()` to Scene
+- Added `is2D()` query based on bounds height
+
+**Usage Examples:**
+
+```cpp
+using namespace vde;
+
+// 3D Scene: 200m x 200m x 30m world
+auto bounds = WorldBounds::fromDirectionalLimits(
+    100_m, WorldBounds::south(100_m),  // north/south: -100 to +100
+    WorldBounds::west(100_m), 100_m,   // west/east: -100 to +100
+    20_m, WorldBounds::down(10_m)      // up/down: -10 to +20
+);
+scene->setWorldBounds(bounds);
+// bounds.width() == 200_m, bounds.depth() == 200_m, bounds.height() == 30_m
+
+// 2D Game with camera
+CameraBounds2D camera;
+camera.setScreenSize(1920_px, 1080_px);
+camera.setWorldWidth(16_m);  // Show 16 meters across screen
+camera.centerOn(0_m, 0_m);
+
+// Convert mouse click to world position
+glm::vec2 worldPos = camera.screenToWorld(mouseX_px, mouseY_px);
+
+// Check visibility
+if (camera.isVisible(entityX, entityY)) { /* render */ }
+```
+
+**Design Decisions:**
+
+1. **Implicit Float Conversion for Meters/Pixels**
+   - Pro: Seamless integration with existing glm/float APIs
+   - Pro: Zero runtime overhead (constexpr)
+   - Con: Less strict type safety (can still mix accidentally)
+   - Decision: Convenience > strictness for game development velocity
+
+2. **Y-Up Default Coordinate System**
+   - Matches Vulkan/OpenGL conventions
+   - North=+Z allows natural map orientation
+   - Z-up preset available for CAD/GIS imports
+
+3. **Screen Y-Flip in CameraBounds2D**
+   - Screen: (0,0) top-left, Y increases down
+   - World: Y increases up (typical for games)
+   - Automatic conversion in screenToWorld/worldToScreen
+
+4. **Constraint Bounds Clamping**
+   - Camera smoothly clamps to constraint edges
+   - When zoomed out past constraint size, centers on constraints
+   - Prevents showing "out of bounds" areas
+
+**Performance Notes:**
+- `Meters`, `Pixels` are zero-overhead abstractions (compile to floats)
+- User-defined literals computed at compile time
+- Bounds checks are simple AABB operations: O(1)
+- Coordinate mapping caches `PixelToWorldMapping`, recalculates only on changes
 
 ---
 

@@ -110,6 +110,7 @@ set(VDE_SOURCES
     src/api/LightBox.cpp
     src/api/Scene.cpp
     src/api/Mesh.cpp
+    src/api/CameraBounds.cpp
 )
 
 # Public headers
@@ -144,6 +145,9 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/Resource.h
     include/vde/api/InputHandler.h
     include/vde/api/KeyCodes.h
+    include/vde/api/WorldUnits.h
+    include/vde/api/WorldBounds.h
+    include/vde/api/CameraBounds.h
 )
 
 # Create library

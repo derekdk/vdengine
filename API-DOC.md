@@ -17,6 +17,7 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Camera System](#camera-system)
 - [Lighting System](#lighting-system)
 - [Common Types](#common-types)
+- [World Coordinates & Bounds](#world-coordinates--bounds)
 - [Examples](#examples)
 
 ---
@@ -49,7 +50,10 @@ include/vde/api/
 ├── InputHandler.h   # Input handling interface
 ├── KeyCodes.h       # Key and mouse button constants
 ├── GameCamera.h     # Camera classes
-└── LightBox.h       # Lighting system
+├── LightBox.h       # Lighting system
+├── WorldUnits.h     # Type-safe units (Meters, Pixels)
+├── WorldBounds.h    # 3D/2D world boundary definitions
+└── CameraBounds.h   # 2D camera with pixel-to-world mapping
 ```
 
 ---
@@ -736,6 +740,296 @@ transform.rotation = vde::Rotation(0, 45, 0);
 transform.scale = vde::Scale(1.0f);
 
 glm::mat4 matrix = transform.getMatrix();
+```
+
+---
+
+## World Coordinates & Bounds
+
+VDE provides type-safe world coordinate APIs that make units and directions explicit, preventing common bugs and improving code readability.
+
+### Coordinate System
+
+VDE uses a right-handed Y-up coordinate system by default:
+
+```
+        +Y (Up)
+         |
+         |
+         |_______ +X (East)
+        /
+       /
+      +Z (North)
+```
+
+| Direction | Axis | Sign |
+|-----------|------|------|
+| North | Z | + |
+| South | Z | - |
+| East | X | + |
+| West | X | - |
+| Up | Y | + |
+| Down | Y | - |
+
+### Meters - Type-Safe Distance
+
+The `Meters` type provides explicit unit documentation:
+
+```cpp
+using namespace vde;
+
+// Using user-defined literals (recommended)
+Meters distance = 100_m;
+Meters halfDist = distance / 2;  // 50 meters
+
+// Explicit construction
+Meters other = Meters(50.0f);
+
+// Arithmetic
+Meters sum = distance + other;     // 150 meters
+Meters diff = distance - other;    // 50 meters
+Meters scaled = distance * 2;      // 200 meters
+
+// Comparisons
+if (distance > 50_m) { /* ... */ }
+
+// Implicit conversion to float for glm/rendering
+float raw = distance;  // 100.0f
+```
+
+### Pixels - Type-Safe Screen Units
+
+```cpp
+Pixels screenX = 1920_px;
+Pixels screenY = 1080_px;
+
+ScreenSize size(1920_px, 1080_px);
+float aspect = size.aspectRatio();  // 1.777...
+```
+
+### WorldPoint - 3D Position with Units
+
+```cpp
+// Direct construction
+WorldPoint pt(10_m, 5_m, 20_m);  // x, y, z
+
+// From cardinal directions (north, east, up)
+WorldPoint pt2 = WorldPoint::fromDirections(100_m, 50_m, 20_m);
+// Creates: x=50 (east), y=20 (up), z=100 (north)
+
+// Convert to GLM for rendering
+glm::vec3 v = pt.toVec3();
+```
+
+### WorldExtent - 3D Size with Units
+
+```cpp
+WorldExtent size(200_m, 30_m, 200_m);  // width, height, depth
+
+// 2D extent (no height)
+WorldExtent flat = WorldExtent::flat(200_m, 200_m);  // width, depth
+
+bool is2D = flat.is2D();  // true
+```
+
+### WorldBounds - 3D Scene Boundaries
+
+Define scene bounds with explicit directional limits:
+
+```cpp
+// Create 200m x 200m x 30m world bounds
+// From 100m north to 100m south, 100m west to 100m east
+// From 20m up to 10m down
+auto bounds = WorldBounds::fromDirectionalLimits(
+    100_m,                     // north limit (+Z)
+    WorldBounds::south(100_m), // south limit (-Z)
+    WorldBounds::west(100_m),  // west limit (-X)
+    100_m,                     // east limit (+X)
+    20_m,                      // up limit (+Y)
+    WorldBounds::down(10_m)    // down limit (-Y)
+);
+
+// Query dimensions
+Meters width = bounds.width();   // 200m (east-west)
+Meters depth = bounds.depth();   // 200m (north-south)
+Meters height = bounds.height(); // 30m (up-down)
+
+// Query limits
+Meters north = bounds.northLimit();  // 100m
+Meters south = bounds.southLimit();  // -100m
+
+// Point containment
+WorldPoint pt(0_m, 0_m, 0_m);
+bool inside = bounds.contains(pt);  // true
+
+// Intersection
+bool overlaps = bounds.intersects(otherBounds);
+
+// Center-based construction
+auto centered = WorldBounds::fromCenterAndExtent(
+    WorldPoint(0_m, 0_m, 0_m),
+    WorldExtent(100_m, 50_m, 100_m)
+);
+```
+
+### WorldBounds2D - 2D Scene Boundaries
+
+For top-down or side-scrolling games:
+
+```cpp
+// Top-down game using cardinal directions
+auto bounds = WorldBounds2D::fromCardinal(
+    100_m,   // north
+    -100_m,  // south
+    -100_m,  // west
+    100_m    // east
+);
+
+// Side-scroller using left/right/top/bottom
+auto level = WorldBounds2D::fromLRTB(
+    0_m,     // left
+    1000_m,  // right
+    100_m,   // top
+    0_m      // bottom
+);
+
+// Convert to 3D bounds for unified APIs
+WorldBounds bounds3D = bounds.toWorldBounds(10_m, 0_m);
+```
+
+### Setting Scene Bounds
+
+```cpp
+class MyScene : public vde::Scene {
+    void onEnter() override {
+        // Set world bounds for the scene
+        setWorldBounds(WorldBounds::fromDirectionalLimits(
+            100_m, WorldBounds::south(100_m),
+            WorldBounds::west(100_m), 100_m,
+            20_m, WorldBounds::down(10_m)
+        ));
+        
+        // Check if 2D
+        if (is2D()) {
+            // Configure for 2D rendering
+        }
+    }
+};
+```
+
+### CameraBounds2D - Pixel-to-World Mapping
+
+For 2D games, `CameraBounds2D` provides coordinate conversion between screen pixels and world units:
+
+```cpp
+CameraBounds2D camera;
+
+// Configure screen size (from window)
+camera.setScreenSize(1920_px, 1080_px);
+
+// Set visible world width (height derived from aspect ratio)
+camera.setWorldWidth(16_m);  // Show 16 meters horizontally
+
+// Position camera
+camera.centerOn(0_m, 0_m);
+
+// Zoom
+camera.setZoom(2.0f);  // 2x zoom (shows 8m width instead of 16m)
+
+// Constrain camera to world bounds
+camera.setConstraintBounds(WorldBounds2D::fromCardinal(
+    50_m, -50_m, -50_m, 50_m
+));
+
+// Coordinate conversion
+glm::vec2 worldPos = camera.screenToWorld(mouseX_px, mouseY_px);
+glm::vec2 screenPos = camera.worldToScreen(entityX, entityY);
+
+// Visibility testing
+if (camera.isVisible(entityX, entityY)) {
+    // Entity is on screen
+}
+
+// Get what's visible
+WorldBounds2D visible = camera.getVisibleBounds();
+```
+
+### PixelToWorldMapping - Conversion Ratios
+
+For custom coordinate mapping:
+
+```cpp
+// 100 pixels = 1 meter
+auto mapping = PixelToWorldMapping::fromPixelsPerMeter(100.0f);
+
+// Fit 20 meters across a 1920 pixel screen
+auto fit = PixelToWorldMapping::fitWidth(20_m, 1920_px);
+
+// Convert
+Meters worldDist = mapping.toWorld(500_px);   // 5 meters
+Pixels screenDist = mapping.toPixels(10_m);   // 1000 pixels
+
+// Get ratio
+float ppm = mapping.getPixelsPerMeter();  // 100.0
+```
+
+### 2D Game Setup Example
+
+```cpp
+class My2DScene : public vde::Scene {
+    CameraBounds2D m_camera;
+    
+    void onEnter() override {
+        // Define world bounds
+        setWorldBounds(WorldBounds::flat(
+            50_m, WorldBounds::south(50_m),
+            WorldBounds::west(50_m), 50_m
+        ));
+        
+        // Setup 2D camera
+        m_camera.setScreenSize(1920_px, 1080_px);
+        m_camera.setWorldWidth(32_m);
+        m_camera.centerOn(0_m, 0_m);
+        m_camera.setConstraintBounds(WorldBounds2D::fromCardinal(
+            50_m, -50_m, -50_m, 50_m
+        ));
+        
+        setCameraBounds2D(m_camera);
+        
+        // Create 2D camera for rendering
+        setCamera(new vde::Camera2D(
+            m_camera.getVisibleWidth(),
+            m_camera.getVisibleHeight()
+        ));
+    }
+    
+    void onMouseClick(double screenX, double screenY) {
+        // Convert click to world coordinates
+        glm::vec2 worldPos = m_camera.screenToWorld(
+            Pixels(screenX), Pixels(screenY)
+        );
+        
+        // Spawn entity at click location
+        auto entity = addEntity<vde::SpriteEntity>(m_spriteId);
+        entity->setPosition(worldPos.x, worldPos.y, 0);
+    }
+    
+    void update(float dt) override {
+        // Pan camera with arrow keys
+        auto* input = getInputHandler();
+        if (input) {
+            if (input->isKeyPressed(KEY_LEFT)) 
+                m_camera.move(-10_m * dt, 0_m);
+            if (input->isKeyPressed(KEY_RIGHT)) 
+                m_camera.move(10_m * dt, 0_m);
+        }
+        
+        // Update scene camera bounds
+        setCameraBounds2D(m_camera);
+        
+        vde::Scene::update(dt);
+    }
+};
 ```
 
 ---

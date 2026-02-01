@@ -36,6 +36,11 @@
 #include "LightBox.h"
 #include "GameCamera.h"
 
+// World coordinates and bounds
+#include "WorldUnits.h"
+#include "WorldBounds.h"
+#include "CameraBounds.h"
+
 /**
  * @namespace vde
  * @brief Vulkan Display Engine namespace
