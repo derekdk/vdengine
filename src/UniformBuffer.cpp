@@ -35,7 +35,7 @@ UniformBuffer& UniformBuffer::operator=(UniformBuffer&& other) noexcept {
     return *this;
 }
 
-void UniformBuffer::create(VkDevice device, VkPhysicalDevice physicalDevice,
+void UniformBuffer::create(VkDevice device, [[maybe_unused]] VkPhysicalDevice physicalDevice,
                            VkDeviceSize bufferSize, uint32_t count) {
     if (device == VK_NULL_HANDLE) {
         throw std::runtime_error("Cannot create UniformBuffer with null device!");

@@ -86,6 +86,14 @@ if(NOT TARGET glslang)
     FetchContent_MakeAvailable(glslang)
 endif()
 
+# miniaudio for cross-platform audio
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG 0.11.21
+)
+FetchContent_MakeAvailable(miniaudio)
+
 # Library sources
 set(VDE_SOURCES
     src/Window.cpp
@@ -113,6 +121,11 @@ set(VDE_SOURCES
     src/api/Mesh.cpp
     src/api/CameraBounds.cpp
     src/api/Material.cpp
+    # Audio
+    src/miniaudio_impl.cpp
+    src/api/AudioClip.cpp
+    src/api/AudioManager.cpp
+    src/api/AudioSource.cpp
 )
 
 # Public headers
@@ -151,6 +164,10 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/WorldUnits.h
     include/vde/api/WorldBounds.h
     include/vde/api/CameraBounds.h
+    # Audio headers
+    include/vde/api/AudioClip.h
+    include/vde/api/AudioManager.h
+    include/vde/api/AudioSource.h
 )
 
 # Create library
@@ -175,6 +192,7 @@ target_include_directories(vde PUBLIC
 target_include_directories(vde PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
+    ${miniaudio_SOURCE_DIR}
 )
 
 # Link dependencies

@@ -40,25 +40,25 @@ class InputHandler {
      * @brief Called when a key is pressed.
      * @param key The key code (see KeyCodes.h)
      */
-    virtual void onKeyPress(int key) {}
+    virtual void onKeyPress([[maybe_unused]] int key) {}
 
     /**
      * @brief Called when a key is released.
      * @param key The key code (see KeyCodes.h)
      */
-    virtual void onKeyRelease(int key) {}
+    virtual void onKeyRelease([[maybe_unused]] int key) {}
 
     /**
      * @brief Called when a key is held down (repeated).
      * @param key The key code (see KeyCodes.h)
      */
-    virtual void onKeyRepeat(int key) {}
+    virtual void onKeyRepeat([[maybe_unused]] int key) {}
 
     /**
      * @brief Called for character input (for text entry).
      * @param codepoint Unicode code point
      */
-    virtual void onCharInput(unsigned int codepoint) {}
+    virtual void onCharInput([[maybe_unused]] unsigned int codepoint) {}
 
     // Mouse events
 
@@ -68,7 +68,8 @@ class InputHandler {
      * @param x Mouse X position in pixels
      * @param y Mouse Y position in pixels
      */
-    virtual void onMouseButtonPress(int button, double x, double y) {}
+    virtual void onMouseButtonPress([[maybe_unused]] int button, [[maybe_unused]] double x,
+                                    [[maybe_unused]] double y) {}
 
     /**
      * @brief Called when a mouse button is released.
@@ -76,21 +77,22 @@ class InputHandler {
      * @param x Mouse X position in pixels
      * @param y Mouse Y position in pixels
      */
-    virtual void onMouseButtonRelease(int button, double x, double y) {}
+    virtual void onMouseButtonRelease([[maybe_unused]] int button, [[maybe_unused]] double x,
+                                      [[maybe_unused]] double y) {}
 
     /**
      * @brief Called when the mouse is moved.
      * @param x New mouse X position in pixels
      * @param y New mouse Y position in pixels
      */
-    virtual void onMouseMove(double x, double y) {}
+    virtual void onMouseMove([[maybe_unused]] double x, [[maybe_unused]] double y) {}
 
     /**
      * @brief Called when the mouse scroll wheel is used.
      * @param xOffset Horizontal scroll offset
      * @param yOffset Vertical scroll offset
      */
-    virtual void onMouseScroll(double xOffset, double yOffset) {}
+    virtual void onMouseScroll([[maybe_unused]] double xOffset, [[maybe_unused]] double yOffset) {}
 
     /**
      * @brief Called when the mouse enters the window.
@@ -109,14 +111,16 @@ class InputHandler {
      * @param gamepadId The gamepad ID
      * @param button The button index
      */
-    virtual void onGamepadButtonPress(int gamepadId, int button) {}
+    virtual void onGamepadButtonPress([[maybe_unused]] int gamepadId, [[maybe_unused]] int button) {
+    }
 
     /**
      * @brief Called when a gamepad button is released.
      * @param gamepadId The gamepad ID
      * @param button The button index
      */
-    virtual void onGamepadButtonRelease(int gamepadId, int button) {}
+    virtual void onGamepadButtonRelease([[maybe_unused]] int gamepadId,
+                                        [[maybe_unused]] int button) {}
 
     /**
      * @brief Called when a gamepad axis changes.
@@ -124,7 +128,8 @@ class InputHandler {
      * @param axis The axis index
      * @param value The axis value (-1.0 to 1.0)
      */
-    virtual void onGamepadAxis(int gamepadId, int axis, float value) {}
+    virtual void onGamepadAxis([[maybe_unused]] int gamepadId, [[maybe_unused]] int axis,
+                               [[maybe_unused]] float value) {}
 
     // Query methods (for polling input state)
 
@@ -133,14 +138,14 @@ class InputHandler {
      * @param key The key code
      * @return true if the key is pressed
      */
-    virtual bool isKeyPressed(int key) const { return false; }
+    virtual bool isKeyPressed([[maybe_unused]] int key) const { return false; }
 
     /**
      * @brief Check if a mouse button is currently pressed.
      * @param button The mouse button
      * @return true if the button is pressed
      */
-    virtual bool isMouseButtonPressed(int button) const { return false; }
+    virtual bool isMouseButtonPressed([[maybe_unused]] int button) const { return false; }
 
     /**
      * @brief Get the current mouse position.

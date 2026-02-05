@@ -338,7 +338,7 @@ class Game {
     /**
      * @brief Called every frame before scene update.
      */
-    virtual void onUpdate(float deltaTime) {}
+    virtual void onUpdate([[maybe_unused]] float deltaTime) {}
 
     /**
      * @brief Called every frame after scene render.

@@ -8,6 +8,7 @@
 #include <vde/Types.h>
 #include <vde/VulkanContext.h>
 #include <vde/Window.h>
+#include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
 #include <vde/api/LightBox.h>
 
@@ -73,7 +74,9 @@ bool Game::initialize(const GameSettings& settings) {
 
         // Create sprite rendering pipeline (Phase 3)
         createSpriteRenderingPipeline();
-        createLightingResources();
+
+        // Initialize audio system (Phase 6)
+        AudioManager::getInstance().initialize(settings.audio);
 
         // Setup input callbacks
         setupInputCallbacks();
@@ -127,6 +130,9 @@ void Game::shutdown() {
 
     // Clear sprite descriptor cache (static in Entity.cpp)
     clearSpriteDescriptorCache();
+
+    // Shutdown audio system
+    AudioManager::getInstance().shutdown();
 
     // Cleanup rendering pipelines
     destroyLightingResources();
@@ -195,6 +201,9 @@ void Game::run() {
 
             m_activeScene->update(m_deltaTime);
         }
+
+        // Update audio system
+        AudioManager::getInstance().update(m_deltaTime);
 
         // Render
         if (m_vulkanContext) {

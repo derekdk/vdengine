@@ -89,3 +89,41 @@ add_custom_command(TARGET vde_resource_demo POST_BUILD
     $<TARGET_FILE_DIR:vde_resource_demo>/shaders
     COMMENT "Copying shader files..."
 )
+
+# Audio demo example demonstrating audio system
+add_executable(vde_audio_demo
+    audio_demo/main.cpp
+)
+
+target_link_libraries(vde_audio_demo PRIVATE vde)
+
+# Copy shader files for audio_demo example
+add_custom_command(TARGET vde_audio_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_audio_demo>/shaders
+    COMMENT "Copying shader files..."
+)
+
+# Copy audio assets directory
+add_custom_command(TARGET vde_audio_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets
+    $<TARGET_FILE_DIR:vde_audio_demo>/assets
+    COMMENT "Copying audio assets next to executable..."
+)
+
+# 2D Sidescroller example demonstrating platformer game mechanics
+add_executable(vde_sidescroller
+    sidescroller/main.cpp
+)
+
+target_link_libraries(vde_sidescroller PRIVATE vde)
+
+# Copy shader files for sidescroller example
+add_custom_command(TARGET vde_sidescroller POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_sidescroller>/shaders
+    COMMENT "Copying shader files..."
+)

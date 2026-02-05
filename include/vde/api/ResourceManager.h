@@ -259,10 +259,10 @@ size_t ResourceManager::estimateResourceSize(const ResourcePtr<T>& resource) con
         // Estimate based on dimensions if available
         auto texture = std::static_pointer_cast<Texture>(resource);
         return static_cast<size_t>(texture->getWidth()) * texture->getHeight() * 4;
+    } else {
+        // Default estimate for other resource types (AudioClip, etc.)
+        return 1024;
     }
-
-    // Default estimate
-    return 1024;
 }
 
 }  // namespace vde

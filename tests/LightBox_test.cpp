@@ -228,7 +228,6 @@ TEST_F(ThreePointLightBoxTest, GetBackLight) {
 TEST_F(ThreePointLightBoxTest, LightsAreDifferent) {
     const Light& key = lightBox->getKeyLight();
     const Light& fill = lightBox->getFillLight();
-    const Light& back = lightBox->getBackLight();
 
     // Each light should have a different direction
     EXPECT_NE(key.direction.x, fill.direction.x);

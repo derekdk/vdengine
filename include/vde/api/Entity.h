@@ -130,7 +130,7 @@ class Entity {
      * @brief Called every frame to update entity state.
      * @param deltaTime Time since last update in seconds
      */
-    virtual void update(float deltaTime) {}
+    virtual void update([[maybe_unused]] float deltaTime) {}
 
     /**
      * @brief Called every frame to render the entity.

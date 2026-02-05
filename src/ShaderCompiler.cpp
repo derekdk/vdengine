@@ -51,7 +51,7 @@ ShaderCompiler::ShaderCompiler(ShaderCompiler&&) noexcept = default;
 ShaderCompiler& ShaderCompiler::operator=(ShaderCompiler&&) noexcept = default;
 
 CompilationResult ShaderCompiler::compile(const std::string& source, ShaderStage stage,
-                                          const std::string& sourceName) {
+                                          [[maybe_unused]] const std::string& sourceName) {
     CompilationResult result;
 
     // Map to glslang stage
@@ -62,7 +62,6 @@ CompilationResult ShaderCompiler::compile(const std::string& source, ShaderStage
 
     // Set source
     const char* sources[] = {source.c_str()};
-    const int lengths[] = {static_cast<int>(source.length())};
     shader.setStrings(sources, 1);
 
     // Set environment

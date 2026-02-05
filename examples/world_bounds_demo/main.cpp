@@ -67,7 +67,8 @@ class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
         m_mouseY = static_cast<float>(y);
     }
 
-    void onMouseButtonPress(int button, double x, double y) override {
+    void onMouseButtonPress(int button, [[maybe_unused]] double x,
+                            [[maybe_unused]] double y) override {
         if (button == 0) {
             m_clicked = true;
         }
@@ -304,8 +305,8 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
         // Update marker visibility based on camera bounds
         for (auto& marker : m_markers) {
             Position pos = marker->getPosition();
-            bool visible = m_cameraBounds.isVisible(Meters(pos.x), Meters(pos.y));
-            // Markers should always be visible in this demo, but demonstrate the check
+            // Demonstrate bounds check (markers remain visible in this demo)
+            [[maybe_unused]] bool visible = m_cameraBounds.isVisible(Meters(pos.x), Meters(pos.y));
             // marker->setVisible(visible);
         }
     }
