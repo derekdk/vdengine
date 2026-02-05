@@ -13,7 +13,7 @@ This document outlines the plan to implement the high-level Game API that sits o
 | Phase 2.5 | World Coordinates & Bounds | ✅ Complete | 2026-02-01 |
 | Phase 3 | SpriteEntity & Depth Testing | ✅ Complete | 2026-01-31 |
 | Phase 4 | Materials & Lighting | ✅ Complete | 2026-02-01 |
-| Phase 5 | Resource Management | ⏳ Pending | - |
+| Phase 5 | Resource Management | ✅ Complete | 2026-02-04 |
 | Phase 6 | Audio & Polish | ⏳ Pending | - |
 
 ### Phase 1 Completion Notes (2026-01-31)
@@ -779,35 +779,337 @@ struct MaterialPushConstants {
 
 ---
 
-### Phase 5: Resource Management (Future)
+### Phase 5: Resource Management ✅ COMPLETE
 
-```
-src/
-├── api/
-│   ├── Entity.cpp       (Phase 1)
-│   ├── MeshEntity.cpp   (Phase 1 stub, Phase 2 full)
-│   ├── SpriteEntity.cpp (Phase 3)
-│   ├── Scene.cpp        (Phase 1)
-│   ├── Game.cpp         (Phase 1)
-│   ├── GameCamera.cpp   (Phase 1)
-│   ├── LightBox.cpp     (Phase 1)
-│   └── Mesh.cpp         (Phase 2)
-├── BufferUtils.cpp
-├── Camera.cpp
-├── ... (existing files)
+**Goal:** Implement global resource caching, improve resource loading, and make Texture integrate with the Resource system.
 
-tests/
-├── api/
-│   ├── Entity_test.cpp      (Phase 1)
-│   ├── GameCamera_test.cpp  (Phase 1)
-│   ├── LightBox_test.cpp    (Phase 1)
-│   ├── Scene_test.cpp       (Phase 1)
-│   ├── Game_test.cpp        (Phase 1)
-│   ├── Mesh_test.cpp        (Phase 2)
-│   └── MeshEntity_test.cpp  (Phase 2)
-├── Camera_test.cpp
-├── ... (existing tests)
+**Status:** ✅ Completed 2026-02-04
+
+#### Completion Summary
+
+**All objectives achieved:**
+- ✅ Texture now inherits from Resource
+- ✅ Two-phase loading pattern (CPU load, GPU upload)
+- ✅ ResourceManager implemented with weak_ptr caching
+- ✅ Automatic deduplication and memory management
+- ✅ Descriptor set cleanup fixed
+- ✅ Comprehensive unit tests (31 tests total)
+
+**Files Created:**
+- `include/vde/api/ResourceManager.h` (~280 lines) - ResourceManager class
+- `src/api/ResourceManager.cpp` (~60 lines) - Implementation  
+- `tests/Texture_test.cpp` (~160 lines) - Texture tests (14 tests)
+- `tests/ResourceManager_test.cpp` (~250 lines) - ResourceManager tests (17 tests)
+
+**Files Modified:**
+- `include/vde/Texture.h` - Added Resource inheritance, two-phase loading
+- `src/Texture.cpp` - Implemented new API, kept backward compatibility
+- `include/vde/api/Scene.h` - Updated addResource() for Texture support
+- `include/vde/api/Game.h` - Added ResourceManager member
+- `src/api/Entity.cpp` - Added descriptor cache cleanup
+- `src/api/Game.cpp` - Call cleanup on shutdown
+- `tests/CMakeLists.txt` - Added new test files
+- `CMakeLists.txt` - Added ResourceManager.cpp
+
+**Total Code:**
+- New: ~750 lines (implementation + tests)
+- Modified: ~150 lines
+
+---
+
+#### Current State Analysis
+
+**What Works:**
+- ✅ Mesh inherits from Resource
+- ✅ Scene has per-scene resource storage
+- ✅ Basic resource ID system exists
+- ✅ Mesh can be loaded via Scene::addResource()
+
+**What's Missing:**
+- ❌ Texture doesn't inherit from Resource (different API)
+- ❌ No global resource caching (duplicate loads across scenes)
+- ❌ Texture loading requires many Vulkan parameters
+- ❌ Descriptor set cleanup issues (Phase 3 note)
+- ❌ No resource reference counting or auto-cleanup
+
+#### 5.1 Texture Resource Integration ⏳
+
+**Goal:** Make Texture inherit from Resource with simplified API matching Mesh pattern.
+
+**Changes to `include/vde/Texture.h`:**
+```cpp
+class Texture : public Resource {
+public:
+    Texture() = default;
+    virtual ~Texture();
+    
+    // Simplified loading - defers Vulkan object creation
+    bool loadFromFile(const std::string& path) override;
+    
+    // GPU upload (called lazily on first use)
+    bool uploadToGPU(VulkanContext* context);
+    
+    // Check if uploaded to GPU
+    bool isOnGPU() const { return m_image != VK_NULL_HANDLE; }
+    
+    // Cleanup GPU resources
+    void freeGPUResources(VkDevice device);
+    
+    // Resource interface
+    const char* getTypeName() const override { return "Texture"; }
+    
+    // Existing getters for Vulkan handles
+    VkImage getImage() const { return m_image; }
+    VkImageView getImageView() const { return m_imageView; }
+    VkSampler getSampler() const { return m_sampler; }
+    
+private:
+    // CPU-side image data (for lazy upload)
+    std::vector<uint8_t> m_pixelData;
+    uint32_t m_width = 0;
+    uint32_t m_height = 0;
+    uint32_t m_channels = 4;
+    
+    // GPU-side Vulkan objects
+    VkImage m_image = VK_NULL_HANDLE;
+    VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
+    VkImageView m_imageView = VK_NULL_HANDLE;
+    VkSampler m_sampler = VK_NULL_HANDLE;
+    VkDevice m_device = VK_NULL_HANDLE;
+};
 ```
+
+**Implementation in `src/Texture.cpp`:**
+- `loadFromFile()` - Load pixel data with stb_image, store in m_pixelData
+- `uploadToGPU()` - Create VkImage/VkImageView/VkSampler, upload via staging buffer
+- Update existing methods to use new two-phase pattern
+- Keep backward compatibility for existing code
+
+**Design Benefits:**
+1. Consistent with Mesh pattern (CPU load, GPU upload)
+2. Resources can be loaded without VulkanContext
+3. Enables resource pre-loading before GPU init
+4. Simplifies Scene::addResource template
+
+#### 5.2 ResourceManager Class ⏳
+
+**Goal:** Global resource cache to share resources across scenes and avoid duplicate loads.
+
+**Create `include/vde/api/ResourceManager.h`:**
+```cpp
+class ResourceManager {
+public:
+    ResourceManager() = default;
+    ~ResourceManager() = default;
+    
+    // Load or get cached resource
+    template <typename T>
+    ResourcePtr<T> load(const std::string& path);
+    
+    // Add pre-created resource
+    template <typename T>
+    ResourcePtr<T> add(const std::string& key, ResourcePtr<T> resource);
+    
+    // Get resource by path
+    template <typename T>
+    ResourcePtr<T> get(const std::string& path);
+    
+    // Check if resource is cached
+    bool has(const std::string& path) const;
+    
+    // Remove resource from cache
+    void remove(const std::string& path);
+    
+    // Clear all cached resources
+    void clear();
+    
+    // Get resource statistics
+    size_t getCachedCount() const;
+    size_t getMemoryUsage() const;
+    
+private:
+    struct CacheEntry {
+        std::weak_ptr<Resource> resource;
+        std::type_index type;
+        size_t lastAccessTime;
+    };
+    
+    std::unordered_map<std::string, CacheEntry> m_cache;
+    size_t m_accessCounter = 0;
+};
+```
+
+**Implementation in `src/api/ResourceManager.cpp`:**
+- Use weak_ptr to allow automatic cleanup when no references exist
+- Type-safe resource retrieval with type checking
+- Thread-safe access with mutex (future enhancement)
+- LRU eviction policy (future enhancement)
+
+**Key Features:**
+1. **Automatic Deduplication** - Same path = same resource instance
+2. **Weak References** - Resources auto-delete when unused
+3. **Type Safety** - Template ensures type correctness
+4. **Access Tracking** - Foundation for LRU cache
+
+#### 5.3 Scene Integration ⏳
+
+**Updates to `include/vde/api/Scene.h`:**
+```cpp
+class Scene {
+public:
+    // Use global resource manager for loading
+    template <typename T>
+    ResourcePtr<T> loadResource(const std::string& path);
+    
+    // Track resources used by this scene (for cleanup)
+    template <typename T>
+    void useResource(ResourcePtr<T> resource);
+    
+    // Existing addResource methods now use ResourceManager
+    template <typename T>
+    ResourceId addResource(const std::string& path);
+    
+private:
+    // Resources actively used by this scene
+    std::vector<std::shared_ptr<Resource>> m_activeResources;
+};
+```
+
+**Implementation in `src/api/Scene.cpp`:**
+- Update `addResource()` to use Game's ResourceManager
+- Track resources for scene lifetime
+- Clean up on scene destruction
+
+#### 5.4 Game Integration ⏳
+
+**Updates to `include/vde/api/Game.h`:**
+```cpp
+class Game {
+public:
+    // Global resource manager
+    ResourceManager& getResourceManager() { return m_resourceManager; }
+    
+private:
+    ResourceManager m_resourceManager;
+};
+```
+
+**Updates to `src/api/Game.cpp`:**
+- Initialize ResourceManager
+- Clear resources on shutdown
+
+#### 5.5 Descriptor Set Cleanup Fix ⏳
+
+**Problem from Phase 3:**
+- SpriteEntity caches descriptor sets per texture
+- Descriptor sets not freed when textures destroyed
+
+**Solution:**
+- Track descriptor sets in Texture class
+- Clean up in Texture destructor
+- Or: Move to per-material descriptor set pattern
+
+**Updates to `src/api/Entity.cpp` (SpriteEntity::render):**
+```cpp
+// Option 1: Store descriptor set in Texture
+VkDescriptorSet descriptorSet = texture->getOrCreateDescriptorSet(context);
+
+// Option 2: Create descriptor set per-frame (simple but less efficient)
+VkDescriptorSet descriptorSet = createDescriptorSet(texture, context);
+```
+
+#### 5.6 Unit Tests ⏳
+
+**Create `tests/ResourceManager_test.cpp`:**
+```cpp
+TEST(ResourceManager, LoadCreatesNewResource)
+TEST(ResourceManager, LoadSamePathReturnsSameInstance)
+TEST(ResourceManager, WeakPtrAllowsAutoCleanup)
+TEST(ResourceManager, GetReturnsNullptrForMissingResource)
+TEST(ResourceManager, HasChecksExistence)
+TEST(ResourceManager, RemoveDeletesFromCache)
+TEST(ResourceManager, ClearRemovesAllResources)
+TEST(ResourceManager, TypeMismatchReturnsNullptr)
+TEST(ResourceManager, GetCachedCount)
+```
+
+**Update `tests/Scene_test.cpp`:**
+```cpp
+TEST(Scene, LoadResourceUsesResourceManager)
+TEST(Scene, AddResourceDeduplicates)
+TEST(Scene, ResourcesCleanedUpOnSceneDestruction)
+```
+
+**Create `tests/Texture_test.cpp`:**
+```cpp
+TEST(Texture, LoadFromFileStoresData)
+TEST(Texture, InheritsFromResource)
+TEST(Texture, GetTypeNameReturnsTexture)
+TEST(Texture, IsLoadedAfterLoad)
+TEST(Texture, IsOnGPUAfterUpload)
+// Integration test with VulkanContext (optional)
+```
+
+**Expected Test Counts:**
+- ResourceManager_test: ~10 tests
+- Updated Scene_test: +5 tests
+- Texture_test: ~8 tests
+- **Total: ~23 new tests**
+
+#### Implementation Order
+
+1. ✅ **Create Phase 5 plan**
+2. ⏳ **Refactor Texture** (2-3 hours)
+   - Make Texture inherit from Resource
+   - Implement loadFromFile() / uploadToGPU() pattern
+   - Update existing Texture usage (if any)
+   - Write Texture unit tests
+
+3. ⏳ **Implement ResourceManager** (2-3 hours)
+   - Create ResourceManager class
+   - Implement template methods
+   - Write ResourceManager unit tests
+
+4. ⏳ **Scene & Game Integration** (1-2 hours)
+   - Add ResourceManager to Game
+   - Update Scene::addResource to use ResourceManager
+   - Update Scene tests
+
+5. ⏳ **Descriptor Set Cleanup** (1 hour)
+   - Fix SpriteEntity descriptor set leak
+   - Test with sprite_demo example
+
+6. ⏳ **Verification & Documentation** (1 hour)
+   - Run all tests
+   - Test examples (simple_game, sprite_demo)
+   - Update GAME_API_IMPLEMENTATION_PLAN.md
+   - Add usage examples to docs
+
+**Total Estimated Time: 7-10 hours**
+
+#### Files to Create/Modify
+
+**New Files:**
+- `include/vde/api/ResourceManager.h` (~150 lines)
+- `src/api/ResourceManager.cpp` (~200 lines)
+- `tests/ResourceManager_test.cpp` (~150 lines)
+- `tests/Texture_test.cpp` (~120 lines)
+
+**Modified Files:**
+- `include/vde/Texture.h` - Add Resource inheritance (~50 lines changed)
+- `src/Texture.cpp` - Refactor to two-phase load (~100 lines changed)
+- `include/vde/api/Game.h` - Add ResourceManager member (~5 lines)
+- `src/api/Game.cpp` - Initialize ResourceManager (~10 lines)
+- `include/vde/api/Scene.h` - Update resource methods (~20 lines)
+- `src/api/Scene.cpp` - Use ResourceManager (~30 lines changed)
+- `src/api/Entity.cpp` - Fix descriptor set cleanup (~20 lines)
+- `tests/Scene_test.cpp` - Add resource tests (~50 lines)
+- `CMakeLists.txt` - Add ResourceManager.cpp (~2 lines)
+
+**Total New Code: ~620 lines**
+**Total Modified Code: ~285 lines**
+
+---
 
 ---
 

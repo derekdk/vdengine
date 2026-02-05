@@ -74,3 +74,18 @@ add_custom_command(TARGET vde_materials_lighting_demo POST_BUILD
     $<TARGET_FILE_DIR:vde_materials_lighting_demo>/shaders
     COMMENT "Copying shader files..."
 )
+
+# Resource Management demo example demonstrating Phase 5 features
+add_executable(vde_resource_demo
+    resource_demo/main.cpp
+)
+
+target_link_libraries(vde_resource_demo PRIVATE vde)
+
+# Copy shader files for resource_demo example
+add_custom_command(TARGET vde_resource_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_resource_demo>/shaders
+    COMMENT "Copying shader files..."
+)

@@ -23,6 +23,9 @@
 
 namespace vde {
 
+// Forward declaration of sprite descriptor cache cleanup function from Entity.cpp
+extern void clearSpriteDescriptorCache();
+
 // ============================================================================
 // Game Implementation
 // ============================================================================
@@ -121,6 +124,9 @@ void Game::shutdown() {
     // Clear all scenes
     m_scenes.clear();
     m_sceneStack.clear();
+
+    // Clear sprite descriptor cache (static in Entity.cpp)
+    clearSpriteDescriptorCache();
 
     // Cleanup rendering pipelines
     destroyLightingResources();

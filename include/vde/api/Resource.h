@@ -26,6 +26,14 @@ class Resource {
   public:
     virtual ~Resource() = default;
 
+    // Prevent copying
+    Resource(const Resource&) = delete;
+    Resource& operator=(const Resource&) = delete;
+
+    // Allow moving
+    Resource(Resource&& other) noexcept = default;
+    Resource& operator=(Resource&& other) noexcept = default;
+
     /**
      * @brief Get the unique ID of this resource.
      */

@@ -8,6 +8,8 @@
  * resources, and rendering for a portion of the game.
  */
 
+#include <vde/Texture.h>
+
 #include <memory>
 #include <string>
 #include <typeindex>
@@ -357,8 +359,10 @@ ResourceId Scene::addResource(const std::string& path) {
     resource->m_id = m_nextResourceId++;
     resource->m_path = path;
 
-    // Load the resource
+    // Load the resource (CPU-side only)
     if constexpr (std::is_same_v<T, Mesh>) {
+        resource->loadFromFile(path);
+    } else if constexpr (std::is_same_v<T, Texture>) {
         resource->loadFromFile(path);
     }
     // Add other resource type loading here

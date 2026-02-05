@@ -20,6 +20,7 @@
 
 #include "GameSettings.h"
 #include "InputHandler.h"
+#include "ResourceManager.h"
 #include "Scene.h"
 
 namespace vde {
@@ -215,6 +216,19 @@ class Game {
     const VulkanContext* getVulkanContext() const { return m_vulkanContext.get(); }
 
     /**
+     * @brief Get the global resource manager.
+     *
+     * Use this to load and cache resources globally, sharing them across scenes.
+     *
+     * @example
+     * @code
+     * auto texture = game.getResourceManager().load<Texture>("player.png");
+     * @endcode
+     */
+    ResourceManager& getResourceManager() { return m_resourceManager; }
+    const ResourceManager& getResourceManager() const { return m_resourceManager; }
+
+    /**
      * @brief Apply new display settings.
      */
     void applyDisplaySettings(const DisplaySettings& settings);
@@ -345,6 +359,7 @@ class Game {
     // Core systems
     std::unique_ptr<Window> m_window;
     std::unique_ptr<VulkanContext> m_vulkanContext;
+    ResourceManager m_resourceManager;
 
     // Rendering infrastructure (Phase 2)
     VkPipelineLayout m_meshPipelineLayout = VK_NULL_HANDLE;

@@ -27,8 +27,22 @@ static std::shared_ptr<Mesh> s_spriteQuad = nullptr;
 
 // Descriptor set cache for textures per frame (maps {frame, texture} to descriptor set)
 // We need per-frame caching because the UBO buffer changes each frame
+// Note: Descriptor sets are allocated from Game's descriptor pool and cleaned up
+// when the pool is destroyed. This map just tracks which sets exist.
 static constexpr uint32_t MAX_FRAMES = 2;
 static std::unordered_map<Texture*, VkDescriptorSet> s_textureDescriptorSets[MAX_FRAMES];
+
+/**
+ * @brief Clear sprite descriptor set cache (called on Game shutdown).
+ *
+ * This is a free function (not static) so it can be called from Game.cpp.
+ * Declared as extern in Game.cpp.
+ */
+void clearSpriteDescriptorCache() {
+    for (int i = 0; i < MAX_FRAMES; ++i) {
+        s_textureDescriptorSets[i].clear();
+    }
+}
 
 // Helper to get or create the sprite quad mesh
 static std::shared_ptr<Mesh> getSpriteQuadMesh() {

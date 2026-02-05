@@ -32,6 +32,9 @@ set(VDE_TEST_SOURCES
     CameraBounds_test.cpp
     # Phase 4 tests
     Material_test.cpp
+    # Phase 5 tests
+    Texture_test.cpp
+    ResourceManager_test.cpp
 )
 
 # Create test executable
