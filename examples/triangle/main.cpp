@@ -1,13 +1,15 @@
 /**
  * @file main.cpp
- * @brief Basic VDE example showing a colored triangle.
+ * @brief Basic triangle rendering example for VDE.
  * 
  * This example demonstrates:
- * - Creating a window
- * - Initializing Vulkan context
- * - Creating a graphics pipeline with shaders
- * - Creating vertex and index buffers
- * - Rendering a colored triangle
+ * - Low-level Vulkan rendering with VDE
+ * - Creating a graphics pipeline
+ * - Vertex and index buffer creation
+ * - Drawing a colored triangle
+ * 
+ * NOTE: This is a low-level example that doesn't use the Game API.
+ * For most use cases, see the other examples (simple_game, sprite_demo, etc.)
  */
 
 #include <vde/Core.h>
@@ -15,10 +17,13 @@
 #include <vde/BufferUtils.h>
 #include <vde/Types.h>
 #include <glm/glm.hpp>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <stdexcept>
 #include <array>
-#include <fstream>
+
+// Configuration
+constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
 
 // Triangle vertices with positions and colors
 const std::vector<vde::Vertex> triangleVertices = {
@@ -30,39 +35,20 @@ const std::vector<vde::Vertex> triangleVertices = {
 
 const std::vector<uint16_t> triangleIndices = {0, 1, 2};
 
-// Read shader file (SPIR-V or source to be compiled)
-std::vector<char> readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open file: " + filename);
-    }
-    size_t fileSize = static_cast<size_t>(file.tellg());
-    std::vector<char> buffer(fileSize);
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-    return buffer;
-}
-
-// Read shader source as string
-std::string readShaderSource(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open shader file: " + filename);
-    }
-    std::string content((std::istreambuf_iterator<char>(file)),
-                        std::istreambuf_iterator<char>());
-    return content;
-}
-
+/**
+ * @brief Low-level triangle rendering application.
+ */
 class TriangleApp {
 public:
     void run() {
         initWindow();
         initVulkan();
+        printInstructions();
         mainLoop();
         cleanup();
     }
+
+    int getExitCode() const { return m_exitCode; }
 
 private:
     vde::Window* m_window = nullptr;
@@ -76,15 +62,60 @@ private:
     VkBuffer m_indexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
     
+    double m_startTime = 0.0;
+    bool m_shouldQuit = false;
+    int m_exitCode = 0;
+    
     void initWindow() {
         m_window = new vde::Window(1280, 720, "VDE Triangle Example");
+        
+        // Set up key callback for quit
+        glfwSetWindowUserPointer(m_window->getHandle(), this);
+        glfwSetKeyCallback(m_window->getHandle(), [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+            (void)scancode;
+            (void)mods;
+            auto* app = static_cast<TriangleApp*>(glfwGetWindowUserPointer(window));
+            if (action == GLFW_PRESS) {
+                if (key == GLFW_KEY_ESCAPE) {
+                    std::cout << "User requested early exit." << std::endl;
+                    app->m_shouldQuit = true;
+                } else if (key == GLFW_KEY_F) {
+                    std::cerr << "\n========================================" << std::endl;
+                    std::cerr << "  TEST FAILED: User reported issue" << std::endl;
+                    std::cerr << "  Expected: Colored triangle (red/green/blue vertices)" << std::endl;
+                    std::cerr << "========================================\n" << std::endl;
+                    app->m_exitCode = 1;
+                    app->m_shouldQuit = true;
+                }
+            }
+        });
+    }
+    
+    void printInstructions() {
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "  VDE Example: Triangle Rendering" << std::endl;
+        std::cout << "========================================\n" << std::endl;
+        
+        std::cout << "Features demonstrated:" << std::endl;
+        std::cout << "  - Low-level Vulkan rendering" << std::endl;
+        std::cout << "  - Graphics pipeline creation" << std::endl;
+        std::cout << "  - Vertex/index buffer usage" << std::endl;
+        std::cout << "  - Shader compilation from source" << std::endl;
+        
+        std::cout << "\nYou should see:" << std::endl;
+        std::cout << "  - Triangle with gradient colors" << std::endl;
+        std::cout << "  - Red vertex at top" << std::endl;
+        std::cout << "  - Green vertex at bottom-right" << std::endl;
+        std::cout << "  - Blue vertex at bottom-left" << std::endl;
+        
+        std::cout << "\nControls:" << std::endl;
+        std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
+        std::cout << "  ESC   - Exit early" << std::endl;
+        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
     }
     
     void initVulkan() {
         m_context.initialize(m_window);
-        
-        std::cout << "VDE initialized successfully!" << std::endl;
-        std::cout << "Window: " << m_window->getWidth() << "x" << m_window->getHeight() << std::endl;
         
         // Set up camera for 2D rendering (looking straight down at the XY plane)
         vde::Camera& camera = m_context.getCamera();
@@ -119,6 +150,8 @@ private:
             // Draw triangle
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(triangleIndices.size()), 1, 0, 0, 0);
         });
+        
+        m_startTime = glfwGetTime();
     }
     
     void createGraphicsPipeline() {
@@ -127,15 +160,12 @@ private:
         // Compile shaders
         vde::ShaderCompiler compiler;
         
-        std::string vertSource = readShaderSource("shaders/triangle.vert");
-        std::string fragSource = readShaderSource("shaders/triangle.frag");
-        
-        auto vertResult = compiler.compile(vertSource, vde::ShaderStage::Vertex, "triangle.vert");
+        auto vertResult = compiler.compileFile("shaders/triangle.vert", vde::ShaderStage::Vertex);
         if (!vertResult.success) {
             throw std::runtime_error("Vertex shader compilation failed: " + vertResult.errorLog);
         }
         
-        auto fragResult = compiler.compile(fragSource, vde::ShaderStage::Fragment, "triangle.frag");
+        auto fragResult = compiler.compileFile("shaders/triangle.frag", vde::ShaderStage::Fragment);
         if (!fragResult.success) {
             throw std::runtime_error("Fragment shader compilation failed: " + fragResult.errorLog);
         }
@@ -207,7 +237,7 @@ private:
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VK_CULL_MODE_NONE;  // Disable culling for the example
+        rasterizer.cullMode = VK_CULL_MODE_NONE;  // Disable culling
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
         
@@ -278,7 +308,7 @@ private:
             throw std::runtime_error("Failed to create graphics pipeline!");
         }
         
-        // Cleanup shader modules (no longer needed after pipeline creation)
+        // Cleanup shader modules
         vkDestroyShaderModule(device, fragShaderModule, nullptr);
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
@@ -346,8 +376,19 @@ private:
     }
     
     void mainLoop() {
-        while (!m_window->shouldClose()) {
+        while (!m_window->shouldClose() && !m_shouldQuit) {
             m_window->pollEvents();
+            
+            // Check auto-terminate
+            double elapsed = glfwGetTime() - m_startTime;
+            if (elapsed >= AUTO_TERMINATE_SECONDS) {
+                std::cout << "\n========================================" << std::endl;
+                std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
+                std::cout << "  Duration: " << elapsed << " seconds" << std::endl;
+                std::cout << "========================================\n" << std::endl;
+                break;
+            }
+            
             m_context.drawFrame();
         }
         
@@ -376,10 +417,7 @@ private:
         }
         
         m_context.cleanup();
-        
         delete m_window;
-        
-        std::cout << "VDE shutdown complete." << std::endl;
     }
 };
 
@@ -397,9 +435,9 @@ int main() {
         // Finalize glslang
         vde::finalizeGlslang();
         
-        return 0;
+        return app.getExitCode();
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << std::endl;
         vde::finalizeGlslang();
         return 1;
     }

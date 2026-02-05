@@ -13,6 +13,9 @@
 #include <vde/api/GameAPI.h>
 #include <iostream>
 
+// Configuration
+constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
+
 /**
  * @brief Custom input handler for the game.
  */
@@ -23,6 +26,9 @@ public:
     void onKeyPress(int key) override {
         if (key == vde::KEY_ESCAPE) {
             m_escapePressed = true;
+        }
+        if (key == vde::KEY_F) {
+            m_failPressed = true;
         }
         if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
@@ -56,6 +62,12 @@ public:
         return val;
     }
     
+    bool isFailPressed() {
+        bool val = m_failPressed;
+        m_failPressed = false;
+        return val;
+    }
+    
     bool isSpacePressed() {
         bool val = m_spacePressed;
         m_spacePressed = false;
@@ -78,6 +90,7 @@ public:
     
 private:
     bool m_escapePressed = false;
+    bool m_failPressed = false;
     bool m_spacePressed = false;
     bool m_moveForward = false;
     bool m_moveBackward = false;
@@ -117,13 +130,29 @@ public:
     MainScene() = default;
     
     void onEnter() override {
-        std::cout << "MainScene: onEnter" << std::endl;
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "  VDE Example: Simple Game" << std::endl;
+        std::cout << "========================================\n" << std::endl;
+        
+        std::cout << "Features demonstrated:" << std::endl;
+        std::cout << "  - Game class initialization" << std::endl;
+        std::cout << "  - Scene management" << std::endl;
+        std::cout << "  - MeshEntity with rotation" << std::endl;
+        std::cout << "  - OrbitCamera controls" << std::endl;
+        
+        std::cout << "\nYou should see:" << std::endl;
+        std::cout << "  - Blue rotating cube at origin" << std::endl;
+        std::cout << "  - Dark blue background" << std::endl;
+        
+        std::cout << "\nControls:" << std::endl;
+        std::cout << "  SCROLL - Zoom camera in/out" << std::endl;
+        std::cout << "  SPACE  - Toggle rotation speed" << std::endl;
+        std::cout << "  F      - Fail test (if visuals are incorrect)" << std::endl;
+        std::cout << "  ESC    - Exit early" << std::endl;
+        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
         
         // Set up an orbit camera looking at the origin
         setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 5.0f, 20.0f, 45.0f));
-        
-        // LightBox is optional - if not set, default white ambient is used
-        // Uncomment to customize: setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
         
         // Set background color to dark blue
         setBackgroundColor(vde::Color::fromHex(0x1a1a2e));
@@ -137,19 +166,41 @@ public:
         
         // Set a cube mesh
         m_cube->setMesh(vde::Mesh::createCube(1.0f));
-    }
-    
-    void onExit() override {
-        std::cout << "MainScene: onExit" << std::endl;
+        
+        m_elapsedTime = 0.0f;
     }
     
     void update(float deltaTime) override {
+        m_elapsedTime += deltaTime;
+        
         // Handle input
         auto* input = dynamic_cast<GameInputHandler*>(getInputHandler());
         if (input) {
-            // Check for quit
+            // Check for fail key
+            if (input->isFailPressed()) {
+                std::cerr << "\n========================================" << std::endl;
+                std::cerr << "  TEST FAILED: User reported issue" << std::endl;
+                std::cerr << "  Expected: Rotating blue cube with camera controls" << std::endl;
+                std::cerr << "========================================\n" << std::endl;
+                m_testFailed = true;
+                if (getGame()) getGame()->quit();
+                return;
+            }
+            
+            // Check for escape key
             if (input->isEscapePressed()) {
-                getGame()->quit();
+                std::cout << "User requested early exit." << std::endl;
+                if (getGame()) getGame()->quit();
+                return;
+            }
+            
+            // Auto-terminate after configured time
+            if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
+                std::cout << "\n========================================" << std::endl;
+                std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
+                std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
+                std::cout << "========================================\n" << std::endl;
+                if (getGame()) getGame()->quit();
                 return;
             }
             
@@ -175,18 +226,17 @@ public:
         vde::Scene::update(deltaTime);
     }
     
-    void render() override {
-        // Let the base class handle entity rendering
-        vde::Scene::render();
-    }
+    bool didTestFail() const { return m_testFailed; }
     
 private:
     std::shared_ptr<RotatingCube> m_cube;
     float m_speedMultiplier = 1.0f;
+    float m_elapsedTime = 0.0f;
+    bool m_testFailed = false;
 };
 
 /**
- * @brief Menu scene shown at startup.
+ * @brief Menu scene (simplified for auto-termination support).
  */
 class MenuScene : public vde::Scene {
 public:
@@ -195,14 +245,16 @@ public:
     void onEnter() override {
         std::cout << "MenuScene: Press SPACE to start the game" << std::endl;
         setBackgroundColor(vde::Color::fromHex(0x0f0f23));
-        // No camera or lightbox needed for menu - defaults are fine
+        m_elapsedTime = 0.0f;
     }
     
-    void update(float /* deltaTime */) override {
+    void update(float deltaTime) override {
+        m_elapsedTime += deltaTime;
+        
         auto* input = dynamic_cast<GameInputHandler*>(getInputHandler());
         if (input) {
             if (input->isEscapePressed()) {
-                getGame()->quit();
+                if (getGame()) getGame()->quit();
                 return;
             }
             if (input->isSpacePressed()) {
@@ -210,69 +262,74 @@ public:
                 getGame()->setActiveScene("main");
             }
         }
+        
+        // Auto-advance to main scene after 2 seconds
+        if (m_elapsedTime >= 2.0f) {
+            getGame()->setActiveScene("main");
+        }
     }
+
+private:
+    float m_elapsedTime = 0.0f;
+};
+
+/**
+ * @brief Game class for the demo.
+ */
+class SimpleGameDemo : public vde::Game {
+public:
+    void onStart() override {
+        // Set up input handler
+        m_inputHandler = std::make_unique<GameInputHandler>();
+        setInputHandler(m_inputHandler.get());
+        
+        // Add scenes
+        addScene("menu", new MenuScene());
+        auto* mainScene = new MainScene();
+        m_mainScenePtr = mainScene;
+        addScene("main", mainScene);
+        
+        // Start with menu scene
+        setActiveScene("menu");
+    }
+    
+    void onShutdown() override {
+        if (m_mainScenePtr && m_mainScenePtr->didTestFail()) {
+            m_exitCode = 1;
+        }
+    }
+    
+    int getExitCode() const { return m_exitCode; }
+
+private:
+    std::unique_ptr<GameInputHandler> m_inputHandler;
+    MainScene* m_mainScenePtr = nullptr;
+    int m_exitCode = 0;
 };
 
 /**
  * @brief Main entry point.
  */
 int main() {
-    std::cout << "Starting VDE Simple Game..." << std::endl;
+    SimpleGameDemo demo;
+    
+    vde::GameSettings settings;
+    settings.gameName = "VDE Simple Game Example";
+    settings.display.windowWidth = 1280;
+    settings.display.windowHeight = 720;
+    settings.display.fullscreen = false;
+    
     try {
-        // Create game instance
-        vde::Game game;
-        
-        std::cout << "Game instance created" << std::endl;
-        
-        // Configure game settings
-        vde::GameSettings settings;
-        settings.gameName = "VDE Simple Game Example";
-        settings.setWindowSize(1280, 720);
-        settings.display.resizable = true;
-        settings.display.vsync = vde::VSyncMode::On;
-        settings.graphics.quality = vde::GraphicsQuality::Medium;
-        settings.debug.enableValidation = false;  // Disable validation layers for testing
-        settings.debug.showFPS = true;
-        
-        std::cout << "Initializing game..." << std::endl;
-        
-        // Initialize the game
-        if (!game.initialize(settings)) {
-            std::cerr << "Failed to initialize game!" << std::endl;
+        if (!demo.initialize(settings)) {
+            std::cerr << "Failed to initialize demo!" << std::endl;
             return 1;
         }
         
-        std::cout << "Game initialized successfully" << std::endl;
+        demo.run();
+        return demo.getExitCode();
         
-        std::cout << "VDE Simple Game Example" << std::endl;
-        std::cout << "=======================" << std::endl;
-        std::cout << "Controls:" << std::endl;
-        std::cout << "  SPACE - Start game / Toggle rotation speed" << std::endl;
-        std::cout << "  SCROLL - Zoom camera in/out" << std::endl;
-        std::cout << "  ESC - Quit" << std::endl;
-        std::cout << std::endl;
-        
-        // Create input handler
-        GameInputHandler inputHandler;
-        game.setInputHandler(&inputHandler);
-        
-        // Add scenes
-        game.addScene("menu", new MenuScene());
-        game.addScene("main", new MainScene());
-        
-        // Start with menu scene
-        game.setActiveScene("menu");
-        
-        // Run the game loop
-        game.run();
-        
-        // Cleanup
-        game.shutdown();
-        
-        std::cout << "Game ended. Goodbye!" << std::endl;
-        return 0;
     } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << std::endl;
         return 1;
     }
 }

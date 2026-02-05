@@ -16,6 +16,9 @@
 #include <iostream>
 #include <cmath>
 
+// Configuration
+constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
+
 /**
  * @brief Simple input handler for the sprite demo.
  */
@@ -23,6 +26,7 @@ class SpriteInputHandler : public vde::InputHandler {
 public:
     void onKeyPress(int key) override {
         if (key == vde::KEY_ESCAPE) m_escapePressed = true;
+        if (key == vde::KEY_F) m_failPressed = true;
         if (key == vde::KEY_SPACE) m_spacePressed = true;
         if (key == vde::KEY_LEFT) m_left = true;
         if (key == vde::KEY_RIGHT) m_right = true;
@@ -41,6 +45,7 @@ public:
     }
     
     bool isEscapePressed() { bool v = m_escapePressed; m_escapePressed = false; return v; }
+    bool isFailPressed() { bool v = m_failPressed; m_failPressed = false; return v; }
     bool isSpacePressed() { bool v = m_spacePressed; m_spacePressed = false; return v; }
     bool isKey1Pressed() { bool v = m_key1; m_key1 = false; return v; }
     bool isKey2Pressed() { bool v = m_key2; m_key2 = false; return v; }
@@ -53,6 +58,7 @@ public:
     
 private:
     bool m_escapePressed = false;
+    bool m_failPressed = false;
     bool m_spacePressed = false;
     bool m_left = false, m_right = false, m_up = false, m_down = false;
     bool m_key1 = false, m_key2 = false, m_key3 = false;
@@ -108,13 +114,29 @@ public:
     SpriteScene() = default;
     
     void onEnter() override {
-        std::cout << "=== Sprite Demo ===" << std::endl;
-        std::cout << "Controls:" << std::endl;
-        std::cout << "  Arrow keys: Move player sprite" << std::endl;
-        std::cout << "  1/2/3: Change anchor point (center/bottom-left/custom)" << std::endl;
-        std::cout << "  Space: Toggle player visibility" << std::endl;
-        std::cout << "  ESC: Quit" << std::endl;
-        std::cout << std::endl;
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "  VDE Example: Sprite System" << std::endl;
+        std::cout << "========================================\n" << std::endl;
+        
+        std::cout << "Features demonstrated:" << std::endl;
+        std::cout << "  - SpriteEntity creation and rendering" << std::endl;
+        std::cout << "  - Sprite colors and tinting" << std::endl;
+        std::cout << "  - Anchor point positioning" << std::endl;
+        std::cout << "  - Animated sprites" << std::endl;
+        
+        std::cout << "\nYou should see:" << std::endl;
+        std::cout << "  - Green player sprite at center (moveable)" << std::endl;
+        std::cout << "  - Rainbow animated sprite (top-left area)" << std::endl;
+        std::cout << "  - Colored corner sprites (red, blue, orange, purple)" << std::endl;
+        std::cout << "  - Dark semi-transparent background" << std::endl;
+        
+        std::cout << "\nControls:" << std::endl;
+        std::cout << "  Arrow keys - Move player sprite" << std::endl;
+        std::cout << "  1/2/3      - Change anchor point" << std::endl;
+        std::cout << "  Space      - Toggle player visibility" << std::endl;
+        std::cout << "  F          - Fail test (if visuals are incorrect)" << std::endl;
+        std::cout << "  ESC        - Exit early" << std::endl;
+        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
         
         // Set up a 2D camera with viewport in world units (not pixels)
         // Use a viewport size that makes our sprites (which are ~1 unit in size) visible
@@ -150,7 +172,7 @@ public:
         m_background->setColor(vde::Color(0.1f, 0.1f, 0.15f, 0.5f));  // Semi-transparent dark
         m_background->setScale(4.0f, 3.0f, 1.0f);
         
-        std::cout << "Scene initialized with sprites" << std::endl;
+        m_elapsedTime = 0.0f;
     }
     
     void createCornerSprites() {
@@ -194,9 +216,33 @@ public:
         auto* input = dynamic_cast<SpriteInputHandler*>(getInputHandler());
         if (!input) return;
         
-        // Quit on escape
+        m_elapsedTime += deltaTime;
+        
+        // Check for fail key
+        if (input->isFailPressed()) {
+            std::cerr << "\n========================================" << std::endl;
+            std::cerr << "  TEST FAILED: User reported issue" << std::endl;
+            std::cerr << "  Expected: Sprites with colors, animations, anchor points" << std::endl;
+            std::cerr << "========================================\n" << std::endl;
+            m_testFailed = true;
+            if (getGame()) getGame()->quit();
+            return;
+        }
+        
+        // Check for escape key
         if (input->isEscapePressed()) {
-            getGame()->quit();
+            std::cout << "User requested early exit." << std::endl;
+            if (getGame()) getGame()->quit();
+            return;
+        }
+        
+        // Auto-terminate after configured time
+        if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
+            std::cout << "\n========================================" << std::endl;
+            std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
+            std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
+            std::cout << "========================================\n" << std::endl;
+            if (getGame()) getGame()->quit();
             return;
         }
         
@@ -235,56 +281,70 @@ public:
         Scene::update(deltaTime);
     }
     
+    bool didTestFail() const { return m_testFailed; }
+    
 private:
     std::shared_ptr<vde::SpriteEntity> m_player;
     std::shared_ptr<AnimatedSprite> m_animated;
     std::shared_ptr<vde::SpriteEntity> m_background;
+    float m_elapsedTime = 0.0f;
+    bool m_testFailed = false;
+};
+
+/**
+ * @brief Game class for the sprite demo.
+ */
+class SpriteDemo : public vde::Game {
+public:
+    void onStart() override {
+        // Set up input handler
+        m_inputHandler = std::make_unique<SpriteInputHandler>();
+        setInputHandler(m_inputHandler.get());
+        
+        // Create scene
+        auto* scene = new SpriteScene();
+        m_scenePtr = scene;
+        addScene("main", scene);
+        setActiveScene("main");
+    }
+    
+    void onShutdown() override {
+        if (m_scenePtr && m_scenePtr->didTestFail()) {
+            m_exitCode = 1;
+        }
+    }
+    
+    int getExitCode() const { return m_exitCode; }
+
+private:
+    std::unique_ptr<SpriteInputHandler> m_inputHandler;
+    SpriteScene* m_scenePtr = nullptr;
+    int m_exitCode = 0;
 };
 
 /**
  * @brief Main entry point.
  */
 int main() {
-    std::cout << "VDE Sprite Example" << std::endl;
-    std::cout << "==================" << std::endl;
+    SpriteDemo demo;
+    
+    vde::GameSettings settings;
+    settings.gameName = "VDE Sprite Demo";
+    settings.display.windowWidth = 1024;
+    settings.display.windowHeight = 768;
+    settings.display.fullscreen = false;
     
     try {
-        vde::Game game;
-        
-        // Configure game settings
-        vde::GameSettings settings;
-        settings.gameName = "VDE Sprite Demo";
-        settings.display.windowWidth = 1024;
-        settings.display.windowHeight = 768;
-        settings.display.vsync = vde::VSyncMode::On;
-        
-        // Initialize
-        if (!game.initialize(settings)) {
-            std::cerr << "Failed to initialize game!" << std::endl;
+        if (!demo.initialize(settings)) {
+            std::cerr << "Failed to initialize demo!" << std::endl;
             return 1;
         }
         
-        // Create input handler
-        SpriteInputHandler inputHandler;
-        game.setInputHandler(&inputHandler);
-        
-        // Create and add scene
-        auto* scene = new SpriteScene();
-        scene->setInputHandler(&inputHandler);
-        game.addScene("sprites", scene);
-        game.setActiveScene("sprites");
-        
-        // Run the game loop
-        game.run();
-        
-        // Cleanup
-        game.shutdown();
+        demo.run();
+        return demo.getExitCode();
         
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << std::endl;
         return 1;
     }
-    
-    std::cout << "Goodbye!" << std::endl;
-    return 0;
 }
