@@ -24,158 +24,127 @@ All VDE examples should follow this standard pattern to enable:
 
 ## Standard Pattern
 
-### 1. Configuration Constants
+All examples should use the shared `ExampleBase.h` header which provides base classes and utilities to eliminate code duplication.
+
+### 1. Include the Base Header
 
 ```cpp
-// Configuration - adjust as needed for the example
-constexpr float AUTO_TERMINATE_SECONDS = 15.0f;  // Auto-close after this many seconds
+#include "../ExampleBase.h"
 ```
 
-### 2. Input Handler with Fail/Escape Support
+### 2. Input Handler (Inherit from BaseExampleInputHandler)
 
 ```cpp
-class DemoInputHandler : public vde::InputHandler {
+class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
 public:
     void onKeyPress(int key) override {
-        if (key == vde::KEY_ESCAPE) {
-            m_escapePressed = true;
-        }
-        if (key == vde::KEY_F) {
-            m_failPressed = true;
+        // Call base class first for ESC and F keys
+        BaseExampleInputHandler::onKeyPress(key);
+        
+        // Add your custom keys here
+        if (key == vde::KEY_SPACE) {
+            m_spacePressed = true;
         }
     }
     
-    bool isEscapePressed() {
-        bool val = m_escapePressed;
-        m_escapePressed = false;
-        return val;
-    }
-    
-    bool isFailPressed() {
-        bool val = m_failPressed;
-        m_failPressed = false;
+    bool isSpacePressed() {
+        bool val = m_spacePressed;
+        m_spacePressed = false;
         return val;
     }
 
 private:
-    bool m_escapePressed = false;
-    bool m_failPressed = false;
+    bool m_spacePressed = false;
 };
 ```
 
-### 3. Scene with Verification Logic
+### 3. Scene (Inherit from BaseExampleScene)
 
 ```cpp
-class DemoScene : public vde::Scene {
+class DemoScene : public vde::examples::BaseExampleScene {
 public:
+    // Constructor: set auto-terminate time (default is 15.0s)
+    DemoScene() : BaseExampleScene(15.0f) {}
+    
     void onEnter() override {
-        // Print header and description
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "  VDE Example: [Feature Name]" << std::endl;
-        std::cout << "========================================\n" << std::endl;
+        // Print standard header (uses the methods below)
+        printExampleHeader();
         
-        // Describe what features are demonstrated
-        std::cout << "Features demonstrated:" << std::endl;
-        std::cout << "  - Feature 1" << std::endl;
-        std::cout << "  - Feature 2" << std::endl;
-        
-        // Describe what the user should see
-        std::cout << "\nYou should see:" << std::endl;
-        std::cout << "  - [Description of expected visuals]" << std::endl;
-        
-        // Show controls
-        std::cout << "\nControls:" << std::endl;
-        std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
-        std::cout << "  ESC   - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
-        
-        // Set up scene...
-        m_elapsedTime = 0.0f;
+        // Set up your scene here...
     }
     
     void update(float deltaTime) override {
-        Scene::update(deltaTime);
-        m_elapsedTime += deltaTime;
+        // Call base class first (handles ESC, F, auto-terminate)
+        BaseExampleScene::update(deltaTime);
         
+        // Your custom update logic here...
         auto* input = dynamic_cast<DemoInputHandler*>(getInputHandler());
         if (input) {
-            // Check for fail key
-            if (input->isFailPressed()) {
-                std::cerr << "\n========================================" << std::endl;
-                std::cerr << "  TEST FAILED: User reported issue" << std::endl;
-                std::cerr << "  Expected: [describe expected output]" << std::endl;
-                std::cerr << "========================================\n" << std::endl;
-                m_testFailed = true;
-                if (m_game) m_game->quit();
-                return;
-            }
-            
-            // Check for escape key
-            if (input->isEscapePressed()) {
-                std::cout << "User requested early exit." << std::endl;
-                if (m_game) m_game->quit();
-                return;
-            }
-        }
-        
-        // Auto-terminate after configured time
-        if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
-            std::cout << "\n========================================" << std::endl;
-            std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
-            std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
-            std::cout << "========================================\n" << std::endl;
-            if (m_game) m_game->quit();
+            // Handle your custom keys
         }
     }
-    
-    bool didTestFail() const { return m_testFailed; }
 
-private:
-    float m_elapsedTime = 0.0f;
-    bool m_testFailed = false;
+protected:
+    // Override these to customize the header output
+    std::string getExampleName() const override {
+        return "Feature Name";
+    }
+    
+    std::vector<std::string> getFeatures() const override {
+        return {
+            "Feature 1 description",
+            "Feature 2 description"
+        };
+    }
+    
+    std::vector<std::string> getExpectedVisuals() const override {
+        return {
+            "Visual element 1",
+            "Visual element 2"
+        };
+    }
+    
+    std::vector<std::string> getControls() const override {
+        return {
+            "SPACE - Toggle something"
+        };
+    }
 };
 ```
 
-### 4. Game Class with Exit Code
+### 4. Game Class (Use BaseExampleGame Template)
 
 ```cpp
-class DemoGame : public vde::Game {
+class DemoGame : public vde::examples::BaseExampleGame<DemoInputHandler, DemoScene> {
 public:
+    DemoGame() = default;
+    
+    // Optionally override onStart() if you need custom initialization
+    // But make sure to call the base class version!
     void onStart() override {
-        // Set up input handler
-        m_inputHandler = std::make_unique<DemoInputHandler>();
-        setInputHandler(m_inputHandler.get());
-        
-        // Create scene - addScene takes ownership
-        auto* scene = new DemoScene();
-        m_scenePtr = scene;
-        addScene("main", scene);
-        setActiveScene("main");
+        BaseExampleGame::onStart();
+        // Your custom initialization...
     }
-    
-    void onShutdown() override {
-        if (m_scenePtr && m_scenePtr->didTestFail()) {
-            m_exitCode = 1;
-        }
-    }
-    
-    int getExitCode() const { return m_exitCode; }
-
-private:
-    std::unique_ptr<DemoInputHandler> m_inputHandler;
-    DemoScene* m_scenePtr = nullptr;  // Non-owning reference
-    int m_exitCode = 0;
 };
 ```
 
-### 5. Main Function
+### 5. Main Function (Use runExample Helper)
+
+```cpp
+int main() {
+    DemoGame demo;
+    return vde::examples::runExample(demo, "VDE Feature Demo", 1280, 720);
+}
+```
+
+### Alternative: Simple Main (Manual Setup)
 
 ```cpp
 int main() {
     DemoGame demo;
     
     vde::GameSettings settings;
-    settings.gameName = "VDE [Feature] Demo";
+    settings.gameName = "VDE Feature Demo";
     settings.display.windowWidth = 1280;
     settings.display.windowHeight = 720;
     settings.display.fullscreen = false;
@@ -219,12 +188,22 @@ add_custom_command(TARGET vde_[feature]_demo POST_BUILD
 
 ## Best Practices
 
-1. **Clear visual descriptions**: Tell users exactly what they should see
-2. **Reasonable timeout**: 15 seconds is good for most demos; increase for complex animations
-3. **Descriptive failure output**: Help users report what went wrong
-4. **Exit code 0 on success, 1 on failure**: Enables CI/CD integration
-5. **Console output first**: Print instructions before rendering starts
-6. **Keep demos focused**: One feature set per example
+1. **Use ExampleBase.h**: Always inherit from the base classes to maintain consistency
+2. **Clear visual descriptions**: Tell users exactly what they should see in `getExpectedVisuals()`
+3. **Reasonable timeout**: 15 seconds is good for most demos; pass different value to BaseExampleScene constructor
+4. **Descriptive failure output**: The base class handles this, but you can override `getFailureMessage()`
+5. **Exit code 0 on success, 1 on failure**: BaseExampleGame handles this automatically
+6. **Console output first**: Call `printExampleHeader()` at the start of `onEnter()`
+7. **Keep demos focused**: One feature set per example
+8. **Call base class methods**: Always call `BaseExampleScene::update(deltaTime)` and `BaseExampleInputHandler::onKeyPress(key)`
+
+## Benefits of Using ExampleBase.h
+
+- **No code duplication**: Common testing logic is centralized
+- **Consistent output**: All examples have the same look and feel
+- **Easy to add examples**: Less boilerplate code to write
+- **Easy to maintain**: Changes to the testing pattern only need to be made once
+- **Type safety**: Template-based BaseExampleGame ensures correct types
 
 ## Example Reference
 

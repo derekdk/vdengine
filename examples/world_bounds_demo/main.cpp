@@ -18,21 +18,19 @@
 #include <iomanip>
 #include <iostream>
 
-using namespace vde;
+#include "../ExampleBase.h"
 
-// Configuration
-constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
+using namespace vde;
 
 /**
  * @brief Input handler that tracks mouse position
  */
-class DemoInputHandler : public InputHandler {
+class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
-        if (key == KEY_ESCAPE)
-            m_escapePressed = true;
-        if (key == KEY_F)
-            m_failPressed = true;
+        // Call base class first for ESC and F keys
+        BaseExampleInputHandler::onKeyPress(key);
+
         if (key == KEY_SPACE)
             m_spacePressed = true;
         if (key == KEY_W)
@@ -75,16 +73,6 @@ class DemoInputHandler : public InputHandler {
         }
     }
 
-    bool isEscapePressed() {
-        bool v = m_escapePressed;
-        m_escapePressed = false;
-        return v;
-    }
-    bool isFailPressed() {
-        bool v = m_failPressed;
-        m_failPressed = false;
-        return v;
-    }
     bool isSpacePressed() {
         bool v = m_spacePressed;
         m_spacePressed = false;
@@ -107,8 +95,6 @@ class DemoInputHandler : public InputHandler {
     bool isZoomingOut() const { return m_zoomOut; }
 
   private:
-    bool m_escapePressed = false;
-    bool m_failPressed = false;
     bool m_spacePressed = false;
     bool m_clicked = false;
     bool m_up = false, m_down = false, m_left = false, m_right = false;
@@ -133,35 +119,13 @@ class WorldMarker : public SpriteEntity {
 /**
  * @brief Scene demonstrating world bounds and coordinate systems
  */
-class WorldBoundsScene : public Scene {
+class WorldBoundsScene : public vde::examples::BaseExampleScene {
   public:
-    WorldBoundsScene() = default;
+    WorldBoundsScene() : BaseExampleScene(15.0f) {}
 
     void onEnter() override {
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "  VDE Example: World Bounds System" << std::endl;
-        std::cout << "========================================\n" << std::endl;
-
-        std::cout << "Features demonstrated:" << std::endl;
-        std::cout << "  - Type-safe world units (Meters)" << std::endl;
-        std::cout << "  - Cardinal direction-based bounds" << std::endl;
-        std::cout << "  - Screen-to-world coordinate mapping" << std::endl;
-        std::cout << "  - CameraBounds2D for panning/zooming" << std::endl;
-
-        std::cout << "\nYou should see:" << std::endl;
-        std::cout << "  - Grid of colored markers" << std::endl;
-        std::cout << "  - White center marker" << std::endl;
-        std::cout << "  - Cardinal direction markers (N/S/E/W)" << std::endl;
-        std::cout << "  - Dark blue background" << std::endl;
-
-        std::cout << "\nControls:" << std::endl;
-        std::cout << "  WASD   - Pan camera" << std::endl;
-        std::cout << "  Q/E    - Zoom out/in" << std::endl;
-        std::cout << "  Click  - Print world coordinates" << std::endl;
-        std::cout << "  Space  - Toggle constraint bounds" << std::endl;
-        std::cout << "  F      - Fail test (if visuals are incorrect)" << std::endl;
-        std::cout << "  ESC    - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
+        // Print standard header
+        printExampleHeader();
 
         // =========================================================
         // Demonstrate world bounds with cardinal directions
@@ -260,47 +224,15 @@ class WorldBoundsScene : public Scene {
         m_clickMarker->setColor(Color::yellow());
         m_clickMarker->setScale(0.3f, 0.3f, 1.0f);
         m_clickMarker->setVisible(false);
-
-        m_elapsedTime = 0.0f;
     }
 
     void update(float deltaTime) override {
-        m_elapsedTime += deltaTime;
+        // Call base class first (handles ESC, F, auto-terminate)
+        BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<DemoInputHandler*>(getInputHandler());
         if (!input)
             return;
-
-        // Check for fail key
-        if (input->isFailPressed()) {
-            std::cerr << "\n========================================" << std::endl;
-            std::cerr << "  TEST FAILED: User reported issue" << std::endl;
-            std::cerr << "  Expected: Grid of markers, camera panning/zooming" << std::endl;
-            std::cerr << "========================================\n" << std::endl;
-            m_testFailed = true;
-            if (getGame())
-                getGame()->quit();
-            return;
-        }
-
-        // Check for escape key
-        if (input->isEscapePressed()) {
-            std::cout << "User requested early exit." << std::endl;
-            if (getGame())
-                getGame()->quit();
-            return;
-        }
-
-        // Auto-terminate after configured time
-        if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
-            std::cout << "\n========================================" << std::endl;
-            std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
-            std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
-            std::cout << "========================================\n" << std::endl;
-            if (getGame())
-                getGame()->quit();
-            return;
-        }
 
         // Pan camera
         float panSpeed = 20.0f * deltaTime;
@@ -376,11 +308,25 @@ class WorldBoundsScene : public Scene {
             // Markers should always be visible in this demo, but demonstrate the check
             // marker->setVisible(visible);
         }
-
-        Scene::update(deltaTime);
     }
 
-    bool didTestFail() const { return m_testFailed; }
+  protected:
+    std::string getExampleName() const override { return "World Bounds System"; }
+
+    std::vector<std::string> getFeatures() const override {
+        return {"Type-safe world units (Meters)", "Cardinal direction-based bounds",
+                "Screen-to-world coordinate mapping", "CameraBounds2D for panning/zooming"};
+    }
+
+    std::vector<std::string> getExpectedVisuals() const override {
+        return {"Grid of colored markers", "White center marker",
+                "Cardinal direction markers (N/S/E/W)", "Dark blue background"};
+    }
+
+    std::vector<std::string> getControls() const override {
+        return {"WASD   - Pan camera", "Q/E    - Zoom out/in", "Click  - Print world coordinates",
+                "Space  - Toggle constraint bounds"};
+    }
 
   private:
     CameraBounds2D m_cameraBounds;
@@ -389,40 +335,12 @@ class WorldBoundsScene : public Scene {
 
     std::vector<std::shared_ptr<WorldMarker>> m_markers;
     std::shared_ptr<WorldMarker> m_clickMarker;
-
-    float m_elapsedTime = 0.0f;
-    bool m_testFailed = false;
 };
 
 /**
  * @brief Game class for the demo.
  */
-class WorldBoundsDemo : public Game {
-  public:
-    void onStart() override {
-        // Set up input handler
-        m_inputHandler = std::make_unique<DemoInputHandler>();
-        setInputHandler(m_inputHandler.get());
-
-        // Create scene
-        auto* scene = new WorldBoundsScene();
-        m_scenePtr = scene;
-        addScene("main", scene);
-        setActiveScene("main");
-    }
-
-    void onShutdown() override {
-        if (m_scenePtr && m_scenePtr->didTestFail()) {
-            m_exitCode = 1;
-        }
-    }
-
-    int getExitCode() const { return m_exitCode; }
-
-  private:
-    std::unique_ptr<DemoInputHandler> m_inputHandler;
-    WorldBoundsScene* m_scenePtr = nullptr;
-    int m_exitCode = 0;
+class WorldBoundsDemo : public vde::examples::BaseExampleGame<DemoInputHandler, WorldBoundsScene> {
 };
 
 /**
@@ -430,24 +348,5 @@ class WorldBoundsDemo : public Game {
  */
 int main() {
     WorldBoundsDemo demo;
-
-    GameSettings settings;
-    settings.gameName = "World Bounds Demo";
-    settings.display.windowWidth = 1280;
-    settings.display.windowHeight = 720;
-    settings.display.fullscreen = false;
-
-    try {
-        if (!demo.initialize(settings)) {
-            std::cerr << "Failed to initialize demo!" << std::endl;
-            return 1;
-        }
-
-        demo.run();
-        return demo.getExitCode();
-
-    } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
-        return 1;
-    }
+    return vde::examples::runExample(demo, "World Bounds Demo", 1280, 720);
 }

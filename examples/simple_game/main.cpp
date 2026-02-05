@@ -14,23 +14,19 @@
 
 #include <iostream>
 
-// Configuration
-constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
+#include "../ExampleBase.h"
 
 /**
  * @brief Custom input handler for the game.
  */
-class GameInputHandler : public vde::InputHandler {
+class GameInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     GameInputHandler() = default;
 
     void onKeyPress(int key) override {
-        if (key == vde::KEY_ESCAPE) {
-            m_escapePressed = true;
-        }
-        if (key == vde::KEY_F) {
-            m_failPressed = true;
-        }
+        // Call base class first for ESC and F keys
+        BaseExampleInputHandler::onKeyPress(key);
+
         if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
         }
@@ -65,18 +61,6 @@ class GameInputHandler : public vde::InputHandler {
     }
 
     // Query methods
-    bool isEscapePressed() {
-        bool val = m_escapePressed;
-        m_escapePressed = false;
-        return val;
-    }
-
-    bool isFailPressed() {
-        bool val = m_failPressed;
-        m_failPressed = false;
-        return val;
-    }
-
     bool isSpacePressed() {
         bool val = m_spacePressed;
         m_spacePressed = false;
@@ -98,8 +82,6 @@ class GameInputHandler : public vde::InputHandler {
     }
 
   private:
-    bool m_escapePressed = false;
-    bool m_failPressed = false;
     bool m_spacePressed = false;
     bool m_moveForward = false;
     bool m_moveBackward = false;
@@ -135,31 +117,13 @@ class RotatingCube : public vde::MeshEntity {
 /**
  * @brief Main game scene with a rotating cube.
  */
-class MainScene : public vde::Scene {
+class MainScene : public vde::examples::BaseExampleScene {
   public:
-    MainScene() = default;
+    MainScene() : BaseExampleScene(15.0f) {}
 
     void onEnter() override {
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "  VDE Example: Simple Game" << std::endl;
-        std::cout << "========================================\n" << std::endl;
-
-        std::cout << "Features demonstrated:" << std::endl;
-        std::cout << "  - Game class initialization" << std::endl;
-        std::cout << "  - Scene management" << std::endl;
-        std::cout << "  - MeshEntity with rotation" << std::endl;
-        std::cout << "  - OrbitCamera controls" << std::endl;
-
-        std::cout << "\nYou should see:" << std::endl;
-        std::cout << "  - Blue rotating cube at origin" << std::endl;
-        std::cout << "  - Dark blue background" << std::endl;
-
-        std::cout << "\nControls:" << std::endl;
-        std::cout << "  SCROLL - Zoom camera in/out" << std::endl;
-        std::cout << "  SPACE  - Toggle rotation speed" << std::endl;
-        std::cout << "  F      - Fail test (if visuals are incorrect)" << std::endl;
-        std::cout << "  ESC    - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
+        // Print standard header
+        printExampleHeader();
 
         // Set up an orbit camera looking at the origin
         setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 5.0f, 20.0f, 45.0f));
@@ -176,47 +140,15 @@ class MainScene : public vde::Scene {
 
         // Set a cube mesh
         m_cube->setMesh(vde::Mesh::createCube(1.0f));
-
-        m_elapsedTime = 0.0f;
     }
 
     void update(float deltaTime) override {
-        m_elapsedTime += deltaTime;
+        // Call base class first (handles ESC, F, auto-terminate)
+        BaseExampleScene::update(deltaTime);
 
         // Handle input
         auto* input = dynamic_cast<GameInputHandler*>(getInputHandler());
         if (input) {
-            // Check for fail key
-            if (input->isFailPressed()) {
-                std::cerr << "\n========================================" << std::endl;
-                std::cerr << "  TEST FAILED: User reported issue" << std::endl;
-                std::cerr << "  Expected: Rotating blue cube with camera controls" << std::endl;
-                std::cerr << "========================================\n" << std::endl;
-                m_testFailed = true;
-                if (getGame())
-                    getGame()->quit();
-                return;
-            }
-
-            // Check for escape key
-            if (input->isEscapePressed()) {
-                std::cout << "User requested early exit." << std::endl;
-                if (getGame())
-                    getGame()->quit();
-                return;
-            }
-
-            // Auto-terminate after configured time
-            if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
-                std::cout << "\n========================================" << std::endl;
-                std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
-                std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
-                std::cout << "========================================\n" << std::endl;
-                if (getGame())
-                    getGame()->quit();
-                return;
-            }
-
             // Camera zoom with scroll
             float scroll = input->getScrollDelta();
             if (scroll != 0.0f) {
@@ -235,18 +167,27 @@ class MainScene : public vde::Scene {
                           << std::endl;
             }
         }
-
-        // Update all entities (including the cube)
-        vde::Scene::update(deltaTime);
     }
 
-    bool didTestFail() const { return m_testFailed; }
+  protected:
+    std::string getExampleName() const override { return "Simple Game"; }
+
+    std::vector<std::string> getFeatures() const override {
+        return {"Game class initialization", "Scene management", "MeshEntity with rotation",
+                "OrbitCamera controls"};
+    }
+
+    std::vector<std::string> getExpectedVisuals() const override {
+        return {"Blue rotating cube at origin", "Dark blue background"};
+    }
+
+    std::vector<std::string> getControls() const override {
+        return {"SCROLL - Zoom camera in/out", "SPACE  - Toggle rotation speed"};
+    }
 
   private:
     std::shared_ptr<RotatingCube> m_cube;
     float m_speedMultiplier = 1.0f;
-    float m_elapsedTime = 0.0f;
-    bool m_testFailed = false;
 };
 
 /**
@@ -327,24 +268,5 @@ class SimpleGameDemo : public vde::Game {
  */
 int main() {
     SimpleGameDemo demo;
-
-    vde::GameSettings settings;
-    settings.gameName = "VDE Simple Game Example";
-    settings.display.windowWidth = 1280;
-    settings.display.windowHeight = 720;
-    settings.display.fullscreen = false;
-
-    try {
-        if (!demo.initialize(settings)) {
-            std::cerr << "Failed to initialize demo!" << std::endl;
-            return 1;
-        }
-
-        demo.run();
-        return demo.getExitCode();
-
-    } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
-        return 1;
-    }
+    return vde::examples::runExample(demo, "VDE Simple Game Example", 1280, 720);
 }

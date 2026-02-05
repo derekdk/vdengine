@@ -17,19 +17,17 @@
 #include <cmath>
 #include <iostream>
 
-// Configuration
-constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
+#include "../ExampleBase.h"
 
 /**
  * @brief Simple input handler for the sprite demo.
  */
-class SpriteInputHandler : public vde::InputHandler {
+class SpriteInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
-        if (key == vde::KEY_ESCAPE)
-            m_escapePressed = true;
-        if (key == vde::KEY_F)
-            m_failPressed = true;
+        // Call base class first for ESC and F keys
+        BaseExampleInputHandler::onKeyPress(key);
+
         if (key == vde::KEY_SPACE)
             m_spacePressed = true;
         if (key == vde::KEY_LEFT)
@@ -59,16 +57,6 @@ class SpriteInputHandler : public vde::InputHandler {
             m_down = false;
     }
 
-    bool isEscapePressed() {
-        bool v = m_escapePressed;
-        m_escapePressed = false;
-        return v;
-    }
-    bool isFailPressed() {
-        bool v = m_failPressed;
-        m_failPressed = false;
-        return v;
-    }
     bool isSpacePressed() {
         bool v = m_spacePressed;
         m_spacePressed = false;
@@ -96,8 +84,6 @@ class SpriteInputHandler : public vde::InputHandler {
     bool isDown() const { return m_down; }
 
   private:
-    bool m_escapePressed = false;
-    bool m_failPressed = false;
     bool m_spacePressed = false;
     bool m_left = false, m_right = false, m_up = false, m_down = false;
     bool m_key1 = false, m_key2 = false, m_key3 = false;
@@ -172,34 +158,13 @@ class AnimatedSprite : public vde::SpriteEntity {
 /**
  * @brief Scene demonstrating sprite functionality.
  */
-class SpriteScene : public vde::Scene {
+class SpriteScene : public vde::examples::BaseExampleScene {
   public:
-    SpriteScene() = default;
+    SpriteScene() : BaseExampleScene(15.0f) {}
 
     void onEnter() override {
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "  VDE Example: Sprite System" << std::endl;
-        std::cout << "========================================\n" << std::endl;
-
-        std::cout << "Features demonstrated:" << std::endl;
-        std::cout << "  - SpriteEntity creation and rendering" << std::endl;
-        std::cout << "  - Sprite colors and tinting" << std::endl;
-        std::cout << "  - Anchor point positioning" << std::endl;
-        std::cout << "  - Animated sprites" << std::endl;
-
-        std::cout << "\nYou should see:" << std::endl;
-        std::cout << "  - Green player sprite at center (moveable)" << std::endl;
-        std::cout << "  - Rainbow animated sprite (top-left area)" << std::endl;
-        std::cout << "  - Colored corner sprites (red, blue, orange, purple)" << std::endl;
-        std::cout << "  - Dark semi-transparent background" << std::endl;
-
-        std::cout << "\nControls:" << std::endl;
-        std::cout << "  Arrow keys - Move player sprite" << std::endl;
-        std::cout << "  1/2/3      - Change anchor point" << std::endl;
-        std::cout << "  Space      - Toggle player visibility" << std::endl;
-        std::cout << "  F          - Fail test (if visuals are incorrect)" << std::endl;
-        std::cout << "  ESC        - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
+        // Print standard header
+        printExampleHeader();
 
         // Set up a 2D camera with viewport in world units (not pixels)
         // Use a viewport size that makes our sprites (which are ~1 unit in size) visible
@@ -234,8 +199,6 @@ class SpriteScene : public vde::Scene {
         m_background->setPosition(0.0f, 0.0f, -0.1f);                 // Behind other sprites
         m_background->setColor(vde::Color(0.1f, 0.1f, 0.15f, 0.5f));  // Semi-transparent dark
         m_background->setScale(4.0f, 3.0f, 1.0f);
-
-        m_elapsedTime = 0.0f;
     }
 
     void createCornerSprites() {
@@ -276,42 +239,12 @@ class SpriteScene : public vde::Scene {
     }
 
     void update(float deltaTime) override {
+        // Call base class first (handles ESC, F, auto-terminate)
+        BaseExampleScene::update(deltaTime);
+
         auto* input = dynamic_cast<SpriteInputHandler*>(getInputHandler());
         if (!input)
             return;
-
-        m_elapsedTime += deltaTime;
-
-        // Check for fail key
-        if (input->isFailPressed()) {
-            std::cerr << "\n========================================" << std::endl;
-            std::cerr << "  TEST FAILED: User reported issue" << std::endl;
-            std::cerr << "  Expected: Sprites with colors, animations, anchor points" << std::endl;
-            std::cerr << "========================================\n" << std::endl;
-            m_testFailed = true;
-            if (getGame())
-                getGame()->quit();
-            return;
-        }
-
-        // Check for escape key
-        if (input->isEscapePressed()) {
-            std::cout << "User requested early exit." << std::endl;
-            if (getGame())
-                getGame()->quit();
-            return;
-        }
-
-        // Auto-terminate after configured time
-        if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
-            std::cout << "\n========================================" << std::endl;
-            std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
-            std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
-            std::cout << "========================================\n" << std::endl;
-            if (getGame())
-                getGame()->quit();
-            return;
-        }
 
         // Toggle player visibility
         if (input->isSpacePressed()) {
@@ -348,75 +281,43 @@ class SpriteScene : public vde::Scene {
             pos.y -= speed * deltaTime;
 
         m_player->setPosition(pos);
-
-        // Update all entities
-        Scene::update(deltaTime);
     }
 
-    bool didTestFail() const { return m_testFailed; }
+  protected:
+    std::string getExampleName() const override { return "Sprite System"; }
+
+    std::vector<std::string> getFeatures() const override {
+        return {"SpriteEntity creation and rendering", "Sprite colors and tinting",
+                "Anchor point positioning", "Animated sprites"};
+    }
+
+    std::vector<std::string> getExpectedVisuals() const override {
+        return {"Green player sprite at center (moveable)",
+                "Rainbow animated sprite (top-left area)",
+                "Colored corner sprites (red, blue, orange, purple)",
+                "Dark semi-transparent background"};
+    }
+
+    std::vector<std::string> getControls() const override {
+        return {"Arrow keys - Move player sprite", "1/2/3      - Change anchor point",
+                "Space      - Toggle player visibility"};
+    }
 
   private:
     std::shared_ptr<vde::SpriteEntity> m_player;
     std::shared_ptr<AnimatedSprite> m_animated;
     std::shared_ptr<vde::SpriteEntity> m_background;
-    float m_elapsedTime = 0.0f;
-    bool m_testFailed = false;
 };
 
 /**
  * @brief Game class for the sprite demo.
  */
-class SpriteDemo : public vde::Game {
-  public:
-    void onStart() override {
-        // Set up input handler
-        m_inputHandler = std::make_unique<SpriteInputHandler>();
-        setInputHandler(m_inputHandler.get());
-
-        // Create scene
-        auto* scene = new SpriteScene();
-        m_scenePtr = scene;
-        addScene("main", scene);
-        setActiveScene("main");
-    }
-
-    void onShutdown() override {
-        if (m_scenePtr && m_scenePtr->didTestFail()) {
-            m_exitCode = 1;
-        }
-    }
-
-    int getExitCode() const { return m_exitCode; }
-
-  private:
-    std::unique_ptr<SpriteInputHandler> m_inputHandler;
-    SpriteScene* m_scenePtr = nullptr;
-    int m_exitCode = 0;
-};
+class SpriteDemo : public vde::examples::BaseExampleGame<SpriteInputHandler, SpriteScene> {};
 
 /**
  * @brief Main entry point.
  */
 int main() {
     SpriteDemo demo;
-
-    vde::GameSettings settings;
-    settings.gameName = "VDE Sprite Demo";
-    settings.display.windowWidth = 1024;
-    settings.display.windowHeight = 768;
-    settings.display.fullscreen = false;
-
-    try {
-        if (!demo.initialize(settings)) {
-            std::cerr << "Failed to initialize demo!" << std::endl;
-            return 1;
-        }
-
-        demo.run();
-        return demo.getExitCode();
-
-    } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
-        return 1;
-    }
+    return vde::examples::runExample(demo, "VDE Sprite Demo", 1024, 768);
 }

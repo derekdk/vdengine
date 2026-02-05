@@ -18,39 +18,12 @@
 #include <cmath>
 #include <iostream>
 
-// Configuration
-constexpr float AUTO_TERMINATE_SECONDS = 5.0f;  // Auto-close after this many seconds
+#include "../ExampleBase.h"
 
 /**
  * @brief Input handler for the demo.
  */
-class DemoInputHandler : public vde::InputHandler {
-  public:
-    void onKeyPress(int key) override {
-        if (key == vde::KEY_ESCAPE) {
-            m_escapePressed = true;
-        }
-        if (key == vde::KEY_F) {
-            m_failPressed = true;
-        }
-    }
-
-    bool isEscapePressed() {
-        bool val = m_escapePressed;
-        m_escapePressed = false;
-        return val;
-    }
-
-    bool isFailPressed() {
-        bool val = m_failPressed;
-        m_failPressed = false;
-        return val;
-    }
-
-  private:
-    bool m_escapePressed = false;
-    bool m_failPressed = false;
-};
+class DemoInputHandler : public vde::examples::BaseExampleInputHandler {};
 
 /**
  * @brief A cube that rotates over time and uses materials.
@@ -93,27 +66,13 @@ class MaterialCube : public vde::MeshEntity {
 /**
  * @brief Scene demonstrating materials and lighting.
  */
-class MaterialsLightingScene : public vde::Scene {
+class MaterialsLightingScene : public vde::examples::BaseExampleScene {
   public:
-    MaterialsLightingScene() = default;
+    MaterialsLightingScene() : BaseExampleScene(5.0f) {}
 
     void onEnter() override {
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "  VDE Phase 4: Materials & Lighting Demo" << std::endl;
-        std::cout << "========================================\n" << std::endl;
-        std::cout << "Features demonstrated:" << std::endl;
-        std::cout << "  - PBR Materials (albedo, roughness, metallic)" << std::endl;
-        std::cout << "  - Emissive materials (self-illumination)" << std::endl;
-        std::cout << "  - Three-point lighting setup" << std::endl;
-        std::cout << "  - Multiple material types\n" << std::endl;
-        std::cout << "You should see:" << std::endl;
-        std::cout << "  - 5 rotating cubes with different materials" << std::endl;
-        std::cout << "  - Center: White default material" << std::endl;
-        std::cout << "  - Orbiting: Red, Blue metallic, Green, Yellow emissive\n" << std::endl;
-        std::cout << "Controls:" << std::endl;
-        std::cout << "  F     - Fail test (if you don't see cubes)" << std::endl;
-        std::cout << "  ESC   - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
+        // Print standard header
+        printExampleHeader();
 
         // Set up orbit camera
         auto* camera = new vde::OrbitCamera(vde::Position(0, 0, 0), 8.0f, 25.0f, 45.0f);
@@ -183,50 +142,13 @@ class MaterialsLightingScene : public vde::Scene {
         yellowCube->setOrbitRadius(2.5f);
         yellowCube->setOrbitSpeed(0.4f);
         yellowCube->setOrbitStartAngle(4.7124f);  // 270 degrees (3*PI/2);
-
-        m_startTime = 0.0f;
     }
 
     void onExit() override { std::cout << "MaterialsLightingScene: Exiting" << std::endl; }
 
     void update(float deltaTime) override {
-        Scene::update(deltaTime);
-
-        m_elapsedTime += deltaTime;
-
-        // Check for fail key
-        auto* input = dynamic_cast<DemoInputHandler*>(getInputHandler());
-        if (input) {
-            if (input->isFailPressed()) {
-                std::cerr << "\n========================================" << std::endl;
-                std::cerr << "  TEST FAILED: User reported issue" << std::endl;
-                std::cerr << "  User could not see expected output:" << std::endl;
-                std::cerr << "    - 5 rotating cubes with different materials" << std::endl;
-                std::cerr << "    - Three-point lighting illumination" << std::endl;
-                std::cerr << "========================================\n" << std::endl;
-                m_testFailed = true;
-                if (m_game)
-                    m_game->quit();
-                return;
-            }
-
-            if (input->isEscapePressed()) {
-                std::cout << "User requested early exit." << std::endl;
-                if (m_game)
-                    m_game->quit();
-                return;
-            }
-        }
-
-        // Auto-terminate after configured time
-        if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
-            std::cout << "\n========================================" << std::endl;
-            std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
-            std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
-            std::cout << "========================================\n" << std::endl;
-            if (m_game)
-                m_game->quit();
-        }
+        // Call base class first (handles ESC, F, auto-terminate)
+        BaseExampleScene::update(deltaTime);
 
         // Slowly rotate camera around scene
         auto* camera = dynamic_cast<vde::OrbitCamera*>(getCamera());
@@ -236,71 +158,44 @@ class MaterialsLightingScene : public vde::Scene {
         }
     }
 
-    bool didTestFail() const { return m_testFailed; }
+  protected:
+    std::string getExampleName() const override { return "Materials & Lighting"; }
 
-  private:
-    float m_elapsedTime = 0.0f;
-    float m_startTime = 0.0f;
-    bool m_testFailed = false;
+    std::vector<std::string> getFeatures() const override {
+        return {"PBR Materials (albedo, roughness, metallic)",
+                "Emissive materials (self-illumination)", "Three-point lighting setup",
+                "Multiple material types"};
+    }
+
+    std::vector<std::string> getExpectedVisuals() const override {
+        return {"5 rotating cubes with different materials", "Center: White default material",
+                "Orbiting: Red, Blue metallic, Green, Yellow emissive"};
+    }
+
+    std::string getFailureMessage() const override {
+        return "User could not see expected output:\n    - 5 rotating cubes with different "
+               "materials\n    - Three-point lighting illumination";
+    }
 };
 
 /**
  * @brief Main game class for the demo.
  */
-class MaterialsLightingDemo : public vde::Game {
+class MaterialsLightingDemo
+    : public vde::examples::BaseExampleGame<DemoInputHandler, MaterialsLightingScene> {
   public:
     void onStart() override {
         std::cout << "Starting Materials & Lighting Demo..." << std::endl;
-
-        // Set up input handler
-        m_inputHandler = std::make_unique<DemoInputHandler>();
-        setInputHandler(m_inputHandler.get());
-
-        // Create and activate the demo scene
-        // Note: addScene takes ownership, so we pass a raw new pointer
-        auto* scene = new MaterialsLightingScene();
-        m_scenePtr = scene;  // Keep a reference for checking test status
-        addScene("main", scene);
-        setActiveScene("main");
+        BaseExampleGame::onStart();
     }
 
     void onShutdown() override {
-        // Check if test failed
-        if (m_scenePtr && m_scenePtr->didTestFail()) {
-            m_exitCode = 1;
-        }
+        BaseExampleGame::onShutdown();
         std::cout << "Demo shutdown complete." << std::endl;
     }
-
-    int getExitCode() const { return m_exitCode; }
-
-  private:
-    std::unique_ptr<DemoInputHandler> m_inputHandler;
-    MaterialsLightingScene* m_scenePtr = nullptr;  // Non-owning reference
-    int m_exitCode = 0;
 };
 
 int main() {
     MaterialsLightingDemo demo;
-
-    vde::GameSettings settings;
-    settings.gameName = "VDE Materials & Lighting Demo";
-    settings.display.windowWidth = 1280;
-    settings.display.windowHeight = 720;
-    settings.display.fullscreen = false;
-
-    try {
-        if (!demo.initialize(settings)) {
-            std::cerr << "Failed to initialize demo!" << std::endl;
-            return 1;
-        }
-
-        demo.run();
-
-        return demo.getExitCode();
-
-    } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
-        return 1;
-    }
+    return vde::examples::runExample(demo, "VDE Materials & Lighting Demo", 1280, 720);
 }
