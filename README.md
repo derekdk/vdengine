@@ -42,18 +42,39 @@ cmake --build . --config Debug
 .\examples\Debug\triangle_example.exe
 ```
 
-### Using the Build Script
+### Using the Build Scripts (Recommended)
+
+VDE provides convenient PowerShell scripts for all build operations:
 
 ```powershell
-# Build and run all tests
-.\scripts\build-and-test.ps1
+# Quick build with MSBuild (default)
+.\scripts\build.ps1
 
-# Build Release configuration
-.\scripts\build-and-test.ps1 -BuildConfig Release
+# Fast build with Ninja
+.\scripts\build.ps1 -Generator Ninja
+
+# Run all tests
+.\scripts\test.ps1
+
+# Build and test together
+.\scripts\test.ps1 -Build
+
+# Clean rebuild
+.\scripts\rebuild.ps1
 
 # Run specific tests
-.\scripts\build-and-test.ps1 -Filter "CameraTest.*"
+.\scripts\test.ps1 -Filter "CameraTest.*"
+
+# Release build
+.\scripts\build.ps1 -Config Release
+
+# Show all available commands
+.\scripts\help.ps1
 ```
+
+For complete documentation, see:
+- `scripts/README.md` - Detailed script usage
+- `.github/skills/build-tool-workflows/SKILL.md` - Complete build guide
 
 ## Usage Example
 

@@ -15,9 +15,99 @@ This skill provides the essential workflows for building and testing the Vulkan 
 - Troubleshooting build issues
 - Choosing between build systems
 
-## Building the Project
+## Quick Start - Using Build Scripts (RECOMMENDED)
 
-### Build with Visual Studio (default)
+**The VDE project provides convenient PowerShell scripts in the `scripts/` directory for all build operations.**
+
+### Build Scripts Overview
+
+| Script | Purpose | Example |
+|--------|---------|---------|
+| `build.ps1` | Build the project | `.\scripts\build.ps1 -Generator Ninja -Config Debug` |
+| `rebuild.ps1` | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator MSBuild -Config Release` |
+| `clean.ps1` | Clean build artifacts | `.\scripts\clean.ps1 -Generator Ninja -Full` |
+| `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
+
+### Common Build Tasks
+
+**Build with MSBuild (default):**
+```powershell
+.\scripts\build.ps1
+```
+
+**Build with Ninja (faster incremental builds):**
+```powershell
+.\scripts\build.ps1 -Generator Ninja
+```
+
+**Release build:**
+```powershell
+.\scripts\build.ps1 -Config Release
+```
+
+**Clean and rebuild:**
+```powershell
+.\scripts\rebuild.ps1 -Generator Ninja
+```
+
+**Clean build artifacts:**
+```powershell
+.\scripts\clean.ps1
+```
+
+**Full clean (removes entire build directory):**
+```powershell
+.\scripts\clean.ps1 -Full
+```
+
+**Run tests:**
+```powershell
+.\scripts\test.ps1
+```
+
+**Run tests with filter:**
+```powershell
+.\scripts\test.ps1 -Filter "CameraTest.*"
+```
+
+**Build and test in one command:**
+```powershell
+.\scripts\test.ps1 -Build
+```
+
+### Script Parameters Reference
+
+**build.ps1**
+- `-Generator` - MSBuild (default) or Ninja
+- `-Config` - Debug (default) or Release
+- `-Clean` - Clean before building
+- `-Parallel <N>` - Number of parallel build jobs (0 = auto)
+
+**rebuild.ps1**
+- `-Generator` - MSBuild (default) or Ninja
+- `-Config` - Debug (default) or Release
+
+**clean.ps1**
+- `-Generator` - MSBuild (default) or Ninja
+- `-Config` - Debug (default) or Release
+- `-Full` - Remove entire build directory
+
+**test.ps1**
+- `-Generator` - MSBuild (default) or Ninja
+- `-Config` - Debug (default) or Release
+- `-Filter` - GoogleTest filter pattern (default: "*")
+- `-Build` - Build before running tests
+- `-Verbose` - Verbose test output
+
+## Manual Build (Advanced)
+
+If you need finer control or are troubleshooting, you can use CMake directly:
+
+## Manual Build (Advanced)
+
+If you need finer control or are troubleshooting, you can use CMake directly:
+
+### Build with Visual Studio (MSBuild)
 
 The default build system uses Visual Studio's MSBuild with multi-configuration support.
 
@@ -34,8 +124,10 @@ cmake --build build --config Debug --clean-first
 
 **Clean:**
 ```powershell
-cmake --build build --config Debug --target clean
-```
+
+**Note:** The `build.ps1 -Generator Ninja` script handles VS environment setup automatically. Manual steps below are only needed if not using the script.
+
+Ninja provides faster incremental builds but requires additional setup.
 
 ### Build with Ninja (faster incremental builds)
 
@@ -43,45 +135,94 @@ Ninja provides faster incremental builds but requires additional setup.
 
 **Prerequisites:**
 - Ninja must be installed: `choco install ninja` or download from https://ninja-build.org/
-- Visual Studio Developer environment with 64-bit tools must be loaded
+- Visual Studio Developer environment with 64-bit tools **MUST** be loaded
 
-**IMPORTANT:** Always load the Visual Studio Developer environment first with 64-bit architecture:
+**CRITICAL:** Ninja builds will fail with "no include path set" errors if the VS Developer environment is not loaded. This is required for **every new PowerShell session** where you run ninja commands.
 
+**Step 1 - Load Visual Studio Developer Environment (required every session):**
 ```powershell
-# Load VS environment first (required for all Ninja commands)
+# Load VS environment with 64-bit architecture (REQUIRED before any ninja commands)
 $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
 Import-Module "$vsPath\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
 Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -Arch amd64
+
+# Verify environment is loaded - you should see "Visual Studio 2022 Developer PowerShell"
+# and the prompt should show architecture (e.g., x64)
 ```
 
-**Initial build (Debug):**
+**Step 2 - Configure and build:**
 ```powershell
-# After loading VS environment (see above)
+# Initial configure (only needed once or when CMakeLists.txt changes)
 cmake -S . -B build_ninja -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+# Build
 cmake --build build_ninja
 ```
 
-**Rebuild:**
+**Quick rebuild (after loading VS environment):**
 ```powershell
-cmake --build build_ninja --clean-first
+cd build_ninja
+ninja
 ```
 
-**Clean:**
+**Parallel build (faster):**
 ```powershell
-cmake --build build_ninja --target clean
+cd build_ninja
+ninja -j 8  # Use 8 parallel jobs (adjust based on your CPU cores)
+```
+
+**Full rebuild (clean first):**
+```powershell
+cmake --build build_ninja --clean-first
+# Or use ninja directly:
+cd build_ninja
+ninja -t clean
+ninja
 ```
 
 **Release build:**
 ```powershell
-# After loading VS environment and cleaning old build
+# Clean and reconfigure for Release
 Remove-Item -Path build_ninja -Recurse -Force -ErrorAction SilentlyContinue
 cmake -S . -B build_ninja -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build_ninja
 ```
 
-## Running Tests
+**Common Issues:**
 
-### Using the helper script (recommended)
+**Problem:** Errors like "fatal error C1034: algorithm: no include path set" or "Cannot open include file: 'stddef.h'"
+**Solution:** The VS Developer environment is not loaded. Run the Step 1 commands above to load the environment, then try building again.
+test script (RECOMMENDED)
+
+```powershell
+.\scripts\test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Filter <pattern>] [-Build]
+```
+
+**Examples:**
+```powershell
+# Run all tests (default MSBuild Debug)
+.\scripts\test.ps1
+
+# Run all tests with Ninja build
+.\scripts\test.ps1 -Generator Ninja
+
+# Run tests matching a pattern
+.\scripts\test.ps1 -Filter "CameraTest.*"
+
+# Build and test in one command
+.\scripts\test.ps1 -Build
+
+# Run release tests with Ninja
+.\scripts\test.ps1 -Generator Ninja -Config Release -Build
+```
+
+### Using the legacy build-and-test script
+
+```powershell
+./scripts/build-and-test.ps1 [-BuildConfig Debug|Release] [-NoBuild] [-NoTest] [-Filter <gtest-pattern>] [-Generator MSBuild|Ninja]
+```
+
+**Note:** This script is deprecated. Use `build.ps1` and `test.ps1` instea
 
 ```powershell
 ./scripts/build-and-test.ps1 [-BuildConfig Debug|Release] [-NoBuild] [-NoTest] [-Filter <gtest-pattern>]
@@ -97,13 +238,19 @@ This script builds and runs tests with GoogleTest filters if provided.
 # Run tests without building
 ./scripts/build-and-test.ps1 -NoBuild
 
-# Run specific tests matching a pattern
-./scripts/build-and-test.ps1 -NoBuild -Filter "CameraTest.*"
-```
-
-### Using CTest
-
-**Visual Studio build:**
+# RuUse the build scripts for all standard tasks:**
+  - `.\scripts\build.ps1` - Primary build command
+  - `.\scripts\test.ps1` - Run tests efficiently
+  - `.\scripts\rebuild.ps1` - Clean rebuild when needed
+  - `.\scripts\clean.ps1` - Clean build artifacts
+  
+- **Choose the right build system:**
+  - MSBuild (default) - Multi-configuration, IDE integration, simple setup
+  - Testing efficiently:**
+  - Use `.\scripts\test.ps1` for quick test runs
+  - Use `-Filter` to run specific tests during focused development
+  - Use `-Build` flag to ensure latest code is tested
+  - Run tests frequently during developmen
 ```powershell
 ctest --test-dir build --build-config Debug --output-on-failure
 ```
@@ -112,9 +259,25 @@ ctest --test-dir build --build-config Debug --output-on-failure
 ```powershell
 ctest --test-dir build_ninja --output-on-failure
 ```
+(default) - Includes symbols and assertions for development
+  - Release - Optimized for performance testing
+  - Scripts handle configuration switching automatically
 
-### Direct test binary execution
+## Troubleshooting
 
+**Problem:** Build fails with "no include path set" or "Cannot open include file"
+**Solution:** 
+- When using scripts: Run `.\scripts\build.ps1 -Generator Ninja` - it handles environment setup
+- When using manual commands: Load VS Developer environment first (see Manual Build section)
+
+**Problem:** Wrong architecture errors (x86 vs x64)
+**Solution:** The build scripts automatically configure for x64. If using manual commands, ensure `-Arch amd64` is used.
+
+**Problem:** Tests fail to run or executable not found
+**Solution:** 
+- Ensure you've built first: `.\scripts\test.ps1 -Build`
+- Or build separately: `.\scripts\build.ps1` then `.\scripts\test.ps1`
+- Check the correct generator is specified if you have both build directories
 **Visual Studio build:**
 ```powershell
 build/tests/Debug/vde_tests.exe [--gtest_filter=Pattern]
@@ -132,9 +295,11 @@ build_ninja/tests/vde_tests.exe [--gtest_filter=Pattern]
   - Ninja for faster iterative development and CI/CD pipelines
   
 - **Ninja environment setup:**
-  - Always verify the 64-bit environment is loaded when using Ninja
-  - Check for `x64` or `amd64` in your PowerShell prompt
-  - If builds fail with linker errors (x86/x64 mismatch), reload the environment with `-Arch amd64`
+  - **ALWAYS verify the 64-bit VS Developer environment is loaded before running any ninja commands**
+  - Ninja will fail with "no include path set" errors if the environment is not loaded
+  - The environment must be reloaded in every new PowerShell session
+  - Check for `x64` or `amd64` in your PowerShell prompt after loading the environment
+  - If builds fail with "no include path" errors, load the VS environment and try again
 
 - **Testing efficiently:**
   - Run tests frequently during development with the `-NoBuild` flag to save time
