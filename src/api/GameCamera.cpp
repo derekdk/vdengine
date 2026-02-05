@@ -3,9 +3,11 @@
  * @brief Implementation of game camera classes
  */
 
-#include <vde/api/GameCamera.h>
 #include <vde/VulkanContext.h>
+#include <vde/api/GameCamera.h>
+
 #include <glm/gtc/matrix_transform.hpp>
+
 #include <algorithm>
 #include <cmath>
 
@@ -18,10 +20,10 @@ namespace vde {
 void GameCamera::applyTo(VulkanContext& context) {
     // Copy view and projection matrices to the context's camera
     Camera& cam = context.getCamera();
-    
+
     // Set projection parameters
     cam.setPerspective(60.0f, m_aspectRatio, m_nearPlane, m_farPlane);
-    
+
     // Copy position and target from our internal camera
     // This ensures the VulkanContext's camera has the correct view matrix
     cam.setPosition(m_camera.getPosition());
@@ -34,26 +36,20 @@ void GameCamera::applyTo(VulkanContext& context) {
 // ============================================================================
 
 SimpleCamera::SimpleCamera()
-    : GameCamera()
-    , m_position(0.0f, 0.0f, 5.0f)
-    , m_pitch(0.0f)
-    , m_yaw(-90.0f)  // Looking toward -Z
-    , m_fov(60.0f)
-{
+    : GameCamera(), m_position(0.0f, 0.0f, 5.0f), m_pitch(0.0f), m_yaw(-90.0f)  // Looking toward -Z
+      ,
+      m_fov(60.0f) {
     updateVectors();
     updateProjection();
 }
 
 SimpleCamera::SimpleCamera(const Position& position, const Direction& direction)
-    : GameCamera()
-    , m_position(position)
-    , m_fov(60.0f)
-{
+    : GameCamera(), m_position(position), m_fov(60.0f) {
     // Calculate pitch and yaw from direction
     glm::vec3 dir = glm::normalize(direction.toVec3());
     m_pitch = glm::degrees(std::asin(dir.y));
     m_yaw = glm::degrees(std::atan2(dir.z, dir.x));
-    
+
     updateVectors();
     updateProjection();
 }
@@ -97,10 +93,10 @@ void SimpleCamera::move(const Direction& delta) {
 void SimpleCamera::rotate(float deltaPitch, float deltaYaw) {
     m_pitch += deltaPitch;
     m_yaw += deltaYaw;
-    
+
     // Clamp pitch to avoid flipping
     m_pitch = std::clamp(m_pitch, -89.0f, 89.0f);
-    
+
     updateVectors();
 }
 
@@ -115,7 +111,7 @@ void SimpleCamera::updateVectors() {
     forward.y = std::sin(glm::radians(m_pitch));
     forward.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
     forward = glm::normalize(forward);
-    
+
     // Set camera position and target
     glm::vec3 pos = m_position.toVec3();
     m_camera.setPosition(pos);
@@ -127,33 +123,17 @@ void SimpleCamera::updateVectors() {
 // ============================================================================
 
 OrbitCamera::OrbitCamera()
-    : GameCamera()
-    , m_target(0.0f, 0.0f, 0.0f)
-    , m_distance(10.0f)
-    , m_pitch(45.0f)
-    , m_yaw(0.0f)
-    , m_fov(60.0f)
-    , m_minDistance(1.0f)
-    , m_maxDistance(100.0f)
-    , m_minPitch(5.0f)
-    , m_maxPitch(85.0f)
-{
+    : GameCamera(), m_target(0.0f, 0.0f, 0.0f), m_distance(10.0f), m_pitch(45.0f), m_yaw(0.0f),
+      m_fov(60.0f), m_minDistance(1.0f), m_maxDistance(100.0f), m_minPitch(5.0f),
+      m_maxPitch(85.0f) {
     updateCamera();
     updateProjection();
 }
 
 OrbitCamera::OrbitCamera(const Position& target, float distance, float pitch, float yaw)
-    : GameCamera()
-    , m_target(target)
-    , m_distance(distance)
-    , m_pitch(pitch)
-    , m_yaw(yaw)
-    , m_fov(60.0f)
-    , m_minDistance(1.0f)
-    , m_maxDistance(100.0f)
-    , m_minPitch(5.0f)
-    , m_maxPitch(85.0f)
-{
+    : GameCamera(), m_target(target), m_distance(distance), m_pitch(pitch), m_yaw(yaw),
+      m_fov(60.0f), m_minDistance(1.0f), m_maxDistance(100.0f), m_minPitch(5.0f),
+      m_maxPitch(85.0f) {
     updateCamera();
     updateProjection();
 }
@@ -180,7 +160,8 @@ void OrbitCamera::setPitch(float pitch) {
 void OrbitCamera::setYaw(float yaw) {
     // Wrap yaw to 0-360 range
     m_yaw = std::fmod(yaw, 360.0f);
-    if (m_yaw < 0.0f) m_yaw += 360.0f;
+    if (m_yaw < 0.0f)
+        m_yaw += 360.0f;
     updateCamera();
 }
 
@@ -203,26 +184,26 @@ void OrbitCamera::pan(float deltaX, float deltaY) {
     glm::vec3 forward = glm::normalize(m_target.toVec3() - m_camera.getPosition());
     glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
     glm::vec3 up = glm::cross(right, forward);
-    
+
     // Move target
     glm::vec3 delta3D = right * deltaX + up * deltaY;
     m_target.x += delta3D.x;
     m_target.y += delta3D.y;
     m_target.z += delta3D.z;
-    
+
     updateCamera();
 }
 
 void OrbitCamera::setZoomLimits(float minDistance, float maxDistance) {
     m_minDistance = minDistance;
     m_maxDistance = maxDistance;
-    setDistance(m_distance); // Re-clamp current distance
+    setDistance(m_distance);  // Re-clamp current distance
 }
 
 void OrbitCamera::setPitchLimits(float minPitch, float maxPitch) {
     m_minPitch = minPitch;
     m_maxPitch = maxPitch;
-    setPitch(m_pitch); // Re-clamp current pitch
+    setPitch(m_pitch);  // Re-clamp current pitch
 }
 
 void OrbitCamera::updateProjection() {
@@ -233,20 +214,20 @@ void OrbitCamera::updateCamera() {
     // Convert spherical coordinates to Cartesian
     float pitchRad = glm::radians(m_pitch);
     float yawRad = glm::radians(m_yaw);
-    
+
     float cosPitch = std::cos(pitchRad);
     float sinPitch = std::sin(pitchRad);
     float cosYaw = std::cos(yawRad);
     float sinYaw = std::sin(yawRad);
-    
+
     // Calculate camera position relative to target
     glm::vec3 offset;
     offset.x = m_distance * cosPitch * sinYaw;
     offset.y = m_distance * sinPitch;
     offset.z = m_distance * cosPitch * cosYaw;
-    
+
     glm::vec3 cameraPos = m_target.toVec3() + offset;
-    
+
     m_camera.setPosition(cameraPos);
     m_camera.setTarget(m_target.toVec3());
 }
@@ -256,24 +237,14 @@ void OrbitCamera::updateCamera() {
 // ============================================================================
 
 Camera2D::Camera2D()
-    : GameCamera()
-    , m_position(0.0f, 0.0f, 0.0f)
-    , m_zoom(1.0f)
-    , m_rotation(0.0f)
-    , m_viewportWidth(1920.0f)
-    , m_viewportHeight(1080.0f)
-{
+    : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_zoom(1.0f), m_rotation(0.0f),
+      m_viewportWidth(1920.0f), m_viewportHeight(1080.0f) {
     updateCamera();
 }
 
 Camera2D::Camera2D(float width, float height)
-    : GameCamera()
-    , m_position(0.0f, 0.0f, 0.0f)
-    , m_zoom(1.0f)
-    , m_rotation(0.0f)
-    , m_viewportWidth(width)
-    , m_viewportHeight(height)
-{
+    : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_zoom(1.0f), m_rotation(0.0f),
+      m_viewportWidth(width), m_viewportHeight(height) {
     m_aspectRatio = width / height;
     updateCamera();
 }
@@ -322,19 +293,18 @@ void Camera2D::updateCamera() {
     // Position camera looking down the -Z axis
     m_camera.setPosition(glm::vec3(m_position.x, m_position.y, 10.0f));
     m_camera.setTarget(glm::vec3(m_position.x, m_position.y, 0.0f));
-    
+
     // Use orthographic projection for proper 2D rendering
     float halfWidth = (m_viewportWidth * 0.5f) / m_zoom;
     float halfHeight = (m_viewportHeight * 0.5f) / m_zoom;
-    
-    m_camera.setOrthographic(
-        -halfWidth,   // left
-        halfWidth,    // right
-        -halfHeight,  // bottom
-        halfHeight,   // top
-        0.1f,         // near
-        100.0f        // far
+
+    m_camera.setOrthographic(-halfWidth,   // left
+                             halfWidth,    // right
+                             -halfHeight,  // bottom
+                             halfHeight,   // top
+                             0.1f,         // near
+                             100.0f        // far
     );
 }
 
-} // namespace vde
+}  // namespace vde

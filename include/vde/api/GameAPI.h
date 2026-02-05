@@ -3,14 +3,14 @@
 /**
  * @file GameAPI.h
  * @brief Main include file for VDE Game API
- * 
+ *
  * Include this single header to get access to all VDE Game API
  * classes and functionality.
- * 
+ *
  * @example
  * @code
  * #include <vde/api/GameAPI.h>
- * 
+ *
  * class MyGame : public vde::Game {
  *     // ...
  * };
@@ -23,93 +23,93 @@
 #include "GameTypes.h"
 
 // Scene and entity system
-#include "Scene.h"
 #include "Entity.h"
 #include "Resource.h"
+#include "Scene.h"
 
 // Input handling
 #include "InputHandler.h"
 #include "KeyCodes.h"
 
 // Graphics
-#include "Mesh.h"
-#include "LightBox.h"
 #include "GameCamera.h"
+#include "LightBox.h"
 #include "Material.h"
+#include "Mesh.h"
 
 // World coordinates and bounds
-#include "WorldUnits.h"
-#include "WorldBounds.h"
 #include "CameraBounds.h"
+#include "WorldBounds.h"
+#include "WorldUnits.h"
 
 /**
  * @namespace vde
  * @brief Vulkan Display Engine namespace
- * 
+ *
  * The vde namespace contains all classes and functions for the
  * Vulkan Display Engine game API.
- * 
+ *
  * ## Quick Start
- * 
+ *
  * @code
  * #include <vde/api/GameAPI.h>
- * 
+ *
  * class MyScene : public vde::Scene {
  * public:
  *     void onEnter() override {
  *         setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 10.0f));
  *         setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
  *     }
- *     
+ *
  *     void update(float dt) override {
  *         vde::Scene::update(dt);
  *     }
  * };
- * 
+ *
  * int main() {
  *     vde::Game game;
  *     vde::GameSettings settings;
  *     settings.gameName = "My Game";
  *     settings.setWindowSize(1280, 720);
- *     
+ *
  *     if (!game.initialize(settings)) {
  *         return 1;
  *     }
- *     
+ *
  *     game.addScene("main", new MyScene());
  *     game.setActiveScene("main");
  *     game.run();
- *     
+ *
  *     return 0;
  * }
  * @endcode
- * 
+ *
  * ## Key Concepts
- * 
+ *
  * ### Game
  * The vde::Game class is the main entry point. It manages the game loop,
  * window, and scene transitions.
- * 
+ *
  * ### Scenes
  * vde::Scene represents a game state (menu, level, etc.). Each scene
  * manages its own entities, resources, camera, and lighting.
- * 
+ *
  * ### Entities
  * vde::Entity is the base class for game objects. Specialized types
  * include vde::MeshEntity for 3D models and vde::SpriteEntity for 2D.
- * 
+ *
  * ### Resources
  * Resources like vde::Mesh and textures are loaded through scenes
  * and referenced by ID to allow sharing.
- * 
+ *
  * ### Input
  * Implement vde::InputHandler to receive keyboard, mouse, and gamepad
  * events. Set it on the Game or individual Scenes.
- * 
+ *
  * ### Camera
  * Use vde::SimpleCamera, vde::OrbitCamera, or vde::Camera2D depending
  * on your game's perspective needs.
- * 
+ *
  * ### Lighting
  * vde::LightBox and its subclasses define scene lighting. Use
  * vde::SimpleColorLightBox for basic lighting or vde::ThreePointLightBox
@@ -152,4 +152,4 @@ inline int getAPIPatchVersion() {
     return VDE_API_VERSION_PATCH;
 }
 
-} // namespace vde
+}  // namespace vde

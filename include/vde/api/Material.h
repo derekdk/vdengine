@@ -3,16 +3,18 @@
 /**
  * @file Material.h
  * @brief Material system for VDE games
- * 
+ *
  * Provides material classes for defining surface properties of rendered
  * objects. Materials control how objects interact with light including
  * albedo color, roughness, metallic, and emissive properties.
  */
 
-#include "GameTypes.h"
 #include <glm/glm.hpp>
+
 #include <memory>
 #include <string>
+
+#include "GameTypes.h"
 
 namespace vde {
 
@@ -21,13 +23,13 @@ class Texture;
 
 /**
  * @brief Defines the visual surface properties of a mesh.
- * 
+ *
  * Material controls how an object's surface responds to lighting:
  * - Albedo: Base color of the surface
  * - Roughness: How rough/smooth the surface is (0=mirror, 1=rough)
  * - Metallic: How metallic the surface is (0=dielectric, 1=metal)
  * - Emission: Self-illumination color and intensity
- * 
+ *
  * Example usage:
  * @code
  * auto material = std::make_shared<Material>();
@@ -38,7 +40,7 @@ class Texture;
  * @endcode
  */
 class Material {
-public:
+  public:
     using Ref = std::shared_ptr<Material>;
 
     Material() = default;
@@ -77,7 +79,9 @@ public:
      * @brief Set the albedo texture.
      * @param texture Texture to use for albedo, or nullptr to use color only
      */
-    void setAlbedoTexture(std::shared_ptr<Texture> texture) { m_albedoTexture = std::move(texture); }
+    void setAlbedoTexture(std::shared_ptr<Texture> texture) {
+        m_albedoTexture = std::move(texture);
+    }
 
     /**
      * @brief Get the albedo texture.
@@ -227,17 +231,17 @@ public:
 
     /**
      * @brief Material data packed for GPU push constants.
-     * 
+     *
      * This structure is designed to be pushed to the shader as push constants.
      * Size: 48 bytes (fits within typical 128-byte push constant limit)
      */
     struct GPUData {
-        glm::vec4 albedo;        ///< RGB albedo + opacity
-        glm::vec4 emission;      ///< RGB emission + intensity
-        float roughness;         ///< Surface roughness
-        float metallic;          ///< Metallic factor
-        float normalStrength;    ///< Normal map strength
-        float padding;           ///< Padding for alignment
+        glm::vec4 albedo;      ///< RGB albedo + opacity
+        glm::vec4 emission;    ///< RGB emission + intensity
+        float roughness;       ///< Surface roughness
+        float metallic;        ///< Metallic factor
+        float normalStrength;  ///< Normal map strength
+        float padding;         ///< Padding for alignment
     };
 
     /**
@@ -282,7 +286,7 @@ public:
      */
     static Ref createGlass(const Color& tint = Color::white(), float opacity = 0.3f);
 
-protected:
+  protected:
     // Base properties
     Color m_albedo = Color::white();
     float m_roughness = 0.5f;
@@ -303,4 +307,4 @@ protected:
     bool m_castsShadows = true;
 };
 
-} // namespace vde
+}  // namespace vde

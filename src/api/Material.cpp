@@ -3,8 +3,8 @@
  * @brief Implementation of Material class
  */
 
-#include <vde/api/Material.h>
 #include <vde/Texture.h>
+#include <vde/api/Material.h>
 
 namespace vde {
 
@@ -12,17 +12,11 @@ namespace vde {
 // Material Implementation
 // ============================================================================
 
-Material::Material(const Color& albedo)
-    : m_albedo(albedo)
-{
-}
+Material::Material(const Color& albedo) : m_albedo(albedo) {}
 
 Material::Material(const Color& albedo, float roughness, float metallic)
-    : m_albedo(albedo)
-    , m_roughness(glm::clamp(roughness, 0.0f, 1.0f))
-    , m_metallic(glm::clamp(metallic, 0.0f, 1.0f))
-{
-}
+    : m_albedo(albedo), m_roughness(glm::clamp(roughness, 0.0f, 1.0f)),
+      m_metallic(glm::clamp(metallic, 0.0f, 1.0f)) {}
 
 Material::GPUData Material::getGPUData() const {
     GPUData data{};
@@ -78,4 +72,4 @@ Material::Ref Material::createGlass(const Color& tint, float opacity) {
     return material;
 }
 
-} // namespace vde
+}  // namespace vde

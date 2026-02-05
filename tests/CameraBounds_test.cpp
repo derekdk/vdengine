@@ -1,13 +1,15 @@
 /**
  * @file CameraBounds_test.cpp
  * @brief Unit tests for CameraBounds.h (Phase 2.5)
- * 
+ *
  * Tests Pixels, ScreenSize, PixelToWorldMapping, and CameraBounds2D classes.
  */
 
-#include <gtest/gtest.h>
 #include <vde/api/CameraBounds.h>
+
 #include <cmath>
+
+#include <gtest/gtest.h>
 
 using namespace vde;
 
@@ -174,9 +176,9 @@ TEST_F(PixelToWorldMappingTest, ToPixelsVec2) {
 // ============================================================================
 
 class CameraBounds2DTest : public ::testing::Test {
-protected:
+  protected:
     CameraBounds2D camera;
-    
+
     void SetUp() override {
         camera.setScreenSize(1920_px, 1080_px);
         camera.setWorldWidth(16_m);
@@ -253,7 +255,7 @@ TEST_F(CameraBounds2DTest, Move) {
 TEST_F(CameraBounds2DTest, GetVisibleBounds) {
     camera.centerOn(0_m, 0_m);
     WorldBounds2D visible = camera.getVisibleBounds();
-    
+
     // Camera centered at origin with 16m width, 9m height
     EXPECT_FLOAT_EQ(visible.minX.value, -8.0f);
     EXPECT_FLOAT_EQ(visible.maxX.value, 8.0f);
@@ -264,7 +266,7 @@ TEST_F(CameraBounds2DTest, GetVisibleBounds) {
 TEST_F(CameraBounds2DTest, GetVisibleBoundsOffset) {
     camera.centerOn(10_m, 5_m);
     WorldBounds2D visible = camera.getVisibleBounds();
-    
+
     EXPECT_FLOAT_EQ(visible.minX.value, 2.0f);
     EXPECT_FLOAT_EQ(visible.maxX.value, 18.0f);
 }
@@ -346,14 +348,14 @@ TEST_F(CameraBounds2DTest, ConstraintsPreventOutOfBounds) {
     // Set tight constraints: 20x20 meter area
     WorldBounds2D constraints = WorldBounds2D::fromCenter(0_m, 0_m, 20_m, 20_m);
     camera.setConstraintBounds(constraints);
-    
+
     // Try to move camera way out
     camera.centerOn(100_m, 100_m);
-    
+
     // Camera should be clamped within constraints
     glm::vec2 center = camera.getCenter();
     WorldBounds2D visible = camera.getVisibleBounds();
-    
+
     // Visible area should stay within constraints
     EXPECT_LE(visible.maxX.value, 10.0f + 0.1f);
     EXPECT_LE(visible.maxY.value, 10.0f + 0.1f);

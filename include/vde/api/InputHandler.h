@@ -3,7 +3,7 @@
 /**
  * @file InputHandler.h
  * @brief Input handling interface for VDE games
- * 
+ *
  * Provides an abstract interface for handling keyboard, mouse,
  * and gamepad input that games can implement.
  */
@@ -14,10 +14,10 @@ namespace vde {
 
 /**
  * @brief Abstract interface for handling game input.
- * 
+ *
  * Games should inherit from this class and override the methods
  * they need to handle input events.
- * 
+ *
  * @example
  * @code
  * class MyInputHandler : public vde::InputHandler {
@@ -31,7 +31,7 @@ namespace vde {
  * @endcode
  */
 class InputHandler {
-public:
+  public:
     virtual ~InputHandler() = default;
 
     // Keyboard events
@@ -147,7 +147,10 @@ public:
      * @param x Output: mouse X position
      * @param y Output: mouse Y position
      */
-    virtual void getMousePosition(double& x, double& y) const { x = 0; y = 0; }
+    virtual void getMousePosition(double& x, double& y) const {
+        x = 0;
+        y = 0;
+    }
 };
 
-} // namespace vde
+}  // namespace vde

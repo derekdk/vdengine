@@ -3,18 +3,17 @@
  * @brief Unit tests for SpriteEntity class
  */
 
-#include <gtest/gtest.h>
 #include <vde/api/Entity.h>
 #include <vde/api/GameTypes.h>
+
+#include <gtest/gtest.h>
 
 namespace vde {
 namespace test {
 
 class SpriteEntityTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        sprite = std::make_shared<SpriteEntity>();
-    }
+  protected:
+    void SetUp() override { sprite = std::make_shared<SpriteEntity>(); }
 
     std::shared_ptr<SpriteEntity> sprite;
 };
@@ -67,7 +66,7 @@ TEST_F(SpriteEntityTest, DefaultColorIsWhite) {
 TEST_F(SpriteEntityTest, SetColorWorks) {
     Color red(1.0f, 0.0f, 0.0f, 1.0f);
     sprite->setColor(red);
-    
+
     Color result = sprite->getColor();
     EXPECT_FLOAT_EQ(result.r, 1.0f);
     EXPECT_FLOAT_EQ(result.g, 0.0f);
@@ -78,7 +77,7 @@ TEST_F(SpriteEntityTest, SetColorWorks) {
 TEST_F(SpriteEntityTest, SetColorWithAlpha) {
     Color semiTransparent(1.0f, 1.0f, 1.0f, 0.5f);
     sprite->setColor(semiTransparent);
-    
+
     Color result = sprite->getColor();
     EXPECT_FLOAT_EQ(result.a, 0.5f);
 }
@@ -89,7 +88,7 @@ TEST_F(SpriteEntityTest, SetColorWithAlpha) {
 
 TEST_F(SpriteEntityTest, DefaultUVRectIsFullTexture) {
     // Default UV rect should cover the entire texture (0,0) to (1,1)
-    sprite->setUVRect(0.0f, 0.0f, 1.0f, 1.0f); // Reset to default
+    sprite->setUVRect(0.0f, 0.0f, 1.0f, 1.0f);  // Reset to default
     // No direct getter for UV rect components, but setUVRect should work
 }
 
@@ -99,7 +98,7 @@ TEST_F(SpriteEntityTest, SetUVRectForSpriteSheet) {
     float v = 1.0f / 4.0f;  // 0.25
     float w = 1.0f / 4.0f;  // 0.25
     float h = 1.0f / 4.0f;  // 0.25
-    
+
     sprite->setUVRect(u, v, w, h);
     // UV rect is set - no direct getters but it will be used in render()
 }
@@ -139,7 +138,7 @@ TEST_F(SpriteEntityTest, InheritsFromEntity) {
     // SpriteEntity should have Entity base class functionality
     Entity* basePtr = sprite.get();
     EXPECT_NE(basePtr, nullptr);
-    
+
     // Test transform functions from Entity
     sprite->setPosition(10.0f, 20.0f, 0.0f);
     EXPECT_FLOAT_EQ(sprite->getPosition().x, 10.0f);
@@ -171,9 +170,9 @@ TEST_F(SpriteEntityTest, SetScaleForSprite) {
 TEST_F(SpriteEntityTest, GetModelMatrixWorks) {
     sprite->setPosition(1.0f, 2.0f, 0.0f);
     sprite->setScale(2.0f);
-    
+
     glm::mat4 model = sprite->getModelMatrix();
-    
+
     // The matrix should have translation and scale applied
     // Check translation component (column 3)
     EXPECT_FLOAT_EQ(model[3][0], 1.0f);
@@ -183,10 +182,10 @@ TEST_F(SpriteEntityTest, GetModelMatrixWorks) {
 
 TEST_F(SpriteEntityTest, VisibilityWorks) {
     EXPECT_TRUE(sprite->isVisible());
-    
+
     sprite->setVisible(false);
     EXPECT_FALSE(sprite->isVisible());
-    
+
     sprite->setVisible(true);
     EXPECT_TRUE(sprite->isVisible());
 }
@@ -194,7 +193,7 @@ TEST_F(SpriteEntityTest, VisibilityWorks) {
 TEST_F(SpriteEntityTest, HasUniqueId) {
     SpriteEntity sprite1;
     SpriteEntity sprite2;
-    
+
     EXPECT_NE(sprite1.getId(), sprite2.getId());
 }
 
@@ -203,5 +202,5 @@ TEST_F(SpriteEntityTest, NameWorks) {
     EXPECT_EQ(sprite->getName(), "MySprite");
 }
 
-} // namespace test
-} // namespace vde
+}  // namespace test
+}  // namespace vde

@@ -3,15 +3,17 @@
 /**
  * @file LightBox.h
  * @brief Lighting system for VDE games
- * 
+ *
  * Provides lighting classes for scene illumination including
  * simple ambient lighting and more complex lighting setups.
  */
 
-#include "GameTypes.h"
 #include <glm/glm.hpp>
-#include <vector>
+
 #include <memory>
+#include <vector>
+
+#include "GameTypes.h"
 
 namespace vde {
 
@@ -29,16 +31,17 @@ enum class LightType {
  */
 struct Light {
     LightType type = LightType::Directional;
-    Position position;           ///< Position for point/spot lights
-    Direction direction;         ///< Direction for directional/spot lights
+    Position position;    ///< Position for point/spot lights
+    Direction direction;  ///< Direction for directional/spot lights
     Color color = Color::white();
     float intensity = 1.0f;
-    float range = 10.0f;         ///< Range for point/spot lights
-    float spotAngle = 45.0f;     ///< Inner cone angle for spot lights
-    float spotOuterAngle = 60.0f; ///< Outer cone angle for spot lights
+    float range = 10.0f;           ///< Range for point/spot lights
+    float spotAngle = 45.0f;       ///< Inner cone angle for spot lights
+    float spotOuterAngle = 60.0f;  ///< Outer cone angle for spot lights
     bool castsShadows = false;
 
-    static Light directional(const Direction& dir, const Color& color = Color::white(), float intensity = 1.0f) {
+    static Light directional(const Direction& dir, const Color& color = Color::white(),
+                             float intensity = 1.0f) {
         Light light;
         light.type = LightType::Directional;
         light.direction = dir;
@@ -47,7 +50,8 @@ struct Light {
         return light;
     }
 
-    static Light point(const Position& pos, const Color& color = Color::white(), float intensity = 1.0f, float range = 10.0f) {
+    static Light point(const Position& pos, const Color& color = Color::white(),
+                       float intensity = 1.0f, float range = 10.0f) {
         Light light;
         light.type = LightType::Point;
         light.position = pos;
@@ -57,7 +61,8 @@ struct Light {
         return light;
     }
 
-    static Light spot(const Position& pos, const Direction& dir, float angle = 45.0f, const Color& color = Color::white(), float intensity = 1.0f) {
+    static Light spot(const Position& pos, const Direction& dir, float angle = 45.0f,
+                      const Color& color = Color::white(), float intensity = 1.0f) {
         Light light;
         light.type = LightType::Spot;
         light.position = pos;
@@ -71,12 +76,12 @@ struct Light {
 
 /**
  * @brief Base class for lighting configurations.
- * 
+ *
  * A LightBox defines the lighting environment for a scene,
  * including ambient light and individual light sources.
  */
 class LightBox {
-public:
+  public:
     virtual ~LightBox() = default;
 
     /**
@@ -132,7 +137,7 @@ public:
      */
     void clearLights() { m_lights.clear(); }
 
-protected:
+  protected:
     Color m_ambientColor = Color(0.1f, 0.1f, 0.1f);
     float m_ambientIntensity = 1.0f;
     std::vector<Light> m_lights;
@@ -140,14 +145,14 @@ protected:
 
 /**
  * @brief Simple lighting with just ambient color.
- * 
+ *
  * Use this for scenes that don't need complex lighting,
  * such as 2D games or stylized graphics.
  */
 class SimpleColorLightBox : public LightBox {
-public:
+  public:
     SimpleColorLightBox() = default;
-    
+
     /**
      * @brief Create with a specific ambient color.
      */
@@ -168,14 +173,14 @@ public:
 
 /**
  * @brief Standard three-point lighting setup.
- * 
+ *
  * Creates a professional-looking lighting setup with:
  * - Key light (main light)
  * - Fill light (softens shadows)
  * - Back light (rim/separation light)
  */
 class ThreePointLightBox : public LightBox {
-public:
+  public:
     /**
      * @brief Create a three-point lighting setup.
      * @param keyColor Color of the main light
@@ -199,4 +204,4 @@ public:
     Light& getBackLight() { return m_lights[2]; }
 };
 
-} // namespace vde
+}  // namespace vde

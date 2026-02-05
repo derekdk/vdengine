@@ -1,18 +1,16 @@
 #include <vde/HexGeometry.h>
+
 #include <cmath>
 
 namespace vde {
 
 namespace {
-    constexpr float PI = 3.14159265358979323846f;
-    constexpr float DEG_TO_RAD = PI / 180.0f;
-}
+constexpr float PI = 3.14159265358979323846f;
+constexpr float DEG_TO_RAD = PI / 180.0f;
+}  // namespace
 
 HexGeometry::HexGeometry(float size, HexOrientation orientation)
-    : m_size(size)
-    , m_orientation(orientation)
-{
-}
+    : m_size(size), m_orientation(orientation) {}
 
 float HexGeometry::getStartAngle() const {
     // Flat-top: first corner at 0° (right side)
@@ -43,9 +41,9 @@ float HexGeometry::getHeight() const {
 std::vector<glm::vec3> HexGeometry::getCornerPositions(const glm::vec3& center) const {
     std::vector<glm::vec3> corners;
     corners.reserve(6);
-    
+
     float startAngle = getStartAngle();
-    
+
     for (int i = 0; i < 6; i++) {
         float angle = startAngle + i * (PI / 3.0f);  // 60 degrees between corners
         // Generate corners in XZ plane (Y is up)
@@ -53,7 +51,7 @@ std::vector<glm::vec3> HexGeometry::getCornerPositions(const glm::vec3& center) 
         float z = center.z + m_size * std::sin(angle);
         corners.emplace_back(x, center.y, z);
     }
-    
+
     return corners;
 }
 
@@ -62,25 +60,25 @@ glm::vec2 HexGeometry::calculateUV(const glm::vec2& localPos) const {
     // Local positions range from [-size, size] in both axes
     float u = (localPos.x / m_size + 1.0f) * 0.5f;
     float v = (localPos.y / m_size + 1.0f) * 0.5f;
-    
+
     return glm::vec2(u, v);
 }
 
 HexMesh HexGeometry::generateHex(const glm::vec3& center) const {
     HexMesh mesh;
-    
+
     // Using center + 6 corners = 7 vertices
     // 6 triangles from center to each edge
     mesh.vertices.reserve(7);
     mesh.indices.reserve(18);  // 6 triangles * 3 indices
-    
+
     // Default color (white for texture tinting)
     glm::vec3 color(1.0f, 1.0f, 1.0f);
-    
+
     // Center vertex (index 0)
     glm::vec2 centerUV = calculateUV(glm::vec2(0.0f, 0.0f));
     mesh.vertices.push_back({center, color, centerUV});
-    
+
     // Corner vertices (indices 1-6)
     std::vector<glm::vec3> corners = getCornerPositions(center);
     for (int i = 0; i < 6; i++) {
@@ -89,19 +87,19 @@ HexMesh HexGeometry::generateHex(const glm::vec3& center) const {
         glm::vec2 uv = calculateUV(localPos);
         mesh.vertices.push_back({corners[i], color, uv});
     }
-    
+
     // Indices for 6 triangles (center + 2 adjacent corners each)
     // Wind counter-clockwise for front-facing (Vulkan default)
     for (int i = 0; i < 6; i++) {
         uint32_t current = static_cast<uint32_t>(i + 1);
         uint32_t next = static_cast<uint32_t>((i + 1) % 6 + 1);
-        
+
         mesh.indices.push_back(0);        // Center
         mesh.indices.push_back(current);  // Current corner
         mesh.indices.push_back(next);     // Next corner
     }
-    
+
     return mesh;
 }
 
-} // namespace vde
+}  // namespace vde

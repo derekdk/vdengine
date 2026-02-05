@@ -1,4 +1,5 @@
 #include <vde/ImageLoader.h>
+
 #include "stb_image.h"
 
 namespace vde {
@@ -10,26 +11,23 @@ ImageData ImageLoader::load(const std::string& filepath) {
 
 ImageData ImageLoader::load(const std::string& filepath, int desiredChannels) {
     ImageData image;
-    
+
     // Load image with stb_image
-    image.pixels = stbi_load(
-        filepath.c_str(),
-        &image.width,
-        &image.height,
-        &image.channels,  // Original channels in file (output)
-        desiredChannels   // Force this many channels
+    image.pixels = stbi_load(filepath.c_str(), &image.width, &image.height,
+                             &image.channels,  // Original channels in file (output)
+                             desiredChannels   // Force this many channels
     );
-    
+
     if (!image.pixels) {
         image.width = 0;
         image.height = 0;
         image.channels = 0;
         return image;
     }
-    
+
     // Update channels to reflect what we actually loaded
     image.channels = desiredChannels;
-    
+
     return image;
 }
 
@@ -48,4 +46,4 @@ std::string ImageLoader::getLastError() {
     return reason ? std::string(reason) : std::string();
 }
 
-} // namespace vde
+}  // namespace vde

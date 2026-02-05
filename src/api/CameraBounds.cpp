@@ -1,4 +1,5 @@
 #include <vde/api/CameraBounds.h>
+
 #include <algorithm>
 
 namespace vde {
@@ -68,10 +69,8 @@ void CameraBounds2D::clearConstraintBounds() {
 WorldBounds2D CameraBounds2D::getVisibleBounds() const {
     Meters halfW = getVisibleWidth() * 0.5f;
     Meters halfH = getVisibleHeight() * 0.5f;
-    return WorldBounds2D(
-        m_centerX - halfW, m_centerY - halfH,
-        m_centerX + halfW, m_centerY + halfH
-    );
+    return WorldBounds2D(m_centerX - halfW, m_centerY - halfH, m_centerX + halfW,
+                         m_centerY + halfH);
 }
 
 Meters CameraBounds2D::getVisibleWidth() const {
@@ -86,20 +85,20 @@ Meters CameraBounds2D::getVisibleHeight() const {
 glm::vec2 CameraBounds2D::screenToWorld(Pixels screenX, Pixels screenY) const {
     // Screen origin is top-left, Y increases downward
     // World Y typically increases upward, so we flip Y
-    
+
     // Get visible bounds
     WorldBounds2D visible = getVisibleBounds();
-    
+
     // Normalize screen position to 0-1
     float normalizedX = screenX.value / m_screenSize.width.value;
     float normalizedY = screenY.value / m_screenSize.height.value;
-    
+
     // Map to world coordinates
     // X: left to right maps to minX to maxX
     // Y: top to bottom maps to maxY to minY (flipped)
     float worldX = visible.minX.value + normalizedX * visible.width().value;
     float worldY = visible.maxY.value - normalizedY * visible.height().value;
-    
+
     return glm::vec2(worldX, worldY);
 }
 
@@ -109,15 +108,15 @@ glm::vec2 CameraBounds2D::screenToWorld(const glm::vec2& screenPos) const {
 
 glm::vec2 CameraBounds2D::worldToScreen(Meters worldX, Meters worldY) const {
     WorldBounds2D visible = getVisibleBounds();
-    
+
     // Normalize world position relative to visible bounds
     float normalizedX = (worldX.value - visible.minX.value) / visible.width().value;
     float normalizedY = (visible.maxY.value - worldY.value) / visible.height().value;  // Flip Y
-    
+
     // Map to screen coordinates
     float screenX = normalizedX * m_screenSize.width.value;
     float screenY = normalizedY * m_screenSize.height.value;
-    
+
     return glm::vec2(screenX, screenY);
 }
 
@@ -136,7 +135,7 @@ bool CameraBounds2D::isVisible(const glm::vec2& worldPos) const {
 
 bool CameraBounds2D::isVisible(const WorldBounds2D& bounds) const {
     WorldBounds2D visible = getVisibleBounds();
-    
+
     // Check for intersection
     return bounds.maxX >= visible.minX && bounds.minX <= visible.maxX &&
            bounds.maxY >= visible.minY && bounds.minY <= visible.maxY;
@@ -151,10 +150,10 @@ void CameraBounds2D::applyConstraints() {
     if (!m_hasConstraints) {
         return;
     }
-    
+
     Meters halfW = getVisibleWidth() * 0.5f;
     Meters halfH = getVisibleHeight() * 0.5f;
-    
+
     // If visible area is smaller than constraints, clamp center
     if (getVisibleWidth() <= m_constraints.width()) {
         // Clamp X so visible area stays within constraints
@@ -168,7 +167,7 @@ void CameraBounds2D::applyConstraints() {
         // Visible area larger than constraints, center on constraints
         m_centerX = (m_constraints.minX + m_constraints.maxX) * 0.5f;
     }
-    
+
     if (getVisibleHeight() <= m_constraints.height()) {
         // Clamp Y so visible area stays within constraints
         if (m_centerY - halfH < m_constraints.minY) {
@@ -183,4 +182,4 @@ void CameraBounds2D::applyConstraints() {
     }
 }
 
-} // namespace vde
+}  // namespace vde

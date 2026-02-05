@@ -3,26 +3,27 @@
 /**
  * @file Resource.h
  * @brief Resource management for VDE games
- * 
+ *
  * Provides base classes and utilities for managing game resources
  * such as textures, meshes, sounds, and other assets.
  */
 
-#include "GameTypes.h"
 #include <memory>
 #include <string>
 #include <typeindex>
+
+#include "GameTypes.h"
 
 namespace vde {
 
 /**
  * @brief Base class for all game resources.
- * 
+ *
  * Resources are assets that can be loaded and managed by scenes,
  * including textures, meshes, audio clips, etc.
  */
 class Resource {
-public:
+  public:
     virtual ~Resource() = default;
 
     /**
@@ -45,7 +46,7 @@ public:
      */
     virtual const char* getTypeName() const = 0;
 
-protected:
+  protected:
     Resource() = default;
     Resource(ResourceId id, const std::string& path) : m_id(id), m_path(path) {}
 
@@ -60,14 +61,14 @@ protected:
 /**
  * @brief Smart pointer type for resources.
  */
-template<typename T>
+template <typename T>
 using ResourcePtr = std::shared_ptr<T>;
 
 /**
  * @brief Handle to a resource that can be used without knowing the full type.
  */
 class ResourceHandle {
-public:
+  public:
     ResourceHandle() = default;
     ResourceHandle(ResourceId id, std::type_index type) : m_id(id), m_type(type) {}
 
@@ -79,13 +80,11 @@ public:
         return m_id == other.m_id && m_type == other.m_type;
     }
 
-    bool operator!=(const ResourceHandle& other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const ResourceHandle& other) const { return !(*this == other); }
 
-private:
+  private:
     ResourceId m_id = INVALID_RESOURCE_ID;
     std::type_index m_type = typeid(void);
 };
 
-} // namespace vde
+}  // namespace vde

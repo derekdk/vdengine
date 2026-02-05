@@ -3,8 +3,9 @@
  * @brief Implementation of Scene class
  */
 
-#include <vde/api/Scene.h>
 #include <vde/api/Game.h>
+#include <vde/api/Scene.h>
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -18,15 +19,8 @@ static SimpleColorLightBox s_defaultLightBox(Color::white());
 // ============================================================================
 
 Scene::Scene()
-    : m_name("")
-    , m_game(nullptr)
-    , m_lightBox(nullptr)
-    , m_camera(nullptr)
-    , m_inputHandler(nullptr)
-    , m_backgroundColor(Color::black())
-    , m_nextResourceId(1)
-{
-}
+    : m_name(""), m_game(nullptr), m_lightBox(nullptr), m_camera(nullptr), m_inputHandler(nullptr),
+      m_backgroundColor(Color::black()), m_nextResourceId(1) {}
 
 Scene::~Scene() {
     // Clear all entities, calling their onDetach
@@ -55,16 +49,16 @@ EntityId Scene::addEntity(Entity::Ref entity) {
     if (!entity) {
         return INVALID_ENTITY_ID;
     }
-    
+
     EntityId id = entity->getId();
-    
+
     // Store the index for quick lookup
     m_entityIndex[id] = m_entities.size();
     m_entities.push_back(entity);
-    
+
     // Notify entity it's been added
     entity->onAttach(this);
-    
+
     return id;
 }
 
@@ -90,17 +84,17 @@ void Scene::removeEntity(EntityId id) {
     if (it == m_entityIndex.end()) {
         return;
     }
-    
+
     size_t index = it->second;
     if (index >= m_entities.size()) {
         return;
     }
-    
+
     // Notify entity before removal
     if (m_entities[index]) {
         m_entities[index]->onDetach();
     }
-    
+
     // Swap with last element and pop (O(1) removal)
     if (index < m_entities.size() - 1) {
         // Update index of swapped entity
@@ -108,7 +102,7 @@ void Scene::removeEntity(EntityId id) {
         m_entityIndex[swappedId] = index;
         std::swap(m_entities[index], m_entities.back());
     }
-    
+
     m_entities.pop_back();
     m_entityIndex.erase(it);
 }
@@ -120,7 +114,7 @@ void Scene::clearEntities() {
             entity->onDetach();
         }
     }
-    
+
     m_entities.clear();
     m_entityIndex.clear();
 }
@@ -174,4 +168,4 @@ const InputHandler* Scene::getInputHandler() const {
     return nullptr;
 }
 
-} // namespace vde
+}  // namespace vde

@@ -3,15 +3,16 @@
 /**
  * @file Entity.h
  * @brief Entity system for VDE games
- * 
+ *
  * Provides base entity classes for game objects including
  * mesh entities, sprite entities, and other renderable objects.
  */
 
-#include "GameTypes.h"
-#include "Resource.h"
 #include <memory>
 #include <string>
+
+#include "GameTypes.h"
+#include "Resource.h"
 
 namespace vde {
 
@@ -23,12 +24,12 @@ class Texture;
 
 /**
  * @brief Base class for all game entities.
- * 
+ *
  * An entity represents an object in the game world with a transform
  * (position, rotation, scale) and optional visual representation.
  */
 class Entity {
-public:
+  public:
     using Ref = std::shared_ptr<Entity>;
 
     Entity();
@@ -136,26 +137,26 @@ public:
      */
     virtual void render() {}
 
-protected:
+  protected:
     EntityId m_id;
     std::string m_name;
     Transform m_transform;
     bool m_visible = true;
     Scene* m_scene = nullptr;
 
-private:
+  private:
     static EntityId s_nextId;
 };
 
 /**
  * @brief Entity that renders a 3D mesh.
- * 
+ *
  * MeshEntity can hold either a direct mesh reference or a resource ID.
  * For simple cases (primitives), use setMesh(shared_ptr<Mesh>).
  * For resource-managed meshes, use setMeshId(ResourceId).
  */
 class MeshEntity : public Entity {
-public:
+  public:
     using Ref = std::shared_ptr<MeshEntity>;
 
     MeshEntity();
@@ -233,16 +234,16 @@ public:
 
     void render() override;
 
-protected:
+  protected:
     // Direct references (preferred for simplicity)
     std::shared_ptr<Mesh> m_mesh;
     std::shared_ptr<Texture> m_texture;
     std::shared_ptr<Material> m_material;
-    
+
     // Resource IDs (for Scene-managed resources)
     ResourceId m_meshId = INVALID_RESOURCE_ID;
     ResourceId m_textureId = INVALID_RESOURCE_ID;
-    
+
     Color m_color = Color::white();
 };
 
@@ -250,7 +251,7 @@ protected:
  * @brief Entity that renders a 2D sprite.
  */
 class SpriteEntity : public Entity {
-public:
+  public:
     using Ref = std::shared_ptr<SpriteEntity>;
 
     SpriteEntity();
@@ -301,7 +302,10 @@ public:
     /**
      * @brief Set the sprite's anchor point (0-1, where 0.5,0.5 is center).
      */
-    void setAnchor(float x, float y) { m_anchorX = x; m_anchorY = y; }
+    void setAnchor(float x, float y) {
+        m_anchorX = x;
+        m_anchorY = y;
+    }
 
     /**
      * @brief Get the sprite anchor point X.
@@ -315,17 +319,17 @@ public:
 
     void render() override;
 
-protected:
+  protected:
     // Direct texture reference (preferred for simplicity)
     std::shared_ptr<Texture> m_texture;
-    
+
     // Resource ID (for Scene-managed resources)
     ResourceId m_textureId = INVALID_RESOURCE_ID;
-    
+
     Color m_color = Color::white();
     float m_uvX = 0.0f, m_uvY = 0.0f;
     float m_uvWidth = 1.0f, m_uvHeight = 1.0f;
     float m_anchorX = 0.5f, m_anchorY = 0.5f;
 };
 
-} // namespace vde
+}  // namespace vde

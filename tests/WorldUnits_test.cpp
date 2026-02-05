@@ -1,13 +1,15 @@
 /**
  * @file WorldUnits_test.cpp
  * @brief Unit tests for WorldUnits.h (Phase 2.5)
- * 
+ *
  * Tests Meters, WorldPoint, WorldExtent, and CoordinateSystem types.
  */
 
-#include <gtest/gtest.h>
 #include <vde/api/WorldUnits.h>
+
 #include <cmath>
+
+#include <gtest/gtest.h>
 
 using namespace vde;
 
@@ -171,7 +173,7 @@ TEST_F(CoordinateSystemTest, OppositeDirections) {
     glm::vec3 south = cs.south();
     glm::vec3 west = cs.west();
     glm::vec3 down = cs.down();
-    
+
     EXPECT_FLOAT_EQ(south.z, -1.0f);
     EXPECT_FLOAT_EQ(west.x, -1.0f);
     EXPECT_FLOAT_EQ(down.y, -1.0f);
@@ -187,7 +189,7 @@ TEST_F(CoordinateSystemTest, YUpPreset) {
 TEST_F(CoordinateSystemTest, ZUpPreset) {
     CoordinateSystem cs = CoordinateSystem::zUp();
     EXPECT_FLOAT_EQ(cs.north.y, 1.0f);  // North = +Y in Z-up
-    EXPECT_FLOAT_EQ(cs.east.x, 1.0f);   // East = +X 
+    EXPECT_FLOAT_EQ(cs.east.x, 1.0f);   // East = +X
     EXPECT_FLOAT_EQ(cs.up.z, 1.0f);     // Up = +Z
 }
 
@@ -316,7 +318,7 @@ TEST_F(WorldExtentTest, ToVec3) {
 TEST_F(WorldExtentTest, Is2D) {
     WorldExtent flat = WorldExtent::flat(100_m, 200_m);
     WorldExtent vol = WorldExtent(100_m, 50_m, 200_m);
-    
+
     EXPECT_TRUE(flat.is2D());
     EXPECT_FALSE(vol.is2D());
 }

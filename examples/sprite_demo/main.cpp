@@ -1,7 +1,7 @@
 /**
  * @file main.cpp
  * @brief Sprite example demonstrating the VDE SpriteEntity functionality.
- * 
+ *
  * This example demonstrates:
  * - Creating SpriteEntity objects
  * - Loading textures and assigning to sprites
@@ -11,10 +11,11 @@
  * - Combining 2D sprites with 3D meshes
  */
 
-#include <vde/api/GameAPI.h>
 #include <vde/Texture.h>
-#include <iostream>
+#include <vde/api/GameAPI.h>
+
 #include <cmath>
+#include <iostream>
 
 // Configuration
 constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
@@ -23,40 +24,78 @@ constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
  * @brief Simple input handler for the sprite demo.
  */
 class SpriteInputHandler : public vde::InputHandler {
-public:
+  public:
     void onKeyPress(int key) override {
-        if (key == vde::KEY_ESCAPE) m_escapePressed = true;
-        if (key == vde::KEY_F) m_failPressed = true;
-        if (key == vde::KEY_SPACE) m_spacePressed = true;
-        if (key == vde::KEY_LEFT) m_left = true;
-        if (key == vde::KEY_RIGHT) m_right = true;
-        if (key == vde::KEY_UP) m_up = true;
-        if (key == vde::KEY_DOWN) m_down = true;
-        if (key == vde::KEY_1) m_key1 = true;
-        if (key == vde::KEY_2) m_key2 = true;
-        if (key == vde::KEY_3) m_key3 = true;
+        if (key == vde::KEY_ESCAPE)
+            m_escapePressed = true;
+        if (key == vde::KEY_F)
+            m_failPressed = true;
+        if (key == vde::KEY_SPACE)
+            m_spacePressed = true;
+        if (key == vde::KEY_LEFT)
+            m_left = true;
+        if (key == vde::KEY_RIGHT)
+            m_right = true;
+        if (key == vde::KEY_UP)
+            m_up = true;
+        if (key == vde::KEY_DOWN)
+            m_down = true;
+        if (key == vde::KEY_1)
+            m_key1 = true;
+        if (key == vde::KEY_2)
+            m_key2 = true;
+        if (key == vde::KEY_3)
+            m_key3 = true;
     }
-    
+
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT) m_left = false;
-        if (key == vde::KEY_RIGHT) m_right = false;
-        if (key == vde::KEY_UP) m_up = false;
-        if (key == vde::KEY_DOWN) m_down = false;
+        if (key == vde::KEY_LEFT)
+            m_left = false;
+        if (key == vde::KEY_RIGHT)
+            m_right = false;
+        if (key == vde::KEY_UP)
+            m_up = false;
+        if (key == vde::KEY_DOWN)
+            m_down = false;
     }
-    
-    bool isEscapePressed() { bool v = m_escapePressed; m_escapePressed = false; return v; }
-    bool isFailPressed() { bool v = m_failPressed; m_failPressed = false; return v; }
-    bool isSpacePressed() { bool v = m_spacePressed; m_spacePressed = false; return v; }
-    bool isKey1Pressed() { bool v = m_key1; m_key1 = false; return v; }
-    bool isKey2Pressed() { bool v = m_key2; m_key2 = false; return v; }
-    bool isKey3Pressed() { bool v = m_key3; m_key3 = false; return v; }
-    
+
+    bool isEscapePressed() {
+        bool v = m_escapePressed;
+        m_escapePressed = false;
+        return v;
+    }
+    bool isFailPressed() {
+        bool v = m_failPressed;
+        m_failPressed = false;
+        return v;
+    }
+    bool isSpacePressed() {
+        bool v = m_spacePressed;
+        m_spacePressed = false;
+        return v;
+    }
+    bool isKey1Pressed() {
+        bool v = m_key1;
+        m_key1 = false;
+        return v;
+    }
+    bool isKey2Pressed() {
+        bool v = m_key2;
+        m_key2 = false;
+        return v;
+    }
+    bool isKey3Pressed() {
+        bool v = m_key3;
+        m_key3 = false;
+        return v;
+    }
+
     bool isLeft() const { return m_left; }
     bool isRight() const { return m_right; }
     bool isUp() const { return m_up; }
     bool isDown() const { return m_down; }
-    
-private:
+
+  private:
     bool m_escapePressed = false;
     bool m_failPressed = false;
     bool m_spacePressed = false;
@@ -68,41 +107,65 @@ private:
  * @brief An animated sprite that cycles through colors.
  */
 class AnimatedSprite : public vde::SpriteEntity {
-public:
+  public:
     AnimatedSprite() = default;
-    
+
     void update(float deltaTime) override {
         m_time += deltaTime;
-        
+
         // Cycle hue over time for rainbow effect
         float hue = std::fmod(m_time * 0.5f, 1.0f);
-        
+
         // Convert HSV to RGB (simplified, assuming S=1, V=1)
         float r, g, b;
         int i = static_cast<int>(hue * 6.0f);
         float f = hue * 6.0f - i;
         switch (i % 6) {
-            case 0: r = 1; g = f; b = 0; break;
-            case 1: r = 1 - f; g = 1; b = 0; break;
-            case 2: r = 0; g = 1; b = f; break;
-            case 3: r = 0; g = 1 - f; b = 1; break;
-            case 4: r = f; g = 0; b = 1; break;
-            default: r = 1; g = 0; b = 1 - f; break;
+        case 0:
+            r = 1;
+            g = f;
+            b = 0;
+            break;
+        case 1:
+            r = 1 - f;
+            g = 1;
+            b = 0;
+            break;
+        case 2:
+            r = 0;
+            g = 1;
+            b = f;
+            break;
+        case 3:
+            r = 0;
+            g = 1 - f;
+            b = 1;
+            break;
+        case 4:
+            r = f;
+            g = 0;
+            b = 1;
+            break;
+        default:
+            r = 1;
+            g = 0;
+            b = 1 - f;
+            break;
         }
-        
+
         setColor(vde::Color(r, g, b, 1.0f));
-        
+
         // Gentle rotation
         auto rot = getRotation();
         rot.roll = std::sin(m_time * 2.0f) * 15.0f;
         setRotation(rot);
-        
+
         // Pulse scale
         float scale = 1.0f + std::sin(m_time * 3.0f) * 0.1f;
         setScale(scale, scale, 1.0f);
     }
-    
-private:
+
+  private:
     float m_time = 0.0f;
 };
 
@@ -110,26 +173,26 @@ private:
  * @brief Scene demonstrating sprite functionality.
  */
 class SpriteScene : public vde::Scene {
-public:
+  public:
     SpriteScene() = default;
-    
+
     void onEnter() override {
         std::cout << "\n========================================" << std::endl;
         std::cout << "  VDE Example: Sprite System" << std::endl;
         std::cout << "========================================\n" << std::endl;
-        
+
         std::cout << "Features demonstrated:" << std::endl;
         std::cout << "  - SpriteEntity creation and rendering" << std::endl;
         std::cout << "  - Sprite colors and tinting" << std::endl;
         std::cout << "  - Anchor point positioning" << std::endl;
         std::cout << "  - Animated sprites" << std::endl;
-        
+
         std::cout << "\nYou should see:" << std::endl;
         std::cout << "  - Green player sprite at center (moveable)" << std::endl;
         std::cout << "  - Rainbow animated sprite (top-left area)" << std::endl;
         std::cout << "  - Colored corner sprites (red, blue, orange, purple)" << std::endl;
         std::cout << "  - Dark semi-transparent background" << std::endl;
-        
+
         std::cout << "\nControls:" << std::endl;
         std::cout << "  Arrow keys - Move player sprite" << std::endl;
         std::cout << "  1/2/3      - Change anchor point" << std::endl;
@@ -137,17 +200,17 @@ public:
         std::cout << "  F          - Fail test (if visuals are incorrect)" << std::endl;
         std::cout << "  ESC        - Exit early" << std::endl;
         std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
-        
+
         // Set up a 2D camera with viewport in world units (not pixels)
         // Use a viewport size that makes our sprites (which are ~1 unit in size) visible
         auto* camera = new vde::Camera2D(8.0f, 6.0f);  // 8x6 world units visible
         camera->setPosition(0.0f, 0.0f);
         camera->setZoom(1.0f);
         setCamera(camera);
-        
+
         // Set background color
         setBackgroundColor(vde::Color::fromHex(0x2d3436));
-        
+
         // Create player sprite (no texture for now - will render as colored quad)
         m_player = addEntity<vde::SpriteEntity>();
         m_player->setName("Player");
@@ -155,30 +218,30 @@ public:
         m_player->setColor(vde::Color::fromHex(0x00b894));  // Green
         m_player->setScale(0.5f, 0.5f, 1.0f);
         m_player->setAnchor(0.5f, 0.5f);  // Center anchor
-        
+
         // Create an animated rainbow sprite
         m_animated = addEntity<AnimatedSprite>();
         m_animated->setName("RainbowSprite");
         m_animated->setPosition(-1.5f, 1.0f, 0.0f);
         m_animated->setScale(0.4f, 0.4f, 1.0f);
-        
+
         // Create corner sprites to show anchor point behavior
         createCornerSprites();
-        
+
         // Create a background sprite
         m_background = addEntity<vde::SpriteEntity>();
         m_background->setName("Background");
-        m_background->setPosition(0.0f, 0.0f, -0.1f);  // Behind other sprites
+        m_background->setPosition(0.0f, 0.0f, -0.1f);                 // Behind other sprites
         m_background->setColor(vde::Color(0.1f, 0.1f, 0.15f, 0.5f));  // Semi-transparent dark
         m_background->setScale(4.0f, 3.0f, 1.0f);
-        
+
         m_elapsedTime = 0.0f;
     }
-    
+
     void createCornerSprites() {
         // Create sprites in corners to demonstrate anchor points
         float offset = 1.5f;
-        
+
         // Top-left corner - anchor at top-left (0, 1)
         auto tl = addEntity<vde::SpriteEntity>();
         tl->setName("TopLeft");
@@ -186,7 +249,7 @@ public:
         tl->setColor(vde::Color::fromHex(0xe74c3c));  // Red
         tl->setScale(0.3f, 0.3f, 1.0f);
         tl->setAnchor(0.0f, 1.0f);
-        
+
         // Top-right corner - anchor at top-right (1, 1)
         auto tr = addEntity<vde::SpriteEntity>();
         tr->setName("TopRight");
@@ -194,7 +257,7 @@ public:
         tr->setColor(vde::Color::fromHex(0x3498db));  // Blue
         tr->setScale(0.3f, 0.3f, 1.0f);
         tr->setAnchor(1.0f, 1.0f);
-        
+
         // Bottom-left corner - anchor at bottom-left (0, 0)
         auto bl = addEntity<vde::SpriteEntity>();
         bl->setName("BottomLeft");
@@ -202,7 +265,7 @@ public:
         bl->setColor(vde::Color::fromHex(0xf39c12));  // Orange
         bl->setScale(0.3f, 0.3f, 1.0f);
         bl->setAnchor(0.0f, 0.0f);
-        
+
         // Bottom-right corner - anchor at bottom-right (1, 0)
         auto br = addEntity<vde::SpriteEntity>();
         br->setName("BottomRight");
@@ -211,13 +274,14 @@ public:
         br->setScale(0.3f, 0.3f, 1.0f);
         br->setAnchor(1.0f, 0.0f);
     }
-    
+
     void update(float deltaTime) override {
         auto* input = dynamic_cast<SpriteInputHandler*>(getInputHandler());
-        if (!input) return;
-        
+        if (!input)
+            return;
+
         m_elapsedTime += deltaTime;
-        
+
         // Check for fail key
         if (input->isFailPressed()) {
             std::cerr << "\n========================================" << std::endl;
@@ -225,33 +289,37 @@ public:
             std::cerr << "  Expected: Sprites with colors, animations, anchor points" << std::endl;
             std::cerr << "========================================\n" << std::endl;
             m_testFailed = true;
-            if (getGame()) getGame()->quit();
+            if (getGame())
+                getGame()->quit();
             return;
         }
-        
+
         // Check for escape key
         if (input->isEscapePressed()) {
             std::cout << "User requested early exit." << std::endl;
-            if (getGame()) getGame()->quit();
+            if (getGame())
+                getGame()->quit();
             return;
         }
-        
+
         // Auto-terminate after configured time
         if (m_elapsedTime >= AUTO_TERMINATE_SECONDS) {
             std::cout << "\n========================================" << std::endl;
             std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
             std::cout << "  Duration: " << m_elapsedTime << " seconds" << std::endl;
             std::cout << "========================================\n" << std::endl;
-            if (getGame()) getGame()->quit();
+            if (getGame())
+                getGame()->quit();
             return;
         }
-        
+
         // Toggle player visibility
         if (input->isSpacePressed()) {
             m_player->setVisible(!m_player->isVisible());
-            std::cout << "Player visibility: " << (m_player->isVisible() ? "ON" : "OFF") << std::endl;
+            std::cout << "Player visibility: " << (m_player->isVisible() ? "ON" : "OFF")
+                      << std::endl;
         }
-        
+
         // Change anchor point with number keys
         if (input->isKey1Pressed()) {
             m_player->setAnchor(0.5f, 0.5f);
@@ -265,25 +333,29 @@ public:
             m_player->setAnchor(1.0f, 0.5f);
             std::cout << "Anchor: Right-Center (1, 0.5)" << std::endl;
         }
-        
+
         // Move player with arrow keys
         float speed = 2.0f;
         auto pos = m_player->getPosition();
-        
-        if (input->isLeft()) pos.x -= speed * deltaTime;
-        if (input->isRight()) pos.x += speed * deltaTime;
-        if (input->isUp()) pos.y += speed * deltaTime;
-        if (input->isDown()) pos.y -= speed * deltaTime;
-        
+
+        if (input->isLeft())
+            pos.x -= speed * deltaTime;
+        if (input->isRight())
+            pos.x += speed * deltaTime;
+        if (input->isUp())
+            pos.y += speed * deltaTime;
+        if (input->isDown())
+            pos.y -= speed * deltaTime;
+
         m_player->setPosition(pos);
-        
+
         // Update all entities
         Scene::update(deltaTime);
     }
-    
+
     bool didTestFail() const { return m_testFailed; }
-    
-private:
+
+  private:
     std::shared_ptr<vde::SpriteEntity> m_player;
     std::shared_ptr<AnimatedSprite> m_animated;
     std::shared_ptr<vde::SpriteEntity> m_background;
@@ -295,28 +367,28 @@ private:
  * @brief Game class for the sprite demo.
  */
 class SpriteDemo : public vde::Game {
-public:
+  public:
     void onStart() override {
         // Set up input handler
         m_inputHandler = std::make_unique<SpriteInputHandler>();
         setInputHandler(m_inputHandler.get());
-        
+
         // Create scene
         auto* scene = new SpriteScene();
         m_scenePtr = scene;
         addScene("main", scene);
         setActiveScene("main");
     }
-    
+
     void onShutdown() override {
         if (m_scenePtr && m_scenePtr->didTestFail()) {
             m_exitCode = 1;
         }
     }
-    
+
     int getExitCode() const { return m_exitCode; }
 
-private:
+  private:
     std::unique_ptr<SpriteInputHandler> m_inputHandler;
     SpriteScene* m_scenePtr = nullptr;
     int m_exitCode = 0;
@@ -327,22 +399,22 @@ private:
  */
 int main() {
     SpriteDemo demo;
-    
+
     vde::GameSettings settings;
     settings.gameName = "VDE Sprite Demo";
     settings.display.windowWidth = 1024;
     settings.display.windowHeight = 768;
     settings.display.fullscreen = false;
-    
+
     try {
         if (!demo.initialize(settings)) {
             std::cerr << "Failed to initialize demo!" << std::endl;
             return 1;
         }
-        
+
         demo.run();
         return demo.getExitCode();
-        
+
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;
         return 1;

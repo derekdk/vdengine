@@ -1,7 +1,8 @@
 #include <vde/ShaderCache.h>
+
 #include <fstream>
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 
 namespace vde {
 
@@ -9,7 +10,7 @@ uint64_t ShaderHash::hash(const std::string& content) {
     // FNV-1a 64-bit hash
     const uint64_t FNV_PRIME = 0x00000100000001B3ULL;
     const uint64_t FNV_OFFSET_BASIS = 0xcbf29ce484222325ULL;
-    
+
     uint64_t h = FNV_OFFSET_BASIS;
     for (char c : content) {
         h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
@@ -23,7 +24,7 @@ uint64_t ShaderHash::hashFile(const std::string& filePath) {
     if (!file.is_open()) {
         return 0;
     }
-    
+
     std::stringstream buffer;
     buffer << file.rdbuf();
     return hash(buffer.str());
@@ -43,4 +44,4 @@ uint64_t ShaderHash::fromHexString(const std::string& hex) {
     return result;
 }
 
-} // namespace vde
+}  // namespace vde
