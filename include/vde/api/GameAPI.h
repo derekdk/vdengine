@@ -35,6 +35,7 @@
 #include "Mesh.h"
 #include "LightBox.h"
 #include "GameCamera.h"
+#include "Material.h"
 
 // World coordinates and bounds
 #include "WorldUnits.h"

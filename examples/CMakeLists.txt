@@ -59,3 +59,18 @@ add_custom_command(TARGET vde_world_bounds_demo POST_BUILD
     $<TARGET_FILE_DIR:vde_world_bounds_demo>/shaders
     COMMENT "Copying shader files..."
 )
+
+# Materials & Lighting demo example demonstrating Phase 4 features
+add_executable(vde_materials_lighting_demo
+    materials_lighting_demo/main.cpp
+)
+
+target_link_libraries(vde_materials_lighting_demo PRIVATE vde)
+
+# Copy shader files for materials_lighting_demo example
+add_custom_command(TARGET vde_materials_lighting_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_materials_lighting_demo>/shaders
+    COMMENT "Copying shader files..."
+)

@@ -4,9 +4,11 @@
  */
 
 #include <vde/api/Game.h>
+#include <vde/api/LightBox.h>
 #include <vde/Window.h>
 #include <vde/VulkanContext.h>
 #include <vde/ShaderCompiler.h>
+#include <vde/BufferUtils.h>
 #include <vde/Types.h>
 
 #include <GLFW/glfw3.h>
@@ -15,6 +17,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <iostream>
+#include <cstring>
 
 namespace vde {
 
@@ -73,11 +76,15 @@ bool Game::initialize(const GameSettings& settings) {
         m_vulkanContext = std::make_unique<VulkanContext>();
         m_vulkanContext->initialize(m_window.get());
         
+        // Create lighting resources first (needed by mesh pipeline)
+        createLightingResources();
+        
         // Create mesh rendering pipeline
         createMeshRenderingPipeline();
         
         // Create sprite rendering pipeline (Phase 3)
         createSpriteRenderingPipeline();
+        createLightingResources();
         
         // Setup input callbacks
         setupInputCallbacks();
@@ -130,6 +137,7 @@ void Game::shutdown() {
     m_sceneStack.clear();
     
     // Cleanup rendering pipelines
+    destroyLightingResources();
     destroySpriteRenderingPipeline();
     destroyMeshRenderingPipeline();
     
@@ -636,17 +644,24 @@ void Game::createMeshRenderingPipeline() {
         throw std::runtime_error("Failed to create mesh descriptor set layout");
     }
     
-    // Push constant range (for model matrix)
+    // Push constant range (for model matrix + material properties)
+    // Size: 64 (mat4) + 48 (MaterialPushConstants) = 112 bytes
     VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4);  // Model matrix
+    pushConstantRange.size = sizeof(glm::mat4) + sizeof(MaterialPushConstants);
     
-    // Pipeline layout
+    // Pipeline layout with two descriptor set layouts
+    // Set 0: UBO (view/projection), Set 1: Lighting UBO
+    std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts = {
+        m_meshDescriptorSetLayout,
+        m_lightingDescriptorSetLayout
+    };
+    
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &m_meshDescriptorSetLayout;
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+    pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
     
@@ -1048,6 +1063,223 @@ void Game::updateSpriteDescriptor(VkDescriptorSet descriptorSet,
     vkUpdateDescriptorSets(m_vulkanContext->getDevice(), 
                           static_cast<uint32_t>(descriptorWrites.size()), 
                           descriptorWrites.data(), 0, nullptr);
+}
+
+// ============================================================================
+// Lighting Resources (Phase 4)
+// ============================================================================
+
+void Game::createLightingResources() {
+    std::cout << "Creating lighting resources..." << std::endl;
+    
+    if (!m_vulkanContext) {
+        std::cout << "No Vulkan context!" << std::endl;
+        return;
+    }
+    
+    VkDevice device = m_vulkanContext->getDevice();
+    constexpr uint32_t framesInFlight = 2;  // MAX_FRAMES_IN_FLIGHT
+    
+    // Create lighting descriptor set layout (Set 1: Lighting UBO)
+    VkDescriptorSetLayoutBinding lightingBinding{};
+    lightingBinding.binding = 0;
+    lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingBinding.descriptorCount = 1;
+    lightingBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &lightingBinding;
+    
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_lightingDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create lighting descriptor set layout");
+    }
+    
+    // Create descriptor pool for lighting UBO
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = framesInFlight;
+    
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = framesInFlight;
+    
+    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_lightingDescriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create lighting descriptor pool");
+    }
+    
+    // Create lighting UBO buffers (one per frame)
+    VkDeviceSize bufferSize = sizeof(LightingUBO);
+    m_lightingUBOBuffers.resize(framesInFlight);
+    m_lightingUBOMemory.resize(framesInFlight);
+    m_lightingUBOMapped.resize(framesInFlight);
+    
+    for (uint32_t i = 0; i < framesInFlight; i++) {
+        BufferUtils::createBuffer(bufferSize,
+                                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                  m_lightingUBOBuffers[i], m_lightingUBOMemory[i]);
+        
+        // Persistently map the buffer
+        vkMapMemory(device, m_lightingUBOMemory[i], 0, bufferSize, 0, &m_lightingUBOMapped[i]);
+    }
+    
+    // Allocate descriptor sets
+    std::vector<VkDescriptorSetLayout> layouts(framesInFlight, m_lightingDescriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_lightingDescriptorPool;
+    allocInfo.descriptorSetCount = framesInFlight;
+    allocInfo.pSetLayouts = layouts.data();
+    
+    m_lightingDescriptorSets.resize(framesInFlight);
+    if (vkAllocateDescriptorSets(device, &allocInfo, m_lightingDescriptorSets.data()) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate lighting descriptor sets");
+    }
+    
+    // Update descriptor sets to point to UBO buffers
+    for (uint32_t i = 0; i < framesInFlight; i++) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = m_lightingUBOBuffers[i];
+        bufferInfo.offset = 0;
+        bufferInfo.range = bufferSize;
+        
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = m_lightingDescriptorSets[i];
+        descriptorWrite.dstBinding = 0;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+        
+        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+    }
+    
+    // Initialize with default lighting (white ambient)
+    LightingUBO defaultLighting{};
+    defaultLighting.ambientColorAndIntensity = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
+    defaultLighting.lightCounts = glm::ivec4(0, 0, 0, 0);
+    
+    for (uint32_t i = 0; i < framesInFlight; i++) {
+        memcpy(m_lightingUBOMapped[i], &defaultLighting, sizeof(LightingUBO));
+    }
+    
+    std::cout << "Lighting resources created successfully" << std::endl;
+}
+
+void Game::destroyLightingResources() {
+    if (!m_vulkanContext) {
+        return;
+    }
+    
+    VkDevice device = m_vulkanContext->getDevice();
+    
+    // Unmap and destroy UBO buffers
+    for (size_t i = 0; i < m_lightingUBOBuffers.size(); i++) {
+        if (m_lightingUBOMapped[i]) {
+            vkUnmapMemory(device, m_lightingUBOMemory[i]);
+        }
+        if (m_lightingUBOBuffers[i] != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, m_lightingUBOBuffers[i], nullptr);
+        }
+        if (m_lightingUBOMemory[i] != VK_NULL_HANDLE) {
+            vkFreeMemory(device, m_lightingUBOMemory[i], nullptr);
+        }
+    }
+    m_lightingUBOBuffers.clear();
+    m_lightingUBOMemory.clear();
+    m_lightingUBOMapped.clear();
+    
+    // Descriptor sets are freed when pool is destroyed
+    m_lightingDescriptorSets.clear();
+    
+    if (m_lightingDescriptorPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, m_lightingDescriptorPool, nullptr);
+        m_lightingDescriptorPool = VK_NULL_HANDLE;
+    }
+    
+    if (m_lightingDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_lightingDescriptorSetLayout, nullptr);
+        m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+}
+
+VkDescriptorSet Game::getCurrentLightingDescriptorSet() const {
+    if (m_lightingDescriptorSets.empty() || !m_vulkanContext) {
+        return VK_NULL_HANDLE;
+    }
+    uint32_t currentFrame = m_vulkanContext->getCurrentFrame();
+    if (currentFrame >= m_lightingDescriptorSets.size()) {
+        currentFrame = 0;
+    }
+    return m_lightingDescriptorSets[currentFrame];
+}
+
+void Game::updateLightingUBO(const Scene* scene) {
+    if (!m_vulkanContext || m_lightingUBOMapped.empty()) {
+        return;
+    }
+    
+    uint32_t currentFrame = m_vulkanContext->getCurrentFrame();
+    if (currentFrame >= m_lightingUBOMapped.size()) {
+        currentFrame = 0;
+    }
+    
+    LightingUBO ubo{};
+    
+    if (scene) {
+        const LightBox& lightBox = scene->getEffectiveLighting();
+        
+        // Set ambient
+        const Color& ambient = lightBox.getAmbientColor();
+        ubo.ambientColorAndIntensity = glm::vec4(ambient.r, ambient.g, ambient.b, 
+                                                  lightBox.getAmbientIntensity());
+        
+        // Convert lights
+        const std::vector<Light>& lights = lightBox.getLights();
+        uint32_t numLights = static_cast<uint32_t>(std::min(lights.size(), static_cast<size_t>(MAX_LIGHTS)));
+        ubo.lightCounts = glm::ivec4(static_cast<int>(numLights), 0, 0, 0);
+        
+        for (uint32_t i = 0; i < numLights; i++) {
+            const Light& light = lights[i];
+            GPULight& gpuLight = ubo.lights[i];
+            
+            // Position/direction and type
+            if (light.type == LightType::Directional) {
+                gpuLight.positionAndType = glm::vec4(light.direction.x, light.direction.y, 
+                                                      light.direction.z, 0.0f);
+            } else {
+                gpuLight.positionAndType = glm::vec4(light.position.x, light.position.y,
+                                                      light.position.z, 
+                                                      static_cast<float>(static_cast<int>(light.type)));
+            }
+            
+            // Direction and range
+            gpuLight.directionAndRange = glm::vec4(light.direction.x, light.direction.y,
+                                                    light.direction.z, light.range);
+            
+            // Color and intensity
+            gpuLight.colorAndIntensity = glm::vec4(light.color.r, light.color.g, 
+                                                    light.color.b, light.intensity);
+            
+            // Spot params (cosines of angles)
+            gpuLight.spotParams = glm::vec4(
+                std::cos(glm::radians(light.spotAngle)),
+                std::cos(glm::radians(light.spotOuterAngle)),
+                0.0f, 0.0f
+            );
+        }
+    } else {
+        // Default: white ambient, no lights
+        ubo.ambientColorAndIntensity = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
+        ubo.lightCounts = glm::ivec4(0, 0, 0, 0);
+    }
+    
+    memcpy(m_lightingUBOMapped[currentFrame], &ubo, sizeof(LightingUBO));
 }
 
 } // namespace vde

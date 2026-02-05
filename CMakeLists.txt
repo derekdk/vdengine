@@ -111,6 +111,7 @@ set(VDE_SOURCES
     src/api/Scene.cpp
     src/api/Mesh.cpp
     src/api/CameraBounds.cpp
+    src/api/Material.cpp
 )
 
 # Public headers
@@ -142,6 +143,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/Scene.h
     include/vde/api/LightBox.h
     include/vde/api/Mesh.h
+    include/vde/api/Material.h
     include/vde/api/Resource.h
     include/vde/api/InputHandler.h
     include/vde/api/KeyCodes.h

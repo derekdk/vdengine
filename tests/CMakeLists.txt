@@ -30,6 +30,8 @@ set(VDE_TEST_SOURCES
     WorldUnits_test.cpp
     WorldBounds_test.cpp
     CameraBounds_test.cpp
+    # Phase 4 tests
+    Material_test.cpp
 )
 
 # Create test executable

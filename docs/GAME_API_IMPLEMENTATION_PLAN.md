@@ -12,7 +12,7 @@ This document outlines the plan to implement the high-level Game API that sits o
 | Phase 2 | Mesh Rendering | ✅ Complete | 2026-01-31 |
 | Phase 2.5 | World Coordinates & Bounds | ✅ Complete | 2026-02-01 |
 | Phase 3 | SpriteEntity & Depth Testing | ✅ Complete | 2026-01-31 |
-| Phase 4 | Materials & Lighting | ⏳ Pending | - |
+| Phase 4 | Materials & Lighting | ✅ Complete | 2026-02-01 |
 | Phase 5 | Resource Management | ⏳ Pending | - |
 | Phase 6 | Audio & Polish | ⏳ Pending | - |
 
@@ -588,13 +588,198 @@ Created in Game::createMeshRenderingPipeline():
 
 ---
 
-### Phase 4: Materials & Lighting (Future)
-- Gamepad support via GLFW
-- Action mapping
+### Phase 4: Materials & Lighting ✅ COMPLETE
+
+**Goal:** Implement a Material system for surface properties and connect the existing LightBox to GPU rendering with multi-light support.
+
+**Status:** ✅ Completed 2026-02-01
+
+#### 4.1 Material Class (`include/vde/api/Material.h`, `src/api/Material.cpp`) ✅
+```cpp
+// Implemented:
+- Material() - Default constructor (gray, roughness 0.5, non-metallic)
+- Material(albedo, roughness, metallic, emission) - Full constructor
+- Setter/getter methods with clamping for roughness/metallic
+- Material::GPUData struct for push constants (48 bytes)
+- getGPUData() - Convert to GPU-ready format
+
+// Factory methods:
+- Material::createDefault() - Standard gray material
+- Material::createColored(color) - Simple colored material
+- Material::createMetallic(color, roughness) - Metallic surface (metallic=1.0)
+- Material::createEmissive(color, intensity) - Glowing material
+- Material::createGlass(opacity) - Transparent glass-like material
+
+// Texture placeholders (for future texture-based materials):
+- hasAlbedoTexture(), getAlbedoTexture()
+- hasNormalTexture(), hasRoughnessTexture(), hasMetallicTexture(), hasEmissionTexture()
+```
+
+**Material Properties:**
+- **Albedo**: Base color (RGBA)
+- **Roughness**: Surface roughness (0=smooth mirror, 1=rough diffuse)
+- **Metallic**: Metalness (0=dielectric, 1=metal)
+- **Emission**: Self-illumination intensity (can exceed 1.0 for HDR)
+- **Emission Color**: Color of emitted light
+
+#### 4.2 GPU Lighting Data Structures (`include/vde/Types.h`) ✅
+```cpp
+// Added structures for GPU transfer:
+struct GPULight {
+    glm::vec4 positionAndType;     // xyz=position/direction, w=type
+    glm::vec4 directionAndRange;   // xyz=direction, w=range
+    glm::vec4 colorAndIntensity;   // rgb=color, a=intensity
+    glm::vec4 spotParams;          // x=innerCos, y=outerCos, zw=reserved
+};  // 64 bytes
+
+struct LightingUBO {
+    glm::vec4 ambientColorAndIntensity;  // rgb=color, a=intensity
+    glm::ivec4 lightCounts;              // x=numLights, yzw=reserved
+    GPULight lights[MAX_LIGHTS];         // MAX_LIGHTS = 8
+};  // 544 bytes total
+
+struct MaterialPushConstants {
+    glm::vec4 albedo;         // rgba
+    glm::vec4 emissionColor;  // rgb + padding
+    float roughness;
+    float metallic;
+    float emission;
+    float padding;
+};  // 48 bytes
+```
+
+#### 4.3 Shader Updates ✅
+
+**shaders/mesh.vert** - Updated for materials:
+- Added MaterialPushConstants in push constant block (after model matrix)
+- Passes material properties to fragment shader
+- Outputs world normal and view position for lighting calculations
+
+**shaders/mesh.frag** - Full multi-light support:
+```glsl
+// Features:
+- LightingUBO binding (set 1, binding 0)
+- Multi-light loop (up to 8 lights)
+- Light types: Directional (0), Point (1), Spot (2)
+- Blinn-Phong specular calculation
+- Distance attenuation for point/spot lights
+- Spotlight cone falloff
+- Material-based ambient/diffuse/specular response
+- Emission support (adds directly to final color)
+```
+
+**Lighting Model:**
+- Ambient: `ambient_color * ambient_intensity * albedo`
+- Diffuse: `light_color * intensity * max(dot(N, L), 0) * albedo`
+- Specular: `light_color * intensity * pow(max(dot(N, H), 0), shininess)` (Blinn-Phong)
+- Shininess derived from roughness: `shininess = 2 / (roughness^4 + 0.001) - 2`
+- Metallic affects specular color (metals tint specular to albedo)
+
+#### 4.4 Lighting Infrastructure (`src/api/Game.cpp`) ✅
+
+**createLightingResources():**
+- Creates descriptor set layout for lighting UBO (Set 1, Binding 0)
+- Creates descriptor pool for per-frame lighting descriptor sets
+- Creates UBO buffers (one per frame-in-flight)
+- Persistently maps UBO buffers for efficient updates
+- Allocates and updates descriptor sets
+
+**destroyLightingResources():**
+- Unmaps and destroys UBO buffers
+- Destroys descriptor pool and layout
+
+**updateLightingUBO(const Scene*):**
+- Converts LightBox data to LightingUBO format
+- Copies ambient color/intensity
+- Converts each Light to GPULight format
+- Handles light type conversion (Directional, Point, Spot)
+- Uploads to current frame's UBO buffer
+
+**getCurrentLightingDescriptorSet():**
+- Returns descriptor set for current frame
+
+#### 4.5 MeshEntity Material Support (`src/api/Entity.cpp`) ✅
+```cpp
+// Added to MeshEntity:
+- setMaterial(Material) / getMaterial() / hasMaterial()
+- m_material member (optional<Material>)
+
+// Updated MeshEntity::render():
+1. Update lighting UBO from scene's LightBox
+2. Bind mesh pipeline
+3. Bind UBO descriptor set (Set 0)
+4. Bind lighting descriptor set (Set 1)
+5. Push model matrix (64 bytes) + MaterialPushConstants (48 bytes)
+6. Use material properties if set, otherwise default gray material
+```
+
+#### 4.6 Pipeline Updates (`src/api/Game.cpp`) ✅
+
+**createMeshRenderingPipeline() modifications:**
+- Push constant size increased to 112 bytes (64 model + 48 material)
+- Pipeline layout now uses 2 descriptor set layouts:
+  - Set 0: UBO (view/projection matrices)
+  - Set 1: Lighting UBO
+- Push constants accessible from both vertex and fragment stages
+
+#### 4.7 Unit Tests (`tests/Material_test.cpp`) ✅ ~280 lines
+```cpp
+// Test categories:
+- Construction tests (default, with albedo, with all parameters)
+- Setter/getter tests with value clamping
+- GPU data conversion tests
+- Factory method tests (createDefault, createColored, createMetallic, createEmissive, createGlass)
+- Method chaining tests
+- Texture flag tests (placeholder)
+- Edge case tests (zero values, max values, copy/move construction)
+```
+
+**Implementation Files:**
+- `include/vde/api/Material.h` (~260 lines) - Material class definition
+- `src/api/Material.cpp` (~80 lines) - Implementation
+- `include/vde/Types.h` - Added GPULight, LightingUBO, MaterialPushConstants
+- `shaders/mesh.vert` - Updated with material push constants
+- `shaders/mesh.frag` - Full multi-light Blinn-Phong lighting
+- `include/vde/api/Game.h` - Added lighting methods and members
+- `src/api/Game.cpp` - Lighting infrastructure (~220 lines added)
+- `include/vde/api/Entity.h` - Added Material to MeshEntity
+- `src/api/Entity.cpp` - Updated render() for materials/lighting
+- `tests/Material_test.cpp` (~280 lines) - Comprehensive unit tests
+
+**Design Decisions:**
+
+1. **Push Constants for Materials**
+   - 48-byte MaterialPushConstants struct fits in typical 128-byte limit
+   - Avoids per-material descriptor sets
+   - Simple and efficient for small number of material properties
+
+2. **Lighting UBO in Set 1**
+   - Separates lighting from MVP matrices (Set 0)
+   - Allows independent update of lighting data
+   - Per-frame UBO buffers avoid synchronization issues
+
+3. **Blinn-Phong Lighting**
+   - Well-understood model, good balance of quality vs. complexity
+   - Half-vector optimization for specular
+   - Roughness-to-shininess conversion for intuitive control
+
+4. **LightBox Integration**
+   - Scene's LightBox converted to GPU format each frame
+   - Default white ambient used when no LightBox set
+   - Supports all existing Light types (Directional, Point, Spot)
+
+**Known Limitations (Phase 4):**
+- No texture-based materials (albedo/normal/roughness maps)
+- No shadows
+- Fixed 8-light maximum (GPU array size)
+- No PBR (physically-based rendering) - using Blinn-Phong approximation
+- No environment mapping/reflections
+
+**Phase 4 Total: ~900 lines implementation + ~280 lines tests**
 
 ---
 
-## File Structure After Implementation
+### Phase 5: Resource Management (Future)
 
 ```
 src/

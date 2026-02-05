@@ -18,6 +18,7 @@ namespace vde {
 // Forward declarations
 class Scene;
 class Mesh;
+class Material;
 class Texture;
 
 /**
@@ -214,12 +215,29 @@ public:
      */
     const Color& getColor() const { return m_color; }
 
+    /**
+     * @brief Set the material (takes shared ownership).
+     * @param material The material to use for rendering
+     */
+    void setMaterial(std::shared_ptr<Material> material) { m_material = std::move(material); }
+
+    /**
+     * @brief Get the material.
+     */
+    std::shared_ptr<Material> getMaterial() const { return m_material; }
+
+    /**
+     * @brief Check if entity has a material.
+     */
+    bool hasMaterial() const { return m_material != nullptr; }
+
     void render() override;
 
 protected:
     // Direct references (preferred for simplicity)
     std::shared_ptr<Mesh> m_mesh;
     std::shared_ptr<Texture> m_texture;
+    std::shared_ptr<Material> m_material;
     
     // Resource IDs (for Scene-managed resources)
     ResourceId m_meshId = INVALID_RESOURCE_ID;

@@ -17,6 +17,7 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <vector>
 
 namespace vde {
 
@@ -286,6 +287,26 @@ public:
                                 VkBuffer uboBuffer, VkDeviceSize uboSize,
                                 VkImageView imageView, VkSampler sampler);
 
+    // =========================================================================
+    // Lighting System (Phase 4)
+    // =========================================================================
+
+    /**
+     * @brief Get the lighting descriptor set layout (Set 1 for mesh pipeline).
+     */
+    VkDescriptorSetLayout getLightingDescriptorSetLayout() const { return m_lightingDescriptorSetLayout; }
+
+    /**
+     * @brief Get the current frame's lighting descriptor set.
+     */
+    VkDescriptorSet getCurrentLightingDescriptorSet() const;
+
+    /**
+     * @brief Update the lighting UBO with scene lighting data.
+     * @param scene Scene containing LightBox to upload
+     */
+    void updateLightingUBO(const Scene* scene);
+
 protected:
     // Virtual methods for subclassing
 
@@ -339,6 +360,14 @@ private:
     std::string m_pendingScene;
     bool m_sceneSwitchPending = false;
 
+    // Lighting infrastructure (Phase 4)
+    VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_lightingDescriptorPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_lightingDescriptorSets;  // One per frame-in-flight
+    std::vector<VkBuffer> m_lightingUBOBuffers;              // One per frame-in-flight
+    std::vector<VkDeviceMemory> m_lightingUBOMemory;         // One per frame-in-flight
+    std::vector<void*> m_lightingUBOMapped;                  // Persistently mapped pointers
+
     // Input
     InputHandler* m_inputHandler = nullptr;
 
@@ -364,6 +393,8 @@ private:
     void destroyMeshRenderingPipeline();
     void createSpriteRenderingPipeline();
     void destroySpriteRenderingPipeline();
+    void createLightingResources();
+    void destroyLightingResources();
 
 };
 

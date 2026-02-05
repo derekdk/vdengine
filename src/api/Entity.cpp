@@ -7,9 +7,11 @@
 #include <vde/api/Scene.h>
 #include <vde/api/Game.h>
 #include <vde/api/Mesh.h>
+#include <vde/api/Material.h>
 #include <vde/VulkanContext.h>
 #include <vde/Texture.h>
 #include <vde/DescriptorManager.h>
+#include <vde/Types.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <unordered_map>
 
@@ -122,6 +124,7 @@ MeshEntity::MeshEntity()
     : Entity()
     , m_mesh(nullptr)
     , m_texture(nullptr)
+    , m_material(nullptr)
     , m_meshId(INVALID_RESOURCE_ID)
     , m_textureId(INVALID_RESOURCE_ID)
     , m_color(Color::white())
@@ -156,6 +159,9 @@ void MeshEntity::render() {
     if (!mesh->isOnGPU()) {
         mesh->uploadToGPU(context);
     }
+    
+    // Update lighting UBO with scene lighting data
+    game->updateLightingUBO(m_scene);
     
     // Get current command buffer
     VkCommandBuffer cmd = context->getCurrentCommandBuffer();
@@ -196,10 +202,44 @@ void MeshEntity::render() {
                                pipelineLayout, 0, 1, &uboDescriptorSet, 0, nullptr);
     }
     
-    // Push model matrix as push constant
-    glm::mat4 modelMatrix = getModelMatrix();
-    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                       0, sizeof(glm::mat4), &modelMatrix);
+    // Bind lighting descriptor set (set 1)
+    VkDescriptorSet lightingDescriptorSet = game->getCurrentLightingDescriptorSet();
+    if (lightingDescriptorSet != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                               pipelineLayout, 1, 1, &lightingDescriptorSet, 0, nullptr);
+    }
+    
+    // Prepare push constants: model matrix + material properties
+    struct MeshPushConstants {
+        glm::mat4 model;
+        MaterialPushConstants material;
+    } pushData;
+    
+    pushData.model = getModelMatrix();
+    
+    // Get material properties (use defaults if no material)
+    if (m_material) {
+        Material::GPUData gpuData = m_material->getGPUData();
+        pushData.material.albedo = gpuData.albedo;
+        pushData.material.emission = gpuData.emission;
+        pushData.material.roughness = gpuData.roughness;
+        pushData.material.metallic = gpuData.metallic;
+        pushData.material.normalStrength = gpuData.normalStrength;
+        pushData.material.padding = 0.0f;
+    } else {
+        // Default material: entity color, medium roughness, non-metallic
+        pushData.material.albedo = glm::vec4(m_color.r, m_color.g, m_color.b, 1.0f);
+        pushData.material.emission = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        pushData.material.roughness = 0.5f;
+        pushData.material.metallic = 0.0f;
+        pushData.material.normalStrength = 1.0f;
+        pushData.material.padding = 0.0f;
+    }
+    
+    // Push model matrix and material as push constants
+    vkCmdPushConstants(cmd, pipelineLayout, 
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(MeshPushConstants), &pushData);
     
     // Bind mesh buffers
     mesh->bind(cmd);

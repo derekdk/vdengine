@@ -96,4 +96,59 @@ struct UniformBufferObject {
 static_assert(sizeof(UniformBufferObject) == 192, 
     "UniformBufferObject size must be 192 bytes (3 aligned mat4)");
 
+/**
+ * @brief Maximum number of lights supported in the lighting UBO.
+ */
+constexpr uint32_t MAX_LIGHTS = 8;
+
+/**
+ * @brief GPU representation of a single light source.
+ * 
+ * Packed for GLSL std140 layout. Must match shader light struct exactly.
+ * Size: 64 bytes (4 x vec4)
+ */
+struct GPULight {
+    alignas(16) glm::vec4 positionAndType;   ///< xyz = position/direction, w = type (0=dir, 1=point, 2=spot)
+    alignas(16) glm::vec4 directionAndRange; ///< xyz = direction (for spot/dir), w = range (for point/spot)
+    alignas(16) glm::vec4 colorAndIntensity; ///< xyz = RGB color, w = intensity
+    alignas(16) glm::vec4 spotParams;        ///< x = inner angle cos, y = outer angle cos, zw = reserved
+};
+
+static_assert(sizeof(GPULight) == 64, "GPULight must be 64 bytes");
+
+/**
+ * @brief Lighting uniform buffer object for shader data.
+ * 
+ * Contains ambient lighting parameters and an array of light sources.
+ * Follows GLSL std140 layout rules for proper GPU alignment.
+ * 
+ * Total size: 16 (ambient) + 16 (counts) + 64*8 (lights) = 544 bytes
+ */
+struct LightingUBO {
+    alignas(16) glm::vec4 ambientColorAndIntensity;  ///< xyz = ambient color, w = intensity
+    alignas(16) glm::ivec4 lightCounts;              ///< x = num lights, yzw = reserved
+    GPULight lights[MAX_LIGHTS];                     ///< Array of light sources
+};
+
+static_assert(sizeof(LightingUBO) == 544, 
+    "LightingUBO size must be 544 bytes");
+
+/**
+ * @brief Material data packed for GPU push constants.
+ * 
+ * This structure matches Material::GPUData and is used for push constants.
+ * Size: 48 bytes (fits within typical 128-byte push constant limit)
+ */
+struct MaterialPushConstants {
+    alignas(16) glm::vec4 albedo;        ///< RGB albedo + opacity
+    alignas(16) glm::vec4 emission;      ///< RGB emission + intensity  
+    float roughness;                      ///< Surface roughness (0-1)
+    float metallic;                       ///< Metallic factor (0-1)
+    float normalStrength;                 ///< Normal map strength
+    float padding;                        ///< Padding for alignment
+};
+
+static_assert(sizeof(MaterialPushConstants) == 48,
+    "MaterialPushConstants size must be 48 bytes");
+
 } // namespace vde
