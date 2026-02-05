@@ -10,6 +10,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **rebuild.ps1** | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator Ninja` |
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
+| **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 
 ## Quick Start
 
@@ -181,6 +182,41 @@ Run unit tests with optional filtering and building.
 - `Test1:Test2` - Multiple tests (colon-separated)
 - `-Pattern*` - Exclude tests matching pattern
 
+### format.ps1
+
+Format C++ source files using clang-format according to the project's style guide.
+
+**Syntax:**
+```powershell
+.\scripts\format.ps1 [-Check] [-Help]
+```
+
+**Parameters:**
+- `-Check` - Check formatting without modifying files
+- `-Help` - Show detailed help
+
+**Examples:**
+```powershell
+# Format all C++ files in-place
+.\scripts\format.ps1
+
+# Check formatting (CI/pre-commit)
+.\scripts\format.ps1 -Check
+
+# Show help
+.\scripts\format.ps1 -Help
+```
+
+**Files Formatted:**
+- `include/vde/**/*.h` - Public headers
+- `src/**/*.cpp` - Implementation files
+- `examples/**/*.cpp` - Example code
+- `tests/**/*.cpp` - Test files
+
+**Requirements:**
+- clang-format must be installed and in PATH
+- Install via Visual Studio (C++ clang tools) or LLVM distribution
+
 ## Common Workflows
 
 ### Daily Development
@@ -213,6 +249,9 @@ Run unit tests with optional filtering and building.
 .\scripts\clean.ps1 -Full
 .\scripts\build.ps1
 .\scripts\test.ps1
+
+# Check code formatting
+.\scripts\format.ps1 -Check
 ```
 
 ### Release Testing
@@ -220,6 +259,15 @@ Run unit tests with optional filtering and building.
 # Build and test release configuration
 .\scripts\build.ps1 -Config Release
 .\scripts\test.ps1 -Config Release
+```
+
+### Format Code
+```powershell
+# Format all C++ files
+.\scripts\format.ps1
+
+# Check formatting without modifying files
+.\scripts\format.ps1 -Check
 ```
 
 ## Build Directories
@@ -283,6 +331,9 @@ The old `build-and-test.ps1` script is still available for backward compatibilit
 .\scripts\clean.ps1 -Full
 .\scripts\build.ps1
 ```
+
+**Problem:** clang-format not found
+**Solution:** Install clang-format via Visual Studio (C++ clang tools component) or download LLVM from https://releases.llvm.org/
 
 ## Help
 

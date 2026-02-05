@@ -70,11 +70,31 @@ VDE provides convenient PowerShell scripts for all build operations:
 
 # Show all available commands
 .\scripts\help.ps1
+
+# Format C++ code
+.\scripts\format.ps1
 ```
 
 For complete documentation, see:
 - `scripts/README.md` - Detailed script usage
 - `.github/skills/build-tool-workflows/SKILL.md` - Complete build guide
+
+## Code Formatting
+
+VDE uses clang-format to maintain consistent code style. The configuration is defined in [.clang-format](.clang-format) at the project root.
+
+```powershell
+# Format all C++ files
+.\scripts\format.ps1
+
+# Check formatting (useful for CI/pre-commit)
+.\scripts\format.ps1 -Check
+```
+
+**VSCode Integration:**
+- Format-on-save is enabled by default (see [.vscode/settings.json](.vscode/settings.json))
+- Right-click → Format Document (or Alt+Shift+F)
+- Requires clang-format in PATH (install via Visual Studio C++ clang tools or LLVM)
 
 ## Usage Example
 
