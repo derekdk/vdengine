@@ -22,6 +22,7 @@ VDE provides a clean abstraction over Vulkan's verbose API while maintaining fle
 - **Vulkan SDK 1.3+** ([Download](https://vulkan.lunarg.com/))
 - **C++20 compatible compiler** (MSVC 2022, GCC 11+, Clang 14+)
 - **Git** (for dependency fetching)
+- **Git LFS** (for asset files) - [Installation Guide](docs/GIT_LFS_SETUP.md)
 
 ### Building
 

@@ -4,9 +4,10 @@ Thank you for your interest in contributing to the Vulkan Display Engine!
 
 ## Getting Started
 
-1. Fork the repository
-2. Clone your fork
-3. Create a feature branch: `git checkout -b feature/my-feature`
+1. Install Git LFS: See [Git LFS Setup Guide](GIT_LFS_SETUP.md)
+2. Fork the repository
+3. Clone your fork (LFS files will download automatically)
+4. Create a feature branch: `git checkout -b feature/my-feature`
 4. Make your changes
 5. Run tests: `.\scripts\build-and-test.ps1`
 6. Commit with descriptive messages
@@ -19,6 +20,7 @@ Thank you for your interest in contributing to the Vulkan Display Engine!
 - Vulkan SDK 1.3+
 - C++20 compatible compiler
 - Git
+- Git LFS (for asset files) - See [Git LFS Setup Guide](GIT_LFS_SETUP.md)
 
 ### Building for Development
 
