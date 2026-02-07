@@ -10,9 +10,12 @@
 #include <glm/gtc/constants.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <limits>
+#include <set>
 #include <sstream>
+#include <utility>
 
 namespace vde {
 
@@ -378,6 +381,153 @@ ResourcePtr<Mesh> Mesh::createCylinder(float radius, float height, int segments)
         indices.push_back(topCenterIdx);
         indices.push_back(topLeft);
         indices.push_back(topRight);
+    }
+
+    mesh->setData(vertices, indices);
+    return mesh;
+}
+
+ResourcePtr<Mesh> Mesh::createPyramid(float baseSize, float height) {
+    auto mesh = std::make_shared<Mesh>();
+
+    float halfBase = baseSize * 0.5f;
+    // Centre the pyramid vertically: base at -height/4, apex at +3*height/4
+    float baseY = -height * 0.25f;
+    float apexY = height * 0.75f;
+
+    glm::vec3 bl(-halfBase, baseY, -halfBase);
+    glm::vec3 br(halfBase, baseY, -halfBase);
+    glm::vec3 fr(halfBase, baseY, halfBase);
+    glm::vec3 fl(-halfBase, baseY, halfBase);
+    glm::vec3 apex(0.0f, apexY, 0.0f);
+
+    glm::vec2 uv(0.0f, 0.0f);
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+
+    // Helper: add a triangle with computed face normal in the vertex color
+    // field (the mesh shader uses vertex.color as the surface normal).
+    auto addTri = [&](const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
+        glm::vec3 normal = glm::normalize(glm::cross(b - a, c - a));
+        uint32_t base = static_cast<uint32_t>(vertices.size());
+        vertices.push_back({a, normal, uv});
+        vertices.push_back({b, normal, uv});
+        vertices.push_back({c, normal, uv});
+        indices.push_back(base);
+        indices.push_back(base + 1);
+        indices.push_back(base + 2);
+    };
+
+    // Base (two triangles, normal facing down)
+    addTri(bl, br, fr);
+    addTri(bl, fr, fl);
+
+    // Side faces (normals face outward)
+    addTri(bl, apex, br);  // back
+    addTri(br, apex, fr);  // right
+    addTri(fr, apex, fl);  // front
+    addTri(fl, apex, bl);  // left
+
+    mesh->setData(vertices, indices);
+    return mesh;
+}
+
+// ---------------------------------------------------------------------------
+// Wireframe Helpers (file-local)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/**
+ * @brief Append a thin rectangular tube between two 3D points.
+ *
+ * Each tube has 4 side faces (8 vertices, 24 indices).
+ * The vertex color stores the outward-pointing normal.
+ */
+void addEdgeTube(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices,
+                 const glm::vec3& start, const glm::vec3& end, float thickness) {
+    glm::vec3 dir = end - start;
+    float len = glm::length(dir);
+    if (len < 0.0001f)
+        return;
+    dir /= len;
+
+    // Build a perpendicular frame around the edge direction
+    glm::vec3 up = (std::abs(dir.y) < 0.99f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+    glm::vec3 right = glm::normalize(glm::cross(dir, up));
+    glm::vec3 forward = glm::normalize(glm::cross(right, dir));
+
+    float halfT = thickness * 0.5f;
+    uint32_t base = static_cast<uint32_t>(vertices.size());
+    glm::vec2 uv(0.0f, 0.0f);
+
+    // Four corner offsets and their outward normals
+    glm::vec3 offsets[4] = {
+        right * halfT + forward * halfT,
+        right * halfT - forward * halfT,
+        -right * halfT - forward * halfT,
+        -right * halfT + forward * halfT,
+    };
+    glm::vec3 normals[4] = {
+        glm::normalize(right + forward),
+        glm::normalize(right - forward),
+        glm::normalize(-right - forward),
+        glm::normalize(-right + forward),
+    };
+
+    // 8 vertices: 4 at start, 4 at end
+    for (int i = 0; i < 4; i++) {
+        vertices.push_back({start + offsets[i], normals[i], uv});
+    }
+    for (int i = 0; i < 4; i++) {
+        vertices.push_back({end + offsets[i], normals[i], uv});
+    }
+
+    // 4 side quads (2 tris each)
+    for (int i = 0; i < 4; i++) {
+        uint32_t next = static_cast<uint32_t>((i + 1) % 4);
+        indices.push_back(base + i);
+        indices.push_back(base + i + 4);
+        indices.push_back(base + next + 4);
+        indices.push_back(base + i);
+        indices.push_back(base + next + 4);
+        indices.push_back(base + next);
+    }
+}
+
+/**
+ * @brief Build a canonical edge key so (a,b) == (b,a).
+ */
+std::pair<uint32_t, uint32_t> makeEdgeKey(uint32_t a, uint32_t b) {
+    return (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
+}
+
+}  // namespace
+
+ResourcePtr<Mesh> Mesh::createWireframe(const ResourcePtr<Mesh>& sourceMesh, float thickness) {
+    if (!sourceMesh) {
+        return std::make_shared<Mesh>();
+    }
+    return createWireframe(sourceMesh->getVertices(), sourceMesh->getIndices(), thickness);
+}
+
+ResourcePtr<Mesh> Mesh::createWireframe(const std::vector<Vertex>& srcVertices,
+                                        const std::vector<uint32_t>& srcIndices, float thickness) {
+    auto mesh = std::make_shared<Mesh>();
+
+    // Collect unique edges from the triangle list
+    std::set<std::pair<uint32_t, uint32_t>> edgeSet;
+    for (size_t i = 0; i + 2 < srcIndices.size(); i += 3) {
+        edgeSet.insert(makeEdgeKey(srcIndices[i], srcIndices[i + 1]));
+        edgeSet.insert(makeEdgeKey(srcIndices[i + 1], srcIndices[i + 2]));
+        edgeSet.insert(makeEdgeKey(srcIndices[i + 2], srcIndices[i]));
+    }
+
+    // Build tube geometry for each unique edge
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    for (const auto& [a, b] : edgeSet) {
+        addEdgeTube(vertices, indices, srcVertices[a].position, srcVertices[b].position, thickness);
     }
 
     mesh->setData(vertices, indices);

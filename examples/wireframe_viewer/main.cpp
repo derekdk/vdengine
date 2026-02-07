@@ -8,8 +8,8 @@
  * - Mouse wheel zoom
  * - Click-and-drag to rotate the object (only when clicking on the object)
  *
- * The wireframe is built from thin tube geometry so it renders through
- * the standard mesh (VK_POLYGON_MODE_FILL) pipeline.
+ * The wireframe is built via Mesh::createWireframe() which generates thin
+ * tube geometry so it renders through the standard mesh pipeline.
  *
  * Press 'F' to fail the test, ESC to exit early.
  */
@@ -19,14 +19,11 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <optional>
-#include <utility>
-#include <vector>
 
 #include "../ExampleBase.h"
 
@@ -39,260 +36,6 @@ enum class RenderMode { Wireframe = 0, Solid, SolidPlusWireframe };
 
 static constexpr float kWireframeThickness = 0.015f;
 static constexpr float kWireframeOverlayScale = 1.005f;
-
-// =============================================================================
-// Wireframe Geometry Helpers
-// =============================================================================
-
-/**
- * @brief Append a thin rectangular tube between two 3D points.
- *
- * Each tube has 4 side faces (8 vertices, 24 indices).
- * The vertex `color` field stores the outward-pointing normal
- * (required by the mesh shader for lighting).
- */
-static void addEdge(std::vector<vde::Vertex>& vertices, std::vector<uint32_t>& indices,
-                    const glm::vec3& start, const glm::vec3& end, float thickness) {
-    glm::vec3 dir = end - start;
-    float len = glm::length(dir);
-    if (len < 0.0001f)
-        return;
-    dir /= len;
-
-    // Build a perpendicular frame around the edge direction
-    glm::vec3 up = (std::abs(dir.y) < 0.99f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
-    glm::vec3 right = glm::normalize(glm::cross(dir, up));
-    glm::vec3 forward = glm::normalize(glm::cross(right, dir));
-
-    float halfT = thickness * 0.5f;
-    uint32_t base = static_cast<uint32_t>(vertices.size());
-    glm::vec2 uv(0.0f, 0.0f);
-
-    // Four corner offsets and their outward normals
-    glm::vec3 offsets[4] = {
-        right * halfT + forward * halfT,
-        right * halfT - forward * halfT,
-        -right * halfT - forward * halfT,
-        -right * halfT + forward * halfT,
-    };
-    glm::vec3 normals[4] = {
-        glm::normalize(right + forward),
-        glm::normalize(right - forward),
-        glm::normalize(-right - forward),
-        glm::normalize(-right + forward),
-    };
-
-    // 8 vertices: 4 at start, 4 at end
-    for (int i = 0; i < 4; i++) {
-        vertices.push_back({start + offsets[i], normals[i], uv});
-    }
-    for (int i = 0; i < 4; i++) {
-        vertices.push_back({end + offsets[i], normals[i], uv});
-    }
-
-    // 4 side quads (2 tris each)
-    for (int i = 0; i < 4; i++) {
-        uint32_t next = static_cast<uint32_t>((i + 1) % 4);
-        indices.push_back(base + i);
-        indices.push_back(base + i + 4);
-        indices.push_back(base + next + 4);
-        indices.push_back(base + i);
-        indices.push_back(base + next + 4);
-        indices.push_back(base + next);
-    }
-}
-
-/**
- * @brief Build a wireframe mesh from a set of points and edge pairs.
- */
-static std::shared_ptr<vde::Mesh> buildWireframeMesh(const std::vector<glm::vec3>& points,
-                                                     const std::vector<std::pair<int, int>>& edges,
-                                                     float thickness) {
-    std::vector<vde::Vertex> vertices;
-    std::vector<uint32_t> indices;
-
-    for (const auto& [a, b] : edges) {
-        addEdge(vertices, indices, points[a], points[b], thickness);
-    }
-
-    auto mesh = std::make_shared<vde::Mesh>();
-    mesh->setData(vertices, indices);
-    return mesh;
-}
-
-// =============================================================================
-// Pyramid Mesh Creation
-// =============================================================================
-
-static std::shared_ptr<vde::Mesh> createPyramidSolid() {
-    float halfBase = 0.5f;
-    float baseY = -0.25f;
-    float apexY = 0.75f;
-
-    glm::vec3 bl(-halfBase, baseY, -halfBase);
-    glm::vec3 br(halfBase, baseY, -halfBase);
-    glm::vec3 fr(halfBase, baseY, halfBase);
-    glm::vec3 fl(-halfBase, baseY, halfBase);
-    glm::vec3 apex(0.0f, apexY, 0.0f);
-
-    glm::vec2 uv(0.0f, 0.0f);
-    std::vector<vde::Vertex> vertices;
-    std::vector<uint32_t> indices;
-
-    // Helper: add a triangle with a computed face normal stored in the
-    // vertex color field (the mesh shader uses color-as-normal).
-    auto addTri = [&](const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
-        glm::vec3 normal = glm::normalize(glm::cross(b - a, c - a));
-        uint32_t base = static_cast<uint32_t>(vertices.size());
-        vertices.push_back({a, normal, uv});
-        vertices.push_back({b, normal, uv});
-        vertices.push_back({c, normal, uv});
-        indices.push_back(base);
-        indices.push_back(base + 1);
-        indices.push_back(base + 2);
-    };
-
-    // Base (two triangles, normal facing down)
-    addTri(bl, br, fr);
-    addTri(bl, fr, fl);
-
-    // Side faces (normals face outward automatically)
-    addTri(bl, apex, br);  // back
-    addTri(br, apex, fr);  // right
-    addTri(fr, apex, fl);  // front
-    addTri(fl, apex, bl);  // left
-
-    auto mesh = std::make_shared<vde::Mesh>();
-    mesh->setData(vertices, indices);
-    return mesh;
-}
-
-static std::shared_ptr<vde::Mesh> createPyramidWireframe(float thickness) {
-    float halfBase = 0.5f;
-    float baseY = -0.25f;
-    float apexY = 0.75f;
-
-    std::vector<glm::vec3> pts = {
-        {-halfBase, baseY, -halfBase},  // 0 BL
-        {halfBase, baseY, -halfBase},   // 1 BR
-        {halfBase, baseY, halfBase},    // 2 FR
-        {-halfBase, baseY, halfBase},   // 3 FL
-        {0.0f, apexY, 0.0f},            // 4 Apex
-    };
-
-    std::vector<std::pair<int, int>> edges = {
-        {0, 1}, {1, 2}, {2, 3}, {3, 0},  // base
-        {0, 4}, {1, 4}, {2, 4}, {3, 4},  // sides to apex
-    };
-
-    return buildWireframeMesh(pts, edges, thickness);
-}
-
-// =============================================================================
-// Cube Wireframe
-// =============================================================================
-
-static std::shared_ptr<vde::Mesh> createCubeWireframe(float size, float thickness) {
-    float h = size * 0.5f;
-
-    std::vector<glm::vec3> pts = {
-        {-h, -h, -h}, {h, -h, -h}, {h, -h, h}, {-h, -h, h},  // bottom
-        {-h, h, -h},  {h, h, -h},  {h, h, h},  {-h, h, h},   // top
-    };
-
-    std::vector<std::pair<int, int>> edges = {
-        {0, 1}, {1, 2}, {2, 3}, {3, 0},  // bottom
-        {4, 5}, {5, 6}, {6, 7}, {7, 4},  // top
-        {0, 4}, {1, 5}, {2, 6}, {3, 7},  // vertical
-    };
-
-    return buildWireframeMesh(pts, edges, thickness);
-}
-
-// =============================================================================
-// Sphere Wireframe (latitude / longitude lines)
-// =============================================================================
-
-static std::shared_ptr<vde::Mesh> createSphereWireframe(float radius, int latLines, int lonLines,
-                                                        int segmentsPerCircle, float thickness) {
-    std::vector<vde::Vertex> vertices;
-    std::vector<uint32_t> indices;
-
-    const float pi = glm::pi<float>();
-    const float twoPi = 2.0f * pi;
-
-    // Latitude lines (horizontal circles)
-    for (int i = 1; i <= latLines; i++) {
-        float phi = pi * static_cast<float>(i) / static_cast<float>(latLines + 1);
-        float y = radius * std::cos(phi);
-        float r = radius * std::sin(phi);
-
-        for (int j = 0; j < segmentsPerCircle; j++) {
-            float t1 = twoPi * static_cast<float>(j) / static_cast<float>(segmentsPerCircle);
-            float t2 = twoPi * static_cast<float>(j + 1) / static_cast<float>(segmentsPerCircle);
-
-            glm::vec3 p1(r * std::cos(t1), y, r * std::sin(t1));
-            glm::vec3 p2(r * std::cos(t2), y, r * std::sin(t2));
-            addEdge(vertices, indices, p1, p2, thickness);
-        }
-    }
-
-    // Longitude lines (vertical great-circle arcs)
-    for (int j = 0; j < lonLines; j++) {
-        float theta = twoPi * static_cast<float>(j) / static_cast<float>(lonLines);
-
-        for (int i = 0; i < segmentsPerCircle; i++) {
-            float phi1 = pi * static_cast<float>(i) / static_cast<float>(segmentsPerCircle);
-            float phi2 = pi * static_cast<float>(i + 1) / static_cast<float>(segmentsPerCircle);
-
-            glm::vec3 p1(radius * std::sin(phi1) * std::cos(theta), radius * std::cos(phi1),
-                         radius * std::sin(phi1) * std::sin(theta));
-            glm::vec3 p2(radius * std::sin(phi2) * std::cos(theta), radius * std::cos(phi2),
-                         radius * std::sin(phi2) * std::sin(theta));
-            addEdge(vertices, indices, p1, p2, thickness);
-        }
-    }
-
-    auto mesh = std::make_shared<vde::Mesh>();
-    mesh->setData(vertices, indices);
-    return mesh;
-}
-
-// =============================================================================
-// Ray-Sphere Hit Testing
-// =============================================================================
-
-/**
- * @brief Test whether a ray from the mouse cursor intersects a bounding sphere.
- *
- * The mouse position is unprojected into a world-space ray using the
- * inverse of the view-projection matrix.  Vulkan NDC conventions apply
- * (Y points down, Z depth 0..1).
- */
-static bool hitTestSphere(double mouseX, double mouseY, float screenW, float screenH,
-                          const glm::mat4& viewProj, const glm::vec3& sphereCenter,
-                          float sphereRadius) {
-    // Mouse -> Vulkan NDC (Y down, Z 0..1)
-    float ndcX = (2.0f * static_cast<float>(mouseX) / screenW) - 1.0f;
-    float ndcY = (2.0f * static_cast<float>(mouseY) / screenH) - 1.0f;
-
-    glm::mat4 invVP = glm::inverse(viewProj);
-
-    glm::vec4 nearClip = invVP * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
-    glm::vec4 farClip = invVP * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
-    nearClip /= nearClip.w;
-    farClip /= farClip.w;
-
-    glm::vec3 rayOrigin(nearClip);
-    glm::vec3 rayDir = glm::normalize(glm::vec3(farClip) - rayOrigin);
-
-    // Analytical ray-sphere intersection
-    glm::vec3 oc = rayOrigin - sphereCenter;
-    float a = glm::dot(rayDir, rayDir);
-    float b = 2.0f * glm::dot(oc, rayDir);
-    float c = glm::dot(oc, oc) - sphereRadius * sphereRadius;
-    return (b * b - 4.0f * a * c) >= 0.0f;
-}
 
 // =============================================================================
 // Input Handler
@@ -433,13 +176,15 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
 
         setBackgroundColor(vde::Color::fromHex(0x1a1a2e));
 
-        // Pre-create all meshes
-        m_pyramidSolid = createPyramidSolid();
-        m_pyramidWireframe = createPyramidWireframe(kWireframeThickness);
+        // --- Create solid meshes using API factory methods ---
+        m_pyramidSolid = vde::Mesh::createPyramid(1.0f, 1.0f);
         m_cubeSolid = vde::Mesh::createCube(1.0f);
-        m_cubeWireframe = createCubeWireframe(1.0f, kWireframeThickness);
         m_sphereSolid = vde::Mesh::createSphere(0.5f, 32, 16);
-        m_sphereWireframe = createSphereWireframe(0.5f, 6, 8, 48, kWireframeThickness);
+
+        // --- Create wireframe meshes from solids ---
+        m_pyramidWireframe = vde::Mesh::createWireframe(m_pyramidSolid, kWireframeThickness);
+        m_cubeWireframe = vde::Mesh::createWireframe(m_cubeSolid, kWireframeThickness);
+        m_sphereWireframe = vde::Mesh::createWireframe(m_sphereSolid, kWireframeThickness);
 
         // Pre-create materials
         m_solidMaterial =
@@ -562,7 +307,6 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
     RenderMode m_currentMode = RenderMode::Wireframe;
     float m_objectPitch = 0.0f;
     float m_objectYaw = 0.0f;
-    float m_boundingRadius = 0.8f;
 
     // -----------------------------------------------------------------
 
@@ -573,17 +317,14 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
         case ShapeType::Pyramid:
             m_solidEntity->setMesh(m_pyramidSolid);
             m_wireframeEntity->setMesh(m_pyramidWireframe);
-            m_boundingRadius = 0.8f;
             break;
         case ShapeType::Cube:
             m_solidEntity->setMesh(m_cubeSolid);
             m_wireframeEntity->setMesh(m_cubeWireframe);
-            m_boundingRadius = 0.87f;
             break;
         case ShapeType::Sphere:
             m_solidEntity->setMesh(m_sphereSolid);
             m_wireframeEntity->setMesh(m_sphereWireframe);
-            m_boundingRadius = 0.55f;
             break;
         }
 
@@ -650,9 +391,14 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
 
         float w = static_cast<float>(game->getWindow()->getWidth());
         float h = static_cast<float>(game->getWindow()->getHeight());
-        glm::mat4 vp = cam->getViewProjectionMatrix();
 
-        return hitTestSphere(mouseX, mouseY, w, h, vp, glm::vec3(0.0f), m_boundingRadius);
+        // Use camera's screenToWorldRay + the solid mesh's bounding radius
+        vde::Ray ray =
+            cam->screenToWorldRay(static_cast<float>(mouseX), static_cast<float>(mouseY), w, h);
+
+        auto solidMesh = m_solidEntity->getMesh();
+        float radius = solidMesh ? solidMesh->getBoundingRadius() : 0.5f;
+        return ray.hitsSphere(glm::vec3(0.0f), radius);
     }
 };
 

@@ -13,6 +13,7 @@
 #include <vulkan/vulkan.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "GameTypes.h"
@@ -118,6 +119,61 @@ class Mesh : public Resource {
      */
     static ResourcePtr<Mesh> createCylinder(float radius = 0.5f, float height = 1.0f,
                                             int segments = 32);
+
+    /**
+     * @brief Create a pyramid mesh with a square base.
+     *
+     * The pyramid is centered at the origin with the base below and
+     * the apex above.  Face normals are stored in the vertex color field
+     * (as required by the mesh shader for lighting).
+     *
+     * @param baseSize Width/depth of the square base
+     * @param height Height from base to apex
+     * @return Shared pointer to the mesh
+     */
+    static ResourcePtr<Mesh> createPyramid(float baseSize = 1.0f, float height = 1.0f);
+
+    /**
+     * @brief Create a wireframe version of any mesh.
+     *
+     * Extracts unique edges from the triangle index buffer and builds
+     * thin rectangular tubes along each edge.  The resulting mesh renders
+     * through the standard VK_POLYGON_MODE_FILL pipeline and looks like
+     * a wireframe.
+     *
+     * @param sourceMesh The mesh to extract edges from
+     * @param thickness Diameter of each wireframe tube
+     * @return Shared pointer to the new wireframe mesh
+     */
+    static ResourcePtr<Mesh> createWireframe(const ResourcePtr<Mesh>& sourceMesh,
+                                             float thickness = 0.015f);
+
+    /**
+     * @brief Create a wireframe version of any mesh from raw geometry.
+     *
+     * @param vertices Vertex data (only positions are used)
+     * @param indices Triangle index data
+     * @param thickness Diameter of each wireframe tube
+     * @return Shared pointer to the new wireframe mesh
+     */
+    static ResourcePtr<Mesh> createWireframe(const std::vector<Vertex>& vertices,
+                                             const std::vector<uint32_t>& indices,
+                                             float thickness = 0.015f);
+
+    // Bounding volume queries
+
+    /**
+     * @brief Get the axis-aligned bounding box center.
+     */
+    glm::vec3 getBoundsCenter() const { return (m_boundsMin + m_boundsMax) * 0.5f; }
+
+    /**
+     * @brief Get the bounding sphere radius (half-diagonal of the AABB).
+     *
+     * This is a conservative approximation — the actual mesh may be
+     * smaller, but will never be larger than this radius.
+     */
+    float getBoundingRadius() const { return glm::length(m_boundsMax - getBoundsCenter()); }
 
     // GPU buffer management
 

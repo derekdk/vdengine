@@ -322,3 +322,92 @@ TEST_F(Camera2DTest, GetViewMatrix) {
     }
     EXPECT_TRUE(hasNonZero);
 }
+
+// ============================================================================
+// Ray Tests
+// ============================================================================
+
+class RayTest : public ::testing::Test {};
+
+TEST_F(RayTest, HitsSphereAtOrigin) {
+    Ray ray;
+    ray.origin = glm::vec3(0.0f, 0.0f, 5.0f);
+    ray.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+
+    EXPECT_TRUE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
+}
+
+TEST_F(RayTest, MissesSphereOffToSide) {
+    Ray ray;
+    ray.origin = glm::vec3(10.0f, 0.0f, 5.0f);
+    ray.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+
+    EXPECT_FALSE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
+}
+
+TEST_F(RayTest, HitsSphereGrazing) {
+    // A ray that just barely touches a unit sphere from the side
+    Ray ray;
+    ray.origin = glm::vec3(1.0f, 0.0f, 5.0f);
+    ray.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+
+    // At exactly radius distance, discriminant should be >= 0
+    EXPECT_TRUE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
+}
+
+TEST_F(RayTest, HitsSphereFromInside) {
+    Ray ray;
+    ray.origin = glm::vec3(0.0f, 0.0f, 0.0f);
+    ray.direction = glm::vec3(0.0f, 0.0f, -1.0f);
+
+    EXPECT_TRUE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
+}
+
+// ============================================================================
+// screenToWorldRay Tests
+// ============================================================================
+
+class ScreenToWorldRayTest : public ::testing::Test {
+  protected:
+    std::unique_ptr<OrbitCamera> camera;
+
+    void SetUp() override {
+        camera = std::make_unique<OrbitCamera>(Position(0, 0, 0), 5.0f, 0.0f, 0.0f);
+        camera->setAspectRatio(16.0f / 9.0f);
+        camera->setPitchLimits(-89.0f, 89.0f);
+        camera->setPitch(0.0f);
+    }
+};
+
+TEST_F(ScreenToWorldRayTest, CenterScreenRayPointsForward) {
+    // Ray from the center of the screen should point roughly toward the target
+    Ray ray = camera->screenToWorldRay(640.0f, 360.0f, 1280.0f, 720.0f);
+
+    // Direction should have a dominant component toward the target (negative Z for default orbit)
+    float dirLen = glm::length(ray.direction);
+    EXPECT_NEAR(dirLen, 1.0f, 0.001f);  // Should be normalized
+}
+
+TEST_F(ScreenToWorldRayTest, RayFromCenterHitsOrigin) {
+    // A camera orbiting at distance 5 looking at origin -> center ray should hit a sphere at origin
+    Ray ray = camera->screenToWorldRay(640.0f, 360.0f, 1280.0f, 720.0f);
+
+    EXPECT_TRUE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
+}
+
+TEST_F(ScreenToWorldRayTest, RayFromCornerMissesSmallSphere) {
+    // A ray from the far corner of the screen should miss a small sphere at the origin
+    Ray ray = camera->screenToWorldRay(0.0f, 0.0f, 1280.0f, 720.0f);
+
+    EXPECT_FALSE(ray.hitsSphere(glm::vec3(0.0f), 0.1f));
+}
+
+TEST_F(ScreenToWorldRayTest, SimpleCameraScreenToWorldRay) {
+    SimpleCamera cam(Position(0, 0, 5), Direction(0, 0, -1));
+    cam.setAspectRatio(16.0f / 9.0f);
+
+    Ray ray = cam.screenToWorldRay(640.0f, 360.0f, 1280.0f, 720.0f);
+
+    // Center ray should hit a sphere at origin
+    EXPECT_TRUE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
+}

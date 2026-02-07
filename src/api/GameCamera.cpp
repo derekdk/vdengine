@@ -31,6 +31,25 @@ void GameCamera::applyTo(VulkanContext& context) {
     cam.setUp(m_camera.getUp());
 }
 
+Ray GameCamera::screenToWorldRay(float screenX, float screenY, float screenWidth,
+                                 float screenHeight) const {
+    // Mouse -> Vulkan NDC (Y down, Z 0..1)
+    float ndcX = (2.0f * screenX / screenWidth) - 1.0f;
+    float ndcY = (2.0f * screenY / screenHeight) - 1.0f;
+
+    glm::mat4 invVP = glm::inverse(getViewProjectionMatrix());
+
+    glm::vec4 nearClip = invVP * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
+    glm::vec4 farClip = invVP * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
+    nearClip /= nearClip.w;
+    farClip /= farClip.w;
+
+    Ray ray;
+    ray.origin = glm::vec3(nearClip);
+    ray.direction = glm::normalize(glm::vec3(farClip) - ray.origin);
+    return ray;
+}
+
 // ============================================================================
 // SimpleCamera Implementation
 // ============================================================================

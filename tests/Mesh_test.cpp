@@ -406,3 +406,158 @@ TEST_F(MeshTest, SharedPtrMeshDestructorDoesNotCrash) {
 
     SUCCEED();
 }
+
+// ============================================================================
+// createPyramid Tests
+// ============================================================================
+
+TEST_F(MeshTest, CreatePyramidHasGeometry) {
+    auto mesh = Mesh::createPyramid();
+
+    EXPECT_GT(mesh->getVertexCount(), 0);
+    EXPECT_GT(mesh->getIndexCount(), 0);
+}
+
+TEST_F(MeshTest, CreatePyramidBoundsAreReasonable) {
+    auto mesh = Mesh::createPyramid(1.0f, 1.0f);
+
+    glm::vec3 min = mesh->getBoundsMin();
+    glm::vec3 max = mesh->getBoundsMax();
+
+    // Base is 1.0 wide, so X and Z should span about -0.5..0.5
+    EXPECT_NEAR(min.x, -0.5f, 0.01f);
+    EXPECT_NEAR(max.x, 0.5f, 0.01f);
+    EXPECT_NEAR(min.z, -0.5f, 0.01f);
+    EXPECT_NEAR(max.z, 0.5f, 0.01f);
+
+    // Height 1.0: base at -0.25, apex at 0.75
+    EXPECT_NEAR(min.y, -0.25f, 0.01f);
+    EXPECT_NEAR(max.y, 0.75f, 0.01f);
+}
+
+TEST_F(MeshTest, CreatePyramidWithCustomSize) {
+    auto mesh = Mesh::createPyramid(2.0f, 3.0f);
+
+    glm::vec3 min = mesh->getBoundsMin();
+    glm::vec3 max = mesh->getBoundsMax();
+
+    // Base is 2.0 wide, X and Z should span about -1.0..1.0
+    EXPECT_NEAR(min.x, -1.0f, 0.01f);
+    EXPECT_NEAR(max.x, 1.0f, 0.01f);
+
+    // Height 3.0: base at -0.75, apex at 2.25
+    EXPECT_NEAR(min.y, -0.75f, 0.01f);
+    EXPECT_NEAR(max.y, 2.25f, 0.01f);
+}
+
+TEST_F(MeshTest, CreatePyramidHas18Vertices) {
+    // 6 triangles * 3 verts each = 18 (separate face normals require unshared verts)
+    auto mesh = Mesh::createPyramid();
+    EXPECT_EQ(mesh->getVertexCount(), 18);
+    EXPECT_EQ(mesh->getIndexCount(), 18);
+}
+
+// ============================================================================
+// createWireframe Tests
+// ============================================================================
+
+TEST_F(MeshTest, CreateWireframeFromCube) {
+    auto cube = Mesh::createCube(1.0f);
+    auto wireframe = Mesh::createWireframe(cube, 0.01f);
+
+    EXPECT_GT(wireframe->getVertexCount(), 0);
+    EXPECT_GT(wireframe->getIndexCount(), 0);
+    // A cube has 12 edges, each tube = 8 verts, 24 indices
+    // But createCube has separate verts per face (24 verts, 36 indices)
+    // so edges are extracted from the triangle indices
+    EXPECT_GE(wireframe->getVertexCount(), 12u * 8u);
+}
+
+TEST_F(MeshTest, CreateWireframeFromSphere) {
+    auto sphere = Mesh::createSphere(0.5f, 8, 4);
+    auto wireframe = Mesh::createWireframe(sphere, 0.01f);
+
+    EXPECT_GT(wireframe->getVertexCount(), 0);
+    EXPECT_GT(wireframe->getIndexCount(), 0);
+}
+
+TEST_F(MeshTest, CreateWireframeFromPyramid) {
+    auto pyramid = Mesh::createPyramid();
+    auto wireframe = Mesh::createWireframe(pyramid, 0.02f);
+
+    EXPECT_GT(wireframe->getVertexCount(), 0);
+    EXPECT_GT(wireframe->getIndexCount(), 0);
+}
+
+TEST_F(MeshTest, CreateWireframeFromNullReturnsEmpty) {
+    ResourcePtr<Mesh> nullMesh = nullptr;
+    auto wireframe = Mesh::createWireframe(nullMesh, 0.01f);
+
+    EXPECT_EQ(wireframe->getVertexCount(), 0);
+    EXPECT_EQ(wireframe->getIndexCount(), 0);
+}
+
+TEST_F(MeshTest, CreateWireframeBoundsContainOriginal) {
+    auto cube = Mesh::createCube(1.0f);
+    auto wireframe = Mesh::createWireframe(cube, 0.02f);
+
+    // Wireframe bounds should be at least as big as the original mesh
+    // (tubes add a small amount of thickness around each edge)
+    glm::vec3 origMin = cube->getBoundsMin();
+    glm::vec3 origMax = cube->getBoundsMax();
+    glm::vec3 wireMin = wireframe->getBoundsMin();
+    glm::vec3 wireMax = wireframe->getBoundsMax();
+
+    EXPECT_LE(wireMin.x, origMin.x + 0.02f);
+    EXPECT_LE(wireMin.y, origMin.y + 0.02f);
+    EXPECT_LE(wireMin.z, origMin.z + 0.02f);
+    EXPECT_GE(wireMax.x, origMax.x - 0.02f);
+    EXPECT_GE(wireMax.y, origMax.y - 0.02f);
+    EXPECT_GE(wireMax.z, origMax.z - 0.02f);
+}
+
+// ============================================================================
+// getBoundsCenter / getBoundingRadius Tests
+// ============================================================================
+
+TEST_F(MeshTest, GetBoundsCenterOfCube) {
+    auto mesh = Mesh::createCube(2.0f);
+    glm::vec3 center = mesh->getBoundsCenter();
+
+    EXPECT_NEAR(center.x, 0.0f, 0.01f);
+    EXPECT_NEAR(center.y, 0.0f, 0.01f);
+    EXPECT_NEAR(center.z, 0.0f, 0.01f);
+}
+
+TEST_F(MeshTest, GetBoundingRadiusOfCube) {
+    auto mesh = Mesh::createCube(2.0f);
+    float radius = mesh->getBoundingRadius();
+
+    // Half-diagonal of a 2x2x2 cube = sqrt(1^2 + 1^2 + 1^2) = sqrt(3) ~= 1.732
+    EXPECT_NEAR(radius, std::sqrt(3.0f), 0.01f);
+}
+
+TEST_F(MeshTest, GetBoundingRadiusOfSphere) {
+    auto mesh = Mesh::createSphere(1.0f, 32, 16);
+    float radius = mesh->getBoundingRadius();
+
+    // The bounding radius is the AABB half-diagonal, not the mesh radius.
+    // For a unit sphere, the AABB spans -1..1 on each axis, so the
+    // half-diagonal = sqrt(1^2 + 1^2 + 1^2) = sqrt(3) ~= 1.732
+    EXPECT_NEAR(radius, std::sqrt(3.0f), 0.05f);
+}
+
+TEST_F(MeshTest, GetBoundingRadiusOfEmptyMeshIsZero) {
+    Mesh mesh;
+    EXPECT_FLOAT_EQ(mesh.getBoundingRadius(), 0.0f);
+}
+
+TEST_F(MeshTest, GetBoundsCenterOfPyramid) {
+    auto mesh = Mesh::createPyramid(1.0f, 1.0f);
+    glm::vec3 center = mesh->getBoundsCenter();
+
+    // Pyramid: base at -0.25, apex at 0.75 => center Y = 0.25
+    EXPECT_NEAR(center.x, 0.0f, 0.01f);
+    EXPECT_NEAR(center.y, 0.25f, 0.01f);
+    EXPECT_NEAR(center.z, 0.0f, 0.01f);
+}
