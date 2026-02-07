@@ -127,3 +127,18 @@ add_custom_command(TARGET vde_sidescroller POST_BUILD
     $<TARGET_FILE_DIR:vde_sidescroller>/shaders
     COMMENT "Copying shader files..."
 )
+
+# Wireframe viewer example demonstrating shape switching, render modes, and interaction
+add_executable(vde_wireframe_viewer
+    wireframe_viewer/main.cpp
+)
+
+target_link_libraries(vde_wireframe_viewer PRIVATE vde)
+
+# Copy shader files for wireframe_viewer example
+add_custom_command(TARGET vde_wireframe_viewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_wireframe_viewer>/shaders
+    COMMENT "Copying shader files..."
+)
