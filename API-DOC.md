@@ -13,9 +13,12 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
   - [Scene](#scene)
   - [Entity](#entity)
   - [Resource](#resource)
+    - [ResourceManager](#resourcemanager)
+    - [Material](#material)
 - [Input System](#input-system)
 - [Camera System](#camera-system)
 - [Lighting System](#lighting-system)
+- [Audio System](#audio-system)
 - [Common Types](#common-types)
 - [World Coordinates & Bounds](#world-coordinates--bounds)
 - [Examples](#examples)
@@ -31,9 +34,10 @@ The VDE Game API provides a clean, object-oriented interface for game developmen
 - **Scene Management**: Organize your game into discrete scenes (menus, levels, etc.)
 - **Entity System**: Manage game objects with transforms, meshes, and sprites
 - **Resource Management**: Load and share textures, meshes, and other assets
-- **Input Handling**: Unified keyboard, mouse, and gamepad input
+- **Input Handling**: Unified keyboard and mouse input (gamepad hooks reserved for future expansion)
 - **Camera System**: Multiple camera types for different game styles
 - **Lighting**: Flexible lighting with ambient, directional, point, and spot lights
+- **Audio**: Basic playback for music and sound effects
 
 ### Header Structure
 
@@ -46,11 +50,16 @@ include/vde/api/
 ├── Scene.h          # Scene management
 ├── Entity.h         # Entity classes (MeshEntity, SpriteEntity)
 ├── Resource.h       # Resource base class
+├── ResourceManager.h # Resource caching and sharing
 ├── Mesh.h           # 3D mesh resource
+├── Material.h       # Material properties for meshes
 ├── InputHandler.h   # Input handling interface
 ├── KeyCodes.h       # Key and mouse button constants
 ├── GameCamera.h     # Camera classes
 ├── LightBox.h       # Lighting system
+├── AudioClip.h      # Audio resource (sounds/music)
+├── AudioSource.h    # Audio emitter component
+├── AudioManager.h   # Audio playback system
 ├── WorldUnits.h     # Type-safe units (Meters, Pixels)
 ├── WorldBounds.h    # 3D/2D world boundary definitions
 └── CameraBounds.h   # 2D camera with pixel-to-world mapping
@@ -200,6 +209,7 @@ game.popScene();
 | `popScene()` | Pop current scene |
 | `getDeltaTime()` | Get frame delta time |
 | `getFPS()` | Get current FPS |
+| `getResourceManager()` | Access the global resource cache |
 
 ---
 
@@ -289,18 +299,17 @@ private:
     }
     
     void loadResources() {
-        m_meshId = addResource<vde::Mesh>("models/character.obj");
-        m_textureId = addResource<vde::Texture>("textures/character.png");
+        auto& resources = getGame()->getResourceManager();
+        m_mesh = resources.load<vde::Mesh>("models/character.obj");
     }
     
     void createEntities() {
-        auto entity = addEntity<vde::MeshEntity>(m_meshId);
-        entity->setTexture(m_textureId);
+        auto entity = addEntity<vde::MeshEntity>();
+        entity->setMesh(m_mesh);
         entity->setPosition(0, 0, 0);
     }
     
-    vde::ResourceId m_meshId;
-    vde::ResourceId m_textureId;
+    vde::ResourcePtr<vde::Mesh> m_mesh;
 };
 ```
 
@@ -332,11 +341,17 @@ vde::Mesh* mesh = scene->getResource<vde::Mesh>(meshId);
 scene->removeResource(meshId);
 ```
 
+> Note: Scene resource IDs are stored, but `MeshEntity` and `SpriteEntity` rendering
+> currently uses direct `shared_ptr` assignments (`setMesh`, `setTexture`).
+> Resource ID binding is planned but not wired yet.
+
 #### Entity Management
 
 ```cpp
 // Create entity with template
-auto entity = scene->addEntity<vde::MeshEntity>(meshId);
+auto mesh = vde::Mesh::createCube(1.0f);
+auto entity = scene->addEntity<vde::MeshEntity>();
+entity->setMesh(mesh);
 
 // Add existing entity
 vde::EntityId id = scene->addEntity(existingEntity);
@@ -381,18 +396,28 @@ vde::EntityId id = entity.getId();
 For 3D models:
 
 ```cpp
-auto meshEntity = scene->addEntity<vde::MeshEntity>(meshId);
-meshEntity->setTexture(textureId);
+auto mesh = vde::Mesh::createCube(1.0f);
+auto meshEntity = scene->addEntity<vde::MeshEntity>();
+meshEntity->setMesh(mesh);
 meshEntity->setColor(vde::Color(1.0f, 0.5f, 0.5f));  // tint
 meshEntity->setPosition(0, 1, 0);
 ```
+
+> Note: Mesh texturing is not wired in the current render path. Use `Material`
+> and `setColor()` for now.
 
 #### SpriteEntity
 
 For 2D sprites:
 
 ```cpp
-auto sprite = scene->addEntity<vde::SpriteEntity>(textureId);
+auto spriteTexture = getGame()->getResourceManager().load<vde::Texture>("sprites/player.png");
+if (auto* context = getGame()->getVulkanContext()) {
+    spriteTexture->uploadToGPU(context);
+}
+
+auto sprite = scene->addEntity<vde::SpriteEntity>();
+sprite->setTexture(spriteTexture);
 sprite->setColor(vde::Color::white());
 sprite->setAnchor(0.5f, 0.5f);  // center
 sprite->setUVRect(0.0f, 0.0f, 0.25f, 0.25f);  // sprite sheet
@@ -431,6 +456,7 @@ Base class for loadable assets.
 |------|-------------|
 | `Mesh` | 3D geometry |
 | `Texture` | 2D images (via engine) |
+| `AudioClip` | Sound effects and music clips |
 
 #### Mesh Primitives
 
@@ -439,6 +465,45 @@ auto cube = vde::Mesh::createCube(1.0f);
 auto sphere = vde::Mesh::createSphere(0.5f, 32, 16);
 auto plane = vde::Mesh::createPlane(10.0f, 10.0f);
 auto cylinder = vde::Mesh::createCylinder(0.5f, 2.0f, 32);
+```
+
+---
+
+### ResourceManager
+
+`ResourceManager` provides a global cache for resources that are shared across scenes.
+You can access it from `Game` and use it to deduplicate loads by path.
+
+```cpp
+auto& resources = game.getResourceManager();
+
+// Load (or get cached) resources
+auto mesh = resources.load<vde::Mesh>("models/ship.obj");
+auto texture = resources.load<vde::Texture>("textures/ship.png");
+
+// Use the same texture again elsewhere (returns cached instance)
+auto texture2 = resources.load<vde::Texture>("textures/ship.png");
+```
+
+> Note: `ResourceManager::load()` performs CPU-side loading. Meshes are uploaded
+> on first render, but textures must be uploaded explicitly with
+> `Texture::uploadToGPU()` before use in sprites.
+
+---
+
+### Material
+
+`Material` defines surface properties for `MeshEntity` rendering.
+
+```cpp
+auto material = vde::Material::createColored(vde::Color(0.8f, 0.2f, 0.1f));
+material->setRoughness(0.4f);
+material->setMetallic(0.1f);
+
+auto mesh = vde::Mesh::createCube(1.0f);
+auto entity = scene->addEntity<vde::MeshEntity>();
+entity->setMesh(mesh);
+entity->setMaterial(material);
 ```
 
 ---
@@ -489,6 +554,8 @@ private:
     bool m_keys[512] = {false};
 };
 ```
+
+> Note: Gamepad callbacks are defined on `InputHandler`, but built-in polling/dispatch is not wired yet.
 
 ### Setting Input Handler
 
@@ -666,6 +733,36 @@ auto spot = vde::Light::spot(
     vde::Color::white(),
     2.0f
 );
+```
+
+---
+
+## Audio System
+
+VDE includes basic audio playback via `AudioManager`, `AudioClip`, and `AudioSource`.
+The audio system is initialized as part of `Game::initialize()` using `GameSettings::audio`.
+
+### AudioClip and AudioManager
+
+```cpp
+// Load audio clip via ResourceManager
+auto clip = game.getResourceManager().load<vde::AudioClip>("audio/laser.wav");
+
+// Play a one-shot sound effect
+vde::AudioManager::getInstance().playSFX(clip, 0.8f);
+
+// Play looping music
+vde::AudioManager::getInstance().playMusic(clip, 0.6f, true, 1.0f);
+```
+
+### AudioSource (3D emitter)
+
+```cpp
+vde::AudioSource source;
+source.setClip(clip);
+source.setSpatial(true);
+source.setPosition(0.0f, 1.0f, 0.0f);
+source.play(true);  // loop
 ```
 
 ---
@@ -978,6 +1075,7 @@ float ppm = mapping.getPixelsPerMeter();  // 100.0
 ```cpp
 class My2DScene : public vde::Scene {
     CameraBounds2D m_camera;
+    vde::ResourcePtr<vde::Texture> m_spriteTexture;
     
     void onEnter() override {
         // Define world bounds
@@ -1001,6 +1099,12 @@ class My2DScene : public vde::Scene {
             m_camera.getVisibleWidth(),
             m_camera.getVisibleHeight()
         ));
+
+        // Load sprite texture and upload to GPU
+        m_spriteTexture = getGame()->getResourceManager().load<vde::Texture>("sprites/player.png");
+        if (auto* context = getGame()->getVulkanContext()) {
+            m_spriteTexture->uploadToGPU(context);
+        }
     }
     
     void onMouseClick(double screenX, double screenY) {
@@ -1010,7 +1114,8 @@ class My2DScene : public vde::Scene {
         );
         
         // Spawn entity at click location
-        auto entity = addEntity<vde::SpriteEntity>(m_spriteId);
+        auto entity = addEntity<vde::SpriteEntity>();
+        entity->setTexture(m_spriteTexture);
         entity->setPosition(worldPos.x, worldPos.y, 0);
     }
     
@@ -1066,10 +1171,11 @@ public:
         ));
         
         // Resources
-        m_meshId = addResource<vde::Mesh>("models/cube.obj");
+        m_mesh = getGame()->getResourceManager().load<vde::Mesh>("models/cube.obj");
         
         // Entity
-        m_cube = addEntity<vde::MeshEntity>(m_meshId);
+        m_cube = addEntity<vde::MeshEntity>();
+        m_cube->setMesh(m_mesh);
         m_cube->setPosition(0, 0, 0);
     }
     
@@ -1083,7 +1189,7 @@ public:
     }
     
 private:
-    vde::ResourceId m_meshId;
+    vde::ResourcePtr<vde::Mesh> m_mesh;
     vde::MeshEntity::Ref m_cube;
 };
 
