@@ -142,3 +142,18 @@ add_custom_command(TARGET vde_wireframe_viewer POST_BUILD
     $<TARGET_FILE_DIR:vde_wireframe_viewer>/shaders
     COMMENT "Copying shader files..."
 )
+
+# Multi-scene demo example demonstrating scene management, switching, and background simulation
+add_executable(vde_multi_scene_demo
+    multi_scene_demo/main.cpp
+)
+
+target_link_libraries(vde_multi_scene_demo PRIVATE vde)
+
+# Copy shader files for multi_scene_demo example
+add_custom_command(TARGET vde_multi_scene_demo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:vde_multi_scene_demo>/shaders
+    COMMENT "Copying shader files..."
+)
