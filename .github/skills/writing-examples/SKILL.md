@@ -26,6 +26,12 @@ All VDE examples should follow this standard pattern to enable:
 
 All examples should use the shared `ExampleBase.h` header which provides base classes and utilities to eliminate code duplication.
 
+## Testing the Example
+1. Make sure the example builds and runs correctly.
+2. Verify that the console output correctly describes the expected visuals and controls.
+3. Run the example and have a user verify the output by pressing 'F' for failure, pressing 'ESC' to exit, or letting it auto-terminate.
+4. Check that the exit code is `0` for success and `1` for failure
+
 ### 1. Include the Base Header
 
 ```cpp
