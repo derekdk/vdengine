@@ -3,22 +3,27 @@
 /**
  * @file Scene.h
  * @brief Scene management for VDE games
- * 
+ *
  * Provides the Scene class for managing game states, entities,
  * resources, and rendering for a portion of the game.
  */
 
-#include "GameTypes.h"
-#include "Entity.h"
-#include "Resource.h"
-#include "LightBox.h"
-#include "GameCamera.h"
-#include "InputHandler.h"
+#include <vde/Texture.h>
+
 #include <memory>
 #include <string>
+#include <typeindex>
 #include <unordered_map>
 #include <vector>
-#include <typeindex>
+
+#include "CameraBounds.h"
+#include "Entity.h"
+#include "GameCamera.h"
+#include "GameTypes.h"
+#include "InputHandler.h"
+#include "LightBox.h"
+#include "Resource.h"
+#include "WorldBounds.h"
 
 namespace vde {
 
@@ -29,11 +34,11 @@ class Texture;
 
 /**
  * @brief Represents a game scene/state.
- * 
+ *
  * A Scene manages a collection of entities, resources, and rendering
  * settings. Games typically have multiple scenes (menu, gameplay, etc.)
  * and switch between them.
- * 
+ *
  * @example
  * @code
  * class MainMenuScene : public vde::Scene {
@@ -49,7 +54,7 @@ class Texture;
  * @endcode
  */
 class Scene {
-public:
+  public:
     Scene();
     virtual ~Scene();
 
@@ -99,7 +104,7 @@ public:
      * @param path Path to load the resource from
      * @return Resource ID for referencing the resource
      */
-    template<typename T>
+    template <typename T>
     ResourceId addResource(const std::string& path);
 
     /**
@@ -108,7 +113,7 @@ public:
      * @param resource The resource to add
      * @return Resource ID
      */
-    template<typename T>
+    template <typename T>
     ResourceId addResource(ResourcePtr<T> resource);
 
     /**
@@ -117,7 +122,7 @@ public:
      * @param id Resource ID
      * @return Pointer to resource, or nullptr if not found
      */
-    template<typename T>
+    template <typename T>
     T* getResource(ResourceId id);
 
     /**
@@ -133,7 +138,7 @@ public:
      * @param args Constructor arguments for the entity
      * @return Shared pointer to the created entity
      */
-    template<typename T, typename... Args>
+    template <typename T, typename... Args>
     std::shared_ptr<T> addEntity(Args&&... args);
 
     /**
@@ -162,7 +167,7 @@ public:
      * @tparam T Entity type
      * @return Vector of matching entities
      */
-    template<typename T>
+    template <typename T>
     std::vector<std::shared_ptr<T>> getEntitiesOfType();
 
     /**
@@ -185,27 +190,37 @@ public:
     /**
      * @brief Set the scene's lighting configuration.
      * @param lightBox The lighting setup to use
+     * @note If no LightBox is set, a default SimpleColorLightBox with white ambient light is used.
      */
     void setLightBox(std::unique_ptr<LightBox> lightBox);
-    void setLightBox(LightBox* lightBox); // Takes ownership
+    void setLightBox(LightBox* lightBox);  // Takes ownership
 
     /**
      * @brief Get the scene's lighting configuration.
+     * @return The LightBox, or nullptr if using default lighting.
      */
     LightBox* getLightBox() { return m_lightBox.get(); }
     const LightBox* getLightBox() const { return m_lightBox.get(); }
+
+    /**
+     * @brief Get the effective lighting (returns default if none set).
+     * @return The LightBox to use for rendering.
+     */
+    const LightBox& getEffectiveLighting() const;
 
     // Camera
 
     /**
      * @brief Set the scene's camera.
      * @param camera The camera to use
+     * @note If no camera is set, a default perspective camera is created.
      */
     void setCamera(std::unique_ptr<GameCamera> camera);
-    void setCamera(GameCamera* camera); // Takes ownership
+    void setCamera(GameCamera* camera);  // Takes ownership
 
     /**
      * @brief Get the scene's camera.
+     * @return The camera, or nullptr if using default.
      */
     GameCamera* getCamera() { return m_camera.get(); }
     const GameCamera* getCamera() const { return m_camera.get(); }
@@ -220,9 +235,10 @@ public:
 
     /**
      * @brief Get the input handler.
+     * Returns the scene's input handler if set, otherwise falls back to the game's input handler.
      */
-    InputHandler* getInputHandler() { return m_inputHandler; }
-    const InputHandler* getInputHandler() const { return m_inputHandler; }
+    InputHandler* getInputHandler();
+    const InputHandler* getInputHandler() const;
 
     // Game reference
 
@@ -244,10 +260,70 @@ public:
      */
     const Color& getBackgroundColor() const { return m_backgroundColor; }
 
-protected:
+    // World Bounds
+
+    /**
+     * @brief Set the world bounds for this scene.
+     *
+     * World bounds define the playable area of the scene using
+     * explicit meter units and cardinal directions.
+     *
+     * @param bounds The 3D bounds of the game world
+     *
+     * @example
+     * @code
+     * // 200m x 200m x 30m world
+     * scene->setWorldBounds(WorldBounds::fromDirectionalLimits(
+     *     100_m, WorldBounds::south(100_m),  // north/south
+     *     WorldBounds::west(100_m), 100_m,   // west/east
+     *     20_m, WorldBounds::down(10_m)      // up/down
+     * ));
+     * @endcode
+     */
+    void setWorldBounds(const WorldBounds& bounds) { m_worldBounds = bounds; }
+
+    /**
+     * @brief Get the world bounds.
+     */
+    const WorldBounds& getWorldBounds() const { return m_worldBounds; }
+    WorldBounds& getWorldBounds() { return m_worldBounds; }
+
+    /**
+     * @brief Check if the scene is 2D (no height dimension).
+     */
+    bool is2D() const { return m_worldBounds.is2D(); }
+
+    // 2D Camera Bounds
+
+    /**
+     * @brief Set 2D camera bounds for pixel-to-world coordinate mapping.
+     *
+     * Use this for 2D games to define how the screen maps to the world
+     * and to convert between screen and world coordinates.
+     *
+     * @param bounds The 2D camera bounds configuration
+     *
+     * @example
+     * @code
+     * CameraBounds2D camera;
+     * camera.setScreenSize(1920_px, 1080_px);
+     * camera.setWorldWidth(16_m);
+     * camera.centerOn(0_m, 0_m);
+     * scene->setCameraBounds2D(camera);
+     * @endcode
+     */
+    void setCameraBounds2D(const CameraBounds2D& bounds) { m_cameraBounds2D = bounds; }
+
+    /**
+     * @brief Get the 2D camera bounds.
+     */
+    CameraBounds2D& getCameraBounds2D() { return m_cameraBounds2D; }
+    const CameraBounds2D& getCameraBounds2D() const { return m_cameraBounds2D; }
+
+  protected:
     std::string m_name;
     Game* m_game = nullptr;
-    
+
     // Entities
     std::vector<Entity::Ref> m_entities;
     std::unordered_map<EntityId, size_t> m_entityIndex;
@@ -266,42 +342,48 @@ protected:
     InputHandler* m_inputHandler = nullptr;
     Color m_backgroundColor = Color::black();
 
+    // World bounds
+    WorldBounds m_worldBounds;
+    CameraBounds2D m_cameraBounds2D;
+
     friend class Game;
 };
 
 // Template implementations
 
-template<typename T>
+template <typename T>
 ResourceId Scene::addResource(const std::string& path) {
     static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
-    
+
     auto resource = std::make_shared<T>();
     resource->m_id = m_nextResourceId++;
     resource->m_path = path;
-    
-    // Load the resource
+
+    // Load the resource (CPU-side only)
     if constexpr (std::is_same_v<T, Mesh>) {
+        resource->loadFromFile(path);
+    } else if constexpr (std::is_same_v<T, Texture>) {
         resource->loadFromFile(path);
     }
     // Add other resource type loading here
-    
+
     m_resources[resource->m_id] = {resource, typeid(T)};
     return resource->m_id;
 }
 
-template<typename T>
+template <typename T>
 ResourceId Scene::addResource(ResourcePtr<T> resource) {
     static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
-    
+
     if (resource->m_id == INVALID_RESOURCE_ID) {
         resource->m_id = m_nextResourceId++;
     }
-    
+
     m_resources[resource->m_id] = {resource, typeid(T)};
     return resource->m_id;
 }
 
-template<typename T>
+template <typename T>
 T* Scene::getResource(ResourceId id) {
     auto it = m_resources.find(id);
     if (it != m_resources.end() && it->second.type == typeid(T)) {
@@ -310,10 +392,10 @@ T* Scene::getResource(ResourceId id) {
     return nullptr;
 }
 
-template<typename T, typename... Args>
+template <typename T, typename... Args>
 std::shared_ptr<T> Scene::addEntity(Args&&... args) {
     static_assert(std::is_base_of<Entity, T>::value, "T must derive from Entity");
-    
+
     auto entity = std::make_shared<T>(std::forward<Args>(args)...);
     m_entityIndex[entity->getId()] = m_entities.size();
     m_entities.push_back(entity);
@@ -321,7 +403,7 @@ std::shared_ptr<T> Scene::addEntity(Args&&... args) {
     return entity;
 }
 
-template<typename T>
+template <typename T>
 std::vector<std::shared_ptr<T>> Scene::getEntitiesOfType() {
     std::vector<std::shared_ptr<T>> result;
     for (auto& entity : m_entities) {
@@ -332,4 +414,4 @@ std::vector<std::shared_ptr<T>> Scene::getEntitiesOfType() {
     return result;
 }
 
-} // namespace vde
+}  // namespace vde

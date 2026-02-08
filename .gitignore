@@ -2,6 +2,12 @@
 build/
 out/
 cmake-build-*/
+# Ninja build directory and files
+build_ninja/
+build.ninja
+.ninja_log
+.ninja_deps
+.ninja*
 
 # IDE and editor files
 .vs/

@@ -3,20 +3,20 @@
  * @brief Unit tests for vde::HexGeometry class.
  */
 
-#include <gtest/gtest.h>
 #include <vde/HexGeometry.h>
+
 #include <cmath>
+
+#include <gtest/gtest.h>
 
 namespace vde {
 namespace test {
 
 class HexGeometryTest : public ::testing::Test {
-protected:
+  protected:
     HexGeometry hexGeom;
-    
-    void SetUp() override {
-        hexGeom = HexGeometry(1.0f, HexOrientation::FlatTop);
-    }
+
+    void SetUp() override { hexGeom = HexGeometry(1.0f, HexOrientation::FlatTop); }
 };
 
 TEST_F(HexGeometryTest, DefaultConstructorCreatesValidGeometry) {
@@ -61,7 +61,7 @@ TEST_F(HexGeometryTest, GetCornerPositionsReturns6Corners) {
 TEST_F(HexGeometryTest, CornersAreAtCorrectDistance) {
     auto corners = hexGeom.getCornerPositions(glm::vec3(0.0f));
     float size = hexGeom.getSize();
-    
+
     for (const auto& corner : corners) {
         float distance = std::sqrt(corner.x * corner.x + corner.z * corner.z);
         EXPECT_NEAR(distance, size, 0.0001f);
@@ -83,7 +83,7 @@ TEST_F(HexGeometryTest, GenerateHexReturns18Indices) {
 TEST_F(HexGeometryTest, CenterVertexIsAtCenter) {
     glm::vec3 center(5.0f, 0.0f, 10.0f);
     HexMesh mesh = hexGeom.generateHex(center);
-    
+
     // First vertex should be at center
     EXPECT_FLOAT_EQ(mesh.vertices[0].position.x, center.x);
     EXPECT_FLOAT_EQ(mesh.vertices[0].position.y, center.y);
@@ -92,7 +92,7 @@ TEST_F(HexGeometryTest, CenterVertexIsAtCenter) {
 
 TEST_F(HexGeometryTest, AllIndicesAreValid) {
     HexMesh mesh = hexGeom.generateHex();
-    
+
     for (uint32_t index : mesh.indices) {
         EXPECT_LT(index, mesh.vertices.size());
     }
@@ -100,7 +100,7 @@ TEST_F(HexGeometryTest, AllIndicesAreValid) {
 
 TEST_F(HexGeometryTest, VerticesHaveUVCoordinates) {
     HexMesh mesh = hexGeom.generateHex();
-    
+
     for (const auto& vertex : mesh.vertices) {
         // UVs should be in [0, 1] range (approximately, may slightly exceed due to hex shape)
         EXPECT_GE(vertex.texCoord.x, -0.1f);
@@ -110,5 +110,5 @@ TEST_F(HexGeometryTest, VerticesHaveUVCoordinates) {
     }
 }
 
-} // namespace test
-} // namespace vde
+}  // namespace test
+}  // namespace vde

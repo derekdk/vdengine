@@ -12,14 +12,7 @@ namespace vde {
 /**
  * @brief Enumeration of shader stages supported by the compiler
  */
-enum class ShaderStage {
-    Vertex,
-    Fragment,
-    Compute,
-    Geometry,
-    TessControl,
-    TessEvaluation
-};
+enum class ShaderStage { Vertex, Fragment, Compute, Geometry, TessControl, TessEvaluation };
 
 /**
  * @brief Get file extension for shader stage
@@ -28,13 +21,20 @@ enum class ShaderStage {
  */
 inline std::string shaderStageExtension(ShaderStage stage) {
     switch (stage) {
-        case ShaderStage::Vertex:         return ".vert";
-        case ShaderStage::Fragment:       return ".frag";
-        case ShaderStage::Compute:        return ".comp";
-        case ShaderStage::Geometry:       return ".geom";
-        case ShaderStage::TessControl:    return ".tesc";
-        case ShaderStage::TessEvaluation: return ".tese";
-        default:                          return ".glsl";
+    case ShaderStage::Vertex:
+        return ".vert";
+    case ShaderStage::Fragment:
+        return ".frag";
+    case ShaderStage::Compute:
+        return ".comp";
+    case ShaderStage::Geometry:
+        return ".geom";
+    case ShaderStage::TessControl:
+        return ".tesc";
+    case ShaderStage::TessEvaluation:
+        return ".tese";
+    default:
+        return ".glsl";
     }
 }
 
@@ -45,13 +45,20 @@ inline std::string shaderStageExtension(ShaderStage stage) {
  */
 inline std::string shaderStageName(ShaderStage stage) {
     switch (stage) {
-        case ShaderStage::Vertex:         return "Vertex";
-        case ShaderStage::Fragment:       return "Fragment";
-        case ShaderStage::Compute:        return "Compute";
-        case ShaderStage::Geometry:       return "Geometry";
-        case ShaderStage::TessControl:    return "TessControl";
-        case ShaderStage::TessEvaluation: return "TessEvaluation";
-        default:                          return "Unknown";
+    case ShaderStage::Vertex:
+        return "Vertex";
+    case ShaderStage::Fragment:
+        return "Fragment";
+    case ShaderStage::Compute:
+        return "Compute";
+    case ShaderStage::Geometry:
+        return "Geometry";
+    case ShaderStage::TessControl:
+        return "TessControl";
+    case ShaderStage::TessEvaluation:
+        return "TessEvaluation";
+    default:
+        return "Unknown";
     }
 }
 
@@ -66,14 +73,20 @@ inline ShaderStage shaderStageFromExtension(const std::string& extension) {
     if (!ext.empty() && ext[0] == '.') {
         ext = ext.substr(1);
     }
-    
-    if (ext == "vert") return ShaderStage::Vertex;
-    if (ext == "frag") return ShaderStage::Fragment;
-    if (ext == "comp") return ShaderStage::Compute;
-    if (ext == "geom") return ShaderStage::Geometry;
-    if (ext == "tesc") return ShaderStage::TessControl;
-    if (ext == "tese") return ShaderStage::TessEvaluation;
+
+    if (ext == "vert")
+        return ShaderStage::Vertex;
+    if (ext == "frag")
+        return ShaderStage::Fragment;
+    if (ext == "comp")
+        return ShaderStage::Compute;
+    if (ext == "geom")
+        return ShaderStage::Geometry;
+    if (ext == "tesc")
+        return ShaderStage::TessControl;
+    if (ext == "tese")
+        return ShaderStage::TessEvaluation;
     return ShaderStage::Vertex;  // Default
 }
 
-} // namespace vde
+}  // namespace vde

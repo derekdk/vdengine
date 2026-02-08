@@ -19,6 +19,22 @@ set(VDE_TEST_SOURCES
     HexGeometry_test.cpp
     ShaderCache_test.cpp
     Types_test.cpp
+    Mesh_test.cpp
+    SpriteEntity_test.cpp
+    # Phase 1 tests
+    Entity_test.cpp
+    Scene_test.cpp
+    GameCamera_test.cpp
+    LightBox_test.cpp
+    # Phase 2.5 tests
+    WorldUnits_test.cpp
+    WorldBounds_test.cpp
+    CameraBounds_test.cpp
+    # Phase 4 tests
+    Material_test.cpp
+    # Phase 5 tests
+    Texture_test.cpp
+    ResourceManager_test.cpp
 )
 
 # Create test executable

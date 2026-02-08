@@ -3,18 +3,25 @@
 /**
  * @file Game.h
  * @brief Main game class for VDE
- * 
+ *
  * Provides the central Game class that manages the game loop,
  * scenes, input, and all engine subsystems.
  */
 
-#include "GameSettings.h"
-#include "Scene.h"
-#include "InputHandler.h"
+#include <vde/Texture.h>
+
+#include <vulkan/vulkan.h>
+
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <functional>
+#include <vector>
+
+#include "GameSettings.h"
+#include "InputHandler.h"
+#include "ResourceManager.h"
+#include "Scene.h"
 
 namespace vde {
 
@@ -24,36 +31,36 @@ class VulkanContext;
 
 /**
  * @brief Main game class that manages the game loop and scenes.
- * 
+ *
  * The Game class is the entry point for VDE-based games. It handles:
  * - Engine initialization and shutdown
  * - The main game loop
  * - Scene management
  * - Input dispatching
  * - Frame timing
- * 
+ *
  * @example
  * @code
  * #include <vde/api/Game.h>
- * 
+ *
  * int main() {
  *     vde::Game game;
  *     vde::GameSettings settings;
  *     settings.gameName = "My Game";
  *     settings.display.windowWidth = 1280;
  *     settings.display.windowHeight = 720;
- *     
+ *
  *     game.initialize(settings);
  *     game.addScene("main", new MainScene());
  *     game.setActiveScene("main");
  *     game.run();
- *     
+ *
  *     return 0;
  * }
  * @endcode
  */
 class Game {
-public:
+  public:
     Game();
     virtual ~Game();
 
@@ -86,7 +93,7 @@ public:
 
     /**
      * @brief Run the main game loop.
-     * 
+     *
      * This method blocks until the game exits.
      */
     void run();
@@ -138,10 +145,10 @@ public:
 
     /**
      * @brief Push a scene onto the scene stack.
-     * 
+     *
      * The current scene is paused and the new scene becomes active.
      * Use popScene() to return to the previous scene.
-     * 
+     *
      * @param name Name of the scene to push
      */
     void pushScene(const std::string& name);
@@ -203,6 +210,25 @@ public:
     const GameSettings& getSettings() const { return m_settings; }
 
     /**
+     * @brief Get the Vulkan context (for advanced rendering).
+     */
+    VulkanContext* getVulkanContext() { return m_vulkanContext.get(); }
+    const VulkanContext* getVulkanContext() const { return m_vulkanContext.get(); }
+
+    /**
+     * @brief Get the global resource manager.
+     *
+     * Use this to load and cache resources globally, sharing them across scenes.
+     *
+     * @example
+     * @code
+     * auto texture = game.getResourceManager().load<Texture>("player.png");
+     * @endcode
+     */
+    ResourceManager& getResourceManager() { return m_resourceManager; }
+    const ResourceManager& getResourceManager() const { return m_resourceManager; }
+
+    /**
      * @brief Apply new display settings.
      */
     void applyDisplaySettings(const DisplaySettings& settings);
@@ -224,7 +250,84 @@ public:
      */
     void setFocusCallback(std::function<void(bool)> callback);
 
-protected:
+    // Public accessors for rendering (used by MeshEntity)
+
+    /**
+     * @brief Get the mesh rendering pipeline.
+     */
+    VkPipeline getMeshPipeline() const { return m_meshPipeline; }
+
+    /**
+     * @brief Get the mesh pipeline layout.
+     */
+    VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
+
+    /**
+     * @brief Get the sprite rendering pipeline.
+     */
+    VkPipeline getSpritePipeline() const { return m_spritePipeline; }
+
+    /**
+     * @brief Get the sprite pipeline layout.
+     */
+    VkPipelineLayout getSpritePipelineLayout() const { return m_spritePipelineLayout; }
+
+    /**
+     * @brief Get the sprite sampler.
+     */
+    VkSampler getSpriteSampler() const { return m_spriteSampler; }
+
+    /**
+     * @brief Get the default white texture for sprites without textures.
+     */
+    Texture* getDefaultWhiteTexture() const { return m_defaultWhiteTexture.get(); }
+
+    /**
+     * @brief Get the sprite descriptor set layout.
+     */
+    VkDescriptorSetLayout getSpriteDescriptorSetLayout() const {
+        return m_spriteDescriptorSetLayout;
+    }
+
+    /**
+     * @brief Allocate a sprite descriptor set with both UBO and texture.
+     */
+    VkDescriptorSet allocateSpriteDescriptorSet();
+
+    /**
+     * @brief Update a sprite descriptor set with UBO and texture bindings.
+     * @param descriptorSet The descriptor set to update
+     * @param uboBuffer The uniform buffer for view/projection matrices
+     * @param uboSize Size of the UBO
+     * @param imageView The texture image view
+     * @param sampler The texture sampler
+     */
+    void updateSpriteDescriptor(VkDescriptorSet descriptorSet, VkBuffer uboBuffer,
+                                VkDeviceSize uboSize, VkImageView imageView, VkSampler sampler);
+
+    // =========================================================================
+    // Lighting System (Phase 4)
+    // =========================================================================
+
+    /**
+     * @brief Get the lighting descriptor set layout (Set 1 for mesh pipeline).
+     */
+    VkDescriptorSetLayout getLightingDescriptorSetLayout() const {
+        return m_lightingDescriptorSetLayout;
+    }
+
+    /**
+     * @brief Get the current frame's lighting descriptor set.
+     */
+    VkDescriptorSet getCurrentLightingDescriptorSet() const;
+
+    /**
+     * @brief Update the lighting UBO with scene lighting data.
+     * @param scene Scene containing LightBox to upload
+     */
+    void updateLightingUBO(const Scene* scene);
+
+  protected:
     // Virtual methods for subclassing
 
     /**
@@ -235,7 +338,7 @@ protected:
     /**
      * @brief Called every frame before scene update.
      */
-    virtual void onUpdate(float deltaTime) {}
+    virtual void onUpdate([[maybe_unused]] float deltaTime) {}
 
     /**
      * @brief Called every frame after scene render.
@@ -247,7 +350,7 @@ protected:
      */
     virtual void onShutdown() {}
 
-private:
+  private:
     // Initialization
     bool m_initialized = false;
     bool m_running = false;
@@ -256,6 +359,20 @@ private:
     // Core systems
     std::unique_ptr<Window> m_window;
     std::unique_ptr<VulkanContext> m_vulkanContext;
+    ResourceManager m_resourceManager;
+
+    // Rendering infrastructure (Phase 2)
+    VkPipelineLayout m_meshPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_meshPipeline = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+
+    // Sprite rendering infrastructure (Phase 3)
+    VkPipelineLayout m_spritePipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_spritePipeline = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_spriteDescriptorSetLayout = VK_NULL_HANDLE;
+    VkSampler m_spriteSampler = VK_NULL_HANDLE;
+    VkDescriptorPool m_spriteDescriptorPool = VK_NULL_HANDLE;
+    std::unique_ptr<Texture> m_defaultWhiteTexture;  // 1x1 white texture for untextured sprites
 
     // Scene management
     std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
@@ -263,6 +380,14 @@ private:
     std::vector<std::string> m_sceneStack;
     std::string m_pendingScene;
     bool m_sceneSwitchPending = false;
+
+    // Lighting infrastructure (Phase 4)
+    VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_lightingDescriptorPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_lightingDescriptorSets;  // One per frame-in-flight
+    std::vector<VkBuffer> m_lightingUBOBuffers;             // One per frame-in-flight
+    std::vector<VkDeviceMemory> m_lightingUBOMemory;        // One per frame-in-flight
+    std::vector<void*> m_lightingUBOMapped;                 // Persistently mapped pointers
 
     // Input
     InputHandler* m_inputHandler = nullptr;
@@ -285,6 +410,12 @@ private:
     void updateTiming();
     void processPendingSceneChange();
     void setupInputCallbacks();
+    void createMeshRenderingPipeline();
+    void destroyMeshRenderingPipeline();
+    void createSpriteRenderingPipeline();
+    void destroySpriteRenderingPipeline();
+    void createLightingResources();
+    void destroyLightingResources();
 };
 
-} // namespace vde
+}  // namespace vde

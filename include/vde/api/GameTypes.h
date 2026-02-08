@@ -3,12 +3,13 @@
 /**
  * @file GameTypes.h
  * @brief Common types for the VDE Game API
- * 
+ *
  * Contains fundamental data structures used by games including
  * colors, positions, directions, and other common types.
  */
 
 #include <glm/glm.hpp>
+
 #include <cstdint>
 #include <string>
 
@@ -22,7 +23,7 @@ struct Color {
 
     Color() : r(1.0f), g(1.0f), b(1.0f), a(1.0f) {}
     Color(float r, float g, float b, float a = 1.0f) : r(r), g(g), b(b), a(a) {}
-    
+
     /**
      * @brief Create color from 8-bit components (0-255).
      */
@@ -36,19 +37,11 @@ struct Color {
     static Color fromHex(uint32_t hex) {
         if (hex > 0xFFFFFF) {
             // Has alpha
-            return Color(
-                ((hex >> 24) & 0xFF) / 255.0f,
-                ((hex >> 16) & 0xFF) / 255.0f,
-                ((hex >> 8) & 0xFF) / 255.0f,
-                (hex & 0xFF) / 255.0f
-            );
+            return Color(((hex >> 24) & 0xFF) / 255.0f, ((hex >> 16) & 0xFF) / 255.0f,
+                         ((hex >> 8) & 0xFF) / 255.0f, (hex & 0xFF) / 255.0f);
         }
-        return Color(
-            ((hex >> 16) & 0xFF) / 255.0f,
-            ((hex >> 8) & 0xFF) / 255.0f,
-            (hex & 0xFF) / 255.0f,
-            1.0f
-        );
+        return Color(((hex >> 16) & 0xFF) / 255.0f, ((hex >> 8) & 0xFF) / 255.0f,
+                     (hex & 0xFF) / 255.0f, 1.0f);
     }
 
     glm::vec3 toVec3() const { return glm::vec3(r, g, b); }
@@ -85,9 +78,7 @@ struct Position {
         return Position(x - other.x, y - other.y, z - other.z);
     }
 
-    Position operator*(float scalar) const {
-        return Position(x * scalar, y * scalar, z * scalar);
-    }
+    Position operator*(float scalar) const { return Position(x * scalar, y * scalar, z * scalar); }
 };
 
 /**
@@ -159,7 +150,7 @@ struct Transform {
     Transform() = default;
     Transform(const Position& pos) : position(pos) {}
     Transform(const Position& pos, const Rotation& rot) : position(pos), rotation(rot) {}
-    Transform(const Position& pos, const Rotation& rot, const Scale& scl) 
+    Transform(const Position& pos, const Rotation& rot, const Scale& scl)
         : position(pos), rotation(rot), scale(scl) {}
 
     /**
@@ -188,4 +179,4 @@ using EntityId = uint64_t;
  */
 constexpr EntityId INVALID_ENTITY_ID = 0;
 
-} // namespace vde
+}  // namespace vde

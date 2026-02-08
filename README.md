@@ -22,6 +22,7 @@ VDE provides a clean abstraction over Vulkan's verbose API while maintaining fle
 - **Vulkan SDK 1.3+** ([Download](https://vulkan.lunarg.com/))
 - **C++20 compatible compiler** (MSVC 2022, GCC 11+, Clang 14+)
 - **Git** (for dependency fetching)
+- **Git LFS** (for asset files) - [Installation Guide](docs/GIT_LFS_SETUP.md)
 
 ### Building
 
@@ -42,18 +43,59 @@ cmake --build . --config Debug
 .\examples\Debug\triangle_example.exe
 ```
 
-### Using the Build Script
+### Using the Build Scripts (Recommended)
+
+VDE provides convenient PowerShell scripts for all build operations:
 
 ```powershell
-# Build and run all tests
-.\scripts\build-and-test.ps1
+# Quick build with MSBuild (default)
+.\scripts\build.ps1
 
-# Build Release configuration
-.\scripts\build-and-test.ps1 -BuildConfig Release
+# Fast build with Ninja
+.\scripts\build.ps1 -Generator Ninja
+
+# Run all tests
+.\scripts\test.ps1
+
+# Build and test together
+.\scripts\test.ps1 -Build
+
+# Clean rebuild
+.\scripts\rebuild.ps1
 
 # Run specific tests
-.\scripts\build-and-test.ps1 -Filter "CameraTest.*"
+.\scripts\test.ps1 -Filter "CameraTest.*"
+
+# Release build
+.\scripts\build.ps1 -Config Release
+
+# Show all available commands
+.\scripts\help.ps1
+
+# Format C++ code
+.\scripts\format.ps1
 ```
+
+For complete documentation, see:
+- `scripts/README.md` - Detailed script usage
+- `.github/skills/build-tool-workflows/SKILL.md` - Complete build guide
+
+## Code Formatting
+
+VDE uses clang-format to maintain consistent code style. The configuration is defined in [.clang-format](.clang-format) at the project root.
+
+```powershell
+# Format all C++ files
+.\scripts\format.ps1
+
+# Check formatting (useful for CI/pre-commit)
+.\scripts\format.ps1 -Check
+```
+
+**VSCode Integration:**
+- Format-on-save is enabled by default (see [.vscode/settings.json](.vscode/settings.json))
+- Right-click → Format Document (or Alt+Shift+F)
+- Requires clang-format in PATH (install via Visual Studio C++ clang tools or LLVM)
 
 ## Usage Example
 

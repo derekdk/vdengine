@@ -11,7 +11,7 @@ option(VDE_SHARED_LIBS "Build as shared library" OFF)
 
 # Compiler options
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /FS)
     add_compile_definitions(
         _CRT_SECURE_NO_WARNINGS
         NOMINMAX
@@ -86,6 +86,14 @@ if(NOT TARGET glslang)
     FetchContent_MakeAvailable(glslang)
 endif()
 
+# miniaudio for cross-platform audio
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG 0.11.21
+)
+FetchContent_MakeAvailable(miniaudio)
+
 # Library sources
 set(VDE_SOURCES
     src/Window.cpp
@@ -102,6 +110,22 @@ set(VDE_SOURCES
     src/stb_impl.cpp
     src/HexGeometry.cpp
     src/HexPrismMesh.cpp
+    # Game API
+    src/api/Entity.cpp
+    src/api/Game.cpp
+    src/api/GameCamera.cpp
+    src/api/GameTypes.cpp
+    src/api/LightBox.cpp
+    src/api/Scene.cpp
+    src/api/ResourceManager.cpp
+    src/api/Mesh.cpp
+    src/api/CameraBounds.cpp
+    src/api/Material.cpp
+    # Audio
+    src/miniaudio_impl.cpp
+    src/api/AudioClip.cpp
+    src/api/AudioManager.cpp
+    src/api/AudioSource.cpp
 )
 
 # Public headers
@@ -123,6 +147,27 @@ set(VDE_PUBLIC_HEADERS
     include/vde/HexPrismMesh.h
     include/vde/QueueFamilyIndices.h
     include/vde/SwapChainSupportDetails.h
+    # Game API headers
+    include/vde/api/GameAPI.h
+    include/vde/api/Game.h
+    include/vde/api/GameSettings.h
+    include/vde/api/GameTypes.h
+    include/vde/api/GameCamera.h
+    include/vde/api/Entity.h
+    include/vde/api/Scene.h
+    include/vde/api/LightBox.h
+    include/vde/api/Mesh.h
+    include/vde/api/Material.h
+    include/vde/api/Resource.h
+    include/vde/api/InputHandler.h
+    include/vde/api/KeyCodes.h
+    include/vde/api/WorldUnits.h
+    include/vde/api/WorldBounds.h
+    include/vde/api/CameraBounds.h
+    # Audio headers
+    include/vde/api/AudioClip.h
+    include/vde/api/AudioManager.h
+    include/vde/api/AudioSource.h
 )
 
 # Create library
@@ -147,6 +192,7 @@ target_include_directories(vde PUBLIC
 target_include_directories(vde PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
+    ${miniaudio_SOURCE_DIR}
 )
 
 # Link dependencies

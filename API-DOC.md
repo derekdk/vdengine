@@ -13,10 +13,14 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
   - [Scene](#scene)
   - [Entity](#entity)
   - [Resource](#resource)
+    - [ResourceManager](#resourcemanager)
+    - [Material](#material)
 - [Input System](#input-system)
 - [Camera System](#camera-system)
 - [Lighting System](#lighting-system)
+- [Audio System](#audio-system)
 - [Common Types](#common-types)
+- [World Coordinates & Bounds](#world-coordinates--bounds)
 - [Examples](#examples)
 
 ---
@@ -30,9 +34,10 @@ The VDE Game API provides a clean, object-oriented interface for game developmen
 - **Scene Management**: Organize your game into discrete scenes (menus, levels, etc.)
 - **Entity System**: Manage game objects with transforms, meshes, and sprites
 - **Resource Management**: Load and share textures, meshes, and other assets
-- **Input Handling**: Unified keyboard, mouse, and gamepad input
+- **Input Handling**: Unified keyboard and mouse input (gamepad hooks reserved for future expansion)
 - **Camera System**: Multiple camera types for different game styles
 - **Lighting**: Flexible lighting with ambient, directional, point, and spot lights
+- **Audio**: Basic playback for music and sound effects
 
 ### Header Structure
 
@@ -45,11 +50,19 @@ include/vde/api/
 ├── Scene.h          # Scene management
 ├── Entity.h         # Entity classes (MeshEntity, SpriteEntity)
 ├── Resource.h       # Resource base class
+├── ResourceManager.h # Resource caching and sharing
 ├── Mesh.h           # 3D mesh resource
+├── Material.h       # Material properties for meshes
 ├── InputHandler.h   # Input handling interface
 ├── KeyCodes.h       # Key and mouse button constants
 ├── GameCamera.h     # Camera classes
-└── LightBox.h       # Lighting system
+├── LightBox.h       # Lighting system
+├── AudioClip.h      # Audio resource (sounds/music)
+├── AudioSource.h    # Audio emitter component
+├── AudioManager.h   # Audio playback system
+├── WorldUnits.h     # Type-safe units (Meters, Pixels)
+├── WorldBounds.h    # 3D/2D world boundary definitions
+└── CameraBounds.h   # 2D camera with pixel-to-world mapping
 ```
 
 ---
@@ -196,6 +209,7 @@ game.popScene();
 | `popScene()` | Pop current scene |
 | `getDeltaTime()` | Get frame delta time |
 | `getFPS()` | Get current FPS |
+| `getResourceManager()` | Access the global resource cache |
 
 ---
 
@@ -285,18 +299,17 @@ private:
     }
     
     void loadResources() {
-        m_meshId = addResource<vde::Mesh>("models/character.obj");
-        m_textureId = addResource<vde::Texture>("textures/character.png");
+        auto& resources = getGame()->getResourceManager();
+        m_mesh = resources.load<vde::Mesh>("models/character.obj");
     }
     
     void createEntities() {
-        auto entity = addEntity<vde::MeshEntity>(m_meshId);
-        entity->setTexture(m_textureId);
+        auto entity = addEntity<vde::MeshEntity>();
+        entity->setMesh(m_mesh);
         entity->setPosition(0, 0, 0);
     }
     
-    vde::ResourceId m_meshId;
-    vde::ResourceId m_textureId;
+    vde::ResourcePtr<vde::Mesh> m_mesh;
 };
 ```
 
@@ -328,11 +341,17 @@ vde::Mesh* mesh = scene->getResource<vde::Mesh>(meshId);
 scene->removeResource(meshId);
 ```
 
+> Note: Scene resource IDs are stored, but `MeshEntity` and `SpriteEntity` rendering
+> currently uses direct `shared_ptr` assignments (`setMesh`, `setTexture`).
+> Resource ID binding is planned but not wired yet.
+
 #### Entity Management
 
 ```cpp
 // Create entity with template
-auto entity = scene->addEntity<vde::MeshEntity>(meshId);
+auto mesh = vde::Mesh::createCube(1.0f);
+auto entity = scene->addEntity<vde::MeshEntity>();
+entity->setMesh(mesh);
 
 // Add existing entity
 vde::EntityId id = scene->addEntity(existingEntity);
@@ -377,18 +396,28 @@ vde::EntityId id = entity.getId();
 For 3D models:
 
 ```cpp
-auto meshEntity = scene->addEntity<vde::MeshEntity>(meshId);
-meshEntity->setTexture(textureId);
+auto mesh = vde::Mesh::createCube(1.0f);
+auto meshEntity = scene->addEntity<vde::MeshEntity>();
+meshEntity->setMesh(mesh);
 meshEntity->setColor(vde::Color(1.0f, 0.5f, 0.5f));  // tint
 meshEntity->setPosition(0, 1, 0);
 ```
+
+> Note: Mesh texturing is not wired in the current render path. Use `Material`
+> and `setColor()` for now.
 
 #### SpriteEntity
 
 For 2D sprites:
 
 ```cpp
-auto sprite = scene->addEntity<vde::SpriteEntity>(textureId);
+auto spriteTexture = getGame()->getResourceManager().load<vde::Texture>("sprites/player.png");
+if (auto* context = getGame()->getVulkanContext()) {
+    spriteTexture->uploadToGPU(context);
+}
+
+auto sprite = scene->addEntity<vde::SpriteEntity>();
+sprite->setTexture(spriteTexture);
 sprite->setColor(vde::Color::white());
 sprite->setAnchor(0.5f, 0.5f);  // center
 sprite->setUVRect(0.0f, 0.0f, 0.25f, 0.25f);  // sprite sheet
@@ -427,6 +456,7 @@ Base class for loadable assets.
 |------|-------------|
 | `Mesh` | 3D geometry |
 | `Texture` | 2D images (via engine) |
+| `AudioClip` | Sound effects and music clips |
 
 #### Mesh Primitives
 
@@ -435,6 +465,45 @@ auto cube = vde::Mesh::createCube(1.0f);
 auto sphere = vde::Mesh::createSphere(0.5f, 32, 16);
 auto plane = vde::Mesh::createPlane(10.0f, 10.0f);
 auto cylinder = vde::Mesh::createCylinder(0.5f, 2.0f, 32);
+```
+
+---
+
+### ResourceManager
+
+`ResourceManager` provides a global cache for resources that are shared across scenes.
+You can access it from `Game` and use it to deduplicate loads by path.
+
+```cpp
+auto& resources = game.getResourceManager();
+
+// Load (or get cached) resources
+auto mesh = resources.load<vde::Mesh>("models/ship.obj");
+auto texture = resources.load<vde::Texture>("textures/ship.png");
+
+// Use the same texture again elsewhere (returns cached instance)
+auto texture2 = resources.load<vde::Texture>("textures/ship.png");
+```
+
+> Note: `ResourceManager::load()` performs CPU-side loading. Meshes are uploaded
+> on first render, but textures must be uploaded explicitly with
+> `Texture::uploadToGPU()` before use in sprites.
+
+---
+
+### Material
+
+`Material` defines surface properties for `MeshEntity` rendering.
+
+```cpp
+auto material = vde::Material::createColored(vde::Color(0.8f, 0.2f, 0.1f));
+material->setRoughness(0.4f);
+material->setMetallic(0.1f);
+
+auto mesh = vde::Mesh::createCube(1.0f);
+auto entity = scene->addEntity<vde::MeshEntity>();
+entity->setMesh(mesh);
+entity->setMaterial(material);
 ```
 
 ---
@@ -485,6 +554,8 @@ private:
     bool m_keys[512] = {false};
 };
 ```
+
+> Note: Gamepad callbacks are defined on `InputHandler`, but built-in polling/dispatch is not wired yet.
 
 ### Setting Input Handler
 
@@ -666,6 +737,36 @@ auto spot = vde::Light::spot(
 
 ---
 
+## Audio System
+
+VDE includes basic audio playback via `AudioManager`, `AudioClip`, and `AudioSource`.
+The audio system is initialized as part of `Game::initialize()` using `GameSettings::audio`.
+
+### AudioClip and AudioManager
+
+```cpp
+// Load audio clip via ResourceManager
+auto clip = game.getResourceManager().load<vde::AudioClip>("audio/laser.wav");
+
+// Play a one-shot sound effect
+vde::AudioManager::getInstance().playSFX(clip, 0.8f);
+
+// Play looping music
+vde::AudioManager::getInstance().playMusic(clip, 0.6f, true, 1.0f);
+```
+
+### AudioSource (3D emitter)
+
+```cpp
+vde::AudioSource source;
+source.setClip(clip);
+source.setSpatial(true);
+source.setPosition(0.0f, 1.0f, 0.0f);
+source.play(true);  // loop
+```
+
+---
+
 ## Common Types
 
 ### Color
@@ -740,6 +841,304 @@ glm::mat4 matrix = transform.getMatrix();
 
 ---
 
+## World Coordinates & Bounds
+
+VDE provides type-safe world coordinate APIs that make units and directions explicit, preventing common bugs and improving code readability.
+
+### Coordinate System
+
+VDE uses a right-handed Y-up coordinate system by default:
+
+```
+        +Y (Up)
+         |
+         |
+         |_______ +X (East)
+        /
+       /
+      +Z (North)
+```
+
+| Direction | Axis | Sign |
+|-----------|------|------|
+| North | Z | + |
+| South | Z | - |
+| East | X | + |
+| West | X | - |
+| Up | Y | + |
+| Down | Y | - |
+
+### Meters - Type-Safe Distance
+
+The `Meters` type provides explicit unit documentation:
+
+```cpp
+using namespace vde;
+
+// Using user-defined literals (recommended)
+Meters distance = 100_m;
+Meters halfDist = distance / 2;  // 50 meters
+
+// Explicit construction
+Meters other = Meters(50.0f);
+
+// Arithmetic
+Meters sum = distance + other;     // 150 meters
+Meters diff = distance - other;    // 50 meters
+Meters scaled = distance * 2;      // 200 meters
+
+// Comparisons
+if (distance > 50_m) { /* ... */ }
+
+// Implicit conversion to float for glm/rendering
+float raw = distance;  // 100.0f
+```
+
+### Pixels - Type-Safe Screen Units
+
+```cpp
+Pixels screenX = 1920_px;
+Pixels screenY = 1080_px;
+
+ScreenSize size(1920_px, 1080_px);
+float aspect = size.aspectRatio();  // 1.777...
+```
+
+### WorldPoint - 3D Position with Units
+
+```cpp
+// Direct construction
+WorldPoint pt(10_m, 5_m, 20_m);  // x, y, z
+
+// From cardinal directions (north, east, up)
+WorldPoint pt2 = WorldPoint::fromDirections(100_m, 50_m, 20_m);
+// Creates: x=50 (east), y=20 (up), z=100 (north)
+
+// Convert to GLM for rendering
+glm::vec3 v = pt.toVec3();
+```
+
+### WorldExtent - 3D Size with Units
+
+```cpp
+WorldExtent size(200_m, 30_m, 200_m);  // width, height, depth
+
+// 2D extent (no height)
+WorldExtent flat = WorldExtent::flat(200_m, 200_m);  // width, depth
+
+bool is2D = flat.is2D();  // true
+```
+
+### WorldBounds - 3D Scene Boundaries
+
+Define scene bounds with explicit directional limits:
+
+```cpp
+// Create 200m x 200m x 30m world bounds
+// From 100m north to 100m south, 100m west to 100m east
+// From 20m up to 10m down
+auto bounds = WorldBounds::fromDirectionalLimits(
+    100_m,                     // north limit (+Z)
+    WorldBounds::south(100_m), // south limit (-Z)
+    WorldBounds::west(100_m),  // west limit (-X)
+    100_m,                     // east limit (+X)
+    20_m,                      // up limit (+Y)
+    WorldBounds::down(10_m)    // down limit (-Y)
+);
+
+// Query dimensions
+Meters width = bounds.width();   // 200m (east-west)
+Meters depth = bounds.depth();   // 200m (north-south)
+Meters height = bounds.height(); // 30m (up-down)
+
+// Query limits
+Meters north = bounds.northLimit();  // 100m
+Meters south = bounds.southLimit();  // -100m
+
+// Point containment
+WorldPoint pt(0_m, 0_m, 0_m);
+bool inside = bounds.contains(pt);  // true
+
+// Intersection
+bool overlaps = bounds.intersects(otherBounds);
+
+// Center-based construction
+auto centered = WorldBounds::fromCenterAndExtent(
+    WorldPoint(0_m, 0_m, 0_m),
+    WorldExtent(100_m, 50_m, 100_m)
+);
+```
+
+### WorldBounds2D - 2D Scene Boundaries
+
+For top-down or side-scrolling games:
+
+```cpp
+// Top-down game using cardinal directions
+auto bounds = WorldBounds2D::fromCardinal(
+    100_m,   // north
+    -100_m,  // south
+    -100_m,  // west
+    100_m    // east
+);
+
+// Side-scroller using left/right/top/bottom
+auto level = WorldBounds2D::fromLRTB(
+    0_m,     // left
+    1000_m,  // right
+    100_m,   // top
+    0_m      // bottom
+);
+
+// Convert to 3D bounds for unified APIs
+WorldBounds bounds3D = bounds.toWorldBounds(10_m, 0_m);
+```
+
+### Setting Scene Bounds
+
+```cpp
+class MyScene : public vde::Scene {
+    void onEnter() override {
+        // Set world bounds for the scene
+        setWorldBounds(WorldBounds::fromDirectionalLimits(
+            100_m, WorldBounds::south(100_m),
+            WorldBounds::west(100_m), 100_m,
+            20_m, WorldBounds::down(10_m)
+        ));
+        
+        // Check if 2D
+        if (is2D()) {
+            // Configure for 2D rendering
+        }
+    }
+};
+```
+
+### CameraBounds2D - Pixel-to-World Mapping
+
+For 2D games, `CameraBounds2D` provides coordinate conversion between screen pixels and world units:
+
+```cpp
+CameraBounds2D camera;
+
+// Configure screen size (from window)
+camera.setScreenSize(1920_px, 1080_px);
+
+// Set visible world width (height derived from aspect ratio)
+camera.setWorldWidth(16_m);  // Show 16 meters horizontally
+
+// Position camera
+camera.centerOn(0_m, 0_m);
+
+// Zoom
+camera.setZoom(2.0f);  // 2x zoom (shows 8m width instead of 16m)
+
+// Constrain camera to world bounds
+camera.setConstraintBounds(WorldBounds2D::fromCardinal(
+    50_m, -50_m, -50_m, 50_m
+));
+
+// Coordinate conversion
+glm::vec2 worldPos = camera.screenToWorld(mouseX_px, mouseY_px);
+glm::vec2 screenPos = camera.worldToScreen(entityX, entityY);
+
+// Visibility testing
+if (camera.isVisible(entityX, entityY)) {
+    // Entity is on screen
+}
+
+// Get what's visible
+WorldBounds2D visible = camera.getVisibleBounds();
+```
+
+### PixelToWorldMapping - Conversion Ratios
+
+For custom coordinate mapping:
+
+```cpp
+// 100 pixels = 1 meter
+auto mapping = PixelToWorldMapping::fromPixelsPerMeter(100.0f);
+
+// Fit 20 meters across a 1920 pixel screen
+auto fit = PixelToWorldMapping::fitWidth(20_m, 1920_px);
+
+// Convert
+Meters worldDist = mapping.toWorld(500_px);   // 5 meters
+Pixels screenDist = mapping.toPixels(10_m);   // 1000 pixels
+
+// Get ratio
+float ppm = mapping.getPixelsPerMeter();  // 100.0
+```
+
+### 2D Game Setup Example
+
+```cpp
+class My2DScene : public vde::Scene {
+    CameraBounds2D m_camera;
+    vde::ResourcePtr<vde::Texture> m_spriteTexture;
+    
+    void onEnter() override {
+        // Define world bounds
+        setWorldBounds(WorldBounds::flat(
+            50_m, WorldBounds::south(50_m),
+            WorldBounds::west(50_m), 50_m
+        ));
+        
+        // Setup 2D camera
+        m_camera.setScreenSize(1920_px, 1080_px);
+        m_camera.setWorldWidth(32_m);
+        m_camera.centerOn(0_m, 0_m);
+        m_camera.setConstraintBounds(WorldBounds2D::fromCardinal(
+            50_m, -50_m, -50_m, 50_m
+        ));
+        
+        setCameraBounds2D(m_camera);
+        
+        // Create 2D camera for rendering
+        setCamera(new vde::Camera2D(
+            m_camera.getVisibleWidth(),
+            m_camera.getVisibleHeight()
+        ));
+
+        // Load sprite texture and upload to GPU
+        m_spriteTexture = getGame()->getResourceManager().load<vde::Texture>("sprites/player.png");
+        if (auto* context = getGame()->getVulkanContext()) {
+            m_spriteTexture->uploadToGPU(context);
+        }
+    }
+    
+    void onMouseClick(double screenX, double screenY) {
+        // Convert click to world coordinates
+        glm::vec2 worldPos = m_camera.screenToWorld(
+            Pixels(screenX), Pixels(screenY)
+        );
+        
+        // Spawn entity at click location
+        auto entity = addEntity<vde::SpriteEntity>();
+        entity->setTexture(m_spriteTexture);
+        entity->setPosition(worldPos.x, worldPos.y, 0);
+    }
+    
+    void update(float dt) override {
+        // Pan camera with arrow keys
+        auto* input = getInputHandler();
+        if (input) {
+            if (input->isKeyPressed(KEY_LEFT)) 
+                m_camera.move(-10_m * dt, 0_m);
+            if (input->isKeyPressed(KEY_RIGHT)) 
+                m_camera.move(10_m * dt, 0_m);
+        }
+        
+        // Update scene camera bounds
+        setCameraBounds2D(m_camera);
+        
+        vde::Scene::update(dt);
+    }
+};
+```
+
+---
+
 ## Examples
 
 ### Complete Game Example
@@ -772,10 +1171,11 @@ public:
         ));
         
         // Resources
-        m_meshId = addResource<vde::Mesh>("models/cube.obj");
+        m_mesh = getGame()->getResourceManager().load<vde::Mesh>("models/cube.obj");
         
         // Entity
-        m_cube = addEntity<vde::MeshEntity>(m_meshId);
+        m_cube = addEntity<vde::MeshEntity>();
+        m_cube->setMesh(m_mesh);
         m_cube->setPosition(0, 0, 0);
     }
     
@@ -789,7 +1189,7 @@ public:
     }
     
 private:
-    vde::ResourceId m_meshId;
+    vde::ResourcePtr<vde::Mesh> m_mesh;
     vde::MeshEntity::Ref m_cube;
 };
 

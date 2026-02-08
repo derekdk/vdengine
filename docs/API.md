@@ -37,7 +37,13 @@ Creates a window with the specified dimensions and title.
 | `GLFWwindow* getHandle() const` | Returns underlying GLFW handle |
 | `uint32_t getWidth() const` | Current width in pixels |
 | `uint32_t getHeight() const` | Current height in pixels |
+| `void setResolution(uint32_t width, uint32_t height)` | Set window resolution |
+| `void setFullscreen(bool fullscreen)` | Toggle fullscreen mode |
+| `bool isFullscreen() const` | Check fullscreen state |
 | `void setResizeCallback(ResizeCallback)` | Set window resize callback |
+| `static const Resolution& getResolution(size_t index)` | Get predefined resolution by index |
+| `static size_t getResolutionCount()` | Get number of predefined resolutions |
+| `static const Resolution* getResolutions()` | Get array of predefined resolutions |
 
 ### Types
 
@@ -63,24 +69,33 @@ Core Vulkan context managing instance, device, and swapchain.
 
 | Method | Description |
 |--------|-------------|
-| `bool initialize(Window* window)` | Initialize Vulkan with the given window |
+| `void initialize(Window* window)` | Initialize Vulkan with the given window (throws on failure) |
 | `void cleanup()` | Destroy all Vulkan resources |
+| `void recreateSwapchain(uint32_t width, uint32_t height)` | Recreate swapchain after resize |
 | `void drawFrame()` | Render a single frame |
-| `void waitIdle()` | Wait for GPU to finish all operations |
 | `void setRenderCallback(RenderCallback)` | Set the per-frame render callback |
 | `void setClearColor(const glm::vec4&)` | Set the clear color |
+| `const glm::vec4& getClearColor() const` | Get the current clear color |
 
 ### Accessors
 
 | Method | Returns |
 |--------|---------|
-| `VkDevice getDevice()` | Logical device handle |
+| `VkInstance getInstance() const` | Vulkan instance handle |
 | `VkPhysicalDevice getPhysicalDevice()` | Physical device handle |
+| `VkDevice getDevice()` | Logical device handle |
+| `VkQueue getGraphicsQueue()` | Graphics queue |
+| `VkQueue getPresentQueue()` | Present queue |
+| `uint32_t getGraphicsQueueFamily()` | Graphics queue family index |
 | `VkRenderPass getRenderPass()` | Main render pass |
 | `VkCommandPool getCommandPool()` | Command pool for graphics |
-| `VkQueue getGraphicsQueue()` | Graphics queue |
 | `VkExtent2D getSwapChainExtent()` | Swapchain dimensions |
-| `uint32_t getSwapChainImageCount()` | Number of swapchain images |
+| `uint32_t getCurrentFrame()` | Current frame-in-flight index |
+| `VkCommandBuffer getCurrentCommandBuffer() const` | Command buffer for current frame |
+| `VkBuffer getCurrentUniformBuffer() const` | Uniform buffer for current frame |
+| `VkDescriptorSet getCurrentUBODescriptorSet() const` | UBO descriptor set for current frame |
+| `Camera& getCamera()` | Engine camera used for rendering |
+| `DescriptorManager& getDescriptorManager()` | Descriptor manager instance |
 
 ### Types
 
@@ -118,6 +133,8 @@ using RenderCallback = std::function<void(VkCommandBuffer)>;
 | Method | Description |
 |--------|-------------|
 | `void setPerspective(float fov, float aspect, float near, float far)` | Set projection parameters |
+| `void setOrthographic(float left, float right, float bottom, float top, float near, float far)` | Set orthographic projection |
+| `bool isOrthographic() const` | Check if orthographic projection is active |
 | `void setAspectRatio(float aspect)` | Update aspect ratio |
 | `void setFOV(float fov)` | Update field of view |
 
@@ -128,6 +145,15 @@ using RenderCallback = std::function<void(VkCommandBuffer)>;
 | `glm::mat4 getViewMatrix()` | View matrix |
 | `glm::mat4 getProjectionMatrix()` | Projection matrix (Vulkan Y-flip) |
 | `glm::mat4 getViewProjectionMatrix()` | Combined VP matrix |
+
+### Projection Accessors
+
+| Method | Returns |
+|--------|---------|
+| `float getFOV() const` | Field of view in degrees |
+| `float getAspectRatio() const` | Aspect ratio |
+| `float getNearPlane() const` | Near clipping plane |
+| `float getFarPlane() const` | Far clipping plane |
 
 ### Constants
 
@@ -150,9 +176,15 @@ Vulkan texture loading and management.
 
 | Method | Description |
 |--------|-------------|
-| `bool loadFromFile(const std::string& path, VkDevice, VkPhysicalDevice, VkCommandPool, VkQueue)` | Load texture from file |
-| `void cleanup()` | Destroy texture resources |
-| `VkDescriptorImageInfo getDescriptorInfo()` | Get descriptor for binding |
+| `bool loadFromFile(const std::string& path)` | Load texture data into CPU memory |
+| `bool loadFromData(const uint8_t* pixels, uint32_t width, uint32_t height)` | Load texture from raw pixel data |
+| `bool uploadToGPU(VulkanContext* context)` | Create GPU objects and upload data |
+| `bool isOnGPU() const` | Check if texture is uploaded to GPU |
+| `void freeGPUResources(VkDevice device)` | Free GPU objects (keep CPU data) |
+| `void cleanup()` | Destroy CPU and GPU resources |
+| `bool isValid() const` | Check if image, view, and sampler are created |
+| `bool loadFromFile(const std::string& path, VkDevice, VkPhysicalDevice, VkCommandPool, VkQueue)` | Legacy one-step load/upload |
+| `bool createFromData(const uint8_t* pixels, uint32_t width, uint32_t height, VkDevice, VkPhysicalDevice, VkCommandPool, VkQueue)` | Legacy one-step load/upload |
 
 ### Accessors
 
@@ -193,6 +225,14 @@ static void copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
 
 static VkCommandBuffer beginSingleTimeCommands();
 static void endSingleTimeCommands(VkCommandBuffer cmd);
+
+static void createDeviceLocalBuffer(const void* data, VkDeviceSize size,
+                                    VkBufferUsageFlags usage,
+                                    VkBuffer& buffer, VkDeviceMemory& memory);
+
+static void createMappedBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                               VkBuffer& buffer, VkDeviceMemory& memory,
+                               void** mappedMemory);
 ```
 
 ---
@@ -206,15 +246,29 @@ Shader compilation and caching.
 ### Constructor
 
 ```cpp
-ShaderCache(VkDevice device, const std::string& cacheDir = "cache/");
+ShaderCache(const std::string& cacheDirectory = "cache/shaders");
 ```
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| `VkShaderModule getOrCompile(const std::string& path, ShaderStage stage)` | Get cached or compile shader |
-| `void clear()` | Clear all cached modules |
+| `bool initialize()` | Initialize cache and load manifest |
+| `std::vector<uint32_t> loadShader(const std::string& path, std::optional<ShaderStage> stage = std::nullopt)` | Load from cache or compile |
+| `std::vector<uint32_t> reloadShader(const std::string& path)` | Force recompile a shader |
+| `bool hasSourceChanged(const std::string& path) const` | Check if source differs from cache |
+| `void invalidate(const std::string& path)` | Invalidate a cached shader |
+| `void clearCache()` | Clear all cached files |
+| `bool saveManifest()` | Save cache manifest to disk |
+| `std::vector<std::string> hotReload()` | Recompile changed shaders |
+| `void setEnabled(bool enabled)` | Enable or disable caching |
+| `bool isEnabled() const` | Check if caching is enabled |
+| `bool isInitialized() const` | Check if cache is initialized |
+| `size_t getCacheEntryCount() const` | Number of cache entries |
+| `size_t getCacheHits() const` | Cache hit count |
+| `size_t getCacheMisses() const` | Cache miss count |
+| `const std::string& getLastError() const` | Last error message |
+| `const std::string& getCacheDirectory() const` | Cache directory path |
 
 ---
 
@@ -285,6 +339,34 @@ struct UniformBufferObject {
 };
 ```
 
+### Lighting and Material GPU Types
+
+```cpp
+constexpr uint32_t MAX_LIGHTS = 8;
+
+struct GPULight {
+    glm::vec4 positionAndType;
+    glm::vec4 directionAndRange;
+    glm::vec4 colorAndIntensity;
+    glm::vec4 spotParams;
+};
+
+struct LightingUBO {
+    glm::vec4 ambientColorAndIntensity;
+    glm::ivec4 lightCounts;
+    GPULight lights[MAX_LIGHTS];
+};
+
+struct MaterialPushConstants {
+    glm::vec4 albedo;
+    glm::vec4 emission;
+    float roughness;
+    float metallic;
+    float normalStrength;
+    float padding;
+};
+```
+
 ---
 
 ## Version Information
@@ -292,9 +374,11 @@ struct UniformBufferObject {
 ```cpp
 namespace vde {
     struct Version {
-        static constexpr int major = 0;
-        static constexpr int minor = 1;
-        static constexpr int patch = 0;
+        static constexpr int MAJOR = 0;
+        static constexpr int MINOR = 1;
+        static constexpr int PATCH = 0;
+
+        static const char* getString();
     };
 }
 ```
@@ -316,7 +400,7 @@ try {
 Functions that may fail gracefully return `bool`:
 
 ```cpp
-if (!texture.loadFromFile("missing.png", ...)) {
+if (!texture.loadFromFile("missing.png")) {
     // Handle missing texture
 }
 ```

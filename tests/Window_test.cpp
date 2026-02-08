@@ -3,20 +3,20 @@
  * @brief Unit tests for vde::Window class.
  */
 
-#include <gtest/gtest.h>
 #include <vde/Window.h>
+
+#include <gtest/gtest.h>
 
 namespace vde {
 namespace test {
 
 class WindowTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         // GLFW must be initialized for window tests
     }
-    
-    void TearDown() override {
-    }
+
+    void TearDown() override {}
 };
 
 TEST_F(WindowTest, ResolutionStructIsValid) {
@@ -34,12 +34,8 @@ TEST_F(WindowTest, ResolutionAspectRatioCalculation) {
 
 TEST_F(WindowTest, MultipleResolutionsCanBeCreated) {
     Resolution resolutions[] = {
-        {1280, 720, "720p"},
-        {1920, 1080, "1080p"},
-        {2560, 1440, "1440p"},
-        {3840, 2160, "4K"}
-    };
-    
+        {1280, 720, "720p"}, {1920, 1080, "1080p"}, {2560, 1440, "1440p"}, {3840, 2160, "4K"}};
+
     EXPECT_EQ(4u, sizeof(resolutions) / sizeof(resolutions[0]));
     EXPECT_EQ(1280u, resolutions[0].width);
     EXPECT_EQ(3840u, resolutions[3].width);
@@ -48,5 +44,5 @@ TEST_F(WindowTest, MultipleResolutionsCanBeCreated) {
 // Note: Window creation tests require a display and GLFW initialization
 // These are typically integration tests and may be skipped in CI environments
 
-} // namespace test
-} // namespace vde
+}  // namespace test
+}  // namespace vde

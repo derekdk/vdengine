@@ -3,24 +3,55 @@
 /**
  * @file GameCamera.h
  * @brief Simplified camera classes for VDE games
- * 
+ *
  * Provides easy-to-use camera classes that wrap the engine's
  * camera functionality for common game scenarios.
  */
 
-#include "GameTypes.h"
 #include <vde/Camera.h>
+
 #include <memory>
+
+#include "GameTypes.h"
 
 namespace vde {
 
+// Forward declaration
+class VulkanContext;
+
+/**
+ * @brief A ray in 3D space defined by an origin and direction.
+ *
+ * Useful for picking, hit-testing, and raycasting operations.
+ */
+struct Ray {
+    glm::vec3 origin{0.0f};
+    glm::vec3 direction{0.0f, 0.0f, -1.0f};
+
+    /**
+     * @brief Test whether this ray intersects a bounding sphere.
+     * @param center Center of the sphere in world space
+     * @param radius Radius of the sphere
+     * @return true if the ray intersects the sphere
+     */
+    bool hitsSphere(const glm::vec3& center, float radius) const {
+        glm::vec3 oc = origin - center;
+        float a = glm::dot(direction, direction);
+        float b = 2.0f * glm::dot(oc, direction);
+        float c = glm::dot(oc, oc) - radius * radius;
+        return (b * b - 4.0f * a * c) >= 0.0f;
+    }
+};
+
 /**
  * @brief Base class for game cameras.
- * 
+ *
  * Provides a simplified interface for camera control in games.
+ * GameCamera wraps the low-level Camera class and provides game-friendly
+ * interfaces like OrbitCamera, SimpleCamera, and Camera2D.
  */
 class GameCamera {
-public:
+  public:
     virtual ~GameCamera() = default;
 
     /**
@@ -47,24 +78,61 @@ public:
     /**
      * @brief Set the camera's aspect ratio.
      */
-    void setAspectRatio(float aspect) { m_aspectRatio = aspect; updateProjection(); }
+    void setAspectRatio(float aspect) {
+        m_aspectRatio = aspect;
+        updateProjection();
+    }
+
+    /**
+     * @brief Get the camera's aspect ratio.
+     */
+    float getAspectRatio() const { return m_aspectRatio; }
 
     /**
      * @brief Set the near clipping plane.
      */
-    void setNearPlane(float near) { m_nearPlane = near; updateProjection(); }
+    void setNearPlane(float near) {
+        m_nearPlane = near;
+        updateProjection();
+    }
 
     /**
      * @brief Set the far clipping plane.
      */
-    void setFarPlane(float far) { m_farPlane = far; updateProjection(); }
+    void setFarPlane(float far) {
+        m_farPlane = far;
+        updateProjection();
+    }
 
     /**
      * @brief Update camera (called once per frame).
      */
-    virtual void update(float deltaTime) {}
+    virtual void update(float deltaTime) { (void)deltaTime; }
 
-protected:
+    /**
+     * @brief Apply this camera's matrices to a VulkanContext.
+     *
+     * Copies the view and projection matrices to the context's camera,
+     * making this camera active for rendering.
+     *
+     * @param context The VulkanContext to apply to
+     */
+    void applyTo(VulkanContext& context);
+
+    /**
+     * @brief Unproject a screen-space point into a world-space ray.
+     *
+     * Uses Vulkan NDC conventions (Y points down, Z depth 0..1).
+     *
+     * @param screenX Mouse X in pixels (0 = left)
+     * @param screenY Mouse Y in pixels (0 = top)
+     * @param screenWidth Viewport width in pixels
+     * @param screenHeight Viewport height in pixels
+     * @return A Ray whose origin is on the near plane and whose direction points into the scene
+     */
+    Ray screenToWorldRay(float screenX, float screenY, float screenWidth, float screenHeight) const;
+
+  protected:
     Camera m_camera;
     float m_aspectRatio = 16.0f / 9.0f;
     float m_nearPlane = 0.1f;
@@ -75,14 +143,14 @@ protected:
 
 /**
  * @brief Simple perspective camera with position and direction.
- * 
+ *
  * Use this for first-person style games or when you need
  * direct control over camera position and orientation.
  */
 class SimpleCamera : public GameCamera {
-public:
+  public:
     SimpleCamera();
-    
+
     /**
      * @brief Create camera at position looking in direction.
      * @param position Camera position in world space
@@ -130,10 +198,10 @@ public:
      */
     void rotate(float deltaPitch, float deltaYaw);
 
-protected:
+  protected:
     void updateProjection() override;
 
-private:
+  private:
     Position m_position;
     float m_pitch = 0.0f;
     float m_yaw = -90.0f;
@@ -144,12 +212,12 @@ private:
 
 /**
  * @brief Orbital camera that rotates around a target point.
- * 
+ *
  * Use this for third-person games, RTS cameras, or any
  * situation where the camera orbits around a focal point.
  */
 class OrbitCamera : public GameCamera {
-public:
+  public:
     OrbitCamera();
 
     /**
@@ -234,10 +302,10 @@ public:
      */
     void setPitchLimits(float minPitch, float maxPitch);
 
-protected:
+  protected:
     void updateProjection() override;
 
-private:
+  private:
     Position m_target;
     float m_distance = 10.0f;
     float m_pitch = 45.0f;
@@ -254,11 +322,11 @@ private:
 
 /**
  * @brief 2D orthographic camera.
- * 
+ *
  * Use this for 2D games, UI rendering, or top-down views.
  */
 class Camera2D : public GameCamera {
-public:
+  public:
     Camera2D();
 
     /**
@@ -309,10 +377,10 @@ public:
      */
     void move(float deltaX, float deltaY);
 
-protected:
+  protected:
     void updateProjection() override;
 
-private:
+  private:
     Position m_position;
     float m_zoom = 1.0f;
     float m_rotation = 0.0f;
@@ -322,4 +390,4 @@ private:
     void updateCamera();
 };
 
-} // namespace vde
+}  // namespace vde
