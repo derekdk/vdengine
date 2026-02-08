@@ -37,6 +37,8 @@ set(VDE_TEST_SOURCES
     ResourceManager_test.cpp
     # Scheduler tests
     Scheduler_test.cpp
+    # Phase 2 multi-scene tests
+    SceneGroup_test.cpp
 )
 
 # Create test executable

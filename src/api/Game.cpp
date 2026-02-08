@@ -14,6 +14,7 @@
 
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstring>
@@ -118,11 +119,15 @@ void Game::shutdown() {
     // Call shutdown hook
     onShutdown();
 
-    // Deactivate current scene
-    if (m_activeScene) {
-        m_activeScene->onExit();
-        m_activeScene = nullptr;
+    // Deactivate all scenes in the active group
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end()) {
+            it->second->onExit();
+        }
     }
+    m_activeScene = nullptr;
+    m_activeSceneGroup = SceneGroup{};
 
     // Clear all scenes
     m_scenes.clear();
@@ -166,6 +171,15 @@ void Game::run() {
 
     // Enter active scene if one is set
     if (m_activeScene) {
+        // Ensure there's a scene group for the active scene
+        if (m_activeSceneGroup.empty()) {
+            for (auto& [name, scenePtr] : m_scenes) {
+                if (scenePtr.get() == m_activeScene) {
+                    m_activeSceneGroup = SceneGroup::create(name, {name});
+                    break;
+                }
+            }
+        }
         m_activeScene->onEnter();
     }
 
@@ -247,9 +261,70 @@ Scene* Game::getScene(const std::string& name) {
 }
 
 void Game::setActiveScene(const std::string& name) {
-    // Defer scene switch to avoid issues during update/render
+    // Defer scene switch to avoid issues during update/render.
+    // Internally creates a single-scene group.
     m_pendingScene = name;
     m_sceneSwitchPending = true;
+}
+
+void Game::setActiveSceneGroup(const SceneGroup& group) {
+    // Validate that all scenes exist
+    for (const auto& sceneName : group.sceneNames) {
+        if (m_scenes.find(sceneName) == m_scenes.end()) {
+            return;  // Silently ignore invalid groups
+        }
+    }
+
+    // Build sets for old and new groups to diff them
+    auto isInList = [](const std::vector<std::string>& list, const std::string& name) {
+        for (const auto& n : list) {
+            if (n == name)
+                return true;
+        }
+        return false;
+    };
+
+    // Exit scenes that are in the OLD group but NOT in the NEW group
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (!isInList(group.sceneNames, sceneName)) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                it->second->onExit();
+            }
+        }
+    }
+
+    // Clear scene stack (group switch resets the stack)
+    m_sceneStack.clear();
+
+    // Remember old group for enter logic
+    SceneGroup oldGroup = m_activeSceneGroup;
+
+    // Set new group
+    m_activeSceneGroup = group;
+
+    // Set primary scene (first in the group)
+    if (!group.sceneNames.empty()) {
+        auto it = m_scenes.find(group.sceneNames[0]);
+        if (it != m_scenes.end()) {
+            m_activeScene = it->second.get();
+        }
+    } else {
+        m_activeScene = nullptr;
+    }
+
+    // Enter scenes that are in the NEW group but NOT in the OLD group
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (!isInList(oldGroup.sceneNames, sceneName)) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                it->second->onEnter();
+            }
+        }
+    }
+
+    // Rebuild the scheduler graph for the new group
+    rebuildSchedulerGraph();
 }
 
 void Game::pushScene(const std::string& name) {
@@ -359,17 +434,36 @@ void Game::processPendingSceneChange() {
         return;
     }
 
-    // Exit current scene
-    if (m_activeScene) {
-        m_activeScene->onExit();
+    // Exit scenes in the current group that are NOT the pending scene
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (sceneName == m_pendingScene)
+            continue;  // Will stay active — don't exit
+        auto sceneIt = m_scenes.find(sceneName);
+        if (sceneIt != m_scenes.end()) {
+            sceneIt->second->onExit();
+        }
     }
 
     // Clear scene stack (setActiveScene resets the stack)
     m_sceneStack.clear();
 
-    // Enter new scene
+    // Check if the pending scene was already in the old group
+    bool wasAlreadyActive = false;
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (sceneName == m_pendingScene) {
+            wasAlreadyActive = true;
+            break;
+        }
+    }
+
+    // Create a single-scene group
+    m_activeSceneGroup = SceneGroup::create(m_pendingScene, {m_pendingScene});
+
+    // Enter new scene only if it wasn't already in the group
     m_activeScene = it->second.get();
-    m_activeScene->onEnter();
+    if (!wasAlreadyActive) {
+        m_activeScene->onEnter();
+    }
 
     // Rebuild the scheduler graph for the new scene
     rebuildSchedulerGraph();
@@ -1269,25 +1363,80 @@ void Game::updateLightingUBO(const Scene* scene) {
 void Game::rebuildSchedulerGraph() {
     m_scheduler.clear();
 
-    // Task 1: GameLogic — onUpdate hook + scene update
-    TaskId updateTask = m_scheduler.addTask({"game.update", TaskPhase::GameLogic, [this]() {
-                                                 // Call update hook
-                                                 onUpdate(m_deltaTime);
+    // ---------------------------------------------------------------
+    // Collect scenes that need updating this frame:
+    //   1. All scenes in the active group
+    //   2. Any scene outside the group with continueInBackground==true
+    // ---------------------------------------------------------------
+    struct SceneEntry {
+        Scene* scene = nullptr;
+        std::string name;
+        int priority = 0;
+    };
 
-                                                 // Update active scene
-                                                 if (m_activeScene) {
-                                                     m_activeScene->update(m_deltaTime);
-                                                 }
-                                             }});
+    std::vector<SceneEntry> updateScenes;
 
+    // Active group scenes
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end()) {
+            updateScenes.push_back({it->second.get(), sceneName, it->second->getUpdatePriority()});
+        }
+    }
+
+    // Background scenes (not already in the group)
+    for (auto& [name, scenePtr] : m_scenes) {
+        if (!scenePtr->getContinueInBackground()) {
+            continue;
+        }
+        // Skip if already in the active group
+        bool inGroup = false;
+        for (const auto& gn : m_activeSceneGroup.sceneNames) {
+            if (gn == name) {
+                inGroup = true;
+                break;
+            }
+        }
+        if (!inGroup) {
+            updateScenes.push_back({scenePtr.get(), name, scenePtr->getUpdatePriority()});
+        }
+    }
+
+    // Sort by update priority (lower value = earlier execution)
+    std::sort(updateScenes.begin(), updateScenes.end(),
+              [](const SceneEntry& a, const SceneEntry& b) { return a.priority < b.priority; });
+
+    // ---------------------------------------------------------------
+    // Task 1: GameLogic — onUpdate hook + all scene updates
+    // ---------------------------------------------------------------
+    // Chain: onUpdate -> update(scene1) -> update(scene2) -> ...
+    TaskId prevTask = m_scheduler.addTask(
+        {"game.update", TaskPhase::GameLogic, [this]() { onUpdate(m_deltaTime); }});
+
+    for (size_t i = 0; i < updateScenes.size(); ++i) {
+        Scene* scene = updateScenes[i].scene;
+        const std::string& sceneName = updateScenes[i].name;
+        prevTask = m_scheduler.addTask({"scene.update." + sceneName,
+                                        TaskPhase::GameLogic,
+                                        [this, scene]() { scene->update(m_deltaTime); },
+                                        {prevTask}});
+    }
+
+    TaskId lastUpdateTask = prevTask;
+
+    // ---------------------------------------------------------------
     // Task 2: Audio — update audio system
+    // ---------------------------------------------------------------
     TaskId audioTask =
         m_scheduler.addTask({"audio.global",
                              TaskPhase::Audio,
                              [this]() { AudioManager::getInstance().update(m_deltaTime); },
-                             {updateTask}});
+                             {lastUpdateTask}});
 
-    // Task 3: PreRender — apply camera and background color
+    // ---------------------------------------------------------------
+    // Task 3: PreRender — apply camera and background color from
+    //         the PRIMARY scene (first in the active group)
+    // ---------------------------------------------------------------
     TaskId preRenderTask = m_scheduler.addTask(
         {"scene.preRender",
          TaskPhase::PreRender,
@@ -1307,15 +1456,22 @@ void Game::rebuildSchedulerGraph() {
          },
          {audioTask}});
 
-    // Task 4: Render — draw frame
+    // ---------------------------------------------------------------
+    // Task 4: Render — draw frame.  Renders ALL group scenes in order
+    //         (primary scene first, then overlays).
+    // ---------------------------------------------------------------
     m_scheduler.addTask({"scene.render",
                          TaskPhase::Render,
                          [this]() {
                              if (m_vulkanContext) {
                                  m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
                                      (void)cmd;
-                                     if (m_activeScene) {
-                                         m_activeScene->render();
+                                     // Render all scenes in the active group
+                                     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+                                         auto it = m_scenes.find(sceneName);
+                                         if (it != m_scenes.end()) {
+                                             it->second->render();
+                                         }
                                      }
                                      onRender();
                                  });

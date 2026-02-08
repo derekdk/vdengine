@@ -22,6 +22,7 @@
 #include "InputHandler.h"
 #include "ResourceManager.h"
 #include "Scene.h"
+#include "SceneGroup.h"
 #include "Scheduler.h"
 
 namespace vde {
@@ -135,8 +136,29 @@ class Game {
     /**
      * @brief Set the active scene.
      * @param name Name of the scene to activate
+     *
+     * Internally creates a single-scene group so that
+     * setActiveSceneGroup-based scheduling works identically.
      */
     void setActiveScene(const std::string& name);
+
+    /**
+     * @brief Set a group of scenes to be active simultaneously.
+     *
+     * The first scene in the group is the primary scene (its camera
+     * and background color are used for rendering).  All scenes in
+     * the group receive update() calls each frame.  Scenes outside
+     * the group that have continueInBackground==true also receive
+     * update() calls.
+     *
+     * @param group The SceneGroup describing the scenes to activate
+     */
+    void setActiveSceneGroup(const SceneGroup& group);
+
+    /**
+     * @brief Get the currently active scene group.
+     */
+    const SceneGroup& getActiveSceneGroup() const { return m_activeSceneGroup; }
 
     /**
      * @brief Get the currently active scene.
@@ -392,6 +414,7 @@ class Game {
     std::vector<std::string> m_sceneStack;
     std::string m_pendingScene;
     bool m_sceneSwitchPending = false;
+    SceneGroup m_activeSceneGroup;
 
     // Lighting infrastructure (Phase 4)
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;

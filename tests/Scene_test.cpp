@@ -281,3 +281,31 @@ TEST_F(SceneTest, UpdateCallsAllEntities) {
     EXPECT_EQ(entity2->updateCount, 1);
     EXPECT_EQ(entity3->updateCount, 1);
 }
+
+// ============================================================================
+// Background / Priority Tests (Phase 2)
+// ============================================================================
+
+TEST_F(SceneTest, ContinueInBackgroundDefaultFalse) {
+    EXPECT_FALSE(scene->getContinueInBackground());
+}
+
+TEST_F(SceneTest, SetContinueInBackground) {
+    scene->setContinueInBackground(true);
+    EXPECT_TRUE(scene->getContinueInBackground());
+
+    scene->setContinueInBackground(false);
+    EXPECT_FALSE(scene->getContinueInBackground());
+}
+
+TEST_F(SceneTest, UpdatePriorityDefaultZero) {
+    EXPECT_EQ(scene->getUpdatePriority(), 0);
+}
+
+TEST_F(SceneTest, SetUpdatePriority) {
+    scene->setUpdatePriority(5);
+    EXPECT_EQ(scene->getUpdatePriority(), 5);
+
+    scene->setUpdatePriority(-3);
+    EXPECT_EQ(scene->getUpdatePriority(), -3);
+}

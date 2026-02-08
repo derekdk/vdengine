@@ -13,7 +13,7 @@
 |-------|-------------|--------|------------|---------------|
 | 0 | [Pre-flight & Baseline](#phase-0-pre-flight--baseline) | **Done** | 423/423 | 10/10 |
 | 1 | [Scheduler Foundation (Single-Threaded)](#phase-1-scheduler-foundation-single-threaded) | **Done** | 444/444 | 10/10 |
-| 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | Not Started | — | — |
+| 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | **Done** | 457/457 | 10/10 |
 | 3 | [Scene Phase Callbacks & Audio Event Queue](#phase-3-scene-phase-callbacks--audio-event-queue) | Not Started | — | — |
 | 4 | [Physics Scene](#phase-4-physics-scene) | Not Started | — | — |
 | 5 | [Physics Entities & Sync](#phase-5-physics-entities--sync) | Not Started | — | — |
@@ -143,19 +143,19 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **2.1** Create `SceneGroup` struct in `SceneGroup.h` with `name`, `sceneNames`, `SceneGroup::create()` helper
-- [ ] **2.2** Add `setContinueInBackground()` / `getContinueInBackground()` and `setUpdatePriority()` / `getUpdatePriority()` to `Scene`
-- [ ] **2.3** Add `setActiveSceneGroup()` to `Game`; refactor `setActiveScene()` to create a single-scene group internally
-- [ ] **2.4** Implement `rebuildSchedulerGraph()` in `Game.cpp` that creates tasks for each scene in the active group:
+- [x] **2.1** Create `SceneGroup` struct in `SceneGroup.h` with `name`, `sceneNames`, `SceneGroup::create()` helper
+- [x] **2.2** Add `setContinueInBackground()` / `getContinueInBackground()` and `setUpdatePriority()` / `getUpdatePriority()` to `Scene`
+- [x] **2.3** Add `setActiveSceneGroup()` to `Game`; refactor `setActiveScene()` to create a single-scene group internally
+- [x] **2.4** Implement `rebuildSchedulerGraph()` in `Game.cpp` that creates tasks for each scene in the active group:
   - Input → Update(scene1) → Update(scene2) → ... → PreRender(scene1) → PreRender(scene2) → Render
   - Background scenes also get Update tasks
-- [ ] **2.5** Wire `setActiveSceneGroup` / `setActiveScene` to call `rebuildSchedulerGraph()`
-- [ ] **2.6** Write `SceneGroup_test.cpp`:
+- [x] **2.5** Wire `setActiveSceneGroup` / `setActiveScene` to call `rebuildSchedulerGraph()`
+- [x] **2.6** Write `SceneGroup_test.cpp`:
   - Construction & `create()` helper
   - Empty group
   - Verify scene ordering
-- [ ] **2.7** Add Scene background/priority tests to `Scene_test.cpp`
-- [ ] **2.8** Update `multi_scene_demo` example to demonstrate `setActiveSceneGroup()` with two scenes rendering simultaneously
+- [x] **2.7** Add Scene background/priority tests to `Scene_test.cpp`
+- [x] **2.8** Update `multi_scene_demo` example to demonstrate `setActiveSceneGroup()` with two scenes rendering simultaneously
 
 ### Verification
 
@@ -167,12 +167,14 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass
-- [ ] New tests pass
-- [ ] `setActiveScene("x")` behaves identically to before (backwards compatible)
-- [ ] `setActiveSceneGroup(...)` activates multiple scenes
-- [ ] `multi_scene_demo` visually demonstrates simultaneous scene rendering
-- [ ] All other examples run without regression
+- [x] All existing tests pass
+- [x] New tests pass
+- [x] `setActiveScene("x")` behaves identically to before (backwards compatible)
+- [x] `setActiveSceneGroup(...)` activates multiple scenes
+- [x] `multi_scene_demo` visually demonstrates simultaneous scene rendering
+- [x] All other examples run without regression
+
+**Completed (2026-02-08):** 457 tests passed (444 existing + 9 SceneGroup + 4 Scene background/priority), 10 examples built and verified.
 
 ---
 

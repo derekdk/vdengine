@@ -225,6 +225,40 @@ class Scene {
     GameCamera* getCamera() { return m_camera.get(); }
     const GameCamera* getCamera() const { return m_camera.get(); }
 
+    // Background & Priority
+
+    /**
+     * @brief Mark this scene for continued updates while in background.
+     *
+     * When true and the scene is part of an active SceneGroup, its
+     * update() is called even when it is not the primary scene.
+     * When true and the scene is NOT in the active group, the engine
+     * will still call update() each frame (background updates).
+     *
+     * @param enabled Whether background updates should be enabled
+     */
+    void setContinueInBackground(bool enabled) { m_continueInBackground = enabled; }
+
+    /**
+     * @brief Check if background updates are enabled.
+     */
+    bool getContinueInBackground() const { return m_continueInBackground; }
+
+    /**
+     * @brief Set the update priority (lower values run first).
+     *
+     * When multiple scenes are updated in a frame, their update
+     * tasks are ordered by priority (ascending).  Default is 0.
+     *
+     * @param priority Numeric priority (lower = earlier)
+     */
+    void setUpdatePriority(int priority) { m_updatePriority = priority; }
+
+    /**
+     * @brief Get the update priority.
+     */
+    int getUpdatePriority() const { return m_updatePriority; }
+
     // Input
 
     /**
@@ -341,6 +375,8 @@ class Scene {
     std::unique_ptr<GameCamera> m_camera;
     InputHandler* m_inputHandler = nullptr;
     Color m_backgroundColor = Color::black();
+    bool m_continueInBackground = false;
+    int m_updatePriority = 0;
 
     // World bounds
     WorldBounds m_worldBounds;

@@ -166,6 +166,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/WorldBounds.h
     include/vde/api/CameraBounds.h
     include/vde/api/Scheduler.h
+    include/vde/api/SceneGroup.h
     # Audio headers
     include/vde/api/AudioClip.h
     include/vde/api/AudioManager.h

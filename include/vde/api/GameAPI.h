@@ -27,6 +27,7 @@
 #include "Entity.h"
 #include "Resource.h"
 #include "Scene.h"
+#include "SceneGroup.h"
 
 // Input handling
 #include "InputHandler.h"
