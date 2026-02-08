@@ -11,8 +11,8 @@
 
 | Phase | Description | Status | Tests Pass | Examples Work |
 |-------|-------------|--------|------------|---------------|
-| 0 | [Pre-flight & Baseline](#phase-0-pre-flight--baseline) | Not Started | — | — |
-| 1 | [Scheduler Foundation (Single-Threaded)](#phase-1-scheduler-foundation-single-threaded) | Not Started | — | — |
+| 0 | [Pre-flight & Baseline](#phase-0-pre-flight--baseline) | **Done** | 423/423 | 10/10 |
+| 1 | [Scheduler Foundation (Single-Threaded)](#phase-1-scheduler-foundation-single-threaded) | **Done** | 444/444 | 10/10 |
 | 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | Not Started | — | — |
 | 3 | [Scene Phase Callbacks & Audio Event Queue](#phase-3-scene-phase-callbacks--audio-event-queue) | Not Started | — | — |
 | 4 | [Physics Scene](#phase-4-physics-scene) | Not Started | — | — |
@@ -28,20 +28,20 @@
 
 ### Tasks
 
-- [ ] **0.1** Build all targets (library, tests, examples) with Ninja in Debug
-- [ ] **0.2** Run `vde_tests` — all tests green
-- [ ] **0.3** Build and launch each example to verify they run:
-  - [ ] `vde_triangle_example`
-  - [ ] `vde_simple_game_example`
-  - [ ] `vde_sprite_demo`
-  - [ ] `vde_world_bounds_demo`
-  - [ ] `vde_materials_lighting_demo`
-  - [ ] `vde_resource_demo`
-  - [ ] `vde_audio_demo`
-  - [ ] `vde_sidescroller`
-  - [ ] `vde_wireframe_viewer`
-  - [ ] `vde_multi_scene_demo`
-- [ ] **0.4** Document any pre-existing failures or warnings
+- [x] **0.1** Build all targets (library, tests, examples) with Ninja in Debug
+- [x] **0.2** Run `vde_tests` — all tests green (423/423 passed)
+- [x] **0.3** Build and launch each example to verify they run:
+  - [x] `vde_triangle_example`
+  - [x] `vde_simple_game_example`
+  - [x] `vde_sprite_demo`
+  - [x] `vde_world_bounds_demo`
+  - [x] `vde_materials_lighting_demo`
+  - [x] `vde_resource_demo`
+  - [x] `vde_audio_demo`
+  - [x] `vde_sidescroller`
+  - [x] `vde_wireframe_viewer`
+  - [x] `vde_multi_scene_demo`
+- [x] **0.4** Document any pre-existing failures or warnings — none found
 
 ### Verification
 
@@ -53,8 +53,10 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] No regressions from current state
-- [ ] Baseline documented in this section
+- [x] No regressions from current state
+- [x] Baseline documented in this section
+
+**Baseline (2026-02-08):** 423 tests passed, 10 examples built, CMake deprecation warnings from GLM (cosmetic only).
 
 ---
 
@@ -82,15 +84,15 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **1.1** Create `TaskPhase` enum, `TaskId`, `TaskDescriptor` structs in `Scheduler.h`
-- [ ] **1.2** Implement `Scheduler` class with `addTask()`, `removeTask()`, `execute()`, `clear()`
+- [x] **1.1** Create `TaskPhase` enum, `TaskId`, `TaskDescriptor` structs in `Scheduler.h`
+- [x] **1.2** Implement `Scheduler` class with `addTask()`, `removeTask()`, `execute()`, `clear()`
   - Topological sort based on `dependsOn` edges
   - Single-threaded execution in sorted order
   - Phase-based ordering as tiebreaker (Input < Physics < ... < Render)
-- [ ] **1.3** Add `Scheduler m_scheduler` to `Game`; build a default single-scene graph that mirrors the existing `run()` loop body exactly
-- [ ] **1.4** Refactor `Game::run()` so the loop body becomes: `processInput() → m_scheduler.execute() → drawFrame()`
-  - The scheduler graph contains tasks for: Input, Update (calls `scene->update()`), PreRender (camera apply, etc.), Render
-- [ ] **1.5** Write `Scheduler_test.cpp`:
+- [x] **1.3** Add `Scheduler m_scheduler` to `Game`; build a default single-scene graph that mirrors the existing `run()` loop body exactly
+- [x] **1.4** Refactor `Game::run()` so the loop body becomes: `processInput() → m_scheduler.execute() → drawFrame()`
+  - The scheduler graph contains tasks for: Update (calls `scene->update()`), Audio, PreRender (camera apply, etc.), Render
+- [x] **1.5** Write `Scheduler_test.cpp`:
   - Task registration and ID uniqueness
   - Topological sort correctness (diamond dependencies, linear chain)
   - Phase ordering as tiebreaker
@@ -98,7 +100,7 @@ All tests pass. All examples launch without crash.
   - `removeTask()` removes a single task
   - Cycle detection (throw on cycle)
   - Empty graph execute is a no-op
-- [ ] **1.6** Register new files in `CMakeLists.txt` and `tests/CMakeLists.txt`
+- [x] **1.6** Register new files in `CMakeLists.txt` and `tests/CMakeLists.txt`
 
 ### Verification
 
@@ -109,10 +111,10 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass (no regressions)
-- [ ] New `Scheduler_test` tests pass
-- [ ] All existing examples run identically to Phase 0 baseline
-- [ ] `Game::run()` delegates to `Scheduler::execute()`
+- [x] All existing tests pass (no regressions)
+- [x] New `Scheduler_test` tests pass (21 tests)
+- [x] All existing examples run identically to Phase 0 baseline
+- [x] `Game::run()` delegates to `Scheduler::execute()`
 
 ---
 

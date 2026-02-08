@@ -21,6 +21,7 @@
 #include "Game.h"
 #include "GameSettings.h"
 #include "GameTypes.h"
+#include "Scheduler.h"
 
 // Scene and entity system
 #include "Entity.h"

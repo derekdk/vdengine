@@ -121,6 +121,7 @@ set(VDE_SOURCES
     src/api/Mesh.cpp
     src/api/CameraBounds.cpp
     src/api/Material.cpp
+    src/api/Scheduler.cpp
     # Audio
     src/miniaudio_impl.cpp
     src/api/AudioClip.cpp
@@ -164,6 +165,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/WorldUnits.h
     include/vde/api/WorldBounds.h
     include/vde/api/CameraBounds.h
+    include/vde/api/Scheduler.h
     # Audio headers
     include/vde/api/AudioClip.h
     include/vde/api/AudioManager.h

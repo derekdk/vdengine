@@ -35,6 +35,8 @@ set(VDE_TEST_SOURCES
     # Phase 5 tests
     Texture_test.cpp
     ResourceManager_test.cpp
+    # Scheduler tests
+    Scheduler_test.cpp
 )
 
 # Create test executable

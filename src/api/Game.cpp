@@ -169,6 +169,9 @@ void Game::run() {
         m_activeScene->onEnter();
     }
 
+    // Build the initial scheduler task graph
+    rebuildSchedulerGraph();
+
     // Main game loop
     while (m_running && !m_window->shouldClose()) {
         // Poll window events
@@ -183,41 +186,9 @@ void Game::run() {
         // Process input
         processInput();
 
-        // Call update hook
-        onUpdate(m_deltaTime);
-
-        // Update active scene
-        if (m_activeScene) {
-            // Apply scene camera to Vulkan context
-            if (m_activeScene->getCamera() && m_vulkanContext) {
-                m_activeScene->getCamera()->applyTo(*m_vulkanContext);
-            }
-
-            // Apply scene background color to Vulkan context
-            if (m_vulkanContext) {
-                const Color& bg = m_activeScene->getBackgroundColor();
-                m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
-            }
-
-            m_activeScene->update(m_deltaTime);
-        }
-
-        // Update audio system
-        AudioManager::getInstance().update(m_deltaTime);
-
-        // Render
-        if (m_vulkanContext) {
-            // Set render callback to render the active scene
-            m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
-                (void)cmd;  // Unused in Phase 1
-                if (m_activeScene) {
-                    m_activeScene->render();
-                }
-                onRender();
-            });
-
-            m_vulkanContext->drawFrame();
-        }
+        // Execute the scheduler task graph
+        // (covers: onUpdate, scene update, audio, pre-render, render)
+        m_scheduler.execute();
 
         m_frameCount++;
     }
@@ -399,6 +370,9 @@ void Game::processPendingSceneChange() {
     // Enter new scene
     m_activeScene = it->second.get();
     m_activeScene->onEnter();
+
+    // Rebuild the scheduler graph for the new scene
+    rebuildSchedulerGraph();
 }
 
 void Game::setupInputCallbacks() {
@@ -1290,6 +1264,66 @@ void Game::updateLightingUBO(const Scene* scene) {
     }
 
     memcpy(m_lightingUBOMapped[currentFrame], &ubo, sizeof(LightingUBO));
+}
+
+void Game::rebuildSchedulerGraph() {
+    m_scheduler.clear();
+
+    // Task 1: GameLogic — onUpdate hook + scene update
+    TaskId updateTask = m_scheduler.addTask({"game.update", TaskPhase::GameLogic, [this]() {
+                                                 // Call update hook
+                                                 onUpdate(m_deltaTime);
+
+                                                 // Update active scene
+                                                 if (m_activeScene) {
+                                                     m_activeScene->update(m_deltaTime);
+                                                 }
+                                             }});
+
+    // Task 2: Audio — update audio system
+    TaskId audioTask =
+        m_scheduler.addTask({"audio.global",
+                             TaskPhase::Audio,
+                             [this]() { AudioManager::getInstance().update(m_deltaTime); },
+                             {updateTask}});
+
+    // Task 3: PreRender — apply camera and background color
+    TaskId preRenderTask = m_scheduler.addTask(
+        {"scene.preRender",
+         TaskPhase::PreRender,
+         [this]() {
+             if (m_activeScene) {
+                 // Apply scene camera to Vulkan context
+                 if (m_activeScene->getCamera() && m_vulkanContext) {
+                     m_activeScene->getCamera()->applyTo(*m_vulkanContext);
+                 }
+
+                 // Apply scene background color to Vulkan context
+                 if (m_vulkanContext) {
+                     const Color& bg = m_activeScene->getBackgroundColor();
+                     m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
+                 }
+             }
+         },
+         {audioTask}});
+
+    // Task 4: Render — draw frame
+    m_scheduler.addTask({"scene.render",
+                         TaskPhase::Render,
+                         [this]() {
+                             if (m_vulkanContext) {
+                                 m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
+                                     (void)cmd;
+                                     if (m_activeScene) {
+                                         m_activeScene->render();
+                                     }
+                                     onRender();
+                                 });
+
+                                 m_vulkanContext->drawFrame();
+                             }
+                         },
+                         {preRenderTask}});
 }
 
 }  // namespace vde

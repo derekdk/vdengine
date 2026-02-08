@@ -22,6 +22,7 @@
 #include "InputHandler.h"
 #include "ResourceManager.h"
 #include "Scene.h"
+#include "Scheduler.h"
 
 namespace vde {
 
@@ -159,6 +160,17 @@ class Game {
     void popScene();
 
     // Input handling
+
+    // Scheduler
+
+    /**
+     * @brief Get the task scheduler.
+     *
+     * The scheduler manages the per-frame task graph. It is rebuilt
+     * automatically when scenes change.
+     */
+    Scheduler& getScheduler() { return m_scheduler; }
+    const Scheduler& getScheduler() const { return m_scheduler; }
 
     /**
      * @brief Set the global input handler.
@@ -389,6 +401,9 @@ class Game {
     std::vector<VkDeviceMemory> m_lightingUBOMemory;        // One per frame-in-flight
     std::vector<void*> m_lightingUBOMapped;                 // Persistently mapped pointers
 
+    // Scheduler
+    Scheduler m_scheduler;
+
     // Input
     InputHandler* m_inputHandler = nullptr;
 
@@ -416,6 +431,7 @@ class Game {
     void destroySpriteRenderingPipeline();
     void createLightingResources();
     void destroyLightingResources();
+    void rebuildSchedulerGraph();
 };
 
 }  // namespace vde
