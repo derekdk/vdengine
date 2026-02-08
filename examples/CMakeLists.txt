@@ -109,3 +109,11 @@ add_executable(vde_quad_viewport_demo
 target_link_libraries(vde_quad_viewport_demo PRIVATE vde)
 add_dependencies(vde_quad_viewport_demo copy_example_shaders)
 
+# Four Scene 3D demo - four simultaneous 3D scenes with focus indicator
+add_executable(vde_four_scene_3d_demo
+    four_scene_3d_demo/main.cpp
+)
+
+target_link_libraries(vde_four_scene_3d_demo PRIVATE vde)
+add_dependencies(vde_four_scene_3d_demo copy_example_shaders)
+
