@@ -101,3 +101,11 @@ add_executable(vde_multi_scene_demo
 target_link_libraries(vde_multi_scene_demo PRIVATE vde)
 add_dependencies(vde_multi_scene_demo copy_example_shaders)
 
+# Quad viewport demo example demonstrating four simultaneous scenes in split-screen
+add_executable(vde_quad_viewport_demo
+    quad_viewport_demo/main.cpp
+)
+
+target_link_libraries(vde_quad_viewport_demo PRIVATE vde)
+add_dependencies(vde_quad_viewport_demo copy_example_shaders)
+
