@@ -14,14 +14,14 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 
 ## Quick Start
 
-### Build (Default: MSBuild Debug)
+### Build (Default: Ninja Debug)
 ```powershell
-.\scripts\build.ps1
+.\.\scripts\build.ps1
 ```
 
-### Build with Ninja (Faster)
+### Build with MSBuild
 ```powershell
-.\scripts\build.ps1 -Generator Ninja
+.\.\scripts\build.ps1 -Generator MSBuild
 ```
 
 ### Run Tests
@@ -58,17 +58,17 @@ Build the VDE project with your choice of generator and configuration.
 
 **Examples:**
 ```powershell
-# Default build (MSBuild Debug)
-.\scripts\build.ps1
+# Default build (Ninja Debug)
+.\.\scripts\build.ps1
 
-# Ninja build
-.\scripts\build.ps1 -Generator Ninja
+# MSBuild
+.\.\scripts\build.ps1 -Generator MSBuild
 
 # Release build
 .\scripts\build.ps1 -Config Release
 
-# Clean build with Ninja
-.\scripts\build.ps1 -Generator Ninja -Clean
+# Clean build with MSBuild
+.\.\scripts\build.ps1 -Generator MSBuild -Clean
 
 # Parallel build with 8 jobs
 .\scripts\build.ps1 -Parallel 8
@@ -89,16 +89,16 @@ Perform a full clean rebuild (clean + build).
 ```
 
 **Parameters:**
-- `-Generator` - Build system: `MSBuild` (default) or `Ninja`
+- `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 
 **Examples:**
 ```powershell
-# Default rebuild (MSBuild Debug)
-.\scripts\rebuild.ps1
+# Default rebuild (Ninja Debug)
+.\.\scripts\rebuild.ps1
 
-# Ninja rebuild
-.\scripts\rebuild.ps1 -Generator Ninja
+# MSBuild rebuild
+.\scripts\rebuild.ps1 -Generator MSBuild
 
 # Release rebuild
 .\scripts\rebuild.ps1 -Config Release
@@ -120,11 +120,11 @@ Clean build artifacts or completely remove the build directory.
 
 **Examples:**
 ```powershell
-# Clean Debug artifacts (MSBuild)
-.\scripts\clean.ps1
+# Clean Debug artifacts (Ninja)
+.\.\scripts\clean.ps1
 
-# Clean Ninja build
-.\scripts\clean.ps1 -Generator Ninja
+# Clean MSBuild
+.\.\scripts\clean.ps1 -Generator MSBuild
 
 # Full clean - removes entire build directory
 .\scripts\clean.ps1 -Full
@@ -155,8 +155,8 @@ Run unit tests with optional filtering and building.
 # Run all tests
 .\scripts\test.ps1
 
-# Run tests with Ninja build
-.\scripts\test.ps1 -Generator Ninja
+# Run tests with MSBuild
+.\.\scripts\test.ps1 -Generator MSBuild
 
 # Build and test
 .\scripts\test.ps1 -Build
@@ -221,26 +221,26 @@ Format C++ source files using clang-format according to the project's style guid
 
 ### Daily Development
 ```powershell
-# Quick Ninja build and test
-.\scripts\build.ps1 -Generator Ninja
-.\scripts\test.ps1 -Generator Ninja
+# Quick Ninja build and test (default)
+.\.\scripts\build.ps1
+.\.\scripts\test.ps1
 
 # Or combined
-.\scripts\test.ps1 -Generator Ninja -Build
+.\.\scripts\test.ps1 -Build
 ```
 
 ### Working on Specific Feature
 ```powershell
 # Build
-.\scripts\build.ps1 -Generator Ninja
+.\.\scripts\build.ps1
 
 # Test related tests only
-.\scripts\test.ps1 -Generator Ninja -Filter "MyFeature*"
+.\.\scripts\test.ps1 -Filter "MyFeature*"
 ```
 
 ### Clean Rebuild (after CMake changes)
 ```powershell
-.\scripts\rebuild.ps1 -Generator Ninja
+.\.\scripts\rebuild.ps1
 ```
 
 ### Pre-commit Checks

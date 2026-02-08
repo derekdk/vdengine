@@ -30,14 +30,14 @@ This skill provides the essential workflows for building and testing the Vulkan 
 
 ### Common Build Tasks
 
-**Build with MSBuild (default):**
+**Build with Ninja (default):**
 ```powershell
-.\scripts\build.ps1
+.\.\scripts\build.ps1
 ```
 
-**Build with Ninja (faster incremental builds):**
+**Build with MSBuild:**
 ```powershell
-.\scripts\build.ps1 -Generator Ninja
+.\.\scripts\build.ps1 -Generator MSBuild
 ```
 
 **Release build:**
@@ -78,22 +78,22 @@ This skill provides the essential workflows for building and testing the Vulkan 
 ### Script Parameters Reference
 
 **build.ps1**
-- `-Generator` - MSBuild (default) or Ninja
+- `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Clean` - Clean before building
 - `-Parallel <N>` - Number of parallel build jobs (0 = auto)
 
 **rebuild.ps1**
-- `-Generator` - MSBuild (default) or Ninja
+- `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 
 **clean.ps1**
-- `-Generator` - MSBuild (default) or Ninja
+- `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Full` - Remove entire build directory
 
 **test.ps1**
-- `-Generator` - MSBuild (default) or Ninja
+- `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Filter` - GoogleTest filter pattern (default: "*")
 - `-Build` - Build before running tests
@@ -107,9 +107,22 @@ If you need finer control or are troubleshooting, you can use CMake directly:
 
 If you need finer control or are troubleshooting, you can use CMake directly:
 
-### Build with Visual Studio (MSBuild)
+### Build with Ninja (Default)
 
-The default build system uses Visual Studio's MSBuild with multi-configuration support.
+Ninja provides faster incremental builds and is the recommended build system for development.
+
+**Initial build (Debug):**
+```powershell
+cmake -S . -B build_ninja -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build_ninja
+```
+
+**Rebuild:**
+```powershell
+cmake --build build_ninja --clean-first
+```
+
+### Build with Visual Studio (MSBuild)
 
 **Initial build (Debug):**
 ```powershell
@@ -200,11 +213,11 @@ test script (RECOMMENDED)
 
 **Examples:**
 ```powershell
-# Run all tests (default MSBuild Debug)
-.\scripts\test.ps1
+# Run all tests (default Ninja Debug)
+.\.\scripts\test.ps1
 
-# Run all tests with Ninja build
-.\scripts\test.ps1 -Generator Ninja
+# Run all tests with MSBuild
+.\.\scripts\test.ps1 -Generator MSBuild
 
 # Run tests matching a pattern
 .\scripts\test.ps1 -Filter "CameraTest.*"
@@ -245,7 +258,8 @@ This script builds and runs tests with GoogleTest filters if provided.
   - `.\scripts\clean.ps1` - Clean build artifacts
   
 - **Choose the right build system:**
-  - MSBuild (default) - Multi-configuration, IDE integration, simple setup
+  - Ninja (default) - Faster builds, better for development/iteration
+  - MSBuild - Multi-configuration, IDE integration, simple setup
   - Testing efficiently:**
   - Use `.\scripts\test.ps1` for quick test runs
   - Use `-Filter` to run specific tests during focused development

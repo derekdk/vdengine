@@ -16,29 +16,28 @@ Write-Host "   VDE Build Scripts Quick Reference" -ForegroundColor Green
 Write-Host "=======================================" -ForegroundColor Green
 
 Write-Title "BUILD SCRIPTS"
-Write-Cmd '.\scripts\build.ps1' 'Build the project (default MSBuild Debug)'
+Write-Cmd '.\scripts\build.ps1' 'Build the project (default Ninja Debug)'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean and rebuild'
 Write-Cmd '.\scripts\clean.ps1' 'Clean build artifacts'
 Write-Cmd '.\scripts\test.ps1' 'Run unit tests'
 
 Write-Title "QUICK START"
-Write-Cmd '.\scripts\build.ps1' 'Build with MSBuild (default)'
-Write-Cmd '.\scripts\build.ps1 -Generator Ninja' 'Build with Ninja (faster)'
+Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default)'
+Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
 Write-Cmd '.\scripts\test.ps1' 'Run all tests'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'
 
 Write-Title "COMMON TASKS"
-Write-Cmd '.\scripts\build.ps1 -Generator Ninja' 'Fast incremental build'
+Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
 Write-Cmd '.\scripts\test.ps1 -Filter "Camera*"' 'Run specific tests'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean rebuild'
 Write-Cmd '.\scripts\clean.ps1 -Full' 'Full clean (removes build dir)'
 
 Write-Title "BUILD OPTIONS"
 Write-Host "  Generators - " -NoNewline
-Write-Host "MSBuild" -ForegroundColor Yellow -NoNewline
-Write-Host " (default), " -NoNewline
 Write-Host "Ninja" -ForegroundColor Yellow -NoNewline
-Write-Host " (faster)"
+Write-Host " (default), " -NoNewline
+Write-Host "MSBuild" -ForegroundColor Yellow
 Write-Host "  Configs    - " -NoNewline
 Write-Host "Debug" -ForegroundColor Yellow -NoNewline
 Write-Host " (default), " -NoNewline

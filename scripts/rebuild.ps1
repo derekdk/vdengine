@@ -4,7 +4,7 @@
 
 param(
     [ValidateSet("MSBuild", "Ninja")]
-    [string]$Generator = "MSBuild",
+    [string]$Generator = "Ninja",
     
     [ValidateSet("Debug", "Release")]
     [string]$Config = "Debug"

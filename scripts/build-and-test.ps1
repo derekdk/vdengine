@@ -12,7 +12,7 @@ param(
     [string]$Filter = "*",
     
     [ValidateSet("MSBuild", "Ninja")]
-    [string]$Generator = "MSBuild"
+    [string]$Generator = "Ninja"
 )
 
 $ErrorActionPreference = "Stop"
