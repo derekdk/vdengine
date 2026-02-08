@@ -170,6 +170,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/ViewportRect.h
     # Audio headers
     include/vde/api/AudioClip.h
+    include/vde/api/AudioEvent.h
     include/vde/api/AudioManager.h
     include/vde/api/AudioSource.h
 )

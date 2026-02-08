@@ -3,6 +3,7 @@
  * @brief Implementation of Scene class
  */
 
+#include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
 #include <vde/api/Scene.h>
 
@@ -43,6 +44,82 @@ void Scene::render() {
             entity->render();
         }
     }
+}
+
+// ============================================================================
+// Phase Callbacks
+// ============================================================================
+
+void Scene::updateGameLogic([[maybe_unused]] float deltaTime) {
+    // Default: no-op.  Derived scenes override this when using phase callbacks.
+}
+
+void Scene::updateAudio([[maybe_unused]] float deltaTime) {
+    // Default: drain the audio event queue via AudioManager.
+    auto& audio = AudioManager::getInstance();
+    if (!audio.isInitialized()) {
+        m_audioEventQueue.clear();
+        return;
+    }
+
+    for (auto& evt : m_audioEventQueue) {
+        switch (evt.type) {
+        case AudioEventType::PlaySFX:
+            audio.playSFX(evt.clip, evt.volume, evt.pitch, evt.loop);
+            break;
+        case AudioEventType::PlaySFXAt: {
+            uint32_t id = audio.playSFX(evt.clip, evt.volume, evt.pitch, evt.loop);
+            if (id != 0) {
+                audio.setSoundPosition(id, evt.x, evt.y, evt.z);
+            }
+            break;
+        }
+        case AudioEventType::PlayMusic:
+            audio.playMusic(evt.clip, evt.volume, evt.loop, evt.fadeTime);
+            break;
+        case AudioEventType::StopSound:
+            audio.stopSound(evt.soundId, evt.fadeTime);
+            break;
+        case AudioEventType::StopAll:
+            audio.stopAll();
+            break;
+        case AudioEventType::PauseSound:
+            audio.pauseSound(evt.soundId);
+            break;
+        case AudioEventType::ResumeSound:
+            audio.resumeSound(evt.soundId);
+            break;
+        case AudioEventType::SetVolume:
+            // Reserved for future use
+            break;
+        }
+    }
+    m_audioEventQueue.clear();
+}
+
+void Scene::updateVisuals([[maybe_unused]] float deltaTime) {
+    // Default: no-op.  Derived scenes override this when using phase callbacks.
+}
+
+// ============================================================================
+// Audio Event Queue
+// ============================================================================
+
+void Scene::queueAudioEvent(const AudioEvent& event) {
+    m_audioEventQueue.push_back(event);
+}
+
+void Scene::queueAudioEvent(AudioEvent&& event) {
+    m_audioEventQueue.push_back(std::move(event));
+}
+
+void Scene::playSFX(std::shared_ptr<AudioClip> clip, float volume, float pitch, bool loop) {
+    m_audioEventQueue.push_back(AudioEvent::playSFX(std::move(clip), volume, pitch, loop));
+}
+
+void Scene::playSFXAt(std::shared_ptr<AudioClip> clip, float x, float y, float z, float volume,
+                      float pitch) {
+    m_audioEventQueue.push_back(AudioEvent::playSFXAt(std::move(clip), x, y, z, volume, pitch));
 }
 
 EntityId Scene::addEntity(Entity::Ref entity) {

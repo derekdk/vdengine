@@ -16,7 +16,7 @@
 | 1 | [Scheduler Foundation (Single-Threaded)](#phase-1-scheduler-foundation-single-threaded) | **Done** | 444/444 | 10/10 |
 | 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | **Done** | 457/457 | 10/10 |
 | 3 | [Per-Scene Viewports & Split-Screen Rendering](#phase-3-per-scene-viewports--split-screen-rendering) | **Done** | 489/489 | 10/10 |
-| 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | Not Started | — | — |
+| 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | **Done** | 513/513 | 10/10 |
 | 5 | [Physics Scene](#phase-5-physics-scene) | Not Started | — | — |
 | 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | Not Started | — | — |
 | 7 | [Thread Pool & Parallel Physics](#phase-7-thread-pool--parallel-physics) | Not Started | — | — |
@@ -306,23 +306,23 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **4.1** Define `AudioEvent` struct (Type enum, clip, volume, pitch, loop, position, soundId)
-- [ ] **4.2** Add `enablePhaseCallbacks()`, `usesPhaseCallbacks()`, and the three virtual methods to `Scene`:
+- [x] **4.1** Define `AudioEvent` struct (Type enum, clip, volume, pitch, loop, position, soundId)
+- [x] **4.2** Add `enablePhaseCallbacks()`, `usesPhaseCallbacks()`, and the three virtual methods to `Scene`:
   - `virtual void updateGameLogic(float deltaTime)` — no-op default
   - `virtual void updateAudio(float deltaTime)` — default drains audio queue
   - `virtual void updateVisuals(float deltaTime)` — no-op default
-- [ ] **4.3** Add `queueAudioEvent()`, `playSFX()`, `playSFXAt()` convenience methods to `Scene`
-- [ ] **4.4** Implement default `updateAudio()` to drain `m_audioEventQueue` via `AudioManager`
-- [ ] **4.5** Ensure backwards compatibility: if `usesPhaseCallbacks()` returns false, scheduler calls `update()` as a single task in the GameLogic phase — identical to current behavior
-- [ ] **4.6** Update `rebuildSchedulerGraph()`:
+- [x] **4.3** Add `queueAudioEvent()`, `playSFX()`, `playSFXAt()` convenience methods to `Scene`
+- [x] **4.4** Implement default `updateAudio()` to drain `m_audioEventQueue` via `AudioManager`
+- [x] **4.5** Ensure backwards compatibility: if `usesPhaseCallbacks()` returns false, scheduler calls `update()` as a single task in the GameLogic phase — identical to current behavior
+- [x] **4.6** Update `rebuildSchedulerGraph()`:
   - For scenes with `usesPhaseCallbacks() == true`: create separate GameLogic, Audio, Visual tasks with proper dependencies
   - For legacy scenes: single Update task in GameLogic phase
   - Add `audio.global` task that calls `AudioManager::getInstance().update()` after all per-scene audio tasks
-- [ ] **4.7** Write `AudioEvent_test.cpp`:
+- [x] **4.7** Write `AudioEvent_test.cpp`:
   - AudioEvent construction with various types
   - Queue add/drain cycle
   - Empty queue drain is safe
-- [ ] **4.8** Add phase callback tests to `Scene_test.cpp`:
+- [x] **4.8** Add phase callback tests to `Scene_test.cpp`:
   - Default scene does not use phase callbacks
   - Scene with `enablePhaseCallbacks()` reports `usesPhaseCallbacks() == true`
   - Phase callbacks are called in correct order (mock/stub test)
@@ -337,11 +337,13 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass
-- [ ] New AudioEvent and phase callback tests pass
-- [ ] `audio_demo` example works identically
-- [ ] All other examples work identically (they use `update()`, not phase callbacks)
-- [ ] `AudioManager::update()` is called via scheduler `audio.global` task, not inline in `Game::run()`
+- [x] All existing tests pass
+- [x] New AudioEvent and phase callback tests pass
+- [x] `audio_demo` example works identically
+- [x] All other examples work identically (they use `update()`, not phase callbacks)
+- [x] `AudioManager::update()` is called via scheduler `audio.global` task, not inline in `Game::run()`
+
+**Completed (2026-02-08):** 513 tests passed (489 existing + 15 AudioEvent + 5 Scene audio queue + 4 Scene phase callback), 10 examples built and verified.
 
 ---
 

@@ -24,6 +24,7 @@
 #include "Scheduler.h"
 
 // Scene and entity system
+#include "AudioEvent.h"
 #include "Entity.h"
 #include "Resource.h"
 #include "Scene.h"

@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "AudioEvent.h"
 #include "CameraBounds.h"
 #include "Entity.h"
 #include "GameCamera.h"
@@ -91,6 +92,103 @@ class Scene {
      * @param deltaTime Time since last update in seconds
      */
     virtual void update(float deltaTime);
+
+    // Phase callbacks (opt-in via enablePhaseCallbacks)
+
+    /**
+     * @brief Enable phase callbacks for this scene.
+     *
+     * When enabled, the scheduler splits the scene's update into
+     * three separate tasks:
+     *   1. updateGameLogic(dt) — GameLogic phase
+     *   2. updateAudio(dt)     — Audio phase
+     *   3. updateVisuals(dt)   — PreRender phase (visual-only updates)
+     *
+     * When disabled (the default), the single `update(dt)` task is
+     * used instead, preserving backwards compatibility.
+     */
+    void enablePhaseCallbacks() { m_usePhaseCallbacks = true; }
+
+    /**
+     * @brief Check whether phase callbacks are enabled.
+     */
+    bool usesPhaseCallbacks() const { return m_usePhaseCallbacks; }
+
+    /**
+     * @brief Game logic update (phase callback).
+     *
+     * Called during the GameLogic scheduler phase when phase callbacks
+     * are enabled.  Override this to move/spawn entities, process AI,
+     * read input, and queue audio events.
+     *
+     * The default implementation is a no-op.
+     *
+     * @param deltaTime Time since last update in seconds
+     */
+    virtual void updateGameLogic(float deltaTime);
+
+    /**
+     * @brief Audio update (phase callback).
+     *
+     * Called during the Audio scheduler phase when phase callbacks
+     * are enabled.  The default implementation drains the audio
+     * event queue (`m_audioEventQueue`) via AudioManager.
+     *
+     * Override to add custom audio processing, but call
+     * `Scene::updateAudio(deltaTime)` to keep the queue drain.
+     *
+     * @param deltaTime Time since last update in seconds
+     */
+    virtual void updateAudio(float deltaTime);
+
+    /**
+     * @brief Visual update (phase callback).
+     *
+     * Called during a late GameLogic / early PreRender slot when
+     * phase callbacks are enabled.  Use this for animation ticks,
+     * particle systems, or anything that only affects visuals.
+     *
+     * The default implementation is a no-op.
+     *
+     * @param deltaTime Time since last update in seconds
+     */
+    virtual void updateVisuals(float deltaTime);
+
+    // Audio event queue
+
+    /**
+     * @brief Queue an audio event to be processed during the Audio phase.
+     * @param event The audio event to queue
+     */
+    void queueAudioEvent(const AudioEvent& event);
+    void queueAudioEvent(AudioEvent&& event);
+
+    /**
+     * @brief Convenience: queue a PlaySFX event.
+     * @param clip Audio clip to play
+     * @param volume Volume multiplier (0.0–1.0)
+     * @param pitch Pitch multiplier (1.0 = normal)
+     * @param loop Whether to loop the sound
+     */
+    void playSFX(std::shared_ptr<AudioClip> clip, float volume = 1.0f, float pitch = 1.0f,
+                 bool loop = false);
+
+    /**
+     * @brief Convenience: queue a positional PlaySFXAt event.
+     * @param clip Audio clip to play
+     * @param x X position
+     * @param y Y position
+     * @param z Z position
+     * @param volume Volume multiplier (0.0–1.0)
+     * @param pitch Pitch multiplier (1.0 = normal)
+     */
+    void playSFXAt(std::shared_ptr<AudioClip> clip, float x, float y, float z, float volume = 1.0f,
+                   float pitch = 1.0f);
+
+    /**
+     * @brief Get the number of pending audio events in the queue.
+     */
+    size_t getAudioEventQueueSize() const { return m_audioEventQueue.size(); }
 
     /**
      * @brief Render the scene.
@@ -402,6 +500,12 @@ class Scene {
     // World bounds
     WorldBounds m_worldBounds;
     CameraBounds2D m_cameraBounds2D;
+
+    // Phase callbacks
+    bool m_usePhaseCallbacks = false;
+
+    // Audio event queue
+    std::vector<AudioEvent> m_audioEventQueue;
 
     friend class Game;
 };

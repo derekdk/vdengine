@@ -1559,29 +1559,69 @@ void Game::rebuildSchedulerGraph() {
     // ---------------------------------------------------------------
     // Task 1: GameLogic — onUpdate hook + all scene updates
     // ---------------------------------------------------------------
-    // Chain: onUpdate -> update(scene1) -> update(scene2) -> ...
+    // Chain: onUpdate -> update(scene1) | gameLogic(scene1) -> ...
     TaskId prevTask = m_scheduler.addTask(
         {"game.update", TaskPhase::GameLogic, [this]() { onUpdate(m_deltaTime); }});
+
+    // Track per-scene audio tasks so audio.global can depend on all of them
+    std::vector<TaskId> audioTasks;
 
     for (size_t i = 0; i < updateScenes.size(); ++i) {
         Scene* scene = updateScenes[i].scene;
         const std::string& sceneName = updateScenes[i].name;
-        prevTask = m_scheduler.addTask({"scene.update." + sceneName,
-                                        TaskPhase::GameLogic,
-                                        [this, scene]() { scene->update(m_deltaTime); },
-                                        {prevTask}});
+
+        if (scene->usesPhaseCallbacks()) {
+            // --- Phase callbacks mode: three separate tasks ---
+
+            // GameLogic task
+            TaskId gameLogicTask =
+                m_scheduler.addTask({"scene.gameLogic." + sceneName,
+                                     TaskPhase::GameLogic,
+                                     [this, scene]() { scene->updateGameLogic(m_deltaTime); },
+                                     {prevTask}});
+
+            // Audio task (depends on gameLogic so queued events are available)
+            TaskId audioTask =
+                m_scheduler.addTask({"scene.audio." + sceneName,
+                                     TaskPhase::Audio,
+                                     [this, scene]() { scene->updateAudio(m_deltaTime); },
+                                     {gameLogicTask}});
+            audioTasks.push_back(audioTask);
+
+            // Visuals task (depends on gameLogic; can run concurrently with audio in future)
+            TaskId visualsTask =
+                m_scheduler.addTask({"scene.visuals." + sceneName,
+                                     TaskPhase::GameLogic,
+                                     [this, scene]() { scene->updateVisuals(m_deltaTime); },
+                                     {gameLogicTask}});
+
+            // The next scene's tasks depend on the last task of this scene
+            // (visuals, since it's the broadest output)
+            prevTask = visualsTask;
+        } else {
+            // --- Legacy mode: single update task ---
+            prevTask = m_scheduler.addTask({"scene.update." + sceneName,
+                                            TaskPhase::GameLogic,
+                                            [this, scene]() { scene->update(m_deltaTime); },
+                                            {prevTask}});
+        }
     }
 
     TaskId lastUpdateTask = prevTask;
 
     // ---------------------------------------------------------------
-    // Task 2: Audio — update audio system
+    // Task 2: Audio — global audio system update
+    //         Depends on all per-scene audio tasks AND the last
+    //         update task so it always runs after all scene work.
     // ---------------------------------------------------------------
-    TaskId audioTask =
-        m_scheduler.addTask({"audio.global",
-                             TaskPhase::Audio,
-                             [this]() { AudioManager::getInstance().update(m_deltaTime); },
-                             {lastUpdateTask}});
+    std::vector<TaskId> audioDeps = {lastUpdateTask};
+    for (TaskId id : audioTasks) {
+        audioDeps.push_back(id);
+    }
+
+    TaskId audioTask = m_scheduler.addTask(
+        {"audio.global", TaskPhase::Audio,
+         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioDeps});
 
     // ---------------------------------------------------------------
     // Task 3: PreRender — apply clear color from primary scene.
