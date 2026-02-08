@@ -39,6 +39,8 @@ set(VDE_TEST_SOURCES
     Scheduler_test.cpp
     # Phase 2 multi-scene tests
     SceneGroup_test.cpp
+    # Phase 3 viewport tests
+    ViewportRect_test.cpp
 )
 
 # Create test executable

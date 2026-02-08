@@ -186,20 +186,11 @@ void MeshEntity::render() {
     // Bind pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-    // Set viewport and scissor (dynamic state)
-    VkExtent2D extent = context->getSwapChainExtent();
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(extent.width);
-    viewport.height = static_cast<float>(extent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    // Set viewport and scissor (dynamic state) — uses override if set
+    VkViewport viewport = context->getEffectiveViewport();
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = extent;
+    VkRect2D scissor = context->getEffectiveScissor();
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Bind UBO descriptor set (set 0)
@@ -360,20 +351,11 @@ void SpriteEntity::render() {
     // Bind pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-    // Set viewport and scissor (dynamic state)
-    VkExtent2D extent = context->getSwapChainExtent();
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(extent.width);
-    viewport.height = static_cast<float>(extent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    // Set viewport and scissor (dynamic state) — uses override if set
+    VkViewport viewport = context->getEffectiveViewport();
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = extent;
+    VkRect2D scissor = context->getEffectiveScissor();
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Bind combined sprite descriptor set (contains both UBO and texture)

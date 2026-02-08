@@ -144,6 +144,10 @@ void VulkanContext::cleanupSwapChain() {
         vkDestroyRenderPass(m_device, m_renderPass, nullptr);
         m_renderPass = VK_NULL_HANDLE;
     }
+    if (m_renderPassLoad != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(m_device, m_renderPassLoad, nullptr);
+        m_renderPassLoad = VK_NULL_HANDLE;
+    }
 
     // Destroy image views
     for (auto imageView : m_swapChainImageViews) {
@@ -651,6 +655,15 @@ void VulkanContext::createRenderPass() {
     if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass!");
     }
+
+    // Create LOAD variant for multi-scene rendering (subsequent passes)
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPassLoad) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create load render pass!");
+    }
 }
 
 void VulkanContext::createFramebuffers() {
@@ -888,6 +901,161 @@ void VulkanContext::drawFrame() {
     submitInfo.pCommandBuffers = &m_commandBuffers[m_currentFrame];
 
     // Use per-image render finished semaphore to avoid conflicts with swapchain
+    VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[imageIndex]};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+
+    // Present
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {m_swapChain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    result = vkQueuePresentKHR(m_presentQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        recreateSwapchain(m_swapChainExtent.width, m_swapChainExtent.height);
+    } else if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to present swap chain image!");
+    }
+
+    m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& sceneRenderInfos) {
+    if (sceneRenderInfos.empty()) {
+        return;
+    }
+
+    // Wait for previous frame using this frame index
+    vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+
+    // Acquire next image
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(m_device, m_swapChain, UINT64_MAX,
+                                            m_imageAvailableSemaphores[m_currentFrame],
+                                            VK_NULL_HANDLE, &imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapchain(m_swapChainExtent.width, m_swapChainExtent.height);
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swap chain image!");
+    }
+
+    // Check if a previous frame is using this image
+    if (m_imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+        vkWaitForFences(m_device, 1, &m_imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+    }
+    m_imagesInFlight[imageIndex] = m_inFlightFences[m_currentFrame];
+
+    vkResetFences(m_device, 1, &m_inFlightFences[m_currentFrame]);
+
+    // Record command buffer with multi-scene rendering
+    VkCommandBuffer commandBuffer = m_commandBuffers[m_currentFrame];
+    vkResetCommandBuffer(commandBuffer, 0);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer!");
+    }
+
+    for (size_t i = 0; i < sceneRenderInfos.size(); ++i) {
+        const auto& info = sceneRenderInfos[i];
+        bool isFirst = info.clearPass;
+
+        // Update UBO with this scene's camera via vkCmdUpdateBuffer
+        // (Must be outside render pass)
+        UniformBufferObject ubo{};
+        ubo.model = glm::mat4(1.0f);
+        ubo.view = info.viewMatrix;
+        ubo.proj = info.projMatrix;
+
+        VkBuffer uboBuffer = m_uniformBuffer.getBuffer(m_currentFrame);
+        vkCmdUpdateBuffer(commandBuffer, uboBuffer, 0, sizeof(UniformBufferObject), &ubo);
+
+        // Pipeline barrier: transfer write -> uniform read
+        VkBufferMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = uboBuffer;
+        barrier.offset = 0;
+        barrier.size = sizeof(UniformBufferObject);
+
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0,
+                             nullptr);
+
+        // Begin render pass
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = isFirst ? m_renderPass : m_renderPassLoad;
+        renderPassInfo.framebuffer = m_swapChainFramebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = m_swapChainExtent;
+
+        VkClearValue clearColor = {
+            {{m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a}}};
+        if (isFirst) {
+            renderPassInfo.clearValueCount = 1;
+            renderPassInfo.pClearValues = &clearColor;
+        } else {
+            renderPassInfo.clearValueCount = 0;
+            renderPassInfo.pClearValues = nullptr;
+        }
+
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        // Set per-scene viewport and scissor
+        vkCmdSetViewport(commandBuffer, 0, 1, &info.viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &info.scissor);
+
+        // Set viewport override so entity render methods use this viewport
+        m_viewportOverride = info.viewport;
+        m_scissorOverride = info.scissor;
+        m_hasViewportOverride = true;
+
+        // Call scene's render callback
+        if (info.renderCallback) {
+            info.renderCallback(commandBuffer);
+        }
+
+        vkCmdEndRenderPass(commandBuffer);
+    }
+
+    // Clear viewport override after multi-scene rendering
+    m_hasViewportOverride = false;
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record multi-scene command buffer!");
+    }
+
+    // Submit
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
     VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[imageIndex]};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;

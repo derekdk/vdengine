@@ -61,6 +61,8 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
             m_tabPressed = true;
         if (key == KEY_G)
             m_groupPressed = true;
+        if (key == KEY_V)
+            m_viewportPressed = true;
 
         // Camera controls
         if (key == KEY_W)
@@ -124,6 +126,11 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
         m_groupPressed = false;
         return v;
     }
+    bool consumeViewport() {
+        bool v = m_viewportPressed;
+        m_viewportPressed = false;
+        return v;
+    }
     float consumeScroll() {
         float v = m_scrollDelta;
         m_scrollDelta = 0.0f;
@@ -144,6 +151,7 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
     bool m_spacePressed = false;
     bool m_tabPressed = false;
     bool m_groupPressed = false;
+    bool m_viewportPressed = false;
     float m_scrollDelta = 0.0f;
     bool m_up = false, m_down = false, m_left = false, m_right = false;
 };
@@ -860,6 +868,7 @@ class MultiSceneDemo : public vde::Game {
         // --- G: toggle scene group mode (Space + City rendered together) ---
         if (input->consumeGroup()) {
             m_groupMode = !m_groupMode;
+            m_viewportMode = false;
             if (m_groupMode) {
                 auto group = vde::SceneGroup::create("dual", {"space", "city"});
                 setActiveSceneGroup(group);
@@ -869,6 +878,26 @@ class MultiSceneDemo : public vde::Game {
                           << std::endl;
             } else {
                 // Return to single-scene mode
+                m_activeIndex = 0;
+                setActiveScene("space");
+                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << std::endl;
+            }
+        }
+
+        // --- V: toggle viewport split mode (Space left, City right) ---
+        if (input->consumeViewport()) {
+            m_viewportMode = !m_viewportMode;
+            m_groupMode = false;
+            if (m_viewportMode) {
+                auto group = vde::SceneGroup::createWithViewports(
+                    "split", {
+                                 {"space", vde::ViewportRect::leftHalf()},
+                                 {"city", vde::ViewportRect::rightHalf()},
+                             });
+                setActiveSceneGroup(group);
+                std::cout << "\n>> VIEWPORT MODE: Space (left) + City (right) in split-screen"
+                          << std::endl;
+            } else {
                 m_activeIndex = 0;
                 setActiveScene("space");
                 std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << std::endl;
@@ -923,10 +952,15 @@ class MultiSceneDemo : public vde::Game {
         std::cout << "          Space is the primary scene (camera/background)" << std::endl;
         std::cout << "          City entities are rendered as overlay" << std::endl;
 
+        std::cout << "\nSplit-Screen Viewports (Phase 3):" << std::endl;
+        std::cout << "  V     - Toggle viewport mode (Space left, City right)" << std::endl;
+        std::cout << "          Each scene has its own camera and viewport" << std::endl;
+
         std::cout << "\nControls:" << std::endl;
         std::cout << "  1-4   - Switch to scene 1/2/3/4" << std::endl;
         std::cout << "  TAB   - Cycle to next scene" << std::endl;
         std::cout << "  G     - Toggle scene group mode (Space + City)" << std::endl;
+        std::cout << "  V     - Toggle split-screen viewport mode" << std::endl;
         std::cout << "  P     - Push HUD overlay (tests pushScene)" << std::endl;
         std::cout << "  O     - Pop overlay (tests popScene)" << std::endl;
         std::cout << "  B     - Toggle background simulation for current scene" << std::endl;
@@ -940,7 +974,12 @@ class MultiSceneDemo : public vde::Game {
 
     void printStatus() {
         std::cout << "\n--- Scene Status ---" << std::endl;
-        std::cout << "  Mode: " << (m_groupMode ? "GROUP (Space + City)" : "SINGLE") << std::endl;
+        std::string modeStr = "SINGLE";
+        if (m_groupMode)
+            modeStr = "GROUP (Space + City)";
+        if (m_viewportMode)
+            modeStr = "VIEWPORT (Space | City)";
+        std::cout << "  Mode: " << modeStr << std::endl;
         const auto& group = getActiveSceneGroup();
         std::cout << "  Active group: \"" << group.name << "\" [";
         for (size_t i = 0; i < group.sceneNames.size(); ++i) {
@@ -974,6 +1013,7 @@ class MultiSceneDemo : public vde::Game {
     int m_activeIndex = 0;
     int m_exitCode = 0;
     bool m_groupMode = false;
+    bool m_viewportMode = false;
 };
 
 // ============================================================================

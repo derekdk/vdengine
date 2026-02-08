@@ -28,6 +28,7 @@
 #include "Resource.h"
 #include "Scene.h"
 #include "SceneGroup.h"
+#include "ViewportRect.h"
 
 // Input handling
 #include "InputHandler.h"

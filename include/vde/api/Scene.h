@@ -23,6 +23,7 @@
 #include "InputHandler.h"
 #include "LightBox.h"
 #include "Resource.h"
+#include "ViewportRect.h"
 #include "WorldBounds.h"
 
 namespace vde {
@@ -259,6 +260,25 @@ class Scene {
      */
     int getUpdatePriority() const { return m_updatePriority; }
 
+    // Viewport
+
+    /**
+     * @brief Set the viewport rectangle for this scene.
+     *
+     * When used in a SceneGroup, this controls which portion of the
+     * window the scene renders to.  Default is fullWindow() (the
+     * entire window), which preserves backwards compatibility.
+     *
+     * @param rect Normalized viewport rectangle (0-1 coordinates)
+     */
+    void setViewportRect(const ViewportRect& rect) { m_viewportRect = rect; }
+
+    /**
+     * @brief Get the viewport rectangle for this scene.
+     * @return The viewport rectangle (default is fullWindow)
+     */
+    const ViewportRect& getViewportRect() const { return m_viewportRect; }
+
     // Input
 
     /**
@@ -377,6 +397,7 @@ class Scene {
     Color m_backgroundColor = Color::black();
     bool m_continueInBackground = false;
     int m_updatePriority = 0;
+    ViewportRect m_viewportRect = ViewportRect::fullWindow();
 
     // World bounds
     WorldBounds m_worldBounds;

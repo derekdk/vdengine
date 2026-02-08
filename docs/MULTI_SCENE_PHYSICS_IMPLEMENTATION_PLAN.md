@@ -15,7 +15,7 @@
 | 0 | [Pre-flight & Baseline](#phase-0-pre-flight--baseline) | **Done** | 423/423 | 10/10 |
 | 1 | [Scheduler Foundation (Single-Threaded)](#phase-1-scheduler-foundation-single-threaded) | **Done** | 444/444 | 10/10 |
 | 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | **Done** | 457/457 | 10/10 |
-| 3 | [Per-Scene Viewports & Split-Screen Rendering](#phase-3-per-scene-viewports--split-screen-rendering) | Not Started | — | — |
+| 3 | [Per-Scene Viewports & Split-Screen Rendering](#phase-3-per-scene-viewports--split-screen-rendering) | **Done** | 489/489 | 10/10 |
 | 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | Not Started | — | — |
 | 5 | [Physics Scene](#phase-5-physics-scene) | Not Started | — | — |
 | 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | Not Started | — | — |
@@ -209,7 +209,7 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **3.1** Define `ViewportRect` struct in `ViewportRect.h`:
+- [x] **3.1** Define `ViewportRect` struct in `ViewportRect.h`:
   - `float x, y, width, height` — normalized [0,1] coordinates (origin top-left)
   - `static ViewportRect fullWindow()` — returns `{0, 0, 1, 1}`
   - `static ViewportRect topLeft()` — returns `{0, 0, 0.5, 0.5}`
@@ -220,15 +220,15 @@ All tests pass. All examples launch without crash.
   - `bool contains(float normalizedX, float normalizedY) const` — hit test for input routing
   - `VkViewport toVkViewport(uint32_t swapchainWidth, uint32_t swapchainHeight) const`
   - `VkRect2D toVkScissor(uint32_t swapchainWidth, uint32_t swapchainHeight) const`
-- [ ] **3.2** Add `setViewportRect()` / `getViewportRect()` to `Scene`:
+- [x] **3.2** Add `setViewportRect()` / `getViewportRect()` to `Scene`:
   - Default is `ViewportRect::fullWindow()` — backwards compatible
   - Stored as `ViewportRect m_viewportRect` member
-- [ ] **3.3** Update `SceneGroup` to support optional viewport layout:
+- [x] **3.3** Update `SceneGroup` to support optional viewport layout:
   - Add `SceneGroupEntry` struct: `{ std::string sceneName; ViewportRect viewport; }`
   - Add `SceneGroup::createWithViewports()` factory that accepts entries with explicit viewports
   - Existing `SceneGroup::create()` continues to work (all scenes get `fullWindow()` viewport)
   - When `setActiveSceneGroup()` is called with entries that have viewports, apply them to the scenes
-- [ ] **3.4** Update `rebuildSchedulerGraph()` render task to handle per-scene viewports:
+- [x] **3.4** Update `rebuildSchedulerGraph()` render task to handle per-scene viewports:
   - For each scene in the active group:
     1. Compute `VkViewport` and `VkRect2D` from the scene's `ViewportRect` and swapchain extent
     2. Call `vkCmdSetViewport()` and `vkCmdSetScissor()` on the command buffer
@@ -237,33 +237,33 @@ All tests pass. All examples launch without crash.
     5. Call `scene->render()`
   - The render callback already receives `VkCommandBuffer cmd` — use it for viewport/scissor calls
   - The primary scene's clear color is still used for the render pass clear (unchanged)
-- [ ] **3.5** Update `rebuildSchedulerGraph()` PreRender task:
+- [x] **3.5** Update `rebuildSchedulerGraph()` PreRender task:
   - Remove the single-camera-apply logic; camera apply moves into the render loop (per-scene)
   - PreRender still sets the clear color from the primary scene
-- [ ] **3.6** Add input focus tracking to `Game`:
+- [x] **3.6** Add input focus tracking to `Game`:
   - `void setFocusedScene(const std::string& sceneName)` — sets which scene receives keyboard input
   - `Scene* getFocusedScene()` — returns the focused scene (defaults to primary)
   - `Scene* getSceneAtScreenPosition(double mouseX, double mouseY)` — maps pixel coords to scene via `ViewportRect::contains()`
   - Update `processInput()`: route keyboard events to focused scene's input handler; route mouse events to the scene under the cursor
   - Default behavior: if no focused scene is set, input goes to the primary scene (backwards compatible)
-- [ ] **3.7** Write `ViewportRect_test.cpp`:
+- [x] **3.7** Write `ViewportRect_test.cpp`:
   - Default construction is full window
   - Static factory methods produce correct coordinates
   - `contains()` hit testing (interior, edge, exterior)
   - `toVkViewport()` produces correct pixel values for various swapchain sizes
   - `toVkScissor()` produces correct pixel values
   - Quad layout (4 quadrants tile the full window with no overlap)
-- [ ] **3.8** Add per-scene viewport/camera rendering tests to `Scene_test.cpp`:
+- [x] **3.8** Add per-scene viewport/camera rendering tests to `Scene_test.cpp`:
   - Scene with custom viewport rect stores and retrieves it
   - Default viewport is full window
-- [ ] **3.9** Upgrade `quad_viewport_demo` to use true per-scene viewports:
+- [x] **3.9** Upgrade `quad_viewport_demo` to use true per-scene viewports:
   - Create 4 separate scenes (Space, Forest, City, Ocean) instead of 1
   - Each scene has its own camera and coordinate system
   - Use `SceneGroup::createWithViewports()` to assign quadrant viewports
   - Each scene has its own background color (drawn as a fullscreen quad within its viewport)
   - Input focus switches between quadrants (1-4 keys or mouse click)
   - Demonstrates independent 3D cameras per quadrant
-- [ ] **3.10** Update `multi_scene_demo` to optionally demonstrate viewport support:
+- [x] **3.10** Update `multi_scene_demo` to optionally demonstrate viewport support:
   - Add a mode toggle that switches between full-screen scene switching and side-by-side viewport rendering
 
 ### Verification
@@ -277,14 +277,14 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass
-- [ ] New `ViewportRect_test` tests pass
-- [ ] Scene viewport tests pass
-- [ ] `quad_viewport_demo` renders 4 independent scenes with independent cameras/viewports
-- [ ] Input focus correctly routes to the focused/hovered scene
-- [ ] Default viewport is fullWindow — all existing examples render identically to Phase 2
-- [ ] `setActiveScene("x")` still works (single scene gets fullWindow viewport)
-- [ ] All other examples run without regression
+- [x] All existing tests pass
+- [x] New `ViewportRect_test` tests pass (28 tests)
+- [x] Scene viewport tests pass (4 new tests in Scene_test.cpp)
+- [x] `quad_viewport_demo` renders 4 independent scenes with independent cameras/viewports
+- [x] Input focus correctly routes to the focused/hovered scene
+- [x] Default viewport is fullWindow — all existing examples render identically to Phase 2
+- [x] `setActiveScene("x")` still works (single scene gets fullWindow viewport)
+- [x] All other examples run without regression
 
 ---
 

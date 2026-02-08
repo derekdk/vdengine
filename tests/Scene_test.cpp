@@ -10,6 +10,7 @@
 #include <vde/api/GameCamera.h>
 #include <vde/api/LightBox.h>
 #include <vde/api/Scene.h>
+#include <vde/api/ViewportRect.h>
 #include <vde/api/WorldBounds.h>
 
 #include <gtest/gtest.h>
@@ -308,4 +309,46 @@ TEST_F(SceneTest, SetUpdatePriority) {
 
     scene->setUpdatePriority(-3);
     EXPECT_EQ(scene->getUpdatePriority(), -3);
+}
+
+// ============================================================================
+// Viewport Tests (Phase 3)
+// ============================================================================
+
+TEST_F(SceneTest, DefaultViewportIsFullWindow) {
+    auto vp = scene->getViewportRect();
+    EXPECT_FLOAT_EQ(vp.x, 0.0f);
+    EXPECT_FLOAT_EQ(vp.y, 0.0f);
+    EXPECT_FLOAT_EQ(vp.width, 1.0f);
+    EXPECT_FLOAT_EQ(vp.height, 1.0f);
+    EXPECT_EQ(vp, ViewportRect::fullWindow());
+}
+
+TEST_F(SceneTest, SetViewportRect) {
+    auto topRight = ViewportRect::topRight();
+    scene->setViewportRect(topRight);
+
+    auto vp = scene->getViewportRect();
+    EXPECT_FLOAT_EQ(vp.x, 0.5f);
+    EXPECT_FLOAT_EQ(vp.y, 0.0f);
+    EXPECT_FLOAT_EQ(vp.width, 0.5f);
+    EXPECT_FLOAT_EQ(vp.height, 0.5f);
+}
+
+TEST_F(SceneTest, SetViewportRectCustom) {
+    ViewportRect custom{0.1f, 0.2f, 0.3f, 0.4f};
+    scene->setViewportRect(custom);
+
+    auto vp = scene->getViewportRect();
+    EXPECT_FLOAT_EQ(vp.x, 0.1f);
+    EXPECT_FLOAT_EQ(vp.y, 0.2f);
+    EXPECT_FLOAT_EQ(vp.width, 0.3f);
+    EXPECT_FLOAT_EQ(vp.height, 0.4f);
+}
+
+TEST_F(SceneTest, ViewportRectCanBeResetToFullWindow) {
+    scene->setViewportRect(ViewportRect::bottomLeft());
+    scene->setViewportRect(ViewportRect::fullWindow());
+
+    EXPECT_EQ(scene->getViewportRect(), ViewportRect::fullWindow());
 }

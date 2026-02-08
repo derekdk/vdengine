@@ -323,6 +323,16 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         }
     }
 
+    // Apply per-scene viewport rects from group entries (if present)
+    if (m_activeSceneGroup.hasViewports()) {
+        for (const auto& entry : m_activeSceneGroup.entries) {
+            auto it = m_scenes.find(entry.sceneName);
+            if (it != m_scenes.end()) {
+                it->second->setViewportRect(entry.viewport);
+            }
+        }
+    }
+
     // Rebuild the scheduler graph for the new group
     rebuildSchedulerGraph();
 }
@@ -486,10 +496,11 @@ void Game::setupInputCallbacks() {
         if (!game)
             return;
 
-        // Determine which input handler to use
+        // Determine which input handler to use — focused scene for split-screen
         InputHandler* handler = nullptr;
-        if (game->m_activeScene && game->m_activeScene->getInputHandler()) {
-            handler = game->m_activeScene->getInputHandler();
+        Scene* focusedScene = game->getFocusedScene();
+        if (focusedScene && focusedScene->getInputHandler()) {
+            handler = focusedScene->getInputHandler();
         } else if (game->m_inputHandler) {
             handler = game->m_inputHandler;
         }
@@ -1360,6 +1371,145 @@ void Game::updateLightingUBO(const Scene* scene) {
     memcpy(m_lightingUBOMapped[currentFrame], &ubo, sizeof(LightingUBO));
 }
 
+void Game::setFocusedScene(const std::string& sceneName) {
+    m_focusedSceneName = sceneName;
+}
+
+Scene* Game::getFocusedScene() {
+    if (!m_focusedSceneName.empty()) {
+        auto it = m_scenes.find(m_focusedSceneName);
+        if (it != m_scenes.end()) {
+            return it->second.get();
+        }
+    }
+    return m_activeScene;  // Default to primary scene
+}
+
+const Scene* Game::getFocusedScene() const {
+    if (!m_focusedSceneName.empty()) {
+        auto it = m_scenes.find(m_focusedSceneName);
+        if (it != m_scenes.end()) {
+            return it->second.get();
+        }
+    }
+    return m_activeScene;
+}
+
+Scene* Game::getSceneAtScreenPosition(double mouseX, double mouseY) {
+    if (!m_window) {
+        return nullptr;
+    }
+
+    // Convert pixel coords to normalized [0,1]
+    uint32_t winW = m_settings.display.windowWidth;
+    uint32_t winH = m_settings.display.windowHeight;
+    if (winW == 0 || winH == 0) {
+        return nullptr;
+    }
+
+    float nx = static_cast<float>(mouseX) / static_cast<float>(winW);
+    float ny = static_cast<float>(mouseY) / static_cast<float>(winH);
+
+    // Check each scene in the active group (reverse order for overlays)
+    for (auto it = m_activeSceneGroup.sceneNames.rbegin();
+         it != m_activeSceneGroup.sceneNames.rend(); ++it) {
+        auto sceneIt = m_scenes.find(*it);
+        if (sceneIt != m_scenes.end()) {
+            if (sceneIt->second->getViewportRect().contains(nx, ny)) {
+                return sceneIt->second.get();
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+void Game::renderSingleViewport() {
+    // Apply primary scene's camera to VulkanContext (backwards compatible path)
+    if (m_activeScene && m_activeScene->getCamera()) {
+        m_activeScene->getCamera()->applyTo(*m_vulkanContext);
+    }
+
+    m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
+        (void)cmd;
+        // Render all scenes in the active group
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                it->second->render();
+            }
+        }
+        onRender();
+    });
+
+    m_vulkanContext->drawFrame();
+}
+
+void Game::renderMultiViewport() {
+    VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+
+    std::vector<VulkanContext::SceneRenderInfo> renderInfos;
+
+    for (size_t i = 0; i < m_activeSceneGroup.sceneNames.size(); ++i) {
+        const auto& sceneName = m_activeSceneGroup.sceneNames[i];
+        auto it = m_scenes.find(sceneName);
+        if (it == m_scenes.end()) {
+            continue;
+        }
+
+        Scene* scene = it->second.get();
+
+        VulkanContext::SceneRenderInfo info{};
+        info.clearPass = (i == 0);
+
+        // Get the scene's camera matrices
+        if (scene->getCamera()) {
+            // Apply camera to get internal state updated (positions etc.)
+            scene->getCamera()->applyTo(*m_vulkanContext);
+            info.viewMatrix = m_vulkanContext->getCamera().getViewMatrix();
+            info.projMatrix = m_vulkanContext->getCamera().getProjectionMatrix();
+        } else {
+            info.viewMatrix = glm::mat4(1.0f);
+            info.projMatrix = glm::mat4(1.0f);
+        }
+
+        // Compute viewport and scissor from the scene's ViewportRect
+        const ViewportRect& vpRect = scene->getViewportRect();
+        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
+        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
+
+        // Update camera aspect ratio based on viewport dimensions
+        if (scene->getCamera()) {
+            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
+            scene->getCamera()->setAspectRatio(vpAspect);
+        }
+
+        // Update lighting for this scene
+        updateLightingUBO(scene);
+
+        // Capture scene pointer for the lambda
+        info.renderCallback = [this, scene](VkCommandBuffer cmd) {
+            (void)cmd;
+            scene->render();
+        };
+
+        renderInfos.push_back(std::move(info));
+    }
+
+    // Add the onRender callback to the last scene's render
+    if (!renderInfos.empty()) {
+        auto originalCallback = renderInfos.back().renderCallback;
+        renderInfos.back().renderCallback = [this, originalCallback](VkCommandBuffer cmd) {
+            if (originalCallback) {
+                originalCallback(cmd);
+            }
+            onRender();
+        };
+    }
+
+    m_vulkanContext->drawFrameMultiScene(renderInfos);
+}
+
 void Game::rebuildSchedulerGraph() {
     m_scheduler.clear();
 
@@ -1434,49 +1584,52 @@ void Game::rebuildSchedulerGraph() {
                              {lastUpdateTask}});
 
     // ---------------------------------------------------------------
-    // Task 3: PreRender — apply camera and background color from
-    //         the PRIMARY scene (first in the active group)
+    // Task 3: PreRender — apply clear color from primary scene.
+    //         Camera apply moves into the render loop (per-scene).
     // ---------------------------------------------------------------
     TaskId preRenderTask = m_scheduler.addTask(
         {"scene.preRender",
          TaskPhase::PreRender,
          [this]() {
-             if (m_activeScene) {
-                 // Apply scene camera to Vulkan context
-                 if (m_activeScene->getCamera() && m_vulkanContext) {
-                     m_activeScene->getCamera()->applyTo(*m_vulkanContext);
-                 }
-
+             if (m_activeScene && m_vulkanContext) {
                  // Apply scene background color to Vulkan context
-                 if (m_vulkanContext) {
-                     const Color& bg = m_activeScene->getBackgroundColor();
-                     m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
-                 }
+                 const Color& bg = m_activeScene->getBackgroundColor();
+                 m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
              }
          },
          {audioTask}});
 
     // ---------------------------------------------------------------
-    // Task 4: Render — draw frame.  Renders ALL group scenes in order
-    //         (primary scene first, then overlays).
+    // Task 4: Render — draw frame.  If any scene has a non-fullWindow
+    //         viewport, use multi-pass rendering.  Otherwise, use the
+    //         original single-pass path for backwards compatibility.
     // ---------------------------------------------------------------
     m_scheduler.addTask({"scene.render",
                          TaskPhase::Render,
                          [this]() {
-                             if (m_vulkanContext) {
-                                 m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
-                                     (void)cmd;
-                                     // Render all scenes in the active group
-                                     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-                                         auto it = m_scenes.find(sceneName);
-                                         if (it != m_scenes.end()) {
-                                             it->second->render();
-                                         }
-                                     }
-                                     onRender();
-                                 });
+                             if (!m_vulkanContext) {
+                                 return;
+                             }
 
-                                 m_vulkanContext->drawFrame();
+                             // Check if we need multi-viewport rendering
+                             bool needsMultiViewport = false;
+                             for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+                                 auto it = m_scenes.find(sceneName);
+                                 if (it != m_scenes.end()) {
+                                     if (it->second->getViewportRect() !=
+                                         ViewportRect::fullWindow()) {
+                                         needsMultiViewport = true;
+                                         break;
+                                     }
+                                 }
+                             }
+
+                             if (needsMultiViewport) {
+                                 // Multi-pass per-scene rendering
+                                 renderMultiViewport();
+                             } else {
+                                 // Original single-pass rendering (backwards compatible)
+                                 renderSingleViewport();
                              }
                          },
                          {preRenderTask}});

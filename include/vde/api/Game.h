@@ -24,6 +24,7 @@
 #include "Scene.h"
 #include "SceneGroup.h"
 #include "Scheduler.h"
+#include "ViewportRect.h"
 
 namespace vde {
 
@@ -165,6 +166,33 @@ class Game {
      */
     Scene* getActiveScene() { return m_activeScene; }
     const Scene* getActiveScene() const { return m_activeScene; }
+
+    // Input focus (for split-screen)
+
+    /**
+     * @brief Set which scene receives keyboard input.
+     *
+     * When split-screen viewports are active, this controls which scene
+     * gets keyboard events.  Defaults to the primary scene.
+     *
+     * @param sceneName Name of the scene to focus
+     */
+    void setFocusedScene(const std::string& sceneName);
+
+    /**
+     * @brief Get the currently focused scene for keyboard input.
+     * @return Pointer to the focused scene, or the primary scene if none set
+     */
+    Scene* getFocusedScene();
+    const Scene* getFocusedScene() const;
+
+    /**
+     * @brief Get the scene whose viewport contains the given screen position.
+     * @param mouseX Mouse X position in pixels
+     * @param mouseY Mouse Y position in pixels
+     * @return Pointer to the scene under the cursor, or nullptr
+     */
+    Scene* getSceneAtScreenPosition(double mouseX, double mouseY);
 
     /**
      * @brief Push a scene onto the scene stack.
@@ -416,6 +444,9 @@ class Game {
     bool m_sceneSwitchPending = false;
     SceneGroup m_activeSceneGroup;
 
+    // Input focus for split-screen
+    std::string m_focusedSceneName;
+
     // Lighting infrastructure (Phase 4)
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool m_lightingDescriptorPool = VK_NULL_HANDLE;
@@ -455,6 +486,8 @@ class Game {
     void createLightingResources();
     void destroyLightingResources();
     void rebuildSchedulerGraph();
+    void renderSingleViewport();
+    void renderMultiViewport();
 };
 
 }  // namespace vde
