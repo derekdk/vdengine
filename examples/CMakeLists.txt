@@ -1,19 +1,25 @@
 # VDE Examples CMakeLists.txt
 
+# Create a custom target to copy shaders once (avoids parallel copy conflicts with MSBuild)
+add_custom_target(copy_example_shaders ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Debug/shaders
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        ${CMAKE_CURRENT_BINARY_DIR}/Debug/shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
+    COMMENT "Copying shader files to examples directory..."
+)
+
 # Basic triangle example
 add_executable(vde_triangle_example
     triangle/main.cpp
 )
 
 target_link_libraries(vde_triangle_example PRIVATE vde)
-
-# Copy shader files from main shaders directory to build directory
-add_custom_command(TARGET vde_triangle_example POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_triangle_example>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_triangle_example copy_example_shaders)
 
 # Simple game example using Game API
 add_executable(vde_simple_game_example
@@ -21,14 +27,7 @@ add_executable(vde_simple_game_example
 )
 
 target_link_libraries(vde_simple_game_example PRIVATE vde)
-
-# Copy shader files for simple_game example
-add_custom_command(TARGET vde_simple_game_example POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_simple_game_example>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_simple_game_example copy_example_shaders)
 
 # Sprite demo example demonstrating SpriteEntity
 add_executable(vde_sprite_demo
@@ -36,14 +35,7 @@ add_executable(vde_sprite_demo
 )
 
 target_link_libraries(vde_sprite_demo PRIVATE vde)
-
-# Copy shader files for sprite_demo example
-add_custom_command(TARGET vde_sprite_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_sprite_demo>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_sprite_demo copy_example_shaders)
 
 # World bounds demo example demonstrating Phase 2.5 features
 add_executable(vde_world_bounds_demo
@@ -51,14 +43,7 @@ add_executable(vde_world_bounds_demo
 )
 
 target_link_libraries(vde_world_bounds_demo PRIVATE vde)
-
-# Copy shader files for world_bounds_demo example
-add_custom_command(TARGET vde_world_bounds_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_world_bounds_demo>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_world_bounds_demo copy_example_shaders)
 
 # Materials & Lighting demo example demonstrating Phase 4 features
 add_executable(vde_materials_lighting_demo
@@ -66,14 +51,7 @@ add_executable(vde_materials_lighting_demo
 )
 
 target_link_libraries(vde_materials_lighting_demo PRIVATE vde)
-
-# Copy shader files for materials_lighting_demo example
-add_custom_command(TARGET vde_materials_lighting_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_materials_lighting_demo>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_materials_lighting_demo copy_example_shaders)
 
 # Resource Management demo example demonstrating Phase 5 features
 add_executable(vde_resource_demo
@@ -81,14 +59,7 @@ add_executable(vde_resource_demo
 )
 
 target_link_libraries(vde_resource_demo PRIVATE vde)
-
-# Copy shader files for resource_demo example
-add_custom_command(TARGET vde_resource_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_resource_demo>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_resource_demo copy_example_shaders)
 
 # Audio demo example demonstrating audio system
 add_executable(vde_audio_demo
@@ -96,14 +67,7 @@ add_executable(vde_audio_demo
 )
 
 target_link_libraries(vde_audio_demo PRIVATE vde)
-
-# Copy shader files for audio_demo example
-add_custom_command(TARGET vde_audio_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_audio_demo>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_audio_demo copy_example_shaders)
 
 # Copy audio assets directory
 add_custom_command(TARGET vde_audio_demo POST_BUILD
@@ -119,14 +83,7 @@ add_executable(vde_sidescroller
 )
 
 target_link_libraries(vde_sidescroller PRIVATE vde)
-
-# Copy shader files for sidescroller example
-add_custom_command(TARGET vde_sidescroller POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_sidescroller>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_sidescroller copy_example_shaders)
 
 # Wireframe viewer example demonstrating shape switching, render modes, and interaction
 add_executable(vde_wireframe_viewer
@@ -134,14 +91,7 @@ add_executable(vde_wireframe_viewer
 )
 
 target_link_libraries(vde_wireframe_viewer PRIVATE vde)
-
-# Copy shader files for wireframe_viewer example
-add_custom_command(TARGET vde_wireframe_viewer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_wireframe_viewer>/shaders
-    COMMENT "Copying shader files..."
-)
+add_dependencies(vde_wireframe_viewer copy_example_shaders)
 
 # Multi-scene demo example demonstrating scene management, switching, and background simulation
 add_executable(vde_multi_scene_demo
@@ -149,11 +99,5 @@ add_executable(vde_multi_scene_demo
 )
 
 target_link_libraries(vde_multi_scene_demo PRIVATE vde)
+add_dependencies(vde_multi_scene_demo copy_example_shaders)
 
-# Copy shader files for multi_scene_demo example
-add_custom_command(TARGET vde_multi_scene_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_multi_scene_demo>/shaders
-    COMMENT "Copying shader files..."
-)

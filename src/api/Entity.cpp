@@ -42,6 +42,9 @@ void clearSpriteDescriptorCache() {
     for (int i = 0; i < MAX_FRAMES; ++i) {
         s_textureDescriptorSets[i].clear();
     }
+    // Clean up the static sprite quad mesh to ensure its Vulkan buffers
+    // are destroyed before the device is destroyed
+    s_spriteQuad.reset();
 }
 
 // Helper to get or create the sprite quad mesh
