@@ -1,6 +1,7 @@
 # Multi-Scene Physics & Scheduler — Implementation Plan
 
 > **Design Reference:** [MULTI_SCENE_PHYSICS_DESIGN.md](MULTI_SCENE_PHYSICS_DESIGN.md)  
+> **API Gap Analysis:** [API_SUGGESTION_SPLIT_SCREEN_VIEWPORTS.md](../API_SUGGESTION_SPLIT_SCREEN_VIEWPORTS.md)  
 > **Created:** 2026-02-08  
 > **Last Updated:** 2026-02-08  
 > **Status:** Planning
@@ -14,11 +15,12 @@
 | 0 | [Pre-flight & Baseline](#phase-0-pre-flight--baseline) | **Done** | 423/423 | 10/10 |
 | 1 | [Scheduler Foundation (Single-Threaded)](#phase-1-scheduler-foundation-single-threaded) | **Done** | 444/444 | 10/10 |
 | 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | **Done** | 457/457 | 10/10 |
-| 3 | [Scene Phase Callbacks & Audio Event Queue](#phase-3-scene-phase-callbacks--audio-event-queue) | Not Started | — | — |
-| 4 | [Physics Scene](#phase-4-physics-scene) | Not Started | — | — |
-| 5 | [Physics Entities & Sync](#phase-5-physics-entities--sync) | Not Started | — | — |
-| 6 | [Thread Pool & Parallel Physics](#phase-6-thread-pool--parallel-physics) | Not Started | — | — |
-| 7 | [Advanced Physics Features](#phase-7-advanced-physics-features) | Not Started | — | — |
+| 3 | [Per-Scene Viewports & Split-Screen Rendering](#phase-3-per-scene-viewports--split-screen-rendering) | Not Started | — | — |
+| 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | Not Started | — | — |
+| 5 | [Physics Scene](#phase-5-physics-scene) | Not Started | — | — |
+| 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | Not Started | — | — |
+| 7 | [Thread Pool & Parallel Physics](#phase-7-thread-pool--parallel-physics) | Not Started | — | — |
+| 8 | [Advanced Physics Features](#phase-8-advanced-physics-features) | Not Started | — | — |
 
 ---
 
@@ -178,7 +180,115 @@ All tests pass. All examples launch without crash.
 
 ---
 
-## Phase 3: Scene Phase Callbacks & Audio Event Queue
+## Phase 3: Per-Scene Viewports & Split-Screen Rendering
+
+**Goal:** Enable true split-screen rendering where each scene in a `SceneGroup` renders to its own viewport sub-region with its own camera. Add input focus routing so interactive split-screen is possible. This addresses the deficiencies identified in [API_SUGGESTION_SPLIT_SCREEN_VIEWPORTS.md](../API_SUGGESTION_SPLIT_SCREEN_VIEWPORTS.md).
+
+**Motivation:** Phase 2 added `SceneGroup` for simultaneous multi-scene updates, but all scenes render through a single full-window viewport using only the primary scene's camera. The `quad_viewport_demo` shows the limitation — it simulates split-screen in a single scene with manual entity positioning, precluding independent 3D cameras and coordinate systems.
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `include/vde/api/ViewportRect.h` | `ViewportRect` struct (normalized 0-1 coordinates) |
+| `tests/ViewportRect_test.cpp` | Unit tests for ViewportRect |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `include/vde/api/Scene.h` | Add `setViewportRect()`, `getViewportRect()`, `ViewportRect m_viewportRect` |
+| `src/api/Scene.cpp` | Default viewport (0,0,1,1 = full window) |
+| `include/vde/api/Game.h` | Add `setFocusedScene()`, `getFocusedScene()`, `getSceneAtScreenPosition()` |
+| `src/api/Game.cpp` | Update `rebuildSchedulerGraph()` render task: per-scene viewport/scissor + camera; implement focus tracking and mouse-to-viewport mapping |
+| `include/vde/api/SceneGroup.h` | Add optional `ViewportRect` to `SceneGroupEntry` struct for layout-based viewport assignment |
+| `include/vde/VulkanContext.h` | Add `getSwapChainExtent()` accessor (if not already public) |
+| `include/vde/api/GameAPI.h` | Add `#include "ViewportRect.h"` |
+| `CMakeLists.txt` | Add new files |
+| `tests/CMakeLists.txt` | Add `ViewportRect_test.cpp` |
+
+### Tasks
+
+- [ ] **3.1** Define `ViewportRect` struct in `ViewportRect.h`:
+  - `float x, y, width, height` — normalized [0,1] coordinates (origin top-left)
+  - `static ViewportRect fullWindow()` — returns `{0, 0, 1, 1}`
+  - `static ViewportRect topLeft()` — returns `{0, 0, 0.5, 0.5}`
+  - `static ViewportRect topRight()` — returns `{0.5, 0, 0.5, 0.5}`
+  - `static ViewportRect bottomLeft()` — returns `{0, 0.5, 0.5, 0.5}`
+  - `static ViewportRect bottomRight()` — returns `{0.5, 0.5, 0.5, 0.5}`
+  - `static ViewportRect leftHalf()` / `rightHalf()` / `topHalf()` / `bottomHalf()`
+  - `bool contains(float normalizedX, float normalizedY) const` — hit test for input routing
+  - `VkViewport toVkViewport(uint32_t swapchainWidth, uint32_t swapchainHeight) const`
+  - `VkRect2D toVkScissor(uint32_t swapchainWidth, uint32_t swapchainHeight) const`
+- [ ] **3.2** Add `setViewportRect()` / `getViewportRect()` to `Scene`:
+  - Default is `ViewportRect::fullWindow()` — backwards compatible
+  - Stored as `ViewportRect m_viewportRect` member
+- [ ] **3.3** Update `SceneGroup` to support optional viewport layout:
+  - Add `SceneGroupEntry` struct: `{ std::string sceneName; ViewportRect viewport; }`
+  - Add `SceneGroup::createWithViewports()` factory that accepts entries with explicit viewports
+  - Existing `SceneGroup::create()` continues to work (all scenes get `fullWindow()` viewport)
+  - When `setActiveSceneGroup()` is called with entries that have viewports, apply them to the scenes
+- [ ] **3.4** Update `rebuildSchedulerGraph()` render task to handle per-scene viewports:
+  - For each scene in the active group:
+    1. Compute `VkViewport` and `VkRect2D` from the scene's `ViewportRect` and swapchain extent
+    2. Call `vkCmdSetViewport()` and `vkCmdSetScissor()` on the command buffer
+    3. Apply the scene's camera to the uniform buffer (update UBO with scene's view/projection)
+    4. Update lighting UBO for the scene's `LightBox`
+    5. Call `scene->render()`
+  - The render callback already receives `VkCommandBuffer cmd` — use it for viewport/scissor calls
+  - The primary scene's clear color is still used for the render pass clear (unchanged)
+- [ ] **3.5** Update `rebuildSchedulerGraph()` PreRender task:
+  - Remove the single-camera-apply logic; camera apply moves into the render loop (per-scene)
+  - PreRender still sets the clear color from the primary scene
+- [ ] **3.6** Add input focus tracking to `Game`:
+  - `void setFocusedScene(const std::string& sceneName)` — sets which scene receives keyboard input
+  - `Scene* getFocusedScene()` — returns the focused scene (defaults to primary)
+  - `Scene* getSceneAtScreenPosition(double mouseX, double mouseY)` — maps pixel coords to scene via `ViewportRect::contains()`
+  - Update `processInput()`: route keyboard events to focused scene's input handler; route mouse events to the scene under the cursor
+  - Default behavior: if no focused scene is set, input goes to the primary scene (backwards compatible)
+- [ ] **3.7** Write `ViewportRect_test.cpp`:
+  - Default construction is full window
+  - Static factory methods produce correct coordinates
+  - `contains()` hit testing (interior, edge, exterior)
+  - `toVkViewport()` produces correct pixel values for various swapchain sizes
+  - `toVkScissor()` produces correct pixel values
+  - Quad layout (4 quadrants tile the full window with no overlap)
+- [ ] **3.8** Add per-scene viewport/camera rendering tests to `Scene_test.cpp`:
+  - Scene with custom viewport rect stores and retrieves it
+  - Default viewport is full window
+- [ ] **3.9** Upgrade `quad_viewport_demo` to use true per-scene viewports:
+  - Create 4 separate scenes (Space, Forest, City, Ocean) instead of 1
+  - Each scene has its own camera and coordinate system
+  - Use `SceneGroup::createWithViewports()` to assign quadrant viewports
+  - Each scene has its own background color (drawn as a fullscreen quad within its viewport)
+  - Input focus switches between quadrants (1-4 keys or mouse click)
+  - Demonstrates independent 3D cameras per quadrant
+- [ ] **3.10** Update `multi_scene_demo` to optionally demonstrate viewport support:
+  - Add a mode toggle that switches between full-screen scene switching and side-by-side viewport rendering
+
+### Verification
+
+```powershell
+./scripts/build-and-test.ps1 -BuildConfig Debug
+# Run quad_viewport_demo — each quadrant should be an independent scene with its own camera
+# Run multi_scene_demo — existing behavior unchanged; optional viewport mode works
+# Run all other examples — single-scene viewport (fullWindow) is default, no visual change
+```
+
+### Completion Criteria
+
+- [ ] All existing tests pass
+- [ ] New `ViewportRect_test` tests pass
+- [ ] Scene viewport tests pass
+- [ ] `quad_viewport_demo` renders 4 independent scenes with independent cameras/viewports
+- [ ] Input focus correctly routes to the focused/hovered scene
+- [ ] Default viewport is fullWindow — all existing examples render identically to Phase 2
+- [ ] `setActiveScene("x")` still works (single scene gets fullWindow viewport)
+- [ ] All other examples run without regression
+
+---
+
+## Phase 4: Scene Phase Callbacks & Audio Event Queue
 
 **Goal:** Split `Scene::update()` into `updateGameLogic()`, `updateAudio()`, `updateVisuals()`. Add audio event queue to Scene. Move `AudioManager::update()` into the scheduler as `audio.global`.
 
@@ -196,23 +306,23 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **3.1** Define `AudioEvent` struct (Type enum, clip, volume, pitch, loop, position, soundId)
-- [ ] **3.2** Add `enablePhaseCallbacks()`, `usesPhaseCallbacks()`, and the three virtual methods to `Scene`:
+- [ ] **4.1** Define `AudioEvent` struct (Type enum, clip, volume, pitch, loop, position, soundId)
+- [ ] **4.2** Add `enablePhaseCallbacks()`, `usesPhaseCallbacks()`, and the three virtual methods to `Scene`:
   - `virtual void updateGameLogic(float deltaTime)` — no-op default
   - `virtual void updateAudio(float deltaTime)` — default drains audio queue
   - `virtual void updateVisuals(float deltaTime)` — no-op default
-- [ ] **3.3** Add `queueAudioEvent()`, `playSFX()`, `playSFXAt()` convenience methods to `Scene`
-- [ ] **3.4** Implement default `updateAudio()` to drain `m_audioEventQueue` via `AudioManager`
-- [ ] **3.5** Ensure backwards compatibility: if `usesPhaseCallbacks()` returns false, scheduler calls `update()` as a single task in the GameLogic phase — identical to current behavior
-- [ ] **3.6** Update `rebuildSchedulerGraph()`:
+- [ ] **4.3** Add `queueAudioEvent()`, `playSFX()`, `playSFXAt()` convenience methods to `Scene`
+- [ ] **4.4** Implement default `updateAudio()` to drain `m_audioEventQueue` via `AudioManager`
+- [ ] **4.5** Ensure backwards compatibility: if `usesPhaseCallbacks()` returns false, scheduler calls `update()` as a single task in the GameLogic phase — identical to current behavior
+- [ ] **4.6** Update `rebuildSchedulerGraph()`:
   - For scenes with `usesPhaseCallbacks() == true`: create separate GameLogic, Audio, Visual tasks with proper dependencies
   - For legacy scenes: single Update task in GameLogic phase
   - Add `audio.global` task that calls `AudioManager::getInstance().update()` after all per-scene audio tasks
-- [ ] **3.7** Write `AudioEvent_test.cpp`:
+- [ ] **4.7** Write `AudioEvent_test.cpp`:
   - AudioEvent construction with various types
   - Queue add/drain cycle
   - Empty queue drain is safe
-- [ ] **3.8** Add phase callback tests to `Scene_test.cpp`:
+- [ ] **4.8** Add phase callback tests to `Scene_test.cpp`:
   - Default scene does not use phase callbacks
   - Scene with `enablePhaseCallbacks()` reports `usesPhaseCallbacks() == true`
   - Phase callbacks are called in correct order (mock/stub test)
@@ -235,7 +345,7 @@ All tests pass. All examples launch without crash.
 
 ---
 
-## Phase 4: Physics Scene
+## Phase 5: Physics Scene
 
 **Goal:** Implement `PhysicsScene` with fixed-timestep accumulator, body management, and AABB collision detection. Physics is opt-in per scene.
 
@@ -261,7 +371,7 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **4.1** Define all physics types in `PhysicsTypes.h`:
+- [ ] **5.1** Define all physics types in `PhysicsTypes.h`:
   - `PhysicsConfig` (fixedTimestep, gravity, maxSubSteps, iterations)
   - `PhysicsBodyId`, `INVALID_PHYSICS_BODY_ID`
   - `PhysicsShape` enum (Box, Circle, Sphere, Capsule)
@@ -270,16 +380,16 @@ All tests pass. All examples launch without crash.
   - `PhysicsBodyState` (position, rotation, velocity, isAwake)
   - `CollisionEvent` (bodyA, bodyB, contactPoint, normal, depth)
   - `CollisionCallback` typedef
-- [ ] **4.2** Implement `PhysicsScene` (pimpl):
+- [ ] **5.2** Implement `PhysicsScene` (pimpl):
   - `createBody()`, `destroyBody()`, `getBodyState()`
   - `applyForce()`, `applyImpulse()`, `setLinearVelocity()`, `setBodyPosition()`
   - `step(float deltaTime)` with fixed-timestep accumulator
   - `getInterpolationAlpha()`, `getLastStepCount()`
   - Internal: velocity integration, AABB broadphase, impulse-based collision resolution
   - Start with 2D AABB-only collision for simplicity
-- [ ] **4.3** Add `enablePhysics()`, `disablePhysics()`, `hasPhysics()`, `getPhysicsScene()` to `Scene`
-- [ ] **4.4** Update `rebuildSchedulerGraph()` to insert Physics and PostPhysics tasks for scenes with physics enabled
-- [ ] **4.5** Write `PhysicsScene_test.cpp`:
+- [ ] **5.3** Add `enablePhysics()`, `disablePhysics()`, `hasPhysics()`, `getPhysicsScene()` to `Scene`
+- [ ] **5.4** Update `rebuildSchedulerGraph()` to insert Physics and PostPhysics tasks for scenes with physics enabled
+- [ ] **5.5** Write `PhysicsScene_test.cpp`:
   - Create scene with default config
   - Create/destroy bodies
   - Body falls under gravity after `step()`
@@ -292,7 +402,7 @@ All tests pass. All examples launch without crash.
   - `setGravity()` changes gravity
   - Sensor bodies trigger callbacks but don't respond
   - `getBodyCount()` / `getActiveBodyCount()` are accurate
-- [ ] **4.6** Create `examples/physics_demo/` — falling boxes with static ground:
+- [ ] **5.6** Create `examples/physics_demo/` — falling boxes with static ground:
   - Several dynamic boxes spawned at varying heights
   - Static ground platform
   - Boxes fall and land on ground
@@ -317,7 +427,7 @@ All tests pass. All examples launch without crash.
 
 ---
 
-## Phase 5: Physics Entities & Sync
+## Phase 6: Physics Entities & Sync
 
 **Goal:** Create `PhysicsEntity`, `PhysicsMeshEntity`, `PhysicsSpriteEntity` that bind visual entities to physics bodies. Implement automatic PostPhysics transform sync with interpolation.
 
@@ -341,7 +451,7 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **5.1** Create `PhysicsEntity` base class (extends `Entity`):
+- [ ] **6.1** Create `PhysicsEntity` base class (extends `Entity`):
   - `createPhysicsBody(const PhysicsBodyDef&)` — creates body in scene's `PhysicsScene`
   - `getPhysicsBodyId()`, `getPhysicsState()`
   - `applyForce()`, `applyImpulse()`, `setLinearVelocity()` — delegate to PhysicsScene
@@ -350,12 +460,12 @@ All tests pass. All examples launch without crash.
   - `setAutoSync()` / `getAutoSync()`
   - `onAttach()` / `onDetach()` lifecycle
   - Stores `m_prevPosition`, `m_prevRotation` for interpolation
-- [ ] **5.2** Create `PhysicsSpriteEntity` (extends both visual SpriteEntity features + PhysicsEntity):
+- [ ] **6.2** Create `PhysicsSpriteEntity` (extends both visual SpriteEntity features + PhysicsEntity):
   - Renders as sprite, driven by physics
-- [ ] **5.3** Create `PhysicsMeshEntity` (extends both visual MeshEntity features + PhysicsEntity):
+- [ ] **6.3** Create `PhysicsMeshEntity` (extends both visual MeshEntity features + PhysicsEntity):
   - Renders as mesh, driven by physics
-- [ ] **5.4** Implement PostPhysics sync in scheduler: iterate all entities, dynamic_cast to `PhysicsEntity*`, call `syncFromPhysics(alpha)` if `getAutoSync()`
-- [ ] **5.5** Write `PhysicsEntity_test.cpp`:
+- [ ] **6.4** Implement PostPhysics sync in scheduler: iterate all entities, dynamic_cast to `PhysicsEntity*`, call `syncFromPhysics(alpha)` if `getAutoSync()`
+- [ ] **6.5** Write `PhysicsEntity_test.cpp`:
   - Create PhysicsEntity and attach to Scene with physics
   - `createPhysicsBody()` succeeds and returns valid ID
   - `syncFromPhysics()` updates entity position from body
@@ -364,7 +474,7 @@ All tests pass. All examples launch without crash.
   - `setAutoSync(false)` prevents automatic sync
   - Force/impulse helpers delegate correctly
   - `onDetach()` cleans up physics body
-- [ ] **5.6** Update `physics_demo` to use `PhysicsSpriteEntity`:
+- [ ] **6.6** Update `physics_demo` to use `PhysicsSpriteEntity`:
   - Visual sprites are driven by physics
   - Player entity with keyboard input (`applyForce()` / `applyImpulse()`)
   - Interactive demo with ExampleBase pattern
@@ -387,7 +497,7 @@ All tests pass. All examples launch without crash.
 
 ---
 
-## Phase 6: Thread Pool & Parallel Physics
+## Phase 7: Thread Pool & Parallel Physics
 
 **Goal:** Add a `ThreadPool` and integrate it into the `Scheduler` so independent scene physics can run on worker threads.
 
@@ -410,32 +520,32 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **6.1** Implement `ThreadPool`:
+- [ ] **7.1** Implement `ThreadPool`:
   - Constructor takes thread count, spawns workers
   - `submit(F&& func)` returns `std::future<void>`
   - `waitAll()` blocks until all submitted tasks complete
   - Destructor joins all workers
   - Proper shutdown with condition variable
-- [ ] **6.2** Wire `Scheduler::setWorkerThreadCount()`:
+- [ ] **7.2** Wire `Scheduler::setWorkerThreadCount()`:
   - 0 = single-threaded (current behavior)
   - N > 0 = create `ThreadPool(N)`, dispatch tasks not marked `mainThreadOnly` to pool
-- [ ] **6.3** Update scheduler `execute()`:
+- [ ] **7.3** Update scheduler `execute()`:
   - Tasks marked `mainThreadOnly` run on calling thread
   - Other tasks submitted to thread pool
   - Respect dependency ordering (don't submit until dependencies complete)
-- [ ] **6.4** Write `ThreadPool_test.cpp`:
+- [ ] **7.4** Write `ThreadPool_test.cpp`:
   - Submit single task, verify future completes
   - Submit multiple independent tasks, verify all complete
   - `waitAll()` blocks until done
   - Zero-thread-count gracefully degrades (runs inline)
   - Destructor joins cleanly even with pending tasks
   - Tasks execute on different threads (verify via thread IDs)
-- [ ] **6.5** Create `examples/parallel_physics_demo/`:
+- [ ] **7.5** Create `examples/parallel_physics_demo/`:
   - Two scenes, each with physics
   - `setWorkerThreadCount(2)`
   - Console prints which thread ran each physics step
   - Uses ExampleBase pattern
-- [ ] **6.6** Thread-safety audit:
+- [ ] **7.6** Thread-safety audit:
   - Verify `PhysicsScene` has no shared mutable state across scenes
   - Verify no global mutable state is accessed during physics tasks
   - Document any thread-safety constraints found
@@ -453,12 +563,12 @@ All tests pass. All examples launch without crash.
 - [ ] All existing tests pass
 - [ ] `ThreadPool_test` passes
 - [ ] `parallel_physics_demo` runs without data races (test under ThreadSanitizer if available)
-- [ ] Single-threaded mode (`setWorkerThreadCount(0)`) is identical to Phase 5 behavior
+- [ ] Single-threaded mode (`setWorkerThreadCount(0)`) is identical to Phase 6 behavior
 - [ ] All other examples unaffected
 
 ---
 
-## Phase 7: Advanced Physics Features
+## Phase 8: Advanced Physics Features
 
 **Goal:** Collision callbacks, raycasting, AABB queries, and a comprehensive physics-with-audio example.
 
@@ -481,25 +591,25 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **7.1** Implement collision callbacks:
+- [ ] **8.1** Implement collision callbacks:
   - `setOnCollisionBegin(CollisionCallback)` — fires when two bodies start overlapping
   - `setOnCollisionEnd(CollisionCallback)` — fires when overlap ends
   - Callbacks fire during `step()`, user records events for processing in GameLogic phase
-- [ ] **7.2** Implement raycast:
+- [ ] **8.2** Implement raycast:
   - `bool raycast(origin, direction, maxDistance, outHit)`
   - Returns closest hit body, point, normal, distance
-- [ ] **7.3** Implement AABB query:
+- [ ] **8.3** Implement AABB query:
   - `std::vector<PhysicsBodyId> queryAABB(min, max)`
   - Returns all bodies overlapping the region
-- [ ] **7.4** Add `Scene::getEntityByPhysicsBody(PhysicsBodyId)` helper
-- [ ] **7.5** Add tests:
+- [ ] **8.4** Add `Scene::getEntityByPhysicsBody(PhysicsBodyId)` helper
+- [ ] **8.5** Add tests:
   - Collision callback fires on overlap
   - Collision end callback fires on separation
   - Raycast hits closest body
   - Raycast misses when no body in path
   - AABB query returns correct bodies
   - AABB query returns empty for empty region
-- [ ] **7.6** Create `examples/physics_audio_demo/`:
+- [ ] **8.6** Create `examples/physics_audio_demo/`:
   - Demonstrates the full Collision → GameLogic → Audio chain from design doc Section 4.7
   - Dynamic entities collide; game logic decides outcome; audio cues are queued
   - Uses `enablePhaseCallbacks()` and the three-phase model
@@ -537,37 +647,42 @@ Complete list of all files created or modified across all phases.
 | `tests/Scheduler_test.cpp` | 1 |
 | `include/vde/api/SceneGroup.h` | 2 |
 | `tests/SceneGroup_test.cpp` | 2 |
-| `include/vde/api/AudioEvent.h` | 3 |
-| `tests/AudioEvent_test.cpp` | 3 |
-| `include/vde/api/PhysicsTypes.h` | 4 |
-| `include/vde/api/PhysicsScene.h` | 4 |
-| `src/api/PhysicsScene.cpp` | 4 |
-| `tests/PhysicsScene_test.cpp` | 4 |
-| `examples/physics_demo/main.cpp` | 4 |
-| `include/vde/api/PhysicsEntity.h` | 5 |
-| `src/api/PhysicsEntity.cpp` | 5 |
-| `tests/PhysicsEntity_test.cpp` | 5 |
-| `include/vde/api/ThreadPool.h` | 6 |
-| `src/api/ThreadPool.cpp` | 6 |
-| `tests/ThreadPool_test.cpp` | 6 |
-| `examples/parallel_physics_demo/main.cpp` | 6 |
-| `examples/physics_audio_demo/main.cpp` | 7 |
+| `include/vde/api/ViewportRect.h` | 3 |
+| `tests/ViewportRect_test.cpp` | 3 |
+| `include/vde/api/AudioEvent.h` | 4 |
+| `tests/AudioEvent_test.cpp` | 4 |
+| `include/vde/api/PhysicsTypes.h` | 5 |
+| `include/vde/api/PhysicsScene.h` | 5 |
+| `src/api/PhysicsScene.cpp` | 5 |
+| `tests/PhysicsScene_test.cpp` | 5 |
+| `examples/physics_demo/main.cpp` | 5 |
+| `include/vde/api/PhysicsEntity.h` | 6 |
+| `src/api/PhysicsEntity.cpp` | 6 |
+| `tests/PhysicsEntity_test.cpp` | 6 |
+| `include/vde/api/ThreadPool.h` | 7 |
+| `src/api/ThreadPool.cpp` | 7 |
+| `tests/ThreadPool_test.cpp` | 7 |
+| `examples/parallel_physics_demo/main.cpp` | 7 |
+| `examples/physics_audio_demo/main.cpp` | 8 |
 
 ### Modified Files
 
 | File | Phases Modified |
 |------|----------------|
-| `include/vde/api/Game.h` | 1, 2 |
-| `src/api/Game.cpp` | 1, 2, 3, 4, 5 |
-| `include/vde/api/Scene.h` | 2, 3, 4, 7 |
-| `src/api/Scene.cpp` | 2, 3, 4 |
-| `include/vde/api/GameAPI.h` | 1, 2, 3, 4, 5 |
-| `CMakeLists.txt` | 1, 2, 4, 5, 6 |
-| `tests/CMakeLists.txt` | 1, 2, 3, 4, 5, 6, 7 |
-| `examples/CMakeLists.txt` | 4, 6, 7 |
-| `tests/Scene_test.cpp` | 2, 3 |
-| `examples/multi_scene_demo/main.cpp` | 2 |
-| `examples/physics_demo/main.cpp` | 5 |
+| `include/vde/api/Game.h` | 1, 2, 3 |
+| `src/api/Game.cpp` | 1, 2, 3, 4, 5, 6 |
+| `include/vde/api/Scene.h` | 2, 3, 4, 5, 8 |
+| `src/api/Scene.cpp` | 2, 3, 4, 5 |
+| `include/vde/api/SceneGroup.h` | 3 |
+| `include/vde/api/GameAPI.h` | 1, 2, 3, 4, 5, 6 |
+| `include/vde/VulkanContext.h` | 3 |
+| `CMakeLists.txt` | 1, 2, 3, 5, 6, 7 |
+| `tests/CMakeLists.txt` | 1, 2, 3, 4, 5, 6, 7, 8 |
+| `examples/CMakeLists.txt` | 5, 7, 8 |
+| `tests/Scene_test.cpp` | 2, 3, 4 |
+| `examples/multi_scene_demo/main.cpp` | 2, 3 |
+| `examples/quad_viewport_demo/main.cpp` | 3 |
+| `examples/physics_demo/main.cpp` | 6 |
 
 ---
 
@@ -576,12 +691,14 @@ Complete list of all files created or modified across all phases.
 Each phase must preserve these invariants:
 
 1. **`setActiveScene("name")`** continues to work identically — internally creates a single-scene group
-2. **`Scene::update(float)`** continues to be called for scenes that don't call `enablePhaseCallbacks()`
-3. **`AudioManager::update()`** continues to be called once per frame
-4. **Single-threaded by default** — `setWorkerThreadCount(0)` is the default; no threading unless explicitly enabled
-5. **No physics by default** — scenes without `enablePhysics()` have no physics overhead
-6. **All existing examples** compile and run identically after every phase
-7. **All existing tests** pass after every phase
+2. **Default viewport is full-window** — scenes without `setViewportRect()` render to the entire window, identical to pre-Phase 3 behavior
+3. **`Scene::update(float)`** continues to be called for scenes that don't call `enablePhaseCallbacks()`
+4. **`AudioManager::update()`** continues to be called once per frame
+5. **Single-threaded by default** — `setWorkerThreadCount(0)` is the default; no threading unless explicitly enabled
+6. **No physics by default** — scenes without `enablePhysics()` have no physics overhead
+7. **Input routing defaults to primary scene** — if `setFocusedScene()` is not called, input goes to the primary scene as before
+8. **All existing examples** compile and run identically after every phase
+9. **All existing tests** pass after every phase
 
 ---
 
@@ -615,10 +732,11 @@ Each phase must preserve these invariants:
 |-----------|-------|---------------|
 | `Scheduler_test.cpp` | 1 | Task ordering, dependencies, cycle detection, clear/remove |
 | `SceneGroup_test.cpp` | 2 | Group creation, scene ordering |
-| `AudioEvent_test.cpp` | 3 | Event types, queue add/drain |
-| `PhysicsScene_test.cpp` | 4 | Accumulator, bodies, gravity, collision, callbacks |
-| `PhysicsEntity_test.cpp` | 5 | Body creation, sync, interpolation, lifecycle |
-| `ThreadPool_test.cpp` | 6 | Task submission, concurrency, shutdown |
+| `ViewportRect_test.cpp` | 3 | Viewport factories, contains hit test, Vulkan conversion |
+| `AudioEvent_test.cpp` | 4 | Event types, queue add/drain |
+| `PhysicsScene_test.cpp` | 5 | Accumulator, bodies, gravity, collision, callbacks |
+| `PhysicsEntity_test.cpp` | 6 | Body creation, sync, interpolation, lifecycle |
+| `ThreadPool_test.cpp` | 7 | Task submission, concurrency, shutdown |
 
 ### Examples (must run at every phase)
 
@@ -633,10 +751,11 @@ Each phase must preserve these invariants:
 | `vde_audio_demo` | Pre-existing | Audio system |
 | `vde_sidescroller` | Pre-existing | Platformer mechanics |
 | `vde_wireframe_viewer` | Pre-existing | Shape rendering |
-| `vde_multi_scene_demo` | Pre-existing (updated Phase 2) | Scene management |
-| `vde_physics_demo` | 4 | Physics simulation |
-| `vde_parallel_physics_demo` | 6 | Multi-threaded physics |
-| `vde_physics_audio_demo` | 7 | Physics → logic → audio chain |
+| `vde_multi_scene_demo` | Pre-existing (updated Phase 2, 3) | Scene management, optional viewports |
+| `vde_quad_viewport_demo` | Pre-existing (upgraded Phase 3) | True split-screen with independent cameras |
+| `vde_physics_demo` | 5 | Physics simulation |
+| `vde_parallel_physics_demo` | 7 | Multi-threaded physics |
+| `vde_physics_audio_demo` | 8 | Physics → logic → audio chain |
 
 ---
 
@@ -645,7 +764,11 @@ Each phase must preserve these invariants:
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Scheduler refactor breaks game loop timing | High | Phase 1 graph mirrors exact existing loop; diff test with frame timing |
+| Per-scene viewport breaks single-scene rendering | High | Default viewport is `fullWindow()` (0,0,1,1); single-scene path unchanged |
+| Per-scene UBO update per viewport is expensive | Medium | Only update UBO when camera/viewport differs; profile with 4+ viewports |
 | Multi-scene rendering overwhelms GPU | Medium | Scenes share same swapchain; limit to N renderable scenes |
+| Per-scene clear color not supported in single render pass | Low | Draw fullscreen background quad per viewport; document limitation |
+| Input focus routing conflicts with existing input handlers | Medium | Default to primary scene when no focus set; focus is opt-in |
 | Physics accumulator drift at low FPS | Low | `maxSubSteps` cap prevents spiral of death |
 | Thread pool introduces data races | High | Shared-nothing design during physics; PostPhysics sync on main thread; ThreadSanitizer testing |
 | `dynamic_cast<PhysicsEntity*>` overhead in PostPhysics | Low | Only runs once per entity per frame; profile and optimize if needed |
