@@ -11,6 +11,7 @@
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
 #include <vde/api/LightBox.h>
+#include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
 
 #include <GLFW/glfw3.h>
@@ -1628,12 +1629,22 @@ void Game::rebuildSchedulerGraph() {
                  [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
                  {lastUpdateTask}});
 
-            // PostPhysics: sync step (placeholder for Phase 6 entity sync)
-            TaskId postPhysicsTask =
-                m_scheduler.addTask({"scene.postPhysics." + sceneName,
-                                     TaskPhase::PostPhysics,
-                                     []() { /* Phase 6 will add entity sync here */ },
-                                     {physicsTask}});
+            // PostPhysics: sync physics entity transforms with interpolation
+            TaskId postPhysicsTask = m_scheduler.addTask(
+                {"scene.postPhysics." + sceneName,
+                 TaskPhase::PostPhysics,
+                 [scene]() {
+                     if (!scene->hasPhysics())
+                         return;
+                     float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
+                     for (auto& entityRef : scene->getEntities()) {
+                         auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
+                         if (pe && pe->getAutoSync()) {
+                             pe->syncFromPhysics(alpha);
+                         }
+                     }
+                 },
+                 {physicsTask}});
 
             postPhysicsTasks.push_back(postPhysicsTask);
             lastPhysicsTask = postPhysicsTask;

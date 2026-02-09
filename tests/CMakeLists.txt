@@ -45,6 +45,8 @@ set(VDE_TEST_SOURCES
     AudioEvent_test.cpp
     # Phase 5 physics tests
     PhysicsScene_test.cpp
+    # Phase 6 physics entity tests
+    PhysicsEntity_test.cpp
 )
 
 # Create test executable

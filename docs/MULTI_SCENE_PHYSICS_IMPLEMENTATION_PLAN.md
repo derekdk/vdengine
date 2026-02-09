@@ -18,7 +18,7 @@
 | 3 | [Per-Scene Viewports & Split-Screen Rendering](#phase-3-per-scene-viewports--split-screen-rendering) | **Done** | 489/489 | 10/10 |
 | 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | **Done** | 513/513 | 10/10 |
 | 5 | [Physics Scene](#phase-5-physics-scene) | **Done** | 545/545 | 11/11 |
-| 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | Not Started | — | — |
+| 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | **Done** | 568/568 | 11/11 |
 | 7 | [Thread Pool & Parallel Physics](#phase-7-thread-pool--parallel-physics) | Not Started | — | — |
 | 8 | [Advanced Physics Features](#phase-8-advanced-physics-features) | Not Started | — | — |
 
@@ -455,7 +455,7 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **6.1** Create `PhysicsEntity` base class (extends `Entity`):
+- [x] **6.1** Create `PhysicsEntity` base class (extends `Entity`):
   - `createPhysicsBody(const PhysicsBodyDef&)` — creates body in scene's `PhysicsScene`
   - `getPhysicsBodyId()`, `getPhysicsState()`
   - `applyForce()`, `applyImpulse()`, `setLinearVelocity()` — delegate to PhysicsScene
@@ -464,12 +464,12 @@ All tests pass. All examples launch without crash.
   - `setAutoSync()` / `getAutoSync()`
   - `onAttach()` / `onDetach()` lifecycle
   - Stores `m_prevPosition`, `m_prevRotation` for interpolation
-- [ ] **6.2** Create `PhysicsSpriteEntity` (extends both visual SpriteEntity features + PhysicsEntity):
+- [x] **6.2** Create `PhysicsSpriteEntity` (extends both visual SpriteEntity features + PhysicsEntity):
   - Renders as sprite, driven by physics
-- [ ] **6.3** Create `PhysicsMeshEntity` (extends both visual MeshEntity features + PhysicsEntity):
+- [x] **6.3** Create `PhysicsMeshEntity` (extends both visual MeshEntity features + PhysicsEntity):
   - Renders as mesh, driven by physics
-- [ ] **6.4** Implement PostPhysics sync in scheduler: iterate all entities, dynamic_cast to `PhysicsEntity*`, call `syncFromPhysics(alpha)` if `getAutoSync()`
-- [ ] **6.5** Write `PhysicsEntity_test.cpp`:
+- [x] **6.4** Implement PostPhysics sync in scheduler: iterate all entities, dynamic_cast to `PhysicsEntity*`, call `syncFromPhysics(alpha)` if `getAutoSync()`
+- [x] **6.5** Write `PhysicsEntity_test.cpp`:
   - Create PhysicsEntity and attach to Scene with physics
   - `createPhysicsBody()` succeeds and returns valid ID
   - `syncFromPhysics()` updates entity position from body
@@ -478,7 +478,7 @@ All tests pass. All examples launch without crash.
   - `setAutoSync(false)` prevents automatic sync
   - Force/impulse helpers delegate correctly
   - `onDetach()` cleans up physics body
-- [ ] **6.6** Update `physics_demo` to use `PhysicsSpriteEntity`:
+- [x] **6.6** Update `physics_demo` to use `PhysicsSpriteEntity`:
   - Visual sprites are driven by physics
   - Player entity with keyboard input (`applyForce()` / `applyImpulse()`)
   - Interactive demo with ExampleBase pattern
@@ -493,11 +493,13 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass
-- [ ] `PhysicsEntity_test` passes
-- [ ] `physics_demo` shows visually correct physics-driven sprites
-- [ ] Interpolation produces smooth motion even at mismatched physics/render rates
-- [ ] All other examples unaffected
+- [x] All existing tests pass
+- [x] `PhysicsEntity_test` passes
+- [x] `physics_demo` shows visually correct physics-driven sprites
+- [x] Interpolation produces smooth motion even at mismatched physics/render rates
+- [x] All other examples unaffected
+
+**Completed (2026-02-08):** 568 tests passed (545 existing + 23 PhysicsEntity), 11 examples built and verified. PhysicsEntity uses mixin pattern (no diamond inheritance) with automatic PostPhysics sync via scheduler. Physics demo updated to use PhysicsSpriteEntity with player controls.
 
 ---
 

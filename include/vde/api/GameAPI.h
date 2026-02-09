@@ -26,6 +26,7 @@
 // Scene and entity system
 #include "AudioEvent.h"
 #include "Entity.h"
+#include "PhysicsEntity.h"
 #include "PhysicsScene.h"
 #include "PhysicsTypes.h"
 #include "Resource.h"
