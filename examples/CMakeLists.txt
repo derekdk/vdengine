@@ -165,3 +165,6 @@ add_executable(vde_physics_audio_demo
 target_link_libraries(vde_physics_audio_demo PRIVATE vde)
 add_dependencies(vde_physics_audio_demo copy_example_shaders)
 
+# Dear ImGui integration demo - demonstrates ImGui overlay on VDE scenes
+add_subdirectory(imgui_demo)
+

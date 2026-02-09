@@ -46,3 +46,7 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Creating demo or example applications that showcase engine features.  
 **Location:** `.github/skills/writing-examples/SKILL.md`
 
+### imgui-integration
+**Purpose:** Guide for integrating Dear ImGui with VDE applications.  
+**Use when:** Adding debug UI, tools, or overlay interfaces to VDE games and examples.  
+**Location:** `.github/skills/imgui-integration/SKILL.md`
