@@ -34,7 +34,7 @@ The VDE Game API provides a clean, object-oriented interface for game developmen
 - **Scene Management**: Organize your game into discrete scenes (menus, levels, etc.)
 - **Entity System**: Manage game objects with transforms, meshes, and sprites
 - **Resource Management**: Load and share textures, meshes, and other assets
-- **Input Handling**: Unified keyboard and mouse input (gamepad hooks reserved for future expansion)
+- **Input Handling**: Unified keyboard, mouse, and gamepad/joystick input with event callbacks and polling
 - **Camera System**: Multiple camera types for different game styles
 - **Lighting**: Flexible lighting with ambient, directional, point, and spot lights
 - **Audio**: Basic playback for music and sound effects
@@ -54,7 +54,7 @@ include/vde/api/
 ├── Mesh.h           # 3D mesh resource
 ├── Material.h       # Material properties for meshes
 ├── InputHandler.h   # Input handling interface
-├── KeyCodes.h       # Key and mouse button constants
+├── KeyCodes.h       # Key, mouse, and gamepad constants
 ├── GameCamera.h     # Camera classes
 ├── LightBox.h       # Lighting system
 ├── AudioClip.h      # Audio resource (sounds/music)
@@ -543,19 +543,56 @@ public:
         m_zoom += yOffset;
     }
     
-    // Polling
-    bool isKeyPressed(int key) const override {
-        return m_keys[key];
+    // Gamepad (events fired automatically by engine)
+    void onGamepadConnect(int gamepadId, const char* name) override {
+        std::cout << "Gamepad " << gamepadId << " connected: " << name << "\n";
+    }
+    
+    void onGamepadButtonPress(int gamepadId, int button) override {
+        if (button == vde::GAMEPAD_BUTTON_A) {
+            jump();
+        }
+    }
+    
+    void onGamepadAxis(int gamepadId, int axis, float value) override {
+        if (axis == vde::GAMEPAD_AXIS_LEFT_X) {
+            m_moveX = value;
+        }
+        if (axis == vde::GAMEPAD_AXIS_LEFT_Y) {
+            m_moveY = value;
+        }
     }
     
 private:
     double m_mouseX = 0, m_mouseY = 0;
     float m_zoom = 1.0f;
-    bool m_keys[512] = {false};
+    float m_moveX = 0, m_moveY = 0;
 };
 ```
 
-> Note: Gamepad callbacks are defined on `InputHandler`, but built-in polling/dispatch is not wired yet.
+#### Gamepad Input
+
+Gamepad input uses GLFW's standardized gamepad mapping (Xbox/PlayStation layout). The engine automatically:
+- Detects connected gamepads at startup and during runtime (hot-plug)
+- Polls gamepad state each frame and dispatches press/release/axis events
+- Applies dead zone filtering to analog sticks (default 0.1, customizable)
+- Stores state for polling via `isGamepadButtonPressed()` and `getGamepadAxis()`
+
+**Polling Example:**
+
+```cpp
+void update(float deltaTime) {
+    if (isGamepadConnected(vde::JOYSTICK_1)) {
+        float x = getGamepadAxis(vde::JOYSTICK_1, vde::GAMEPAD_AXIS_LEFT_X);
+        float y = getGamepadAxis(vde::JOYSTICK_1, vde::GAMEPAD_AXIS_LEFT_Y);
+        movePlayer(x * speed * deltaTime, y * speed * deltaTime);
+        
+        if (isGamepadButtonPressed(vde::JOYSTICK_1, vde::GAMEPAD_BUTTON_A)) {
+            jump();
+        }
+    }
+}
+```
 
 ### Setting Input Handler
 
@@ -573,6 +610,8 @@ scene->setInputHandler(&inputHandler);
 
 Common key codes from `KeyCodes.h`:
 
+#### Keyboard
+
 | Constant | Description |
 |----------|-------------|
 | `KEY_A` - `KEY_Z` | Letter keys |
@@ -584,9 +623,40 @@ Common key codes from `KeyCodes.h`:
 | `KEY_LEFT/RIGHT/UP/DOWN` | Arrow keys |
 | `KEY_LEFT_SHIFT` | Left shift |
 | `KEY_LEFT_CONTROL` | Left control |
+
+#### Mouse
+
+| Constant | Description |
+|----------|-------------|
 | `MOUSE_BUTTON_LEFT` | Left mouse button |
 | `MOUSE_BUTTON_RIGHT` | Right mouse button |
 | `MOUSE_BUTTON_MIDDLE` | Middle mouse button |
+
+#### Gamepad
+
+| Constant | Description |
+|----------|-------------|
+| `JOYSTICK_1` - `JOYSTICK_16` | Gamepad slots (0-15) |
+| `GAMEPAD_BUTTON_A` | A button (Cross on PlayStation) |
+| `GAMEPAD_BUTTON_B` | B button (Circle on PlayStation) |
+| `GAMEPAD_BUTTON_X` | X button (Square on PlayStation) |
+| `GAMEPAD_BUTTON_Y` | Y button (Triangle on PlayStation) |
+| `GAMEPAD_BUTTON_LEFT_BUMPER` | Left bumper/shoulder |
+| `GAMEPAD_BUTTON_RIGHT_BUMPER` | Right bumper/shoulder |
+| `GAMEPAD_BUTTON_BACK` | Back/Select button |
+| `GAMEPAD_BUTTON_START` | Start button |
+| `GAMEPAD_BUTTON_GUIDE` | Guide/Home button |
+| `GAMEPAD_BUTTON_LEFT_THUMB` | Left stick click |
+| `GAMEPAD_BUTTON_RIGHT_THUMB` | Right stick click |
+| `GAMEPAD_BUTTON_DPAD_UP/DOWN/LEFT/RIGHT` | D-pad directions |
+| `GAMEPAD_AXIS_LEFT_X/Y` | Left analog stick axes |
+| `GAMEPAD_AXIS_RIGHT_X/Y` | Right analog stick axes |
+| `GAMEPAD_AXIS_LEFT_TRIGGER` | Left trigger (0.0 to 1.0) |
+| `GAMEPAD_AXIS_RIGHT_TRIGGER` | Right trigger (0.0 to 1.0) |
+
+**PlayStation Aliases:** `GAMEPAD_BUTTON_CROSS`, `CIRCLE`, `SQUARE`, `TRIANGLE`  
+**Limits:** `MAX_GAMEPADS` (16), `MAX_GAMEPAD_BUTTONS` (15), `MAX_GAMEPAD_AXES` (6)  
+**Dead Zone:** `GAMEPAD_AXIS_DEADZONE` (0.1)
 
 ---
 

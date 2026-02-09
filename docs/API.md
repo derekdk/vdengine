@@ -902,19 +902,67 @@ struct Light {
 
 **Header**: `<vde/api/InputHandler.h>`
 
-Abstract interface for handling keyboard and mouse input. Subclass and attach to Game or Scene.
+Abstract interface for handling keyboard, mouse, and gamepad input. Subclass and attach to Game or Scene.
 
 ### Virtual Methods
+
+#### Keyboard
 
 | Method | Description |
 |--------|-------------|
 | `virtual void onKeyPress(int key)` | Key pressed |
 | `virtual void onKeyRelease(int key)` | Key released |
-| `virtual void onMouseMove(double x, double y)` | Mouse moved |
-| `virtual void onMouseButton(int button, bool pressed)` | Mouse button |
-| `virtual void onMouseScroll(double xOffset, double yOffset)` | Mouse scroll |
+| `virtual void onKeyRepeat(int key)` | Key held (repeat) |
+| `virtual void onCharInput(unsigned int codepoint)` | Character input (text entry) |
 
-Key constants are defined in `<vde/api/KeyCodes.h>` (e.g., `vde::KEY_W`, `vde::KEY_SPACE`, `vde::MOUSE_LEFT`).
+#### Mouse
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onMouseButtonPress(int button, double x, double y)` | Mouse button pressed |
+| `virtual void onMouseButtonRelease(int button, double x, double y)` | Mouse button released |
+| `virtual void onMouseMove(double x, double y)` | Mouse moved |
+| `virtual void onMouseScroll(double xOffset, double yOffset)` | Mouse scroll |
+| `virtual void onMouseEnter()` | Mouse entered window |
+| `virtual void onMouseLeave()` | Mouse left window |
+
+#### Gamepad
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onGamepadConnect(int gamepadId, const char* name)` | Gamepad connected |
+| `virtual void onGamepadDisconnect(int gamepadId)` | Gamepad disconnected |
+| `virtual void onGamepadButtonPress(int gamepadId, int button)` | Gamepad button pressed |
+| `virtual void onGamepadButtonRelease(int gamepadId, int button)` | Gamepad button released |
+| `virtual void onGamepadAxis(int gamepadId, int axis, float value)` | Gamepad axis changed |
+
+### Query Methods (Polling)
+
+| Method | Description |
+|--------|-------------|
+| `bool isKeyPressed(int key) const` | Check if key is pressed |
+| `bool isMouseButtonPressed(int button) const` | Check if mouse button is pressed |
+| `void getMousePosition(double& x, double& y) const` | Get mouse position |
+| `bool isGamepadConnected(int gamepadId) const` | Check if gamepad is connected |
+| `bool isGamepadButtonPressed(int gamepadId, int button) const` | Check if gamepad button is pressed |
+| `float getGamepadAxis(int gamepadId, int axis) const` | Get gamepad axis value (-1 to 1 for sticks, 0 to 1 for triggers) |
+| `float getDeadZone() const` | Get axis dead zone threshold |
+| `void setDeadZone(float deadZone)` | Set axis dead zone threshold (default 0.1) |
+
+### Constants
+
+Key, mouse button, and gamepad constants are defined in `<vde/api/KeyCodes.h>`:
+
+**Keyboard**: `KEY_A`-`KEY_Z`, `KEY_0`-`KEY_9`, `KEY_SPACE`, `KEY_ESCAPE`, `KEY_ENTER`, arrow keys, function keys, etc.  
+**Mouse**: `MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_RIGHT`, `MOUSE_BUTTON_MIDDLE`  
+**Gamepads**: `JOYSTICK_1`-`JOYSTICK_16` (slots), `GAMEPAD_BUTTON_A/B/X/Y`, `GAMEPAD_BUTTON_LEFT/RIGHT_BUMPER`, `GAMEPAD_BUTTON_DPAD_*`, `GAMEPAD_AXIS_LEFT_X/Y`, `GAMEPAD_AXIS_RIGHT_X/Y`, `GAMEPAD_AXIS_LEFT/RIGHT_TRIGGER`
+
+### Notes
+
+- Gamepad input uses GLFW's standardized gamepad mapping (Xbox/PlayStation layout)
+- Dead zone is applied to analog axes (values below threshold report as 0.0)
+- State is tracked internally for polling methods
+- Multiple gamepads (up to 16) are supported independently
 
 ---
 
