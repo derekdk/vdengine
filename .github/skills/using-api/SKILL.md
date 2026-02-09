@@ -320,7 +320,40 @@ class GameScene : public vde::Scene {
 };
 ```
 
-### 6. Physics Best Practices
+### 6. Defer Entity Mutations from the Render Phase
+
+The game loop runs `update()` and `render()` in separate scheduler phases. Entity mutations (`addEntity`, `removeEntity`, `setMesh`) are **only safe during the update phase**. Code that runs during the render phase — ImGui callbacks in `onRender()` or `drawDebugUI()` — must use `deferCommand()` to schedule mutations for the next update:
+
+```cpp
+// Inside drawDebugUI() — runs during the Render phase:
+if (ImGui::Button("Spawn")) {
+    deferCommand([this]() {
+        auto e = addEntity<MeshEntity>();
+        e->setMesh(myMesh);
+    });
+}
+```
+
+When removing or replacing entities/meshes, use `retireResource()` to prevent GPU use-after-free:
+
+```cpp
+// Remove entity safely from render-phase code
+deferCommand([this, eid]() { removeEntity(eid); });
+retireResource(std::move(entityPtr));  // Keeps GPU buffers alive one more frame
+```
+
+**DO:**
+- Use `deferCommand()` for any entity add/remove/mesh-swap triggered from ImGui or `onRender()`
+- Use `retireResource()` when removing entities or swapping meshes to extend GPU buffer lifetime
+- Perform entity mutations directly in `onEnter()`, `update()`, or `updateGameLogic()` (safe phases)
+
+**DON'T:**
+- Call `addEntity()`, `removeEntity()`, or `setMesh()` directly from `drawDebugUI()` or `onRender()`
+- Forget `retireResource()` when destroying/replacing entities that are currently being rendered
+
+See [API-DOC.md#deferred-commands-safe-entity-mutation](../../../API-DOC.md#deferred-commands-safe-entity-mutation) for full reference.
+
+### 7. Physics Best Practices
 
 **DO:**
 - Apply forces or impulses: `entity->applyForce()`, `applyImpulse()`
@@ -333,7 +366,7 @@ class GameScene : public vde::Scene {
 - Mix physics and non-physics movement on the same entity
 - Create too many physics bodies (performance)
 
-### 7. Multi-Scene Best Practices
+### 8. Multi-Scene Best Practices
 
 **DO:**
 - Use SceneGroup for split-screen and multi-viewport
@@ -456,7 +489,8 @@ Always check these files for current API capabilities:
 6. **Use existing examples** - Look at [examples/](../../../examples/) folder for patterns
 7. **Suggest improvements but deliver** - Document API gaps but complete the task
 8. **Call base class methods** - Always call `Scene::update()` and `Scene::render()`
-9. **Test thoroughly** - Run the application to verify behavior
+9. **Defer render-phase mutations** - Use `deferCommand()` for entity ops in `onRender()`/`drawDebugUI()`
+10. **Test thoroughly** - Run the application to verify behavior
 
 **Key Systems:**
 - **Input**: Keyboard, mouse, gamepad with events and polling
