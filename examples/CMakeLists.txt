@@ -53,6 +53,14 @@ add_executable(vde_asteroids_demo
 target_link_libraries(vde_asteroids_demo PRIVATE vde)
 add_dependencies(vde_asteroids_demo copy_example_shaders)
 
+# Asteroids demo (Physics) - Modern asteroids clone using physics-based gameplay with forces, collision callbacks, and entity management
+add_executable(vde_asteroids_physics_demo
+    asteroids_demo/main_new.cpp
+)
+
+target_link_libraries(vde_asteroids_physics_demo PRIVATE vde)
+add_dependencies(vde_asteroids_physics_demo copy_example_shaders)
+
 # World bounds demo example demonstrating Phase 2.5 features
 add_executable(vde_world_bounds_demo
     world_bounds_demo/main.cpp
