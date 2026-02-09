@@ -1623,11 +1623,13 @@ void Game::rebuildSchedulerGraph() {
         const std::string& sceneName = updateScenes[i].name;
 
         if (scene->hasPhysics()) {
-            TaskId physicsTask = m_scheduler.addTask(
-                {"scene.physics." + sceneName,
-                 TaskPhase::Physics,
-                 [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
-                 {lastUpdateTask}});
+            TaskId physicsTask = m_scheduler.addTask({
+                "scene.physics." + sceneName,
+                TaskPhase::Physics,
+                [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
+                {lastUpdateTask},
+                false  // Physics step can run on worker threads
+            });
 
             // PostPhysics: sync physics entity transforms with interpolation
             TaskId postPhysicsTask = m_scheduler.addTask(

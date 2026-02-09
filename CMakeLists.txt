@@ -124,6 +124,7 @@ set(VDE_SOURCES
     src/api/Scheduler.cpp
     src/api/PhysicsScene.cpp
     src/api/PhysicsEntity.cpp
+    src/api/ThreadPool.cpp
     # Audio
     src/miniaudio_impl.cpp
     src/api/AudioClip.cpp
@@ -173,6 +174,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/PhysicsTypes.h
     include/vde/api/PhysicsScene.h
     include/vde/api/PhysicsEntity.h
+    include/vde/api/ThreadPool.h
     # Audio headers
     include/vde/api/AudioClip.h
     include/vde/api/AudioEvent.h

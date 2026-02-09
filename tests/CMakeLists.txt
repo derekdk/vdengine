@@ -47,6 +47,8 @@ set(VDE_TEST_SOURCES
     PhysicsScene_test.cpp
     # Phase 6 physics entity tests
     PhysicsEntity_test.cpp
+    # Phase 7 thread pool tests
+    ThreadPool_test.cpp
 )
 
 # Create test executable

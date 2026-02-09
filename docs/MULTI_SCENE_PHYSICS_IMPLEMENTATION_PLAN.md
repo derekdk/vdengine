@@ -19,7 +19,7 @@
 | 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | **Done** | 513/513 | 10/10 |
 | 5 | [Physics Scene](#phase-5-physics-scene) | **Done** | 545/545 | 11/11 |
 | 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | **Done** | 568/568 | 11/11 |
-| 7 | [Thread Pool & Parallel Physics](#phase-7-thread-pool--parallel-physics) | Not Started | — | — |
+| 7 | [Thread Pool & Parallel Physics](#phase-7-thread-pool--parallel-physics) | **Done** | 589/589 | 12/12 |
 | 8 | [Advanced Physics Features](#phase-8-advanced-physics-features) | Not Started | — | — |
 
 ---
@@ -526,32 +526,32 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **7.1** Implement `ThreadPool`:
+- [x] **7.1** Implement `ThreadPool`:
   - Constructor takes thread count, spawns workers
   - `submit(F&& func)` returns `std::future<void>`
   - `waitAll()` blocks until all submitted tasks complete
   - Destructor joins all workers
   - Proper shutdown with condition variable
-- [ ] **7.2** Wire `Scheduler::setWorkerThreadCount()`:
+- [x] **7.2** Wire `Scheduler::setWorkerThreadCount()`:
   - 0 = single-threaded (current behavior)
   - N > 0 = create `ThreadPool(N)`, dispatch tasks not marked `mainThreadOnly` to pool
-- [ ] **7.3** Update scheduler `execute()`:
+- [x] **7.3** Update scheduler `execute()`:
   - Tasks marked `mainThreadOnly` run on calling thread
   - Other tasks submitted to thread pool
   - Respect dependency ordering (don't submit until dependencies complete)
-- [ ] **7.4** Write `ThreadPool_test.cpp`:
+- [x] **7.4** Write `ThreadPool_test.cpp`:
   - Submit single task, verify future completes
   - Submit multiple independent tasks, verify all complete
   - `waitAll()` blocks until done
   - Zero-thread-count gracefully degrades (runs inline)
   - Destructor joins cleanly even with pending tasks
   - Tasks execute on different threads (verify via thread IDs)
-- [ ] **7.5** Create `examples/parallel_physics_demo/`:
+- [x] **7.5** Create `examples/parallel_physics_demo/`:
   - Two scenes, each with physics
   - `setWorkerThreadCount(2)`
   - Console prints which thread ran each physics step
   - Uses ExampleBase pattern
-- [ ] **7.6** Thread-safety audit:
+- [x] **7.6** Thread-safety audit:
   - Verify `PhysicsScene` has no shared mutable state across scenes
   - Verify no global mutable state is accessed during physics tasks
   - Document any thread-safety constraints found
@@ -566,11 +566,13 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass
-- [ ] `ThreadPool_test` passes
-- [ ] `parallel_physics_demo` runs without data races (test under ThreadSanitizer if available)
-- [ ] Single-threaded mode (`setWorkerThreadCount(0)`) is identical to Phase 6 behavior
-- [ ] All other examples unaffected
+- [x] All existing tests pass
+- [x] `ThreadPool_test` passes
+- [x] `parallel_physics_demo` runs without data races (test under ThreadSanitizer if available)
+- [x] Single-threaded mode (`setWorkerThreadCount(0)`) is identical to Phase 6 behavior
+- [x] All other examples unaffected
+
+**Completed (2026-02-08):** 589 tests passed (568 existing + 12 ThreadPool + 9 Scheduler+ThreadPool integration), 12 examples built and verified. PhysicsScene uses pimpl with no shared mutable state — safe for parallel execution. Physics step tasks dispatch to worker threads; all other tasks remain on main thread. Collision callbacks in parallel_physics_demo confirm physics runs on worker threads with distinct thread IDs.
 
 ---
 
@@ -788,4 +790,7 @@ Record notable decisions made during implementation here.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| — | — | — |
+| 2026-02-08 | ThreadPool uses `std::packaged_task` with `std::future` per submission, plus atomic busy-counter + condition_variable for `waitAll()` | Simpler than shared_future duplication; busy-counter ensures waitAll doesn't return while a worker is mid-execution |
+| 2026-02-08 | Scheduler multi-threaded path uses level-based frontier dispatch (all ready tasks submitted together, then waited on) rather than fine-grained per-task futures | Matches engine's batch-per-frame pattern; avoids complex per-task synchronization |
+| 2026-02-08 | Physics step tasks set `mainThreadOnly = false`; all other tasks remain `mainThreadOnly = true` | Only physics has verified thread-safety (pimpl, no shared state). Rendering, input, audio all touch global/shared state and must stay on main thread |
+| 2026-02-08 | Thread-safety audit: PhysicsScene::Impl has no global/static mutable state | Each scene's physics is fully isolated — safe for parallel step() calls |

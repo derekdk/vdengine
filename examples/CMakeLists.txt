@@ -125,3 +125,11 @@ add_executable(vde_physics_demo
 target_link_libraries(vde_physics_demo PRIVATE vde)
 add_dependencies(vde_physics_demo copy_example_shaders)
 
+# Parallel physics demo demonstrating thread pool integration
+add_executable(vde_parallel_physics_demo
+    parallel_physics_demo/main.cpp
+)
+
+target_link_libraries(vde_parallel_physics_demo PRIVATE vde)
+add_dependencies(vde_parallel_physics_demo copy_example_shaders)
+

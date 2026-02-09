@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -132,6 +133,25 @@ class Scheduler {
      */
     const std::vector<TaskId>& getLastExecutionOrder() const;
 
+    /**
+     * @brief Set the number of worker threads for parallel execution.
+     *
+     * 0 = single-threaded (default, current behavior).
+     * N > 0 = create a thread pool with N workers.  Tasks not marked
+     * `mainThreadOnly` may be dispatched to worker threads.
+     *
+     * The pool is (re)created immediately.
+     *
+     * @param count Number of worker threads
+     */
+    void setWorkerThreadCount(size_t count);
+
+    /**
+     * @brief Get the current worker thread count.
+     * @return 0 if single-threaded, otherwise the thread count.
+     */
+    size_t getWorkerThreadCount() const;
+
   private:
     struct TaskEntry {
         TaskId id;
@@ -141,6 +161,11 @@ class Scheduler {
     TaskId m_nextId = 1;
     std::unordered_map<TaskId, TaskEntry> m_tasks;
     std::vector<TaskId> m_lastExecutionOrder;
+    size_t m_workerThreadCount = 0;
+
+    // Forward-declared thread pool (only created when m_workerThreadCount > 0)
+    class ThreadPoolImpl;
+    std::unique_ptr<ThreadPoolImpl> m_threadPool;
 
     /**
      * @brief Topologically sort the task graph.
