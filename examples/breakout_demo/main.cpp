@@ -11,6 +11,7 @@ using namespace vde;
 
 class BreakoutInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
+    // Keyboard input
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
         if (key == vde::KEY_LEFT)
@@ -28,12 +29,41 @@ class BreakoutInputHandler : public vde::examples::BaseExampleInputHandler {
             m_right = false;
     }
 
+    // Gamepad input
+    void onGamepadButtonPress(int /*gamepadId*/, int button) override {
+        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT)
+            m_left = true;
+        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT)
+            m_right = true;
+        if (button == vde::GAMEPAD_BUTTON_A)
+            m_space = true;
+    }
+
+    void onGamepadButtonRelease(int /*gamepadId*/, int button) override {
+        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT)
+            m_left = false;
+        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT)
+            m_right = false;
+    }
+
     bool isLeft() const { return m_left; }
     bool isRight() const { return m_right; }
     bool isSpacePressed() {
         bool v = m_space;
         m_space = false;
         return v;
+    }
+
+    /**
+     * @brief Get the left-stick X axis value for the first connected gamepad.
+     * @return Axis value in [-1, 1], or 0 if no gamepad is connected.
+     */
+    float getLeftStickX() const {
+        for (int i = 0; i < vde::MAX_GAMEPADS; ++i) {
+            if (isGamepadConnected(i))
+                return getGamepadAxis(i, vde::GAMEPAD_AXIS_LEFT_X);
+        }
+        return 0.0f;
     }
 
   private:
@@ -76,7 +106,8 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
         // Create bricks
         createBricks();
 
-        std::cout << "Enjoy! Use LEFT/RIGHT to move paddle, SPACE to launch the ball." << std::endl;
+        std::cout << "Enjoy! Use LEFT/RIGHT or gamepad left stick/D-pad to move paddle,"
+                  << " SPACE or A button to launch the ball." << std::endl;
     }
 
     void update(float deltaTime) override {
@@ -86,13 +117,18 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
         if (!input)
             return;
 
-        // Move paddle
+        // Move paddle (keyboard / D-pad)
         float paddleSpeed = 6.0f;
         auto ppos = m_paddle->getPosition();
         if (input->isLeft())
             ppos.x -= paddleSpeed * deltaTime;
         if (input->isRight())
             ppos.x += paddleSpeed * deltaTime;
+
+        // Move paddle (left analog stick)
+        float stickX = input->getLeftStickX();
+        if (std::abs(stickX) > 0.0f)  // dead zone already handled by engine
+            ppos.x += stickX * paddleSpeed * deltaTime;
 
         // Clamp paddle to world bounds (camera half width = 5.0)
         float halfWorldX = 5.0f;
@@ -218,8 +254,8 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
     }
 
     std::vector<std::string> getControls() const override {
-        return {"Left/Right - Move paddle", "Space - Launch ball",
-                "F - Report failure, ESC - Exit"};
+        return {"Left/Right or D-pad - Move paddle", "Left stick - Move paddle (analog)",
+                "Space or A button - Launch ball", "F - Report failure, ESC - Exit"};
     }
 
   private:
