@@ -8,226 +8,250 @@ This document describes the high-level architecture and design decisions of the 
 2. **Reusability** - Generic engine usable across different game types
 3. **Performance** - Minimal overhead, efficient GPU utilization
 4. **Testability** - Components should be unit-testable where possible
+5. **Incremental Adoption** - Low-level and high-level APIs coexist; advanced features are opt-in
 
 ## System Overview
 
+VDE has a two-layer architecture:
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Application                               │
-├─────────────────────────────────────────────────────────────────┤
-│                           VDE API                                │
-│  ┌─────────┐  ┌──────────────┐  ┌────────┐  ┌─────────────────┐ │
-│  │ Window  │  │VulkanContext │  │ Camera │  │  HexGeometry    │ │
-│  └────┬────┘  └──────┬───────┘  └────────┘  └─────────────────┘ │
-│       │              │                                           │
-│  ┌────┴────┐  ┌──────┴───────────────────────────────────────┐  │
-│  │  GLFW   │  │              Vulkan Subsystems               │  │
-│  └─────────┘  │  ┌──────────┐ ┌───────────┐ ┌─────────────┐  │  │
-│               │  │ Texture  │ │ Shaders   │ │   Buffers   │  │  │
-│               │  └──────────┘ └───────────┘ └─────────────┘  │  │
-│               └──────────────────────────────────────────────┘  │
-├─────────────────────────────────────────────────────────────────┤
-│                        Vulkan Driver                             │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Application                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                         Game API Layer                                   │
+│  ┌──────────┐  ┌────────────┐  ┌─────────────────────────────────────┐  │
+│  │   Game   │  │ Scheduler  │  │ SceneManager                        │  │
+│  │          │  │ TaskGraph  │  │  ┌───────────┐   ┌───────────┐     │  │
+│  │ Input    │  │ ThreadPool │  │  │ Scene A   │   │ Scene B   │     │  │
+│  │ Timing   │  └────────────┘  │  │ Entities  │   │ Entities  │     │  │
+│  │ Settings │                  │  │ Camera    │   │ Camera    │     │  │
+│  └──────────┘                  │  │ Viewport  │   │ Viewport  │     │  │
+│                                │  │ Physics   │   │ Physics   │     │  │
+│  ┌──────────┐  ┌────────────┐  │  │ LightBox  │   │ LightBox  │     │  │
+│  │ Resource │  │   Audio    │  │  └───────────┘   └───────────┘     │  │
+│  │ Manager  │  │  Manager   │  └─────────────────────────────────────┘  │
+│  └──────────┘  └────────────┘                                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                      Low-Level Rendering Layer                           │
+│  ┌─────────┐  ┌──────────────┐  ┌────────┐  ┌─────────┐  ┌──────────┐ │
+│  │ Window  │  │VulkanContext │  │ Camera │  │Texture  │  │  Shaders │ │
+│  └────┬────┘  └──────┬───────┘  └────────┘  └─────────┘  └──────────┘ │
+│       │              │                                                  │
+│  ┌────┴────┐  ┌──────┴─────────────────────────────────────────────┐   │
+│  │  GLFW   │  │    BufferUtils · DescriptorManager · UniformBuffer │   │
+│  └─────────┘  └────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                          Vulkan Driver                                   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Component Responsibilities
+## Game API Layer
 
-### Window (window.h/cpp)
+The Game API provides a high-level framework for building games. Most users interact exclusively with this layer.
+
+### Game
+
+Central manager for the game loop, scenes, input, and subsystems.
+
+- Owns `Window`, `VulkanContext`, `Scheduler`, `ResourceManager`
+- Manages named scenes with stack-based overlays
+- Runs the main loop: `processInput() → scheduler.execute() → drawFrame()`
+- Supports callbacks for subclassing (`onStart`, `onUpdate`, `onRender`, `onShutdown`)
+
+**Dependencies**: Window, VulkanContext, Scheduler, ResourceManager, AudioManager
+
+### Scheduler
+
+Task-graph scheduler that replaces the hard-coded game loop body with a declarative graph.
+
+- Tasks have phases (Input → GameLogic → Audio → Physics → PostPhysics → PreRender → Render)
+- Topological sort with phase-based tiebreaking
+- Optional multi-threaded execution via `ThreadPool` for independent tasks (e.g., per-scene physics)
+- Graph is rebuilt automatically when scenes change
+
+**Dependencies**: ThreadPool (optional)
+
+### Scene
+
+A game scene/state managing entities, resources, camera, lighting, and world bounds.
+
+- Entity management (add/remove/query by ID, name, type, or physics body)
+- Per-scene camera, lighting (`LightBox`), and background color
+- Optional `ViewportRect` for split-screen rendering
+- Optional `PhysicsScene` for 2D physics simulation (opt-in)
+- Phase callbacks for 3-phase update model (GameLogic → Audio → Visual)
+- Audio event queue for phase-decoupled sound playback
+- Background update support (`setContinueInBackground`)
+
+**Dependencies**: Game, Entity, GameCamera, LightBox, PhysicsScene (optional)
+
+### Entity System
+
+Game objects with transform (position, rotation, scale) and visual representation.
+
+| Class | Description |
+|-------|-------------|
+| `Entity` | Base class with transform, visibility, lifecycle |
+| `MeshEntity` | 3D mesh with optional material and texture |
+| `SpriteEntity` | 2D sprite with texture, UV rect, anchor point |
+| `PhysicsEntity` | Mixin for physics-body binding with interpolated sync |
+| `PhysicsSpriteEntity` | SpriteEntity + PhysicsEntity |
+| `PhysicsMeshEntity` | MeshEntity + PhysicsEntity |
+
+### Physics System
+
+2D physics simulation with fixed-timestep accumulator. Fully opt-in per scene.
+
+- AABB broad-phase collision detection with impulse-based resolution
+- Body types: Static, Dynamic, Kinematic; sensor bodies for triggers
+- Collision callbacks (global and per-body, begin/end)
+- Raycast and AABB spatial queries
+- Automatic PostPhysics transform sync with interpolation
+- Thread-safe: each `PhysicsScene` uses pimpl with no shared mutable state
+
+### Audio System
+
+Cross-platform audio using miniaudio (WAV, MP3, OGG, FLAC).
+
+- `AudioManager` singleton for playback and mixing
+- Separate volume channels: Master, Music, SFX
+- 3D spatial audio with listener position/orientation
+- `AudioEvent` queue decouples game logic from audio calls
+- Scene convenience methods: `playSFX()`, `playSFXAt()`
+
+### Multi-Scene & Split-Screen
+
+- `SceneGroup` activates multiple scenes simultaneously
+- `ViewportRect` assigns sub-regions of the window to scenes (normalized 0-1 coordinates)
+- Independent cameras per viewport with per-scene UBO updates
+- Input focus routing: keyboard to focused scene, mouse to viewport under cursor
+
+## Low-Level Rendering Layer
+
+Direct Vulkan abstractions for advanced rendering needs.
+
+### Window (Window.h/cpp)
 - GLFW window creation and management
-- Input event polling
-- Resize handling and callbacks
-- Vulkan surface creation (via GLFW)
-
-**Dependencies**: GLFW
-**Dependents**: VulkanContext
+- Input event polling, resize handling
+- Vulkan surface creation, fullscreen toggle, resolution presets
 
 ### VulkanContext (VulkanContext.h/cpp)
-Core Vulkan infrastructure management:
-- Instance creation with validation layers
-- Physical/logical device selection
-- Swap chain management
-- Render pass and framebuffers
-- Command pool and buffers
-- Synchronization primitives (semaphores, fences)
-- Frame rendering orchestration
-
-**Dependencies**: Window, Vulkan
-**Dependents**: Application, Texture, BufferUtils
+Core Vulkan infrastructure:
+- Instance, device, swapchain, render pass, framebuffers
+- Command pool/buffers, synchronization primitives
+- Frame rendering orchestration via render callback
 
 ### Camera (Camera.h/cpp)
-3D view and projection management:
-- Position/target-based setup
-- Orbital camera controls (pitch, yaw, distance)
-- View matrix generation
-- Projection matrix with Vulkan Y-flip correction
+Low-level 3D camera:
+- Orbital controls (pitch, yaw, distance)
+- View/projection matrix generation with Vulkan Y-flip
 - Pan, zoom, translate operations
 
-**Dependencies**: GLM
-**Dependents**: Application
-
 ### Texture (Texture.h/cpp)
-Vulkan texture management:
-- Image loading via stb_image
-- Staging buffer creation
-- Image layout transitions
-- Image view and sampler creation
-- Descriptor info generation
-
-**Dependencies**: ImageLoader, BufferUtils, Vulkan
-**Dependents**: Application
+Vulkan texture management (inherits from `Resource`):
+- Two-phase loading: CPU load via stb_image, GPU upload via staging buffer
+- Image/view/sampler creation and cleanup
 
 ### BufferUtils (BufferUtils.h/cpp)
-Static utility class for Vulkan buffer operations:
-- Memory type finding
-- Buffer creation with various properties
-- Buffer-to-buffer copy via staging
-- Single-time command buffer utilities
+Static utilities for Vulkan buffer operations:
+- Memory type finding, buffer creation, staging copies
+- Device-local and mapped buffer helpers
 
-**Dependencies**: Vulkan
-**Dependents**: Texture, Application
+### ShaderCompiler / ShaderCache
+Runtime GLSL → SPIR-V compilation with disk-based caching.
 
-### ShaderCompiler (ShaderCompiler.h/cpp)
-Runtime GLSL to SPIR-V compilation:
-- Uses glslang library
-- Supports vertex, fragment, compute shaders
-- Returns compiled SPIR-V binary
-
-**Dependencies**: glslang
-**Dependents**: ShaderCache
-
-### ShaderCache (ShaderCache.h/cpp)
-Shader compilation caching:
-- Computes hash of shader source
-- Caches compiled shader modules
-- Loads from cache or compiles on demand
-
-**Dependencies**: ShaderCompiler
-**Dependents**: Application
-
-### HexGeometry (HexGeometry.h/cpp)
-Hexagon mesh generation:
-- Flat-top and pointy-top orientations
-- Vertex and index buffer generation
-- UV coordinate calculation
-- Corner position utilities
-
-**Dependencies**: Types, GLM
-**Dependents**: Application
-
-### HexPrismMesh (HexPrismMesh.h/cpp)
-3D hexagonal prism generation:
-- Top and bottom face generation
-- Side quad generation
-- Normal calculation
-- Height-based geometry
-
-**Dependencies**: GLM
-**Dependents**: Application
+### HexGeometry / HexPrismMesh
+Specialized hexagonal mesh generation.
 
 ## Data Flow
 
-### Initialization Sequence
+### Game Loop Sequence (via Scheduler)
 
 ```
-1. Application creates Window
-2. Application creates VulkanContext
-3. VulkanContext.initialize(&window)
-   ├── createInstance()
-   ├── setupDebugMessenger()
-   ├── createSurface(window)
-   ├── pickPhysicalDevice()
-   ├── createLogicalDevice()
-   ├── createSwapChain()
-   ├── createImageViews()
-   ├── createRenderPass()
-   ├── createFramebuffers()
-   ├── createCommandPool()
-   ├── createCommandBuffers()
-   └── createSyncObjects()
-4. Application sets render callback
-5. Enter main loop
+1. Game::run() starts main loop
+2. Each frame:
+   ├── processInput()              (GLFW poll + dispatch)
+   ├── scheduler.execute()         (Task graph)
+   │   ├── Input phase tasks
+   │   ├── GameLogic phase tasks   (per-scene update or 3-phase callbacks)
+   │   ├── Audio phase tasks       (per-scene audio queue drain + AudioManager::update)
+   │   ├── Physics phase tasks     (per-scene physics step — parallelizable)
+   │   ├── PostPhysics tasks       (sync physics transforms to entities)
+   │   ├── PreRender tasks         (camera apply, clear color)
+   │   └── Render task             (per-scene viewport/camera/scissor + entity render)
+   └── drawFrame()                 (Vulkan submit + present)
 ```
 
-### Render Frame Sequence
+### Multi-Viewport Render Sequence
 
 ```
-1. window.pollEvents()
-2. context.drawFrame()
-   ├── vkWaitForFences()
-   ├── vkAcquireNextImageKHR()
-   ├── vkResetCommandBuffer()
-   ├── vkBeginCommandBuffer()
-   ├── vkCmdBeginRenderPass()
-   ├── renderCallback(commandBuffer)  // User code
-   ├── vkCmdEndRenderPass()
-   ├── vkEndCommandBuffer()
-   ├── vkQueueSubmit()
-   └── vkQueuePresentKHR()
+For each scene in active SceneGroup:
+  1. Compute VkViewport + VkRect2D from scene's ViewportRect
+  2. vkCmdSetViewport / vkCmdSetScissor
+  3. Update UBO with scene's camera view/projection
+  4. Update lighting UBO from scene's LightBox
+  5. scene->render() (iterates entities)
 ```
 
 ## Memory Management
 
-### Resource Ownership
-- VulkanContext owns core Vulkan resources (instance, device, swapchain)
-- Texture owns its image, memory, view, and sampler
-- BufferUtils is stateless (uses static initialization)
-- ShaderCache owns compiled shader modules
+### Ownership Model
 
-### Cleanup Order
-Resources must be destroyed in reverse creation order:
-1. Application resources (textures, buffers)
-2. Pipelines and descriptor sets
-3. Command buffers and pools
-4. Framebuffers and render pass
-5. Swap chain and image views
-6. Logical device
-7. Debug messenger
-8. Surface
-9. Instance
+| Object | Owner | Mechanism |
+|--------|-------|-----------|
+| Window, VulkanContext | Game | unique_ptr |
+| Scene | Game | unique_ptr (map) |
+| Entity | Scene | shared_ptr (vector) |
+| Resource (Mesh, Texture) | Scene or ResourceManager | shared_ptr / weak_ptr cache |
+| GameCamera, LightBox | Scene | unique_ptr |
+| PhysicsScene | Scene | unique_ptr |
+| InputHandler | External | raw pointer (not owned) |
+
+### Resource Lifecycle
+- Resources loaded CPU-side first, GPU upload deferred to first use
+- `ResourceManager` uses weak_ptr caching for automatic deduplication
+- GPU resources cleaned up on shutdown or when last reference drops
 
 ## Threading Model
 
-VDE is currently single-threaded:
-- All Vulkan commands submitted from main thread
-- No internal thread synchronization
-- Applications requiring multi-threading should manage their own synchronization
+- **Default**: Single-threaded. All Vulkan commands on main thread.
+- **Opt-in parallelism**: `Scheduler::setWorkerThreadCount(N)` enables thread pool.
+  - Only physics tasks (per-scene `step()`) are dispatched to workers.
+  - All other tasks (input, rendering, audio) remain on the main thread.
+  - `PhysicsScene` is thread-safe via pimpl with no shared mutable state.
+- **ThreadPool**: Fixed-size worker pool with `submit()` / `waitAll()`.
+  - Level-based frontier dispatch: all ready tasks submitted together, then waited on.
+  - Degrades to inline execution with threadCount == 0.
 
-## Extension Points
+## Test Coverage
 
-### Custom Rendering
-Set a render callback on VulkanContext:
-```cpp
-context.setRenderCallback([](VkCommandBuffer cmd) {
-    // Custom Vulkan rendering commands
-});
-```
+604 unit tests across 24 test files covering:
 
-### Custom Pipelines
-Applications create their own graphics pipelines using:
-- `context.getDevice()` - Logical device
-- `context.getRenderPass()` - Compatible render pass
-- `context.getSwapChainExtent()` - Viewport dimensions
+| Category | Tests | Files |
+|----------|-------|-------|
+| Core rendering | Camera, Texture, Shader, HexGeometry, Types, Window | 7 |
+| Game API | Entity, Scene, GameCamera, LightBox, Material, Mesh, Sprite, WorldBounds, WorldUnits, CameraBounds, ResourceManager | 11 |
+| Multi-scene | Scheduler, SceneGroup, ViewportRect, AudioEvent | 4 |
+| Physics | PhysicsScene, PhysicsEntity | 2 |
+| Threading | ThreadPool | 1 |
 
-### Subclassing
-VulkanContext can be subclassed for custom initialization:
-```cpp
-class MyContext : public vde::VulkanContext {
-protected:
-    // Override initialization methods
-};
-```
+## Examples
 
-## Future Considerations
+14 example programs demonstrating engine features:
 
-### Planned Enhancements
-- ImGui integration for debug UI
-- Basic 2D sprite renderer
-- Texture atlasing
-- Multiple render passes
-- Compute shader support
-
-### Design Constraints
-- Single window support (could add multi-window)
-- Fixed render pass format (could make configurable)
-- No built-in scene graph (intentional - keep engine minimal)
+| Example | Demonstrates |
+|---------|-------------|
+| `triangle` | Basic Vulkan rendering |
+| `simple_game` | Game API basics |
+| `sprite_demo` | 2D sprite rendering |
+| `world_bounds_demo` | World coordinate system |
+| `materials_lighting_demo` | Materials & multi-light rendering |
+| `resource_demo` | Resource management |
+| `audio_demo` | Audio system |
+| `sidescroller` | 2D platformer mechanics |
+| `wireframe_viewer` | Shape rendering |
+| `multi_scene_demo` | Scene management & optional viewports |
+| `quad_viewport_demo` | True 4-quadrant split-screen |
+| `physics_demo` | Physics simulation |
+| `parallel_physics_demo` | Multi-threaded physics |
+| `physics_audio_demo` | Physics → game logic → audio pipeline |

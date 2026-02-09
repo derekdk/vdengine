@@ -1,5 +1,15 @@
 # API Suggestion: Multi-Scene Improvements
 
+> **Implementation Status (Updated)**
+>
+> | # | Feature | Status | Notes |
+> |---|---------|--------|-------|
+> | 1 | Background Scene Updates | **DONE** | `Scene::setContinueInBackground()` implemented; Scheduler updates background scenes each frame |
+> | 2 | Multi-Viewport / Split-Screen | **DONE** | `ViewportRect`, `SceneGroup`, per-scene camera/viewport/scissor all implemented |
+> | 3 | Scene Transition Effects | Not Done | No transition system yet |
+> | 4 | Scene Re-entry Optimization | Not Done | No `onFirstEnter()`/`onReEnter()` hooks; `m_initialized` pattern still required |
+> | 5 | Per-Scene Input Handler Stack | Partial | Focus routing via `setFocusedScene()` exists; no `setBlocksInput()` propagation control |
+
 ## Overview
 
 While building the `multi_scene_demo` example, several API limitations were identified around multi-scene workflows. The current API supports basic scene switching (`setActiveScene`, `pushScene`/`popScene`) well, but more advanced patterns require workarounds.

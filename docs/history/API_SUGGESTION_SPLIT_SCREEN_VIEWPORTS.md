@@ -1,5 +1,18 @@
 # API Suggestion: Split-Screen Viewports & Per-Scene Rendering
 
+> **Implementation Status (Updated)**
+>
+> | # | Deficiency | Status | Notes |
+> |---|-----------|--------|-------|
+> | 1 | Per-scene viewport/scissor rect | **DONE** | `ViewportRect` class + `Scene::setViewportRect()` implemented |
+> | 2 | Per-scene camera in render | **DONE** | Scheduler applies each scene's camera + UBO before render |
+> | 3 | Command buffer access in Scene | **DONE** | Handled internally by Game (Option C); no user-facing change needed |
+> | 4 | Input focus / routing per viewport | **DONE** | `Game::setFocusedScene()` + `Scene::setInputHandler()` with focus gating |
+> | 5 | Visual viewport decorations | Not Done | Low priority; border sprites used as workaround |
+> | 6 | Per-scene clear color | **DONE** | Background quads approach; no extra render pass needed |
+>
+> See `examples/quad_viewport_demo` and `examples/four_scene_3d_demo` for working split-screen examples.
+
 ## Problem
 
 The engine's multi-scene system (`SceneGroup`, Phase 2) supports updating multiple scenes simultaneously, but **all scenes render through a single full-window viewport using only the primary scene's camera**. This makes true split-screen rendering (4 independent 3D views) impossible through the high-level API.
