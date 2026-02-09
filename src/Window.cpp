@@ -106,10 +106,38 @@ void Window::setFullscreen(bool fullscreen) {
     notifyResize();
 }
 
+float Window::getDPIScale() const {
+    float xscale = 1.0f;
+    float yscale = 1.0f;
+    glfwGetWindowContentScale(m_window, &xscale, &yscale);
+    // Return the maximum of x and y scale for consistent UI scaling
+    return (xscale > yscale) ? xscale : yscale;
+}
+
 void Window::notifyResize() {
     if (m_resizeCallback) {
         m_resizeCallback(m_width, m_height);
     }
+}
+
+float Window::getPrimaryMonitorDPIScale() {
+    // Check if GLFW is already initialized
+    bool wasInitialized = (glfwGetCurrentContext() != nullptr);
+    
+    if (!wasInitialized) {
+        glfwInit();
+    }
+    
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    float xscale = 1.0f, yscale = 1.0f;
+    glfwGetMonitorContentScale(primaryMonitor, &xscale, &yscale);
+    float dpiScale = (xscale > yscale) ? xscale : yscale;
+    
+    if (!wasInitialized) {
+        glfwTerminate();
+    }
+    
+    return dpiScale;
 }
 
 }  // namespace vde

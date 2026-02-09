@@ -264,6 +264,15 @@ class Game {
     Window* getWindow() { return m_window.get(); }
     const Window* getWindow() const { return m_window.get(); }
 
+    /**
+     * @brief Get DPI scale factor for the window.
+     * @return DPI scale (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)
+     *
+     * Returns the content scale factor for the window's monitor,
+     * which is useful for scaling UI elements on high-DPI displays.
+     */
+    float getDPIScale() const;
+
     // Settings
 
     /**

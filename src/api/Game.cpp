@@ -222,6 +222,10 @@ void Game::quit() {
     m_running = false;
 }
 
+float Game::getDPIScale() const {
+    return m_window ? m_window->getDPIScale() : 1.0f;
+}
+
 void Game::addScene(const std::string& name, Scene* scene) {
     addScene(name, std::unique_ptr<Scene>(scene));
 }
