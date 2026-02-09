@@ -26,6 +26,20 @@
 #include <string>
 #include <vector>
 
+// ImGui includes (optional - only used if VDE_EXAMPLE_USE_IMGUI is defined)
+#ifdef VDE_EXAMPLE_USE_IMGUI
+#include <vde/VulkanContext.h>
+
+#include <vulkan/vulkan.h>
+
+#include <cstddef>
+#include <stdexcept>
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+#endif
+
 namespace vde {
 namespace examples {
 
@@ -52,6 +66,9 @@ class BaseExampleInputHandler : public vde::InputHandler {
         }
         if (key == vde::KEY_F11) {
             m_fullscreenTogglePressed = true;
+        }
+        if (key == vde::KEY_F1) {
+            m_debugUITogglePressed = true;
         }
     }
 
@@ -82,10 +99,20 @@ class BaseExampleInputHandler : public vde::InputHandler {
         return val;
     }
 
+    /**
+     * @brief Check if debug UI toggle was pressed (clears flag).
+     */
+    bool isDebugUITogglePressed() {
+        bool val = m_debugUITogglePressed;
+        m_debugUITogglePressed = false;
+        return val;
+    }
+
   protected:
     bool m_escapePressed = false;
     bool m_failPressed = false;
     bool m_fullscreenTogglePressed = false;
+    bool m_debugUITogglePressed = false;
 };
 
 /**
@@ -136,6 +163,11 @@ class BaseExampleScene : public vde::Scene {
                 }
             }
 
+            // Check for debug UI toggle
+            if (input->isDebugUITogglePressed()) {
+                m_debugUIVisible = !m_debugUIVisible;
+            }
+
             // Check for escape key
             if (input->isEscapePressed()) {
                 handleEarlyExit();
@@ -154,6 +186,44 @@ class BaseExampleScene : public vde::Scene {
      */
     bool didTestFail() const { return m_testFailed; }
 
+    /**
+     * @brief Check if debug UI is visible.
+     */
+    bool isDebugUIVisible() const { return m_debugUIVisible; }
+
+    /**
+     * @brief Set whether debug UI is visible.
+     */
+    void setDebugUIVisible(bool visible) { m_debugUIVisible = visible; }
+
+    /**
+     * @brief Draw debug UI using ImGui (only called if debug UI is visible).
+     *
+     * Override this in your scene to add custom debug menus.
+     * The DPI scale is already applied by the base game class.
+     */
+    virtual void drawDebugUI() {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        // Default debug UI - FPS and basic stats
+        auto* game = getGame();
+        if (!game)
+            return;
+
+        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(280, 140), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Debug Info")) {
+            ImGui::Text("FPS: %.1f", game->getFPS());
+            ImGui::Text("Frame: %llu", game->getFrameCount());
+            ImGui::Text("Delta: %.3f ms", game->getDeltaTime() * 1000.0f);
+            ImGui::Text("Entities: %zu", getEntities().size());
+            ImGui::Text("DPI Scale: %.2f", game->getDPIScale());
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "Press F1 to toggle");
+        }
+        ImGui::End();
+#endif
+    }
+
   protected:
     /**
      * @brief Get the example name (e.g., "Simple Game", "Sprite System").
@@ -171,7 +241,7 @@ class BaseExampleScene : public vde::Scene {
     virtual std::vector<std::string> getExpectedVisuals() const = 0;
 
     /**
-     * @brief Get list of controls (excluding standard ESC/F).
+     * @brief Get list of controls (excluding standard ESC/F/F1/F11).
      */
     virtual std::vector<std::string> getControls() const { return {}; }
 
@@ -205,6 +275,7 @@ class BaseExampleScene : public vde::Scene {
         }
 
         std::cout << "  F11   - Toggle fullscreen" << std::endl;
+        std::cout << "  F1    - Toggle debug UI" << std::endl;
         std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
         std::cout << "  ESC   - Exit early" << std::endl;
         std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n" << std::endl;
@@ -257,6 +328,7 @@ class BaseExampleScene : public vde::Scene {
     float m_elapsedTime = 0.0f;
     float m_autoTerminateSeconds;
     bool m_testFailed = false;
+    bool m_debugUIVisible = true;  // Debug UI enabled by default
 };
 
 /**
@@ -266,6 +338,7 @@ class BaseExampleScene : public vde::Scene {
  * - Input handler management
  * - Scene reference for test failure checking
  * - Exit code handling (0 for pass, 1 for fail)
+ * - ImGui integration (if VDE_EXAMPLE_USE_IMGUI is defined)
  *
  * Template parameter TInputHandler: Your input handler type (must derive from
  * BaseExampleInputHandler) Template parameter TScene: Your scene type (must derive from
@@ -280,7 +353,11 @@ class BaseExampleGame : public vde::Game {
 
   public:
     BaseExampleGame() = default;
-    virtual ~BaseExampleGame() = default;
+    virtual ~BaseExampleGame() {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        cleanupImGui();
+#endif
+    }
 
     void onStart() override {
         // Set up input handler
@@ -292,9 +369,28 @@ class BaseExampleGame : public vde::Game {
         m_scenePtr = scene;
         addScene("main", scene);
         setActiveScene("main");
+
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        // Initialize ImGui after scene setup
+        initImGui();
+#endif
+    }
+
+    void onRender() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        // Render ImGui overlay if debug UI is visible
+        renderImGui();
+#endif
     }
 
     void onShutdown() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        // Ensure GPU is idle before tearing down ImGui resources
+        if (getVulkanContext()) {
+            vkDeviceWaitIdle(getVulkanContext()->getDevice());
+        }
+        cleanupImGui();
+#endif
         if (m_scenePtr && m_scenePtr->didTestFail()) {
             m_exitCode = 1;
         }
@@ -320,6 +416,139 @@ class BaseExampleGame : public vde::Game {
     std::unique_ptr<TInputHandler> m_inputHandler;
     TScene* m_scenePtr = nullptr;  // Non-owning reference
     int m_exitCode = 0;
+
+#ifdef VDE_EXAMPLE_USE_IMGUI
+    VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
+    bool m_imguiInitialized = false;
+
+    /**
+     * @brief Create a descriptor pool for ImGui's internal use.
+     */
+    static VkDescriptorPool createImGuiDescriptorPool(VkDevice device) {
+        VkDescriptorPoolSize poolSizes[] = {
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100},
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 100;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(std::size(poolSizes));
+        poolInfo.pPoolSizes = poolSizes;
+
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create ImGui descriptor pool!");
+        }
+        return pool;
+    }
+
+    /**
+     * @brief Initialize ImGui with VDE's Vulkan context.
+     */
+    void initImGui() {
+        auto* ctx = getVulkanContext();
+        auto* win = getWindow();
+        if (!ctx || !win)
+            return;
+
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        ImGui::StyleColorsDark();
+
+        // Apply DPI scaling to fonts
+        float dpiScale = getDPIScale();
+        if (dpiScale > 0.0f) {
+            io.FontGlobalScale = dpiScale;
+        }
+
+        // Platform backend – GLFW
+        // install_callbacks=true lets ImGui capture input alongside VDE
+        ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
+
+        // Create a descriptor pool dedicated to ImGui
+        m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
+
+        // Renderer backend – Vulkan
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.Instance = ctx->getInstance();
+        initInfo.PhysicalDevice = ctx->getPhysicalDevice();
+        initInfo.Device = ctx->getDevice();
+        initInfo.QueueFamily = ctx->getGraphicsQueueFamily();
+        initInfo.Queue = ctx->getGraphicsQueue();
+        initInfo.DescriptorPool = m_imguiPool;
+        initInfo.MinImageCount = 2;
+        initInfo.ImageCount = 2;  // double-buffered
+        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.RenderPass = ctx->getRenderPass();
+        initInfo.Subpass = 0;
+
+        ImGui_ImplVulkan_Init(&initInfo);
+
+        // Upload font atlas textures
+        ImGui_ImplVulkan_CreateFontsTexture();
+
+        m_imguiInitialized = true;
+    }
+
+    /**
+     * @brief Render ImGui overlay (called inside the active render pass).
+     */
+    void renderImGui() {
+        if (!m_imguiInitialized)
+            return;
+
+        // Check if debug UI is visible
+        if (!m_scenePtr || !m_scenePtr->isDebugUIVisible())
+            return;
+
+        // Start the ImGui frame
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // Let the scene build its ImGui windows
+        if (m_scenePtr) {
+            m_scenePtr->drawDebugUI();
+        }
+
+        // Finalize and record draw data into the active command buffer
+        ImGui::Render();
+        ImDrawData* drawData = ImGui::GetDrawData();
+
+        auto* ctx = getVulkanContext();
+        if (ctx) {
+            VkCommandBuffer cmd = ctx->getCurrentCommandBuffer();
+            if (cmd != VK_NULL_HANDLE) {
+                ImGui_ImplVulkan_RenderDrawData(drawData, cmd);
+            }
+        }
+    }
+
+    /**
+     * @brief Cleanup ImGui resources.
+     */
+    void cleanupImGui() {
+        if (!m_imguiInitialized)
+            return;
+
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        if (m_imguiPool != VK_NULL_HANDLE) {
+            auto* ctx = getVulkanContext();
+            if (ctx && ctx->getDevice()) {
+                vkDestroyDescriptorPool(ctx->getDevice(), m_imguiPool, nullptr);
+            }
+            m_imguiPool = VK_NULL_HANDLE;
+        }
+
+        m_imguiInitialized = false;
+    }
+#endif
 };
 
 /**

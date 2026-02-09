@@ -234,6 +234,13 @@ class MenuScene : public vde::Scene {
  */
 class SimpleGameDemo : public vde::Game {
   public:
+    SimpleGameDemo() = default;
+    ~SimpleGameDemo() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        cleanupImGui();
+#endif
+    }
+
     void onStart() override {
         // Set up input handler
         m_inputHandler = std::make_unique<GameInputHandler>();
@@ -247,9 +254,45 @@ class SimpleGameDemo : public vde::Game {
 
         // Start with menu scene
         setActiveScene("menu");
+
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        // Initialize ImGui after scene setup
+        initImGui();
+#endif
+    }
+
+    void onRender() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        // Render ImGui overlay for BaseExampleScene-derived scenes
+        auto* activeScene = dynamic_cast<vde::examples::BaseExampleScene*>(getActiveScene());
+        if (activeScene && activeScene->isDebugUIVisible()) {
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            activeScene->drawDebugUI();
+
+            ImGui::Render();
+            ImDrawData* drawData = ImGui::GetDrawData();
+
+            auto* ctx = getVulkanContext();
+            if (ctx) {
+                VkCommandBuffer cmd = ctx->getCurrentCommandBuffer();
+                if (cmd != VK_NULL_HANDLE) {
+                    ImGui_ImplVulkan_RenderDrawData(drawData, cmd);
+                }
+            }
+        }
+#endif
     }
 
     void onShutdown() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        if (getVulkanContext()) {
+            vkDeviceWaitIdle(getVulkanContext()->getDevice());
+        }
+        cleanupImGui();
+#endif
         if (m_mainScenePtr && m_mainScenePtr->didTestFail()) {
             m_exitCode = 1;
         }
@@ -261,6 +304,88 @@ class SimpleGameDemo : public vde::Game {
     std::unique_ptr<GameInputHandler> m_inputHandler;
     MainScene* m_mainScenePtr = nullptr;
     int m_exitCode = 0;
+
+#ifdef VDE_EXAMPLE_USE_IMGUI
+    VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
+    bool m_imguiInitialized = false;
+
+    static VkDescriptorPool createImGuiDescriptorPool(VkDevice device) {
+        VkDescriptorPoolSize poolSizes[] = {
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100},
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 100;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(std::size(poolSizes));
+        poolInfo.pPoolSizes = poolSizes;
+
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create ImGui descriptor pool!");
+        }
+        return pool;
+    }
+
+    void initImGui() {
+        auto* ctx = getVulkanContext();
+        auto* win = getWindow();
+        if (!ctx || !win)
+            return;
+
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        ImGui::StyleColorsDark();
+
+        float dpiScale = getDPIScale();
+        if (dpiScale > 0.0f) {
+            io.FontGlobalScale = dpiScale;
+        }
+
+        ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
+        m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
+
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.Instance = ctx->getInstance();
+        initInfo.PhysicalDevice = ctx->getPhysicalDevice();
+        initInfo.Device = ctx->getDevice();
+        initInfo.QueueFamily = ctx->getGraphicsQueueFamily();
+        initInfo.Queue = ctx->getGraphicsQueue();
+        initInfo.DescriptorPool = m_imguiPool;
+        initInfo.MinImageCount = 2;
+        initInfo.ImageCount = 2;
+        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.RenderPass = ctx->getRenderPass();
+        initInfo.Subpass = 0;
+
+        ImGui_ImplVulkan_Init(&initInfo);
+        ImGui_ImplVulkan_CreateFontsTexture();
+
+        m_imguiInitialized = true;
+    }
+
+    void cleanupImGui() {
+        if (!m_imguiInitialized)
+            return;
+
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        if (m_imguiPool != VK_NULL_HANDLE) {
+            auto* ctx = getVulkanContext();
+            if (ctx && ctx->getDevice()) {
+                vkDestroyDescriptorPool(ctx->getDevice(), m_imguiPool, nullptr);
+            }
+            m_imguiPool = VK_NULL_HANDLE;
+        }
+
+        m_imguiInitialized = false;
+    }
+#endif
 };
 
 /**

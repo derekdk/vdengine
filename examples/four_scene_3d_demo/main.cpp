@@ -39,6 +39,14 @@
 
 #include "../ExampleBase.h"
 
+#ifdef VDE_EXAMPLE_USE_IMGUI
+#include <vde/VulkanContext.h>
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+#endif
+
 using namespace vde;
 
 // ============================================================================
@@ -737,6 +745,11 @@ class CosmosScene : public Focusable3DScene {
 class FourScene3DDemo : public vde::Game {
   public:
     FourScene3DDemo() = default;
+    ~FourScene3DDemo() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        cleanupImGui();
+#endif
+    }
 
     void onStart() override {
         m_input = std::make_unique<FourScene3DInputHandler>();
@@ -761,9 +774,52 @@ class FourScene3DDemo : public vde::Game {
         m_focusIndex = 0;
 
         printHeader();
+
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        initImGui();
+#endif
+    }
+
+    void onRender() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        if (!m_imguiInitialized)
+            return;
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(280, 160), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Debug Info")) {
+            ImGui::Text("FPS: %.1f", getFPS());
+            ImGui::Text("Frame: %llu", getFrameCount());
+            ImGui::Text("Delta: %.3f ms", getDeltaTime() * 1000.0f);
+            ImGui::Text("DPI Scale: %.2f", getDPIScale());
+            ImGui::Separator();
+            ImGui::Text("Focused: %s", kDisplayNames[m_focusIndex]);
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "Press F1 to toggle");
+        }
+        ImGui::End();
+
+        ImGui::Render();
+        auto* ctx = getVulkanContext();
+        if (ctx) {
+            VkCommandBuffer cmd = ctx->getCurrentCommandBuffer();
+            if (cmd != VK_NULL_HANDLE) {
+                ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+            }
+        }
+#endif
     }
 
     void onShutdown() override {
+#ifdef VDE_EXAMPLE_USE_IMGUI
+        if (getVulkanContext()) {
+            vkDeviceWaitIdle(getVulkanContext()->getDevice());
+        }
+        cleanupImGui();
+#endif
         if (m_failed)
             m_exitCode = 1;
     }
@@ -825,6 +881,76 @@ class FourScene3DDemo : public vde::Game {
     static constexpr const char* kDisplayNames[] = {"Crystal Garden (TL)", "Metropolis (TR)",
                                                     "Nature Park (BL)", "Cosmos (BR)"};
 
+#ifdef VDE_EXAMPLE_USE_IMGUI
+    VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
+    bool m_imguiInitialized = false;
+
+    static VkDescriptorPool createImGuiDescriptorPool(VkDevice device) {
+        VkDescriptorPoolSize poolSizes[] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100}};
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 100;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = poolSizes;
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool);
+        return pool;
+    }
+
+    void initImGui() {
+        auto* ctx = getVulkanContext();
+        auto* win = getWindow();
+        if (!ctx || !win)
+            return;
+
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        ImGui::StyleColorsDark();
+
+        float dpiScale = getDPIScale();
+        if (dpiScale > 0.0f)
+            io.FontGlobalScale = dpiScale;
+
+        ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
+        m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
+
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.Instance = ctx->getInstance();
+        initInfo.PhysicalDevice = ctx->getPhysicalDevice();
+        initInfo.Device = ctx->getDevice();
+        initInfo.QueueFamily = ctx->getGraphicsQueueFamily();
+        initInfo.Queue = ctx->getGraphicsQueue();
+        initInfo.DescriptorPool = m_imguiPool;
+        initInfo.MinImageCount = 2;
+        initInfo.ImageCount = 2;
+        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        initInfo.RenderPass = ctx->getRenderPass();
+        initInfo.Subpass = 0;
+
+        ImGui_ImplVulkan_Init(&initInfo);
+        ImGui_ImplVulkan_CreateFontsTexture();
+        m_imguiInitialized = true;
+    }
+
+    void cleanupImGui() {
+        if (!m_imguiInitialized)
+            return;
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+        if (m_imguiPool != VK_NULL_HANDLE) {
+            auto* ctx = getVulkanContext();
+            if (ctx && ctx->getDevice()) {
+                vkDestroyDescriptorPool(ctx->getDevice(), m_imguiPool, nullptr);
+            }
+            m_imguiPool = VK_NULL_HANDLE;
+        }
+        m_imguiInitialized = false;
+    }
+#endif
     void printHeader() {
         std::cout << "\n========================================\n";
         std::cout << "  VDE Example: Four Scene 3D Demo\n";

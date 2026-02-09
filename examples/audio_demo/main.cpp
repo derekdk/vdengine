@@ -32,20 +32,103 @@
 #include <filesystem>
 #include <iostream>
 
+#include "../ExampleBase.h"
+
 using namespace vde;
 
-class AudioDemoScene : public Scene {
+// =============================================================================
+// Input Handler
+// =============================================================================
+
+class AudioInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
+    void onKeyPress(int key) override {
+        BaseExampleInputHandler::onKeyPress(key);
+
+        if (key == KEY_M)
+            m_musicToggle = true;
+        if (key == KEY_SPACE)
+            m_playSFX = true;
+        if (key == KEY_S)
+            m_playSpatial = true;
+        if (key == KEY_U)
+            m_muteToggle = true;
+        if (key == KEY_1)
+            m_masterVol = 0.5f;
+        if (key == KEY_2)
+            m_masterVol = 0.75f;
+        if (key == KEY_3)
+            m_masterVol = 1.0f;
+        if (key == KEY_4)
+            m_musicVol = 0.5f;
+        if (key == KEY_5)
+            m_musicVol = 0.75f;
+        if (key == KEY_6)
+            m_musicVol = 1.0f;
+        if (key == KEY_7)
+            m_sfxVol = 0.5f;
+        if (key == KEY_8)
+            m_sfxVol = 0.75f;
+        if (key == KEY_9)
+            m_sfxVol = 1.0f;
+    }
+
+    bool isMusicTogglePressed() {
+        bool v = m_musicToggle;
+        m_musicToggle = false;
+        return v;
+    }
+    bool isPlaySFXPressed() {
+        bool v = m_playSFX;
+        m_playSFX = false;
+        return v;
+    }
+    bool isPlaySpatialPressed() {
+        bool v = m_playSpatial;
+        m_playSpatial = false;
+        return v;
+    }
+    bool isMuteTogglePressed() {
+        bool v = m_muteToggle;
+        m_muteToggle = false;
+        return v;
+    }
+    float getMasterVolChange() {
+        float v = m_masterVol;
+        m_masterVol = -1.0f;
+        return v;
+    }
+    float getMusicVolChange() {
+        float v = m_musicVol;
+        m_musicVol = -1.0f;
+        return v;
+    }
+    float getSFXVolChange() {
+        float v = m_sfxVol;
+        m_sfxVol = -1.0f;
+        return v;
+    }
+
+  private:
+    bool m_musicToggle = false;
+    bool m_playSFX = false;
+    bool m_playSpatial = false;
+    bool m_muteToggle = false;
+    float m_masterVol = -1.0f;
+    float m_musicVol = -1.0f;
+    float m_sfxVol = -1.0f;
+};
+
+// =============================================================================
+// Scene
+// =============================================================================
+
+class AudioDemoScene : public vde::examples::BaseExampleScene {
+  public:
+    AudioDemoScene() : BaseExampleScene(60.0f) {}
+
     void onEnter() override {
-        std::cout << "\n=== VDE Audio Demo ===\n";
-        std::cout << "Controls:\n";
-        std::cout << "  M: Play/stop background music\n";
-        std::cout << "  SPACE: Play sound effect\n";
-        std::cout << "  1-3: Master volume (50%, 75%, 100%)\n";
-        std::cout << "  4-6: Music volume (50%, 75%, 100%)\n";
-        std::cout << "  7-9: SFX volume (50%, 75%, 100%)\n";
-        std::cout << "  U: Mute/unmute\n";
-        std::cout << "  ESC: Exit\n\n";
+        printExampleHeader();
 
         // Try to load audio clips
         loadAudioAssets();
@@ -100,9 +183,15 @@ class AudioDemoScene : public Scene {
     }
 
     void update(float deltaTime) override {
-        Scene::update(deltaTime);
+        BaseExampleScene::update(deltaTime);
 
         m_time += deltaTime;
+
+        // Handle input
+        auto* input = dynamic_cast<AudioInputHandler*>(getInputHandler());
+        if (input) {
+            handleInput(input);
+        }
 
         // Rotate the audio cube
         if (m_audioCube) {
@@ -136,54 +225,66 @@ class AudioDemoScene : public Scene {
         }
     }
 
-    void handleKey(int key, int action) {
-        if (action != KEY_PRESS)
-            return;
-
+    void handleInput(AudioInputHandler* input) {
         auto& audio = AudioManager::getInstance();
 
-        if (key == KEY_ESCAPE) {
-            getGame()->quit();
-        } else if (key == KEY_M) {
+        if (input->isMusicTogglePressed()) {
             toggleMusic();
-        } else if (key == KEY_SPACE) {
+        }
+        if (input->isPlaySFXPressed()) {
             playSoundEffect();
-        } else if (key == KEY_S) {
+        }
+        if (input->isPlaySpatialPressed()) {
             playSpatialSound();
-        } else if (key == KEY_U) {
+        }
+        if (input->isMuteTogglePressed()) {
             audio.setMuted(!audio.isMuted());
             std::cout << "Audio " << (audio.isMuted() ? "muted" : "unmuted") << "\n";
-        } else if (key == KEY_1) {
-            audio.setMasterVolume(0.5f);
+        }
+
+        float masterVol = input->getMasterVolChange();
+        if (masterVol >= 0.0f) {
+            audio.setMasterVolume(masterVol);
             printAudioStatus();
-        } else if (key == KEY_2) {
-            audio.setMasterVolume(0.75f);
+        }
+
+        float musicVol = input->getMusicVolChange();
+        if (musicVol >= 0.0f) {
+            audio.setMusicVolume(musicVol);
             printAudioStatus();
-        } else if (key == KEY_3) {
-            audio.setMasterVolume(1.0f);
-            printAudioStatus();
-        } else if (key == KEY_4) {
-            audio.setMusicVolume(0.5f);
-            printAudioStatus();
-        } else if (key == KEY_5) {
-            audio.setMusicVolume(0.75f);
-            printAudioStatus();
-        } else if (key == KEY_6) {
-            audio.setMusicVolume(1.0f);
-            printAudioStatus();
-        } else if (key == KEY_7) {
-            audio.setSFXVolume(0.5f);
-            printAudioStatus();
-        } else if (key == KEY_8) {
-            audio.setSFXVolume(0.75f);
-            printAudioStatus();
-        } else if (key == KEY_9) {
-            audio.setSFXVolume(1.0f);
+        }
+
+        float sfxVol = input->getSFXVolChange();
+        if (sfxVol >= 0.0f) {
+            audio.setSFXVolume(sfxVol);
             printAudioStatus();
         }
     }
 
-  private:
+  protected:
+    std::string getExampleName() const override { return "Audio System Demo"; }
+
+    std::vector<std::string> getFeatures() const override {
+        return {"Background music playback", "Sound effects", "3D spatial audio",
+                "Volume controls (master, music, SFX)", "Mute/unmute functionality"};
+    }
+
+    std::vector<std::string> getExpectedVisuals() const override {
+        return {"Blue rotating cube that pulses with music",
+                "Yellow glowing sphere moving in a circle (spatial sound source)",
+                "Dark blue/purple background"};
+    }
+
+    std::vector<std::string> getControls() const override {
+        return {"M     - Play/stop background music",
+                "SPACE - Play sound effect",
+                "S     - Play spatial sound (follows yellow sphere)",
+                "U     - Mute/unmute audio",
+                "1-3   - Master volume (50%, 75%, 100%)",
+                "4-6   - Music volume (50%, 75%, 100%)",
+                "7-9   - SFX volume (50%, 75%, 100%)"};
+    }
+
     void loadAudioAssets() {
         namespace fs = std::filesystem;
 
@@ -328,53 +429,30 @@ class AudioDemoScene : public Scene {
     bool m_isMusicPlaying = false;
 };
 
+// =============================================================================
+// Game
+// =============================================================================
+
+using AudioGame = vde::examples::BaseExampleGame<AudioInputHandler, AudioDemoScene>;
+
+// =============================================================================
+// Main
+// =============================================================================
+
 int main() {
-    try {
-        Game game;
+    AudioGame game;
 
-        GameSettings settings;
-        settings.gameName = "VDE Audio Demo";
-        settings.display.windowWidth = 1280;
-        settings.display.windowHeight = 720;
-        settings.display.vsync = VSyncMode::On;
+    GameSettings settings;
+    settings.gameName = "VDE Audio Demo";
+    settings.display.windowWidth = 1280;
+    settings.display.windowHeight = 720;
+    settings.display.vsync = VSyncMode::On;
 
-        // Enable audio with default settings
-        settings.audio.masterVolume = 0.8f;
-        settings.audio.musicVolume = 0.7f;
-        settings.audio.sfxVolume = 1.0f;
-        settings.audio.muted = false;
+    // Enable audio with default settings
+    settings.audio.masterVolume = 0.8f;
+    settings.audio.musicVolume = 0.7f;
+    settings.audio.sfxVolume = 1.0f;
+    settings.audio.muted = false;
 
-        if (!game.initialize(settings)) {
-            std::cerr << "Failed to initialize game\n";
-            return 1;
-        }
-
-        // Create and add the demo scene
-        auto scene = std::make_unique<AudioDemoScene>();
-        auto* scenePtr = scene.get();
-        game.addScene("demo", std::move(scene));
-        game.setActiveScene("demo");
-
-        // Set up input handler - use a class that overrides onKeyPress
-        class AudioKeyHandler : public InputHandler {
-          public:
-            AudioKeyHandler(AudioDemoScene* scene) : m_scene(scene) {}
-            void onKeyPress(int key) override { m_scene->handleKey(key, KEY_PRESS); }
-
-          private:
-            AudioDemoScene* m_scene;
-        };
-
-        auto inputHandler = std::make_unique<AudioKeyHandler>(scenePtr);
-        game.setInputHandler(inputHandler.get());
-
-        game.run();
-        game.shutdown();
-
-        return 0;
-
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << "\n";
-        return 1;
-    }
+    return vde::examples::runExample(game, "VDE Audio Demo", 1280, 720);
 }
