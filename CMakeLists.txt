@@ -122,6 +122,7 @@ set(VDE_SOURCES
     src/api/CameraBounds.cpp
     src/api/Material.cpp
     src/api/Scheduler.cpp
+    src/api/PhysicsScene.cpp
     # Audio
     src/miniaudio_impl.cpp
     src/api/AudioClip.cpp
@@ -168,6 +169,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/Scheduler.h
     include/vde/api/SceneGroup.h
     include/vde/api/ViewportRect.h
+    include/vde/api/PhysicsTypes.h
+    include/vde/api/PhysicsScene.h
     # Audio headers
     include/vde/api/AudioClip.h
     include/vde/api/AudioEvent.h

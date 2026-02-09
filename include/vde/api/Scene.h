@@ -23,6 +23,7 @@
 #include "GameTypes.h"
 #include "InputHandler.h"
 #include "LightBox.h"
+#include "PhysicsTypes.h"
 #include "Resource.h"
 #include "ViewportRect.h"
 #include "WorldBounds.h"
@@ -32,6 +33,7 @@ namespace vde {
 // Forward declarations
 class Game;
 class Mesh;
+class PhysicsScene;
 class Texture;
 
 /**
@@ -377,6 +379,38 @@ class Scene {
      */
     const ViewportRect& getViewportRect() const { return m_viewportRect; }
 
+    // Physics
+
+    /**
+     * @brief Enable physics simulation for this scene.
+     *
+     * Creates a PhysicsScene with the given configuration.
+     * Once enabled, the scheduler inserts Physics and PostPhysics
+     * tasks for this scene.
+     *
+     * @param config Physics configuration
+     */
+    void enablePhysics(const PhysicsConfig& config = PhysicsConfig{});
+
+    /**
+     * @brief Disable physics simulation for this scene.
+     *
+     * Destroys the PhysicsScene and all bodies.  The scheduler
+     * will no longer insert physics tasks for this scene.
+     */
+    void disablePhysics();
+
+    /**
+     * @brief Check if physics is enabled for this scene.
+     */
+    bool hasPhysics() const { return m_physicsScene != nullptr; }
+
+    /**
+     * @brief Get the physics scene (nullptr if physics not enabled).
+     */
+    PhysicsScene* getPhysicsScene() { return m_physicsScene.get(); }
+    const PhysicsScene* getPhysicsScene() const { return m_physicsScene.get(); }
+
     // Input
 
     /**
@@ -506,6 +540,9 @@ class Scene {
 
     // Audio event queue
     std::vector<AudioEvent> m_audioEventQueue;
+
+    // Physics
+    std::unique_ptr<PhysicsScene> m_physicsScene;
 
     friend class Game;
 };

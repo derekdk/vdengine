@@ -17,7 +17,7 @@
 | 2 | [Multi-Scene Support](#phase-2-multi-scene-support) | **Done** | 457/457 | 10/10 |
 | 3 | [Per-Scene Viewports & Split-Screen Rendering](#phase-3-per-scene-viewports--split-screen-rendering) | **Done** | 489/489 | 10/10 |
 | 4 | [Scene Phase Callbacks & Audio Event Queue](#phase-4-scene-phase-callbacks--audio-event-queue) | **Done** | 513/513 | 10/10 |
-| 5 | [Physics Scene](#phase-5-physics-scene) | Not Started | — | — |
+| 5 | [Physics Scene](#phase-5-physics-scene) | **Done** | 545/545 | 11/11 |
 | 6 | [Physics Entities & Sync](#phase-6-physics-entities--sync) | Not Started | — | — |
 | 7 | [Thread Pool & Parallel Physics](#phase-7-thread-pool--parallel-physics) | Not Started | — | — |
 | 8 | [Advanced Physics Features](#phase-8-advanced-physics-features) | Not Started | — | — |
@@ -373,7 +373,7 @@ All tests pass. All examples launch without crash.
 
 ### Tasks
 
-- [ ] **5.1** Define all physics types in `PhysicsTypes.h`:
+- [x] **5.1** Define all physics types in `PhysicsTypes.h`:
   - `PhysicsConfig` (fixedTimestep, gravity, maxSubSteps, iterations)
   - `PhysicsBodyId`, `INVALID_PHYSICS_BODY_ID`
   - `PhysicsShape` enum (Box, Circle, Sphere, Capsule)
@@ -382,16 +382,16 @@ All tests pass. All examples launch without crash.
   - `PhysicsBodyState` (position, rotation, velocity, isAwake)
   - `CollisionEvent` (bodyA, bodyB, contactPoint, normal, depth)
   - `CollisionCallback` typedef
-- [ ] **5.2** Implement `PhysicsScene` (pimpl):
+- [x] **5.2** Implement `PhysicsScene` (pimpl):
   - `createBody()`, `destroyBody()`, `getBodyState()`
   - `applyForce()`, `applyImpulse()`, `setLinearVelocity()`, `setBodyPosition()`
   - `step(float deltaTime)` with fixed-timestep accumulator
   - `getInterpolationAlpha()`, `getLastStepCount()`
   - Internal: velocity integration, AABB broadphase, impulse-based collision resolution
   - Start with 2D AABB-only collision for simplicity
-- [ ] **5.3** Add `enablePhysics()`, `disablePhysics()`, `hasPhysics()`, `getPhysicsScene()` to `Scene`
-- [ ] **5.4** Update `rebuildSchedulerGraph()` to insert Physics and PostPhysics tasks for scenes with physics enabled
-- [ ] **5.5** Write `PhysicsScene_test.cpp`:
+- [x] **5.3** Add `enablePhysics()`, `disablePhysics()`, `hasPhysics()`, `getPhysicsScene()` to `Scene`
+- [x] **5.4** Update `rebuildSchedulerGraph()` to insert Physics and PostPhysics tasks for scenes with physics enabled
+- [x] **5.5** Write `PhysicsScene_test.cpp`:
   - Create scene with default config
   - Create/destroy bodies
   - Body falls under gravity after `step()`
@@ -404,7 +404,7 @@ All tests pass. All examples launch without crash.
   - `setGravity()` changes gravity
   - Sensor bodies trigger callbacks but don't respond
   - `getBodyCount()` / `getActiveBodyCount()` are accurate
-- [ ] **5.6** Create `examples/physics_demo/` — falling boxes with static ground:
+- [x] **5.6** Create `examples/physics_demo/` — falling boxes with static ground:
   - Several dynamic boxes spawned at varying heights
   - Static ground platform
   - Boxes fall and land on ground
@@ -421,11 +421,13 @@ All tests pass. All examples launch without crash.
 
 ### Completion Criteria
 
-- [ ] All existing tests pass
-- [ ] `PhysicsScene_test` passes (all sub-tests)
-- [ ] `physics_demo` example shows correct physics behavior
-- [ ] All other examples unaffected
-- [ ] Physics is fully opt-in — scenes without `enablePhysics()` have no overhead
+- [x] All existing tests pass
+- [x] `PhysicsScene_test` passes (all sub-tests)
+- [x] `physics_demo` example shows correct physics behavior
+- [x] All other examples unaffected
+- [x] Physics is fully opt-in — scenes without `enablePhysics()` have no overhead
+
+**Completed (2026-02-08):** 545 tests passed (513 existing + 32 PhysicsScene), 11 examples built and verified (10 existing + physics_demo).
 
 ---
 

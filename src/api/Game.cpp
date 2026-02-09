@@ -11,6 +11,7 @@
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
 #include <vde/api/LightBox.h>
+#include <vde/api/PhysicsScene.h>
 
 #include <GLFW/glfw3.h>
 
@@ -1610,12 +1611,45 @@ void Game::rebuildSchedulerGraph() {
     TaskId lastUpdateTask = prevTask;
 
     // ---------------------------------------------------------------
+    // Task 1b: Physics — step physics for scenes that have it.
+    //          Physics depends on all game-logic/update tasks.
+    // ---------------------------------------------------------------
+    TaskId lastPhysicsTask = lastUpdateTask;
+    std::vector<TaskId> postPhysicsTasks;
+
+    for (size_t i = 0; i < updateScenes.size(); ++i) {
+        Scene* scene = updateScenes[i].scene;
+        const std::string& sceneName = updateScenes[i].name;
+
+        if (scene->hasPhysics()) {
+            TaskId physicsTask = m_scheduler.addTask(
+                {"scene.physics." + sceneName,
+                 TaskPhase::Physics,
+                 [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
+                 {lastUpdateTask}});
+
+            // PostPhysics: sync step (placeholder for Phase 6 entity sync)
+            TaskId postPhysicsTask =
+                m_scheduler.addTask({"scene.postPhysics." + sceneName,
+                                     TaskPhase::PostPhysics,
+                                     []() { /* Phase 6 will add entity sync here */ },
+                                     {physicsTask}});
+
+            postPhysicsTasks.push_back(postPhysicsTask);
+            lastPhysicsTask = postPhysicsTask;
+        }
+    }
+
+    // ---------------------------------------------------------------
     // Task 2: Audio — global audio system update
     //         Depends on all per-scene audio tasks AND the last
-    //         update task so it always runs after all scene work.
+    //         physics/update task so it always runs after all scene work.
     // ---------------------------------------------------------------
-    std::vector<TaskId> audioDeps = {lastUpdateTask};
+    std::vector<TaskId> audioDeps = {lastPhysicsTask};
     for (TaskId id : audioTasks) {
+        audioDeps.push_back(id);
+    }
+    for (TaskId id : postPhysicsTasks) {
         audioDeps.push_back(id);
     }
 

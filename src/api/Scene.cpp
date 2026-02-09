@@ -5,6 +5,7 @@
 
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
+#include <vde/api/PhysicsScene.h>
 #include <vde/api/Scene.h>
 
 #include <algorithm>
@@ -221,6 +222,20 @@ void Scene::setCamera(GameCamera* camera) {
 
 void Scene::removeResource(ResourceId id) {
     m_resources.erase(id);
+}
+
+// ============================================================================
+// Physics
+// ============================================================================
+
+void Scene::enablePhysics(const PhysicsConfig& config) {
+    if (!m_physicsScene) {
+        m_physicsScene = std::make_unique<PhysicsScene>(config);
+    }
+}
+
+void Scene::disablePhysics() {
+    m_physicsScene.reset();
 }
 
 InputHandler* Scene::getInputHandler() {

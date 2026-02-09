@@ -117,3 +117,11 @@ add_executable(vde_four_scene_3d_demo
 target_link_libraries(vde_four_scene_3d_demo PRIVATE vde)
 add_dependencies(vde_four_scene_3d_demo copy_example_shaders)
 
+# Physics demo example demonstrating PhysicsScene simulation
+add_executable(vde_physics_demo
+    physics_demo/main.cpp
+)
+
+target_link_libraries(vde_physics_demo PRIVATE vde)
+add_dependencies(vde_physics_demo copy_example_shaders)
+

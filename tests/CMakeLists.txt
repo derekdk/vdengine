@@ -43,6 +43,8 @@ set(VDE_TEST_SOURCES
     ViewportRect_test.cpp
     # Phase 4 scene phase callback & audio event tests
     AudioEvent_test.cpp
+    # Phase 5 physics tests
+    PhysicsScene_test.cpp
 )
 
 # Create test executable
