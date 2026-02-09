@@ -35,6 +35,22 @@ set(VDE_TEST_SOURCES
     # Phase 5 tests
     Texture_test.cpp
     ResourceManager_test.cpp
+    # Scheduler tests
+    Scheduler_test.cpp
+    # Phase 2 multi-scene tests
+    SceneGroup_test.cpp
+    # Phase 3 viewport tests
+    ViewportRect_test.cpp
+    # Phase 4 scene phase callback & audio event tests
+    AudioEvent_test.cpp
+    # Phase 5 physics tests
+    PhysicsScene_test.cpp
+    # Phase 6 physics entity tests
+    PhysicsEntity_test.cpp
+    # Phase 7 thread pool tests
+    ThreadPool_test.cpp
+    # Joystick/gamepad tests
+    Joystick_test.cpp
 )
 
 # Create test executable

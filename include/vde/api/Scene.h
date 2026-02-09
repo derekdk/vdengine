@@ -16,13 +16,16 @@
 #include <unordered_map>
 #include <vector>
 
+#include "AudioEvent.h"
 #include "CameraBounds.h"
 #include "Entity.h"
 #include "GameCamera.h"
 #include "GameTypes.h"
 #include "InputHandler.h"
 #include "LightBox.h"
+#include "PhysicsTypes.h"
 #include "Resource.h"
+#include "ViewportRect.h"
 #include "WorldBounds.h"
 
 namespace vde {
@@ -30,6 +33,7 @@ namespace vde {
 // Forward declarations
 class Game;
 class Mesh;
+class PhysicsScene;
 class Texture;
 
 /**
@@ -90,6 +94,103 @@ class Scene {
      * @param deltaTime Time since last update in seconds
      */
     virtual void update(float deltaTime);
+
+    // Phase callbacks (opt-in via enablePhaseCallbacks)
+
+    /**
+     * @brief Enable phase callbacks for this scene.
+     *
+     * When enabled, the scheduler splits the scene's update into
+     * three separate tasks:
+     *   1. updateGameLogic(dt) — GameLogic phase
+     *   2. updateAudio(dt)     — Audio phase
+     *   3. updateVisuals(dt)   — PreRender phase (visual-only updates)
+     *
+     * When disabled (the default), the single `update(dt)` task is
+     * used instead, preserving backwards compatibility.
+     */
+    void enablePhaseCallbacks() { m_usePhaseCallbacks = true; }
+
+    /**
+     * @brief Check whether phase callbacks are enabled.
+     */
+    bool usesPhaseCallbacks() const { return m_usePhaseCallbacks; }
+
+    /**
+     * @brief Game logic update (phase callback).
+     *
+     * Called during the GameLogic scheduler phase when phase callbacks
+     * are enabled.  Override this to move/spawn entities, process AI,
+     * read input, and queue audio events.
+     *
+     * The default implementation is a no-op.
+     *
+     * @param deltaTime Time since last update in seconds
+     */
+    virtual void updateGameLogic(float deltaTime);
+
+    /**
+     * @brief Audio update (phase callback).
+     *
+     * Called during the Audio scheduler phase when phase callbacks
+     * are enabled.  The default implementation drains the audio
+     * event queue (`m_audioEventQueue`) via AudioManager.
+     *
+     * Override to add custom audio processing, but call
+     * `Scene::updateAudio(deltaTime)` to keep the queue drain.
+     *
+     * @param deltaTime Time since last update in seconds
+     */
+    virtual void updateAudio(float deltaTime);
+
+    /**
+     * @brief Visual update (phase callback).
+     *
+     * Called during a late GameLogic / early PreRender slot when
+     * phase callbacks are enabled.  Use this for animation ticks,
+     * particle systems, or anything that only affects visuals.
+     *
+     * The default implementation is a no-op.
+     *
+     * @param deltaTime Time since last update in seconds
+     */
+    virtual void updateVisuals(float deltaTime);
+
+    // Audio event queue
+
+    /**
+     * @brief Queue an audio event to be processed during the Audio phase.
+     * @param event The audio event to queue
+     */
+    void queueAudioEvent(const AudioEvent& event);
+    void queueAudioEvent(AudioEvent&& event);
+
+    /**
+     * @brief Convenience: queue a PlaySFX event.
+     * @param clip Audio clip to play
+     * @param volume Volume multiplier (0.0–1.0)
+     * @param pitch Pitch multiplier (1.0 = normal)
+     * @param loop Whether to loop the sound
+     */
+    void playSFX(std::shared_ptr<AudioClip> clip, float volume = 1.0f, float pitch = 1.0f,
+                 bool loop = false);
+
+    /**
+     * @brief Convenience: queue a positional PlaySFXAt event.
+     * @param clip Audio clip to play
+     * @param x X position
+     * @param y Y position
+     * @param z Z position
+     * @param volume Volume multiplier (0.0–1.0)
+     * @param pitch Pitch multiplier (1.0 = normal)
+     */
+    void playSFXAt(std::shared_ptr<AudioClip> clip, float x, float y, float z, float volume = 1.0f,
+                   float pitch = 1.0f);
+
+    /**
+     * @brief Get the number of pending audio events in the queue.
+     */
+    size_t getAudioEventQueueSize() const { return m_audioEventQueue.size(); }
 
     /**
      * @brief Render the scene.
@@ -171,6 +272,17 @@ class Scene {
     std::vector<std::shared_ptr<T>> getEntitiesOfType();
 
     /**
+     * @brief Find an entity that owns the given physics body.
+     *
+     * Iterates all entities, checking PhysicsEntity-derived objects
+     * for a matching body ID.
+     *
+     * @param bodyId Physics body ID to search for
+     * @return Pointer to the owning entity, or nullptr if not found
+     */
+    Entity* getEntityByPhysicsBody(PhysicsBodyId bodyId);
+
+    /**
      * @brief Remove an entity by ID.
      */
     void removeEntity(EntityId id);
@@ -224,6 +336,91 @@ class Scene {
      */
     GameCamera* getCamera() { return m_camera.get(); }
     const GameCamera* getCamera() const { return m_camera.get(); }
+
+    // Background & Priority
+
+    /**
+     * @brief Mark this scene for continued updates while in background.
+     *
+     * When true and the scene is part of an active SceneGroup, its
+     * update() is called even when it is not the primary scene.
+     * When true and the scene is NOT in the active group, the engine
+     * will still call update() each frame (background updates).
+     *
+     * @param enabled Whether background updates should be enabled
+     */
+    void setContinueInBackground(bool enabled) { m_continueInBackground = enabled; }
+
+    /**
+     * @brief Check if background updates are enabled.
+     */
+    bool getContinueInBackground() const { return m_continueInBackground; }
+
+    /**
+     * @brief Set the update priority (lower values run first).
+     *
+     * When multiple scenes are updated in a frame, their update
+     * tasks are ordered by priority (ascending).  Default is 0.
+     *
+     * @param priority Numeric priority (lower = earlier)
+     */
+    void setUpdatePriority(int priority) { m_updatePriority = priority; }
+
+    /**
+     * @brief Get the update priority.
+     */
+    int getUpdatePriority() const { return m_updatePriority; }
+
+    // Viewport
+
+    /**
+     * @brief Set the viewport rectangle for this scene.
+     *
+     * When used in a SceneGroup, this controls which portion of the
+     * window the scene renders to.  Default is fullWindow() (the
+     * entire window), which preserves backwards compatibility.
+     *
+     * @param rect Normalized viewport rectangle (0-1 coordinates)
+     */
+    void setViewportRect(const ViewportRect& rect) { m_viewportRect = rect; }
+
+    /**
+     * @brief Get the viewport rectangle for this scene.
+     * @return The viewport rectangle (default is fullWindow)
+     */
+    const ViewportRect& getViewportRect() const { return m_viewportRect; }
+
+    // Physics
+
+    /**
+     * @brief Enable physics simulation for this scene.
+     *
+     * Creates a PhysicsScene with the given configuration.
+     * Once enabled, the scheduler inserts Physics and PostPhysics
+     * tasks for this scene.
+     *
+     * @param config Physics configuration
+     */
+    void enablePhysics(const PhysicsConfig& config = PhysicsConfig{});
+
+    /**
+     * @brief Disable physics simulation for this scene.
+     *
+     * Destroys the PhysicsScene and all bodies.  The scheduler
+     * will no longer insert physics tasks for this scene.
+     */
+    void disablePhysics();
+
+    /**
+     * @brief Check if physics is enabled for this scene.
+     */
+    bool hasPhysics() const { return m_physicsScene != nullptr; }
+
+    /**
+     * @brief Get the physics scene (nullptr if physics not enabled).
+     */
+    PhysicsScene* getPhysicsScene() { return m_physicsScene.get(); }
+    const PhysicsScene* getPhysicsScene() const { return m_physicsScene.get(); }
 
     // Input
 
@@ -341,10 +538,22 @@ class Scene {
     std::unique_ptr<GameCamera> m_camera;
     InputHandler* m_inputHandler = nullptr;
     Color m_backgroundColor = Color::black();
+    bool m_continueInBackground = false;
+    int m_updatePriority = 0;
+    ViewportRect m_viewportRect = ViewportRect::fullWindow();
 
     // World bounds
     WorldBounds m_worldBounds;
     CameraBounds2D m_cameraBounds2D;
+
+    // Phase callbacks
+    bool m_usePhaseCallbacks = false;
+
+    // Audio event queue
+    std::vector<AudioEvent> m_audioEventQueue;
+
+    // Physics
+    std::unique_ptr<PhysicsScene> m_physicsScene;
 
     friend class Game;
 };

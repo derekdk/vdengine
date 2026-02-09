@@ -53,7 +53,132 @@ cmake --build .
 
 ## Your First VDE Application
 
-Create a simple window with Vulkan rendering:
+### Using the Game API (Recommended)
+
+The Game API is the easiest way to create VDE applications:
+
+```cpp
+#include <vde/api/GameAPI.h>
+
+class MyScene : public vde::Scene {
+public:
+    void onEnter() override {
+        // Set up camera and lighting
+        setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 10.0f));
+        setLightBox(new vde::ThreePointLightBox());
+        setBackgroundColor(vde::Color(0.1f, 0.1f, 0.2f));
+
+        // Add a colored cube
+        auto cube = addEntity<vde::MeshEntity>();
+        cube->setMesh(vde::Mesh::createCube());
+        cube->setMaterial(vde::Material::createColored(vde::Color::red()));
+        cube->setName("cube");
+    }
+
+    void update(float deltaTime) override {
+        // Rotate the cube
+        auto* cube = getEntityByName("cube");
+        if (cube) {
+            auto rot = cube->getRotation();
+            cube->setRotation(rot.pitch, rot.yaw + 45.0f * deltaTime, rot.roll);
+        }
+        vde::Scene::update(deltaTime);
+    }
+};
+
+int main() {
+    vde::Game game;
+    vde::GameSettings settings;
+    settings.gameName = "My First VDE Game";
+    settings.setWindowSize(1280, 720);
+
+    game.initialize(settings);
+    game.addScene("main", new MyScene());
+    game.setActiveScene("main");
+    game.run();
+
+    return 0;
+}
+```
+
+### CMakeLists.txt for Your Game
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(MyGame)
+
+# Add VDE as a subdirectory
+add_subdirectory(path/to/vdengine)
+
+# Create your executable
+add_executable(MyGame main.cpp)
+
+# Link against VDE
+target_link_libraries(MyGame PRIVATE vde)
+```
+
+### Adding Input
+
+```cpp
+class MyInput : public vde::InputHandler {
+public:
+    void onKeyPress(int key) override {
+        if (key == vde::KEY_ESCAPE) {
+            // Handle escape
+        }
+    }
+    void onMouseScroll(double, double yOffset) override {
+        // Handle scroll
+    }
+};
+
+// In main():
+MyInput input;
+game.setInputHandler(&input);
+```
+
+### Adding Physics
+
+```cpp
+void onEnter() override {
+    // Enable physics for this scene
+    vde::PhysicsConfig config;
+    config.gravity = {0.0f, -9.81f};
+    enablePhysics(config);
+
+    // Add a physics-driven sprite
+    auto box = addEntity<vde::PhysicsSpriteEntity>();
+    box->setColor(vde::Color::blue());
+    box->setScale(1.0f);
+
+    vde::PhysicsBodyDef def;
+    def.type = vde::PhysicsBodyType::Dynamic;
+    def.shape = vde::PhysicsShape::Box;
+    def.position = {0.0f, 5.0f};
+    def.extents = {0.5f, 0.5f};
+    def.mass = 1.0f;
+    box->createPhysicsBody(def);
+}
+```
+
+### Split-Screen Rendering
+
+```cpp
+// Create scenes for each viewport
+game.addScene("player1", new Player1Scene());
+game.addScene("player2", new Player2Scene());
+
+// Activate both with split-screen layout
+auto group = vde::SceneGroup::createWithViewports("splitscreen", {
+    {"player1", vde::ViewportRect::leftHalf()},
+    {"player2", vde::ViewportRect::rightHalf()},
+});
+game.setActiveSceneGroup(group);
+```
+
+### Using the Low-Level API
+
+For direct Vulkan control without the Game API:
 
 ```cpp
 #include <vde/Core.h>

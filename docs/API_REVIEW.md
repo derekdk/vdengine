@@ -1,5 +1,24 @@
 # VDE Game API Feasibility Review
 
+> **Resolution Status (Updated)**
+>
+> This review was written when the Game API existed only as header declarations with no implementations. Since then, the engine has undergone substantial development. All major gaps have been addressed:
+>
+> | Gap | Status |
+> |-----|--------|
+> | 1. Unimplemented Game Layer | **Resolved** — `Game`, `Scene`, `Entity`, `Scheduler`, full game loop with render integration |
+> | 2. Rendering Integration | **Resolved** — Entity traversal, mesh/sprite pipelines, `LightBox` UBO, material system |
+> | 3. Resource/Asset Pipeline | **Resolved** — `ResourceManager` with mesh/texture loading, ref-counted `ResourceId` system |
+> | 4. Input Plumbing & Events | **Resolved** — GLFW callback integration, `InputHandler` with key/mouse/gamepad, per-scene focus routing |
+> | 5. Simulation & Systems | **Mostly Resolved** — `PhysicsScene`/`PhysicsEntity` (2D AABB), `Scheduler` task graph, `AudioManager`/`AudioEvent` (miniaudio), `ThreadPool` |
+> | 6. Tooling & Debugging | Partially Resolved — Validation layer toggles in `GameSettings`; no ImGui or profiling hooks yet |
+> | 7. Packaging & Distribution | **Not Resolved** — `find_package(vde)` still not functional; subdirectory integration works |
+> | 8. Documentation vs Reality | **Resolved** — API.md, ARCHITECTURE.md, GETTING_STARTED.md all updated to match implementation |
+>
+> **Current stats:** 604 unit tests passing, 14 examples building and running, 28 Game API headers with full implementations.
+>
+> The analysis below is preserved for historical reference.
+
 ## Executive Summary
 - The documented Game API in [API-DOC.md](API-DOC.md) is conceptually sound for a small game layer (scenes, entities, resources, cameras, lighting), but it is not yet wired into the existing Vulkan core. There are no source implementations for the Game/Scene loop, rendering, or resource loading beyond header declarations in [include/vde/api](include/vde/api).
 - The shipped engine today is a rendering toolkit (window + Vulkan context + shaders/buffers) as described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [README.md](README.md); the higher-level gameplay stack is aspirational. Feasibility is high once implemented, but current readiness is low.

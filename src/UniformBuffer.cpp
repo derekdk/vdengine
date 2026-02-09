@@ -55,10 +55,10 @@ void UniformBuffer::create(VkDevice device, [[maybe_unused]] VkPhysicalDevice ph
     m_buffersMapped.resize(count);
 
     for (uint32_t i = 0; i < count; i++) {
-        BufferUtils::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                  m_buffers[i], m_buffersMemory[i]);
+        BufferUtils::createBuffer(
+            bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            m_buffers[i], m_buffersMemory[i]);
 
         // Persistently map the buffer
         VkResult result =

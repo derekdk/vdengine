@@ -179,6 +179,88 @@ class VulkanContext {
      */
     virtual void drawFrame();
 
+    /**
+     * @brief Draw a frame with per-scene rendering passes.
+     *
+     * This supports multi-viewport rendering where each scene has its own
+     * camera and viewport.  Each scene gets its own render pass with
+     * appropriate UBO (view/projection) updates between passes.
+     *
+     * @param sceneRenderInfos Vector of per-scene render data
+     */
+    struct SceneRenderInfo {
+        /// Camera view matrix
+        glm::mat4 viewMatrix;
+        /// Camera projection matrix
+        glm::mat4 projMatrix;
+        /// Vulkan viewport (pixel coordinates)
+        VkViewport viewport;
+        /// Vulkan scissor rect (pixel coordinates)
+        VkRect2D scissor;
+        /// Render callback for this scene
+        RenderCallback renderCallback;
+        /// Whether this is the first scene (uses CLEAR; others use LOAD)
+        bool clearPass = false;
+    };
+    void drawFrameMultiScene(const std::vector<SceneRenderInfo>& sceneRenderInfos);
+
+    // =========================================================================
+    // Viewport Override
+    // =========================================================================
+
+    /**
+     * @brief Set an active viewport override.
+     *
+     * When set, entities should use this viewport instead of computing
+     * a full-window viewport.  Call clearViewportOverride() to revert.
+     *
+     * @param viewport The viewport to use
+     * @param scissor  The scissor rect to use
+     */
+    void setViewportOverride(const VkViewport& viewport, const VkRect2D& scissor) {
+        m_viewportOverride = viewport;
+        m_scissorOverride = scissor;
+        m_hasViewportOverride = true;
+    }
+
+    /**
+     * @brief Clear the viewport override (revert to full window).
+     */
+    void clearViewportOverride() { m_hasViewportOverride = false; }
+
+    /**
+     * @brief Check if a viewport override is active.
+     */
+    bool hasViewportOverride() const { return m_hasViewportOverride; }
+
+    /**
+     * @brief Get the effective viewport (override if set, else full window).
+     */
+    VkViewport getEffectiveViewport() const {
+        if (m_hasViewportOverride)
+            return m_viewportOverride;
+        VkViewport vp{};
+        vp.x = 0.0f;
+        vp.y = 0.0f;
+        vp.width = static_cast<float>(m_swapChainExtent.width);
+        vp.height = static_cast<float>(m_swapChainExtent.height);
+        vp.minDepth = 0.0f;
+        vp.maxDepth = 1.0f;
+        return vp;
+    }
+
+    /**
+     * @brief Get the effective scissor rect (override if set, else full window).
+     */
+    VkRect2D getEffectiveScissor() const {
+        if (m_hasViewportOverride)
+            return m_scissorOverride;
+        VkRect2D sc{};
+        sc.offset = {0, 0};
+        sc.extent = m_swapChainExtent;
+        return sc;
+    }
+
     // =========================================================================
     // Utility
     // =========================================================================
@@ -228,6 +310,7 @@ class VulkanContext {
 
     // Render pass and framebuffers
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
+    VkRenderPass m_renderPassLoad = VK_NULL_HANDLE;  // LOAD variant for multi-scene
     std::vector<VkFramebuffer> m_swapChainFramebuffers;
 
     // Descriptor management
@@ -261,6 +344,11 @@ class VulkanContext {
 
     // Render callback
     RenderCallback m_renderCallback;
+
+    // Viewport override for per-scene rendering
+    VkViewport m_viewportOverride{};
+    VkRect2D m_scissorOverride{};
+    bool m_hasViewportOverride = false;
 
     // Clear color (can be set by subclasses)
     glm::vec4 m_clearColor{0.1f, 0.1f, 0.15f, 1.0f};

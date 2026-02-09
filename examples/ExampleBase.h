@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <vde/Window.h>
 #include <vde/api/GameAPI.h>
 
 #include <iostream>
@@ -49,6 +50,9 @@ class BaseExampleInputHandler : public vde::InputHandler {
         if (key == vde::KEY_F) {
             m_failPressed = true;
         }
+        if (key == vde::KEY_F11) {
+            m_fullscreenTogglePressed = true;
+        }
     }
 
     /**
@@ -69,9 +73,19 @@ class BaseExampleInputHandler : public vde::InputHandler {
         return val;
     }
 
+    /**
+     * @brief Check if fullscreen toggle was pressed (clears flag).
+     */
+    bool isFullscreenTogglePressed() {
+        bool val = m_fullscreenTogglePressed;
+        m_fullscreenTogglePressed = false;
+        return val;
+    }
+
   protected:
     bool m_escapePressed = false;
     bool m_failPressed = false;
+    bool m_fullscreenTogglePressed = false;
 };
 
 /**
@@ -112,6 +126,14 @@ class BaseExampleScene : public vde::Scene {
             if (input->isFailPressed()) {
                 handleTestFailure();
                 return;
+            }
+
+            // Check for fullscreen toggle
+            if (input->isFullscreenTogglePressed()) {
+                if (getGame() && getGame()->getWindow()) {
+                    auto* window = getGame()->getWindow();
+                    window->setFullscreen(!window->isFullscreen());
+                }
             }
 
             // Check for escape key
@@ -182,6 +204,7 @@ class BaseExampleScene : public vde::Scene {
             std::cout << "  " << control << std::endl;
         }
 
+        std::cout << "  F11   - Toggle fullscreen" << std::endl;
         std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
         std::cout << "  ESC   - Exit early" << std::endl;
         std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n" << std::endl;

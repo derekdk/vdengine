@@ -1,566 +1,393 @@
----
+﻿---
 name: using-api
 description: Guide for using the VDE Game API to create games, demos, applications, and examples. Use this when working with the Scene/Entity/Resource system or implementing gameplay features.
 ---
 
 # Using the VDE API
 
-This skill provides guidance on using the VDE Game API to create games, demos, applications, and examples. It focuses on practical implementation patterns and best practices.
+This skill provides high-level guidance on using the VDE Game API to create games, demos, and examples. It focuses on workflow patterns, decision-making, and best practices. **For detailed API reference and code examples, always refer to [API-DOC.md](../../../API-DOC.md).**
 
 ## When to use this skill
 
 - Creating a new game or application using the VDE API
-- Building interactive demos that use the Game, Scene, and Entity system
-- Implementing gameplay features with the high-level API
-- Working with entities, resources, cameras, and lighting
-- Need guidance on API patterns and common tasks
+- Need guidance on API workflow and architecture decisions
+- Understanding the Game/Scene/Entity hierarchy
+- Best practices for resource management, input handling, and physics
+- Choosing the right camera or lighting setup
+- Implementing multi-scene or split-screen features
+- Understanding ownership and lifecycle patterns
 
 ## Core Principles
 
-When using the VDE API to build applications:
+1. **Work with the API as designed** - Use existing classes and methods
+2. **Follow established patterns** - Match the style of [examples/](../../../examples/)
+3. **Reference documentation first** - Check [API-DOC.md](../../../API-DOC.md) for detailed API reference
+4. **Suggest improvements separately** - If API limitations are found, document the workaround but complete the task
 
-1. **Use the API as currently designed** - Work with existing classes and methods
-2. **Follow established patterns** - Match the style of existing examples
-3. **Suggest improvements separately** - If API limitations are found, document suggestions but complete the task with the current API
-4. **Reference documentation** - Always check API-DOC.md and docs/API.md for current capabilities
-
-## API Structure Overview
-
-The VDE Game API has a hierarchical structure:
+## API Architecture
 
 ```
-Game (manages the game loop and scenes)
-├── Scene (represents a game state)
-│   ├── Entities (game objects: MeshEntity, SpriteEntity)
-│   ├── Resources (shared assets: Mesh, Texture, Material)
-│   ├── Camera (view control: OrbitCamera, FixedCamera, etc.)
-│   └── LightBox (lighting: SimpleColorLightBox, etc.)
-└── InputHandler (keyboard, mouse input)
+Game (game loop, scene management)
+ SceneGroup (multiple active scenes with viewports)
+    Scene (game state: menu, level, etc.)
+        Entities (MeshEntity, SpriteEntity, PhysicsEntity)
+        Resources (Mesh, Texture, Material, AudioClip)
+        Camera (OrbitCamera, SimpleCamera, Camera2D)
+        LightBox (lighting system)
+        PhysicsScene (2D physics)
+ ResourceManager (global resource cache)
+ AudioManager (global audio playback)
 ```
 
-### Ownership Rules
+**Key Ownership Rules:**
+- Game owns Scenes and SceneGroups
+- Scene owns Entities (shared_ptr), Resources (shared_ptr), Camera (unique_ptr), LightBox (unique_ptr)
+- Store entity IDs, not pointers; use `ResourcePtr<T>` for resources
+- InputHandler is not owned (raw pointer, typically stack-allocated)
 
-- **Game** owns **Scenes**
-- **Scene** owns **Entities** (shared_ptr) and **Resources** (shared_ptr)
-- **Scene** owns **Camera** (unique_ptr) and **LightBox** (unique_ptr)
-- **InputHandler** is NOT owned (raw pointer, usually stack-allocated)
+## Standard Workflow
 
-## Standard Application Pattern
+### Application Structure
 
-### 1. Basic Structure
+Every VDE application follows this pattern:
 
-Every application using the Game API should follow this pattern:
+1. **Create Game instance**
+2. **Configure GameSettings** (window size, graphics, audio)
+3. **Initialize Game**
+4. **Create and register Scenes**
+5. **Set active scene or scene group**
+6. **Run the game loop**
 
-```cpp
-#include <vde/api/GameAPI.h>
+See [API-DOC.md#getting-started](../../../API-DOC.md#getting-started) for minimal example.
 
-int main() {
-    // 1. Create game instance
-    vde::Game game;
-    
-    // 2. Configure settings
-    vde::GameSettings settings;
-    settings.gameName = "Your Game Name";
-    settings.setWindowSize(1280, 720);
-    
-    // 3. Initialize game
-    if (!game.initialize(settings)) {
-        return 1;
-    }
-    
-    // 4. Create and add scenes
-    game.addScene("main", new MainScene());
-    game.setActiveScene("main");
-    
-    // 5. Run the game loop
-    game.run();
-    
-    return 0;
-}
-```
+### Scene Lifecycle
 
-### 2. Scene Implementation
+Implement scenes by inheriting from `vde::Scene` and overriding lifecycle methods:
 
-Scenes are where game logic lives:
+| Method | When Called | Typical Use |
+|--------|-------------|-------------|
+| `onEnter()` | Scene becomes active | Setup camera, lighting, load resources, create entities |
+| `update(dt)` | Every frame | Update game logic; **must call `Scene::update(dt)`** |
+| `render()` | Every frame after update | Custom rendering (usually just call `Scene::render()`) |
+| `onPause()` | Another scene pushed on top | Pause timers, animations |
+| `onResume()` | Returned to after pop | Resume timers |
+| `onExit()` | Scene deactivated | Cleanup (usually automatic) |
 
-```cpp
-class MainScene : public vde::Scene {
-public:
-    void onEnter() override {
-        // Called when scene becomes active
-        setupCamera();
-        setupLighting();
-        loadResources();
-        createEntities();
-    }
-    
-    void onExit() override {
-        // Called when leaving the scene
-        // Cleanup if needed (usually automatic)
-    }
-    
-    void update(float deltaTime) override {
-        // Update game logic
-        updateEntities(deltaTime);
-        
-        // IMPORTANT: Call base class
-        vde::Scene::update(deltaTime);
-    }
-    
-    void render() override {
-        // Custom rendering if needed
-        // Most cases just call base
-        vde::Scene::render();
-    }
+**Critical:** Always call base class `Scene::update(deltaTime)` and `Scene::render()` in overrides.
 
-private:
-    void setupCamera() {
-        // Create camera (Scene takes ownership)
-        setCamera(new vde::OrbitCamera(
-            vde::Position(0, 0, 0),  // target
-            10.0f                     // distance
-        ));
-    }
-    
-    void setupLighting() {
-        // Create light box (Scene takes ownership)
-        setLightBox(new vde::SimpleColorLightBox(
-            vde::Color::white()
-        ));
-    }
-    
-    void loadResources() {
-        // Load shared resources
-        m_meshId = addResource<vde::Mesh>("models/mymodel.obj");
-        m_textureId = addResource<vde::Texture>("textures/mytexture.png");
-    }
-    
-    void createEntities() {
-        // Create entities
-        auto entity = addEntity<vde::MeshEntity>(m_meshId);
-        entity->setTexture(m_textureId);
-        entity->setPosition(0, 0, 0);
-        
-        // Store entity ID for later access
-        m_entityId = entity->getId();
-    }
-    
-    void updateEntities(float deltaTime) {
-        // Access and update entities
-        if (auto entity = getEntity<vde::MeshEntity>(m_entityId)) {
-            // Update entity
-        }
-    }
+### InputHandling
 
-private:
-    vde::ResourceId m_meshId;
-    vde::ResourceId m_textureId;
-    vde::EntityId m_entityId;
-};
-```
+Implement `vde::InputHandler` interface for event-driven input (keyboard, mouse, gamepad). Set handler globally via `game.setInputHandler()` or per-scene via `scene->setInputHandler()`.
 
-### 3. Input Handling
+**Gamepad support:**
+- Automatic detection and hot-plug
+- Standard button/axis mapping (Xbox/PlayStation layout)
+- Event callbacks (`onGamepadButtonPress`, `onGamepadAxis`, etc.)
+- Dead zone filtering (default 0.1)
 
-Input handlers process user input:
+See [API-DOC.md#input-system](../../../API-DOC.md#input-system) for complete interface and key codes.
 
-```cpp
-class MyInputHandler : public vde::InputHandler {
-public:
-    void onKeyPress(int key) override {
-        if (key == vde::KEY_SPACE) {
-            m_spacePressed = true;
-        }
-        if (key == vde::KEY_ESCAPE) {
-            // Request game exit
-        }
-    }
-    
-    void onKeyRelease(int key) override {
-        // Handle key release
-    }
-    
-    void onMouseMove(double x, double y) override {
-        m_mouseX = x;
-        m_mouseY = y;
-    }
-    
-    void onMouseButton(int button, int action) override {
-        // Handle mouse clicks
-    }
-    
-    // Query methods for game logic
-    bool isSpacePressed() {
-        bool val = m_spacePressed;
-        m_spacePressed = false;
-        return val;
-    }
+## Decision Guide: Choosing the Right Components
 
-private:
-    bool m_spacePressed = false;
-    double m_mouseX = 0.0;
-    double m_mouseY = 0.0;
-};
+### Cameras
 
-// Usage in scene:
-void update(float deltaTime) override {
-    auto* input = dynamic_cast<MyInputHandler*>(getInputHandler());
-    if (input && input->isSpacePressed()) {
-        // Handle space press
-    }
-}
-```
+| Camera Type | Best For | Key Features |
+|-------------|----------|--------------|
+| `OrbitCamera` | 3D games, RTS, demos | Orbits around target, zoom, pitch/yaw limits |
+| `SimpleCamera` | First-person, free camera | Direct position/direction control |
+| `Camera2D` | 2D games | Position, zoom, rotation in 2D plane |
 
-## Common Tasks
-
-### Creating Entities
-
-#### Mesh Entities (3D Objects)
-
-```cpp
-// In scene initialization:
-auto meshId = addResource<vde::Mesh>("models/cube.obj");
-auto textureId = addResource<vde::Texture>("textures/cube.png");
-
-auto entity = addEntity<vde::MeshEntity>(meshId);
-entity->setTexture(textureId);
-entity->setPosition(0, 0, 0);
-entity->setRotation(0, 45, 0);  // Euler angles in degrees
-entity->setScale(1, 1, 1);
-
-// Store ID for later access
-m_cubeId = entity->getId();
-```
-
-#### Sprite Entities (2D Objects)
-
-```cpp
-// Create sprite texture
-auto spriteTexture = addResource<vde::Texture>("sprites/player.png");
-
-// Create sprite entity
-auto sprite = addEntity<vde::SpriteEntity>(spriteTexture);
-sprite->setPosition(0, 0, 0);
-sprite->setScale(1, 1);  // Width and height in world units
-sprite->setColor(vde::Color::white());
-
-// For sprite sheets, set UV rectangle:
-sprite->setUVRect(0.0f, 0.0f, 0.25f, 0.25f);  // Top-left quarter
-
-// Set anchor point (0,0 = top-left, 0.5,0.5 = center, 1,1 = bottom-right)
-sprite->setAnchor(0.5f, 0.5f);  // Center the sprite
-```
-
-### Working with Cameras
-
-#### Orbit Camera (Good for 3D scenes)
-
-```cpp
-auto camera = new vde::OrbitCamera(
-    vde::Position(0, 0, 0),  // target
-    15.0f,                    // distance
-    45.0f,                    // pitch (degrees)
-    0.0f                      // yaw (degrees)
-);
-setCamera(camera);
-```
-
-#### Fixed Camera (Good for controlled views)
-
-```cpp
-auto camera = new vde::FixedCamera(
-    vde::Position(0, 5, 10),  // eye position
-    vde::Position(0, 0, 0),   // look at
-    vde::Direction(0, 1, 0)   // up vector
-);
-setCamera(camera);
-```
-
-#### Side Scroller Camera (2D side-view games)
-
-```cpp
-auto camera = new vde::SideScrollerCamera(
-    vde::Meters(20.0f),  // view width in meters
-    vde::Position(0, 0, 10)  // initial position
-);
-setCamera(camera);
-
-// Update camera to follow player:
-if (auto player = getEntity<vde::SpriteEntity>(m_playerId)) {
-    auto pos = player->getPosition();
-    camera->setPosition(vde::Position(pos.x, pos.y, 10));
-}
-```
+See [API-DOC.md#camera-system](../../../API-DOC.md#camera-system) for detailed usage.
 
 ### Lighting
 
-#### Simple Color Lighting
+| Light Setup | Best For | Description |
+|-------------|----------|-------------|
+| `SimpleColorLightBox` | Simple scenes, 2D games | Ambient light only, or ambient + one directional light |
+| `ThreePointLightBox` | Character showcases, demos | Professional key/fill/rim lighting |
+| `LightBox` | Complex 3D scenes | Full control, multiple lights (directional, point, spot) |
 
-```cpp
-setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
-```
+See [API-DOC.md#lighting-system](../../../API-DOC.md#lighting-system) for light types and configuration.
 
-#### With Custom Color
+### Entities
 
-```cpp
-setLightBox(new vde::SimpleColorLightBox(
-    vde::Color(1.0f, 0.9f, 0.8f)  // Warm white
-));
-```
+| Entity Type | Use Case | Physics |
+|-------------|----------|---------|
+| `MeshEntity` | 3D objects | No physics |
+| `SpriteEntity` | 2D sprites | No physics |
+| `PhysicsMeshEntity` | 3D objects with 2D physics | Auto-synced with physics body |
+| `PhysicsSpriteEntity` | 2D sprites with physics | Auto-synced with physics body |
+
+**Key Operations:**
+- Create: `scene->addEntity<T>()`
+- Access by ID: `scene->getEntity<T>(entityId)`
+- Find by name: `scene->getEntityByName("player")`
+- Transform: `setPosition()`, `setRotation()`, `setScale()`
+- Rendering: `setMesh()`, `setTexture()`, `setMaterial()`, `setColor()`
+
+See [API-DOC.md#entity](../../../API-DOC.md#entity) for complete API.
 
 ### Resources
 
-Resources are shared assets loaded once and used by multiple entities:
+All resources should be loaded via `ResourceManager` for automatic caching:
 
 ```cpp
-// Load a resource
-auto meshId = addResource<vde::Mesh>("models/tree.obj");
+auto& resources = getGame()->getResourceManager();
+auto mesh = resources.load<vde::Mesh>("models/cube.obj");
+auto texture = resources.load<vde::Texture>("textures/brick.png");
+auto audio = resources.load<vde::AudioClip>("audio/jump.wav");
+```
 
-// Use it for multiple entities
-for (int i = 0; i < 10; i++) {
-    auto tree = addEntity<vde::MeshEntity>(meshId);
-    tree->setPosition(i * 5.0f, 0, 0);
+**Important:** Textures must be uploaded to GPU before use in sprites:
+```cpp
+if (auto* context = getGame()->getVulkanContext()) {
+    texture->uploadToGPU(context);
 }
 ```
 
-### Entity Updates
+**Mesh Primitives:** `createCube()`, `createSphere()`, `createPlane()`, `createCylinder()`
+
+See [API-DOC.md#resource](../../../API-DOC.md#resource) and [API-DOC.md#resourcemanager](../../../API-DOC.md#resourcemanager).
+
+## Feature Workflows
+
+### Physics Setup
+
+1. **Enable physics in scene:** `enablePhysics()` or `enablePhysics(customConfig)`
+2. **Create physics entities:** Use `PhysicsSpriteEntity` or `PhysicsMeshEntity`
+3. **Define body:** Set `PhysicsBodyDef` (type, shape, mass, friction, restitution)
+4. **Create body:** `entity->createPhysicsBody(def)`
+5. **Apply forces:** `entity->applyForce()` or `applyImpulse()`
+6. **Handle collisions:** Set callbacks via `getPhysicsScene()->setOnCollisionBegin()`
+
+**Body Types:** Static (immovable), Dynamic (physics-driven), Kinematic (code-driven)  
+**Shapes:** Box (AABB), Circle  
+
+**Important:** Apply forces, not direct position changes (except for initialization or teleportation).
+
+See [API-DOC.md#physics-system](../../../API-DOC.md#physics-system) for comprehensive guide.
+
+### Multi-Scene & Split-Screen
+
+1. **Create individual scenes as usual**
+2. **Create SceneGroup:**
+   ```cpp
+   auto group = vde::SceneGroup::createWithViewports("name", {
+       {"scene1", vde::ViewportRect::leftHalf()},
+       {"scene2", vde::ViewportRect::rightHalf()}
+   });
+   ```
+3. **Activate group:** `game.setActiveSceneGroup(group)`
+
+**Viewport Presets:** `fullWindow()`, `leftHalf()`, `rightHalf()`, `topLeft()`, `bottomRight()`, etc.
+
+**Use Cases:**
+- Split-screen multiplayer (2 or 4 players)
+- Picture-in-picture minimap
+- HUD overlays on gameplay
+
+See [API-DOC.md#multi-scene--split-screen](../../../API-DOC.md#multi-scene--split-screen) for detailed examples.
+
+### Audio Playback
 
 ```cpp
-void update(float deltaTime) override {
-    // Update specific entity
-    if (auto entity = getEntity<vde::MeshEntity>(m_entityId)) {
-        auto pos = entity->getPosition();
-        pos.y += 1.0f * deltaTime;  // Move up
-        entity->setPosition(pos);
-        
-        // Rotate
-        auto rot = entity->getRotation();
-        rot.y += 45.0f * deltaTime;  // Rotate 45 deg/sec
-        entity->setRotation(rot);
-    }
-    
-    vde::Scene::update(deltaTime);
-}
+// Load
+auto clip = getGame()->getResourceManager().load<vde::AudioClip>("audio/sound.wav");
+
+// Play one-shot sound effect
+vde::AudioManager::getInstance().playSFX(clip, volume);
+
+// Play looping music
+vde::AudioManager::getInstance().playMusic(clip, volume, loop, pitch);
 ```
 
-### Scene Management
+For 3D spatial audio, use `AudioSource`. See [API-DOC.md#audio-system](../../../API-DOC.md#audio-system).
 
+### World Coordinates & Bounds (2D Games)
+
+For 2D games that need pixel-to-world conversion (e.g., platformers, sidescrollers):
+
+**Type-safe units:**
 ```cpp
-// Switch to different scene
-game.setActiveScene("gameplay");
-
-// Push overlay scene (e.g., pause menu)
-game.pushScene("pause");
-
-// Pop back to previous scene
-game.popScene();
-
-// Check if we should quit
-if (game.shouldQuit()) {
-    // Cleanup if needed
-}
+vde::Meters distance = 100_m;
+vde::Pixels screenWidth = 1920_px;
 ```
+
+**World boundaries:**
+```cpp
+auto bounds = vde::WorldBounds2D::fromCardinal(100_m, 100_m, 100_m, 100_m);
+```
+
+**Camera with pixel-to-world mapping:**
+```cpp
+vde::CameraBounds2D camera = vde::CameraBounds2D::fromPixelViewport(
+    1920_px, 1080_px,
+    100.0_px,  // pixels per meter
+    bounds
+);
+```
+
+This enables proper scaling and conversion between screen pixels and game world meters.
+
+See [API-DOC.md#world-coordinates--bounds](../../../API-DOC.md#world-coordinates--bounds) for complete guide.
 
 ## Best Practices
 
 ### 1. Always Call Base Class Methods
 
-When overriding scene methods, always call the base class implementation:
-
 ```cpp
 void update(float deltaTime) override {
-    // Your logic
+    // Your logic here
     
-    // MUST call base class
+    // MUST call base class to update entities, physics, etc.
     vde::Scene::update(deltaTime);
 }
-```
 
-### 2. Store IDs, Not Pointers
-
-Entities and resources return shared_ptr, but store IDs instead:
-
-```cpp
-// Good: Store ID
-m_playerId = addEntity<vde::SpriteEntity>(...)->getId();
-
-// Later access:
-if (auto player = getEntity<vde::SpriteEntity>(m_playerId)) {
-    // Use player
+void render() override {
+    // Custom rendering if needed
+    
+    // Call base to render entities
+    vde::Scene::render();
 }
-
-// Avoid: Don't store shared_ptr member variables
-// std::shared_ptr<vde::SpriteEntity> m_player;  // NO
 ```
 
-### 3. Resource Sharing
-
-Load resources once and share them:
+### 2. Store EntityIds, Use ResourcePtr for Resources
 
 ```cpp
-// Good: One resource, many entities
-auto meshId = addResource<vde::Mesh>("tree.obj");
+class MyScene : public vde::Scene {
+    vde::EntityId m_playerId;                  // Store ID, not pointer
+    vde::ResourcePtr<vde::Mesh> m_playerMesh;  // Store ResourcePtr
+    
+    void onEnter() override {
+        auto player = addEntity<vde::MeshEntity>();
+        m_playerId = player->getId();  // Store ID
+        
+        auto& rm = getGame()->getResourceManager();
+        m_playerMesh = rm.load<vde::Mesh>("models/player.obj");  // ResourcePtr
+    }
+    
+    void update(float dt) override {
+        // Get entity by ID when needed
+        if (auto player = getEntity<vde::MeshEntity>(m_playerId)) {
+            player->setPosition(/* ... */);
+        }
+        vde::Scene::update(dt);
+    }
+};
+```
+
+### 3. Use ResourceManager for Shared Assets
+
+```cpp
+// Load via ResourceManager for automatic caching
+auto& resources = getGame()->getResourceManager();
+auto texture = resources.load<vde::Texture>("textures/ground.png");
+
+// Multiple entities can share the same resource
 for (int i = 0; i < 100; i++) {
-    auto tree = addEntity<vde::MeshEntity>(meshId);
-    tree->setPosition(randomPosition());
-}
-
-// Avoid: Loading same resource multiple times
-// Don't do this in a loop!
-```
-
-### 4. Input Handler Lifecycle
-
-Input handlers are typically stack-allocated in main():
-
-```cpp
-int main() {
-    vde::Game game;
-    MyInputHandler input;  // Stack-allocated
-    
-    game.initialize(settings);
-    game.setInputHandler(&input);  // Game does NOT own this
-    
-    // ... setup scenes ...
-    
-    game.run();
-    return 0;
+    auto entity = addEntity<vde::SpriteEntity>();
+    entity->setTexture(texture);  // All share the same texture
 }
 ```
 
-### 5. Use Type-Safe Units
-
-For 2D games with pixel/world conversions, use the type-safe units:
+### 4. Upload Textures to GPU
 
 ```cpp
-#include <vde/api/WorldUnits.h>
+auto texture = resources.load<vde::Texture>("textures/sprite.png");
 
-vde::Meters worldWidth(20.0f);
-vde::Pixels screenWidth(1280);
+// MUST upload before using in SpriteEntity
+if (auto* context = getGame()->getVulkanContext()) {
+    texture->uploadToGPU(context);
+}
 
-// Compile-time safety prevents mixing units
-// worldWidth = screenWidth;  // Compilation error!
+auto sprite = addEntity<vde::SpriteEntity>();
+sprite->setTexture(texture);  // Now safe to use
 ```
+
+### 5. Input Handler Lifecycle
+
+```cpp
+class GameScene : public vde::Scene {
+    MyInputHandler m_inputHandler;  // Stack-allocated, scene lifetime
+    
+    void onEnter() override {
+        setInputHandler(&m_inputHandler);  // Set raw pointer
+    }
+    
+    void onExit() override {
+        setInputHandler(nullptr);  // Clear handler
+    }
+};
+```
+
+### 6. Physics Best Practices
+
+**DO:**
+- Apply forces or impulses: `entity->applyForce()`, `applyImpulse()`
+- Use `PhysicsSpriteEntity` or `PhysicsMeshEntity` for auto-sync
+- Set callbacks for collision handling
+- Use Static bodies for walls/platforms
+
+**DON'T:**
+- Directly set position on physics entities during simulation
+- Mix physics and non-physics movement on the same entity
+- Create too many physics bodies (performance)
+
+### 7. Multi-Scene Best Practices
+
+**DO:**
+- Use SceneGroup for split-screen and multi-viewport
+- Give each scene its own camera
+- Use normalized viewport coordinates (0-1 range)
+
+**DON'T:**
+- Share entities between scenes
+- Assume scenes update in a specific order
 
 ## Handling API Limitations
 
-If you encounter a limitation in the current API while implementing a feature:
+When you encounter an API limitation:
 
-### 1. Document the Suggestion
+### 1. Document the Limitation
 
-Create a markdown file describing the improvement:
-
-```markdown
-# API Suggestion: [Feature Name]
-
-## Problem
-[Describe what you're trying to accomplish and why the current API makes it difficult]
-
-## Current Workaround
-[Show how you solved it with the current API]
-
-## Proposed Improvement
-[Describe the ideal API addition or change]
-
-### Example Usage
-[Show example code of how the improved API would be used]
-
-## Implementation Notes
-[Any relevant implementation details or considerations]
-```
-
-Save this file as: `API_SUGGESTION_[SHORT_NAME].md` in the project root.
+Create a brief note describing:
+- What you needed to do
+- Why the current API doesn't support it well
+- The workaround you used
 
 ### 2. Complete the Task with Current API
 
-Use the existing API to complete the requested task, even if it requires a workaround:
+Use available workarounds to complete the user's request:
+- Direct access to lower-level systems
+- Custom entity subclasses
+- Manual management where auto-management is missing
 
+### 3. Common Workaround Patterns
+
+**Pattern: Direct PhysicsScene Access**
 ```cpp
-// Example: If there's no built-in collision detection
-// Implement a simple solution using available API:
-
-bool checkCollision(const vde::Position& pos1, float radius1,
-                   const vde::Position& pos2, float radius2) {
-    float dx = pos2.x - pos1.x;
-    float dy = pos2.y - pos1.y;
-    float dz = pos2.z - pos1.z;
-    float distSq = dx*dx + dy*dy + dz*dz;
-    float radiusSumSq = (radius1 + radius2) * (radius1 + radius2);
-    return distSq < radiusSumSq;
-}
-
-// Use in scene update:
-void update(float deltaTime) override {
-    auto player = getEntity<vde::SpriteEntity>(m_playerId);
-    auto enemy = getEntity<vde::SpriteEntity>(m_enemyId);
-    
-    if (player && enemy) {
-        if (checkCollision(player->getPosition(), 0.5f,
-                          enemy->getPosition(), 0.5f)) {
-            // Handle collision
-        }
-    }
-    
-    vde::Scene::update(deltaTime);
-}
+// If entities don't provide needed physics control
+auto* physics = getPhysicsScene();
+physics->applyForce(bodyId, force);
 ```
 
-### 3. Common Patterns for Workarounds
-
-#### Custom Entity Behavior
-
-If entities need custom behavior beyond position/rotation/scale:
-
+**Pattern: Custom Entity Subclass**
 ```cpp
-// Create wrapper class
-class PlayerEntity {
+// If built-in entities lack needed functionality
+class CustomEntity : public vde::MeshEntity {
 public:
-    PlayerEntity(vde::Scene* scene, vde::ResourceId textureId) {
-        m_sprite = scene->addEntity<vde::SpriteEntity>(textureId);
-        m_entityId = m_sprite->getId();
+    void update(float dt) override {
+        // Custom behavior
+        vde::MeshEntity::update(dt);
     }
-    
-    void update(float deltaTime) {
-        // Custom logic
-        m_velocity.y -= 9.8f * deltaTime;  // Gravity
-        
-        auto pos = m_sprite->getPosition();
-        pos.x += m_velocity.x * deltaTime;
-        pos.y += m_velocity.y * deltaTime;
-        m_sprite->setPosition(pos);
-    }
-    
-    void jump() {
-        m_velocity.y = 5.0f;
-    }
-    
-    vde::EntityId getId() const { return m_entityId; }
-
-private:
-    std::shared_ptr<vde::SpriteEntity> m_sprite;
-    vde::EntityId m_entityId;
-    glm::vec2 m_velocity{0, 0};
 };
 ```
 
-#### Custom Scene Systems
-
-If you need systems (physics, AI, etc.):
-
+**Pattern: Manual Resource Management**
 ```cpp
-class GameplayScene : public vde::Scene {
-public:
-    void update(float deltaTime) override {
-        // Update custom systems
-        m_physicsSystem.update(deltaTime);
-        m_aiSystem.update(deltaTime);
-        
-        vde::Scene::update(deltaTime);
-    }
-
-private:
-    PhysicsSystem m_physicsSystem;
-    AISystem m_aiSystem;
-};
+// If resource IDs aren't wired up yet
+auto mesh = vde::Mesh::createCube(1.0f);
+entity->setMesh(mesh);  // Direct assignment instead of ID binding
 ```
 
 ## Quick Reference
@@ -569,50 +396,74 @@ private:
 
 ```cpp
 #include <vde/api/GameAPI.h>  // Everything
+
 // OR specific headers:
 #include <vde/api/Game.h>
 #include <vde/api/Scene.h>
 #include <vde/api/Entity.h>
-```
-
-### Key Constants
-
-```cpp
-// From vde/api/KeyCodes.h
-vde::KEY_SPACE, vde::KEY_ESCAPE
-vde::KEY_W, vde::KEY_A, vde::KEY_S, vde::KEY_D
-vde::KEY_UP, vde::KEY_DOWN, vde::KEY_LEFT, vde::KEY_RIGHT
-vde::MOUSE_BUTTON_LEFT, vde::MOUSE_BUTTON_RIGHT
+#include <vde/api/PhysicsEntity.h>
+#include <vde/api/SceneGroup.h>
 ```
 
 ### Common Types
 
 ```cpp
-vde::Position(x, y, z)       // 3D position (glm::vec3)
-vde::Direction(x, y, z)      // Direction vector (glm::vec3)
-vde::Rotation(pitch, yaw, roll)  // Euler angles in degrees
-vde::Color(r, g, b, a)       // RGBA color (0-1 range)
-vde::Meters(value)           // Meters (type-safe)
-vde::Pixels(value)           // Pixels (type-safe)
+// Spatial types
+vde::Position(x, y, z)
+vde::Direction(x, y, z)
+vde::Rotation(pitch, yaw, roll)
+vde::Color(r, g, b, a)
+
+// Type-safe units
+vde::Meters distance = 100_m;
+vde::Pixels screenWidth = 1920_px;
+
+// Physics types
+vde::PhysicsBodyType::Static / Dynamic / Kinematic
+vde::PhysicsShape::Box / Circle
+vde::PhysicsBodyDef
+vde::CollisionEvent
+
+// Multi-scene types
+vde::SceneGroup
+vde::ViewportRect
 ```
+
+### Key Input Constants
+
+See [API-DOC.md#key-codes](../../../API-DOC.md#key-codes) for complete list.
+
+**Common keys:** `KEY_SPACE`, `KEY_ESCAPE`, `KEY_W/A/S/D`, `KEY_ARROW`  
+**Mouse:** `MOUSE_BUTTON_LEFT/RIGHT/MIDDLE`  
+**Gamepad:** `GAMEPAD_BUTTON_A/B/X/Y`, `GAMEPAD_AXIS_LEFT_X/Y`
 
 ## Documentation References
 
 Always check these files for current API capabilities:
 
-- **API-DOC.md** - Complete Game API documentation
-- **docs/API.md** - Core engine API reference
-- **examples/** - Working example code
-- **include/vde/api/** - Header files with inline documentation
+- **[API-DOC.md](../../../API-DOC.md)** - Complete Game API documentation with examples
+- **[docs/API.md](../../../docs/API.md)** - Core engine API reference
+- **[examples/](../../../examples/)** - Working example code
+- **[include/vde/api/](../../../include/vde/api/)** - Header files with inline documentation
 
 ## Summary
 
-1. **Start with the pattern** - Use Game → Scene → Entity → Resource hierarchy
-2. **Follow ownership rules** - Scene owns entities/resources, use IDs not pointers
-3. **Check documentation first** - API-DOC.md has comprehensive information
-4. **Use existing examples** - Look at examples/ folder for patterns
-5. **Suggest improvements but deliver** - Document API gaps but complete the task
-6. **Call base class methods** - Always call Scene::update() and Scene::render()
-7. **Test thoroughly** - Run the application to verify behavior
+1. **Start with the pattern** - Use Game  Scene  Entity  Resource hierarchy
+2. **Follow ownership rules** - Scene owns entities/resources, use IDs for entities and ResourcePtr for resources
+3. **Use ResourceManager** - Load resources via `game.getResourceManager().load<T>()` for global caching
+4. **Upload textures to GPU** - Call `texture->uploadToGPU(context)` before using in sprites
+5. **Check documentation first** - [API-DOC.md](../../../API-DOC.md) has comprehensive information
+6. **Use existing examples** - Look at [examples/](../../../examples/) folder for patterns
+7. **Suggest improvements but deliver** - Document API gaps but complete the task
+8. **Call base class methods** - Always call `Scene::update()` and `Scene::render()`
+9. **Test thoroughly** - Run the application to verify behavior
 
-When in doubt, examine the existing examples in the `examples/` directory for proven patterns.
+**Key Systems:**
+- **Input**: Keyboard, mouse, gamepad with events and polling
+- **Audio**: Sound effects and music via AudioManager
+- **Cameras**: OrbitCamera (3D), SimpleCamera (first-person), Camera2D (2D)
+- **Physics**: 2D AABB physics with collision, bodies, forces
+- **Multi-Scene**: Split-screen, viewports, multiple active scenes
+- **Lighting**: Ambient, directional, point, spot lights
+
+**When in doubt,** examine the existing [examples/](../../../examples/) directory for proven patterns.

@@ -10,6 +10,7 @@
 #include <vde/api/GameCamera.h>
 #include <vde/api/LightBox.h>
 #include <vde/api/Scene.h>
+#include <vde/api/ViewportRect.h>
 #include <vde/api/WorldBounds.h>
 
 #include <gtest/gtest.h>
@@ -280,4 +281,168 @@ TEST_F(SceneTest, UpdateCallsAllEntities) {
     EXPECT_EQ(entity1->updateCount, 1);
     EXPECT_EQ(entity2->updateCount, 1);
     EXPECT_EQ(entity3->updateCount, 1);
+}
+
+// ============================================================================
+// Background / Priority Tests (Phase 2)
+// ============================================================================
+
+TEST_F(SceneTest, ContinueInBackgroundDefaultFalse) {
+    EXPECT_FALSE(scene->getContinueInBackground());
+}
+
+TEST_F(SceneTest, SetContinueInBackground) {
+    scene->setContinueInBackground(true);
+    EXPECT_TRUE(scene->getContinueInBackground());
+
+    scene->setContinueInBackground(false);
+    EXPECT_FALSE(scene->getContinueInBackground());
+}
+
+TEST_F(SceneTest, UpdatePriorityDefaultZero) {
+    EXPECT_EQ(scene->getUpdatePriority(), 0);
+}
+
+TEST_F(SceneTest, SetUpdatePriority) {
+    scene->setUpdatePriority(5);
+    EXPECT_EQ(scene->getUpdatePriority(), 5);
+
+    scene->setUpdatePriority(-3);
+    EXPECT_EQ(scene->getUpdatePriority(), -3);
+}
+
+// ============================================================================
+// Viewport Tests (Phase 3)
+// ============================================================================
+
+TEST_F(SceneTest, DefaultViewportIsFullWindow) {
+    auto vp = scene->getViewportRect();
+    EXPECT_FLOAT_EQ(vp.x, 0.0f);
+    EXPECT_FLOAT_EQ(vp.y, 0.0f);
+    EXPECT_FLOAT_EQ(vp.width, 1.0f);
+    EXPECT_FLOAT_EQ(vp.height, 1.0f);
+    EXPECT_EQ(vp, ViewportRect::fullWindow());
+}
+
+TEST_F(SceneTest, SetViewportRect) {
+    auto topRight = ViewportRect::topRight();
+    scene->setViewportRect(topRight);
+
+    auto vp = scene->getViewportRect();
+    EXPECT_FLOAT_EQ(vp.x, 0.5f);
+    EXPECT_FLOAT_EQ(vp.y, 0.0f);
+    EXPECT_FLOAT_EQ(vp.width, 0.5f);
+    EXPECT_FLOAT_EQ(vp.height, 0.5f);
+}
+
+TEST_F(SceneTest, SetViewportRectCustom) {
+    ViewportRect custom{0.1f, 0.2f, 0.3f, 0.4f};
+    scene->setViewportRect(custom);
+
+    auto vp = scene->getViewportRect();
+    EXPECT_FLOAT_EQ(vp.x, 0.1f);
+    EXPECT_FLOAT_EQ(vp.y, 0.2f);
+    EXPECT_FLOAT_EQ(vp.width, 0.3f);
+    EXPECT_FLOAT_EQ(vp.height, 0.4f);
+}
+
+TEST_F(SceneTest, ViewportRectCanBeResetToFullWindow) {
+    scene->setViewportRect(ViewportRect::bottomLeft());
+    scene->setViewportRect(ViewportRect::fullWindow());
+
+    EXPECT_EQ(scene->getViewportRect(), ViewportRect::fullWindow());
+}
+
+// ============================================================================
+// Phase Callback Tests (Phase 4)
+// ============================================================================
+
+TEST_F(SceneTest, PhaseCallbacksDisabledByDefault) {
+    EXPECT_FALSE(scene->usesPhaseCallbacks());
+}
+
+TEST_F(SceneTest, EnablePhaseCallbacks) {
+    scene->enablePhaseCallbacks();
+    EXPECT_TRUE(scene->usesPhaseCallbacks());
+}
+
+class PhaseTrackingScene : public Scene {
+  public:
+    void updateGameLogic(float deltaTime) override {
+        gameLogicCalled = true;
+        gameLogicDt = deltaTime;
+        ++callOrder;
+        gameLogicOrder = callOrder;
+    }
+    void updateAudio(float deltaTime) override {
+        // Call base to drain queue
+        Scene::updateAudio(deltaTime);
+        audioCalled = true;
+        audioDt = deltaTime;
+        ++callOrder;
+        audioOrder = callOrder;
+    }
+    void updateVisuals(float deltaTime) override {
+        visualsCalled = true;
+        visualsDt = deltaTime;
+        ++callOrder;
+        visualsOrder = callOrder;
+    }
+
+    bool gameLogicCalled = false;
+    bool audioCalled = false;
+    bool visualsCalled = false;
+    float gameLogicDt = 0.0f;
+    float audioDt = 0.0f;
+    float visualsDt = 0.0f;
+    int callOrder = 0;
+    int gameLogicOrder = 0;
+    int audioOrder = 0;
+    int visualsOrder = 0;
+};
+
+TEST_F(SceneTest, PhaseCallbacksCanBeCalledDirectly) {
+    PhaseTrackingScene trackScene;
+    trackScene.enablePhaseCallbacks();
+
+    trackScene.updateGameLogic(0.016f);
+    trackScene.updateAudio(0.016f);
+    trackScene.updateVisuals(0.016f);
+
+    EXPECT_TRUE(trackScene.gameLogicCalled);
+    EXPECT_TRUE(trackScene.audioCalled);
+    EXPECT_TRUE(trackScene.visualsCalled);
+    EXPECT_FLOAT_EQ(trackScene.gameLogicDt, 0.016f);
+    EXPECT_FLOAT_EQ(trackScene.audioDt, 0.016f);
+    EXPECT_FLOAT_EQ(trackScene.visualsDt, 0.016f);
+}
+
+TEST_F(SceneTest, PhaseCallbackOrder) {
+    PhaseTrackingScene trackScene;
+    trackScene.enablePhaseCallbacks();
+
+    trackScene.updateGameLogic(0.016f);
+    trackScene.updateAudio(0.016f);
+    trackScene.updateVisuals(0.016f);
+
+    // gameLogic -> audio -> visuals
+    EXPECT_LT(trackScene.gameLogicOrder, trackScene.audioOrder);
+    EXPECT_LT(trackScene.audioOrder, trackScene.visualsOrder);
+}
+
+TEST_F(SceneTest, DefaultPhaseCallbacksAreNoOps) {
+    // A plain Scene's callbacks should not crash
+    scene->updateGameLogic(0.016f);
+    scene->updateVisuals(0.016f);
+    // updateAudio drains an empty queue — also safe
+    scene->updateAudio(0.016f);
+}
+
+TEST_F(SceneTest, PhaseCallbackUpdateAudioDrainsQueue) {
+    scene->playSFX(nullptr);
+    scene->playSFX(nullptr);
+    EXPECT_EQ(scene->getAudioEventQueueSize(), 2u);
+
+    scene->updateAudio(0.016f);
+    EXPECT_EQ(scene->getAudioEventQueueSize(), 0u);
 }

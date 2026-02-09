@@ -1,5 +1,17 @@
 # API Improvements for 2D Sidescroller Games
 
+> **Implementation Status (Updated)**
+>
+> | # | Feature | Status | Notes |
+> |---|---------|--------|-------|
+> | 1 | SpriteSheet / Atlas Management | Not Done | Manual UV calculation still required |
+> | 2 | Sprite Animation System | Not Done | Manual frame management in update loop |
+> | 3 | TileMap / Tiled Background | Not Done | No tilemap support |
+> | 4 | Sprite Flipping / Mirroring | Not Done | Must use negative scale workaround |
+> | 5 | 2D Physics & Collision Helpers | **Partial** | `PhysicsScene` + `PhysicsEntity` provide 2D AABB collision & impulse resolution; no Circle2D or spatial partitioning yet |
+> | 6 | Camera Extensions for 2D | **Partial** | `Camera2D` has `setBounds()`, `setFollowTarget()` with smoothing; no deadzone or camera shake yet |
+> | 7 | Particle System | Not Done | No particle emitter |
+
 This document outlines suggested API additions to make 2D sidescroller/platformer game development easier in VDE.
 
 ## Current Gaps Found While Building a Sidescroller

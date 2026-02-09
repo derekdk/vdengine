@@ -2,15 +2,30 @@
 
 This document provides a reference for the public API of the Vulkan Display Engine.
 
-## Core Header
+VDE has a two-layer architecture:
 
-Include all VDE functionality with a single header:
+1. **Low-Level Rendering Layer** — Direct Vulkan abstractions (`Window`, `VulkanContext`, `Camera`, `Texture`, etc.)
+2. **Game API Layer** — High-level game framework (`Game`, `Scene`, `Entity`, physics, audio, etc.)
+
+Most users should start with the [Game API](#game-api-layer). The low-level layer is available for advanced rendering needs.
+
+## Core Headers
+
+Include all Game API functionality with a single header:
+
+```cpp
+#include <vde/api/GameAPI.h>
+```
+
+Or include the low-level rendering core:
 
 ```cpp
 #include <vde/Core.h>
 ```
 
-Or include individual components as needed.
+---
+
+# Low-Level Rendering Layer
 
 ---
 
@@ -403,4 +418,953 @@ Functions that may fail gracefully return `bool`:
 if (!texture.loadFromFile("missing.png")) {
     // Handle missing texture
 }
+```
+
+---
+
+# Game API Layer
+
+The Game API provides a high-level framework for building games on top of the Vulkan rendering layer. It manages scenes, entities, resources, input, audio, physics, and multi-scene scheduling.
+
+---
+
+## vde::Game
+
+**Header**: `<vde/api/Game.h>`
+
+Main game class managing the game loop, scenes, and all engine subsystems.
+
+### Basic Usage
+
+```cpp
+vde::Game game;
+vde::GameSettings settings;
+settings.gameName = "My Game";
+settings.setWindowSize(1280, 720);
+
+game.initialize(settings);
+game.addScene("main", new MainScene());
+game.setActiveScene("main");
+game.run();
+```
+
+### Initialization & Lifecycle
+
+| Method | Description |
+|--------|-------------|
+| `bool initialize(const GameSettings&)` | Initialize engine with settings |
+| `void shutdown()` | Shutdown engine and release resources |
+| `bool isInitialized() const` | Check if engine is initialized |
+| `void run()` | Run the main game loop (blocks until quit) |
+| `void quit()` | Request the game to exit |
+| `bool isRunning() const` | Check if game loop is running |
+
+### Scene Management
+
+| Method | Description |
+|--------|-------------|
+| `void addScene(const std::string& name, Scene*)` | Add a scene (Game takes ownership) |
+| `void addScene(const std::string& name, std::unique_ptr<Scene>)` | Add a scene (unique_ptr) |
+| `void removeScene(const std::string& name)` | Remove a scene by name |
+| `Scene* getScene(const std::string& name)` | Get a scene by name |
+| `void setActiveScene(const std::string& name)` | Set the active scene |
+| `Scene* getActiveScene()` | Get the currently active scene |
+| `void setActiveSceneGroup(const SceneGroup&)` | Activate multiple scenes simultaneously |
+| `const SceneGroup& getActiveSceneGroup() const` | Get current active scene group |
+| `void pushScene(const std::string& name)` | Push a scene onto the stack |
+| `void popScene()` | Pop scene and return to previous |
+
+### Input Focus (Split-Screen)
+
+| Method | Description |
+|--------|-------------|
+| `void setFocusedScene(const std::string& name)` | Set which scene receives keyboard input |
+| `Scene* getFocusedScene()` | Get the focused scene |
+| `Scene* getSceneAtScreenPosition(double x, double y)` | Get scene under mouse cursor |
+
+### Scheduler
+
+| Method | Description |
+|--------|-------------|
+| `Scheduler& getScheduler()` | Get the task scheduler |
+
+### Input
+
+| Method | Description |
+|--------|-------------|
+| `void setInputHandler(InputHandler*)` | Set global input handler (not owned) |
+| `InputHandler* getInputHandler()` | Get global input handler |
+
+### Timing
+
+| Method | Description |
+|--------|-------------|
+| `float getDeltaTime() const` | Time since last frame (seconds) |
+| `double getTotalTime() const` | Total time since start (seconds) |
+| `float getFPS() const` | Current frames per second |
+| `uint64_t getFrameCount() const` | Current frame number |
+
+### Window & Settings
+
+| Method | Description |
+|--------|-------------|
+| `Window* getWindow()` | Get the game window |
+| `VulkanContext* getVulkanContext()` | Get the Vulkan context |
+| `ResourceManager& getResourceManager()` | Get global resource manager |
+| `const GameSettings& getSettings() const` | Get current settings |
+| `void applyDisplaySettings(const DisplaySettings&)` | Apply display settings |
+| `void applyGraphicsSettings(const GraphicsSettings&)` | Apply graphics settings |
+
+### Callbacks
+
+| Method | Description |
+|--------|-------------|
+| `void setResizeCallback(std::function<void(uint32_t, uint32_t)>)` | Window resize callback |
+| `void setFocusCallback(std::function<void(bool)>)` | Window focus callback |
+
+### Virtual Methods (for subclassing)
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onStart()` | Called before game loop starts |
+| `virtual void onUpdate(float dt)` | Called every frame before scene update |
+| `virtual void onRender()` | Called every frame after scene render |
+| `virtual void onShutdown()` | Called during shutdown |
+
+---
+
+## vde::Scene
+
+**Header**: `<vde/api/Scene.h>`
+
+Represents a game scene/state managing entities, resources, camera, lighting, and world bounds.
+
+### Lifecycle
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onEnter()` | Called when scene becomes active |
+| `virtual void onExit()` | Called when scene is deactivated |
+| `virtual void onPause()` | Called when another scene is pushed |
+| `virtual void onResume()` | Called when returned to top of stack |
+| `virtual void update(float deltaTime)` | Update scene (calls entity updates) |
+| `virtual void render()` | Render scene entities |
+
+### Phase Callbacks (Opt-In)
+
+When enabled, the scheduler splits `update()` into three ordered phases:
+
+| Method | Description |
+|--------|-------------|
+| `void enablePhaseCallbacks()` | Enable 3-phase update model |
+| `bool usesPhaseCallbacks() const` | Check if phase callbacks enabled |
+| `virtual void updateGameLogic(float dt)` | GameLogic phase (AI, input, spawning) |
+| `virtual void updateAudio(float dt)` | Audio phase (drains audio event queue) |
+| `virtual void updateVisuals(float dt)` | Visual phase (animation, particles) |
+
+### Audio Event Queue
+
+| Method | Description |
+|--------|-------------|
+| `void queueAudioEvent(const AudioEvent&)` | Queue audio event for Audio phase |
+| `void playSFX(shared_ptr<AudioClip>, volume, pitch, loop)` | Queue a PlaySFX event |
+| `void playSFXAt(shared_ptr<AudioClip>, x, y, z, volume, pitch)` | Queue positional audio |
+| `size_t getAudioEventQueueSize() const` | Pending audio event count |
+
+### Entity Management
+
+| Method | Description |
+|--------|-------------|
+| `template<T, Args...> shared_ptr<T> addEntity(Args&&...)` | Create and add entity |
+| `EntityId addEntity(Entity::Ref)` | Add existing entity |
+| `Entity* getEntity(EntityId)` | Get entity by ID |
+| `Entity* getEntityByName(const std::string&)` | Get entity by name |
+| `Entity* getEntityByPhysicsBody(PhysicsBodyId)` | Find entity owning a physics body |
+| `template<T> vector<shared_ptr<T>> getEntitiesOfType()` | Get all entities of type |
+| `void removeEntity(EntityId)` | Remove entity by ID |
+| `void clearEntities()` | Remove all entities |
+| `const vector<Entity::Ref>& getEntities() const` | Get all entities |
+
+### Resource Management
+
+| Method | Description |
+|--------|-------------|
+| `template<T> ResourceId addResource(const std::string& path)` | Add resource from file |
+| `template<T> ResourceId addResource(ResourcePtr<T>)` | Add pre-created resource |
+| `template<T> T* getResource(ResourceId)` | Get resource by ID |
+| `void removeResource(ResourceId)` | Remove resource |
+
+### Camera & Lighting
+
+| Method | Description |
+|--------|-------------|
+| `void setCamera(std::unique_ptr<GameCamera>)` | Set scene camera |
+| `void setCamera(GameCamera*)` | Set scene camera (takes ownership) |
+| `GameCamera* getCamera()` | Get scene camera |
+| `void setLightBox(std::unique_ptr<LightBox>)` | Set lighting configuration |
+| `void setLightBox(LightBox*)` | Set lighting (takes ownership) |
+| `LightBox* getLightBox()` | Get lighting configuration |
+| `const LightBox& getEffectiveLighting() const` | Get effective lighting (default if none set) |
+
+### Background & Priority
+
+| Method | Description |
+|--------|-------------|
+| `void setContinueInBackground(bool)` | Enable updates when scene is not active |
+| `bool getContinueInBackground() const` | Check background update state |
+| `void setUpdatePriority(int)` | Set update order priority (lower = first) |
+| `int getUpdatePriority() const` | Get update priority |
+
+### Viewport
+
+| Method | Description |
+|--------|-------------|
+| `void setViewportRect(const ViewportRect&)` | Set viewport sub-region (normalized 0-1) |
+| `const ViewportRect& getViewportRect() const` | Get viewport rect (default: full window) |
+
+### Physics
+
+| Method | Description |
+|--------|-------------|
+| `void enablePhysics(const PhysicsConfig&)` | Enable physics for this scene |
+| `void disablePhysics()` | Disable physics |
+| `bool hasPhysics() const` | Check if physics is enabled |
+| `PhysicsScene* getPhysicsScene()` | Get physics scene (nullptr if disabled) |
+
+### Input & Misc
+
+| Method | Description |
+|--------|-------------|
+| `void setInputHandler(InputHandler*)` | Set scene input handler (not owned) |
+| `InputHandler* getInputHandler()` | Get input handler (falls back to Game's) |
+| `Game* getGame()` | Get owning Game |
+| `void setBackgroundColor(const Color&)` | Set clear/background color |
+| `const Color& getBackgroundColor() const` | Get background color |
+
+### World Bounds
+
+| Method | Description |
+|--------|-------------|
+| `void setWorldBounds(const WorldBounds&)` | Set 3D world bounds |
+| `const WorldBounds& getWorldBounds() const` | Get world bounds |
+| `bool is2D() const` | Check if scene is 2D |
+| `void setCameraBounds2D(const CameraBounds2D&)` | Set 2D camera bounds |
+| `CameraBounds2D& getCameraBounds2D()` | Get 2D camera bounds |
+
+---
+
+## vde::Entity
+
+**Header**: `<vde/api/Entity.h>`
+
+Base class for all game entities with transform (position, rotation, scale).
+
+### Core
+
+| Method | Description |
+|--------|-------------|
+| `EntityId getId() const` | Unique entity ID |
+| `const std::string& getName() const` | Entity name |
+| `void setName(const std::string&)` | Set entity name |
+
+### Transform
+
+| Method | Description |
+|--------|-------------|
+| `void setPosition(float x, float y, float z)` | Set position |
+| `void setPosition(const Position&)` | Set position (struct) |
+| `void setPosition(const glm::vec3&)` | Set position (vec3) |
+| `const Position& getPosition() const` | Get position |
+| `void setRotation(float pitch, float yaw, float roll)` | Set rotation (degrees) |
+| `const Rotation& getRotation() const` | Get rotation |
+| `void setScale(float uniform)` | Set uniform scale |
+| `void setScale(float x, float y, float z)` | Set non-uniform scale |
+| `const Scale& getScale() const` | Get scale |
+| `const Transform& getTransform() const` | Get full transform |
+| `void setTransform(const Transform&)` | Set full transform |
+| `glm::mat4 getModelMatrix() const` | Get model matrix for rendering |
+
+### Visibility & Lifecycle
+
+| Method | Description |
+|--------|-------------|
+| `void setVisible(bool)` | Set visibility |
+| `bool isVisible() const` | Check visibility |
+| `virtual void onAttach(Scene*)` | Called when added to scene |
+| `virtual void onDetach()` | Called when removed from scene |
+| `virtual void update(float dt)` | Per-frame update |
+| `virtual void render()` | Per-frame render |
+
+---
+
+## vde::MeshEntity
+
+**Header**: `<vde/api/Entity.h>`
+
+Entity that renders a 3D mesh with optional material and texture.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void setMesh(shared_ptr<Mesh>)` | Set mesh directly |
+| `shared_ptr<Mesh> getMesh() const` | Get mesh |
+| `void setMeshId(ResourceId)` | Set mesh by resource ID |
+| `void setTexture(shared_ptr<Texture>)` | Set texture directly |
+| `void setTextureId(ResourceId)` | Set texture by resource ID |
+| `void setColor(const Color&)` | Set base color/tint |
+| `const Color& getColor() const` | Get color |
+| `void setMaterial(shared_ptr<Material>)` | Set material |
+| `shared_ptr<Material> getMaterial() const` | Get material |
+| `bool hasMaterial() const` | Check if material is set |
+
+---
+
+## vde::SpriteEntity
+
+**Header**: `<vde/api/Entity.h>`
+
+Entity that renders a 2D sprite with texture, color tint, UV rect, and anchor point.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void setTexture(shared_ptr<Texture>)` | Set sprite texture |
+| `void setTextureId(ResourceId)` | Set texture by resource ID |
+| `void setColor(const Color&)` | Set color/tint |
+| `const Color& getColor() const` | Get color |
+| `void setUVRect(float u, float v, float w, float h)` | Set UV sub-rectangle (sprite sheets) |
+| `void setAnchor(float x, float y)` | Set anchor point (0-1; 0.5, 0.5 = center) |
+| `float getAnchorX() const` | Get anchor X |
+| `float getAnchorY() const` | Get anchor Y |
+
+---
+
+## vde::GameCamera
+
+**Header**: `<vde/api/GameCamera.h>`
+
+Base class for simplified game cameras wrapping the low-level `Camera`.
+
+### Base Methods
+
+| Method | Description |
+|--------|-------------|
+| `Camera& getCamera()` | Get underlying engine camera |
+| `glm::mat4 getViewMatrix() const` | Get view matrix |
+| `glm::mat4 getProjectionMatrix() const` | Get projection matrix |
+| `glm::mat4 getViewProjectionMatrix() const` | Get combined VP matrix |
+| `void setAspectRatio(float)` | Set aspect ratio |
+| `void setNearPlane(float)` | Set near clip plane |
+| `void setFarPlane(float)` | Set far clip plane |
+| `virtual void update(float dt)` | Per-frame update |
+| `void applyTo(VulkanContext&)` | Apply matrices to Vulkan context |
+| `Ray screenToWorldRay(float x, float y, float w, float h) const` | Unproject screen to world ray |
+
+### SimpleCamera
+
+First-person style camera with direct position and direction control.
+
+```cpp
+SimpleCamera();
+SimpleCamera(const Position& position, const Direction& direction);
+```
+
+| Method | Description |
+|--------|-------------|
+| `void setPosition(const Position&)` | Set camera position |
+| `Position getPosition() const` | Get position |
+| `void setDirection(const Direction&)` | Set look direction |
+| `void setFieldOfView(float fov)` | Set FOV (degrees) |
+| `void move(const Direction& delta)` | Move camera |
+| `void rotate(float deltaPitch, float deltaYaw)` | Rotate camera |
+
+### OrbitCamera
+
+Third-person camera orbiting around a target point.
+
+```cpp
+OrbitCamera();
+OrbitCamera(const Position& target, float distance, float pitch = 45.0f, float yaw = 0.0f);
+```
+
+| Method | Description |
+|--------|-------------|
+| `void setTarget(const Position&)` | Set orbit target |
+| `void setDistance(float)` | Set orbit distance |
+| `void setPitch(float)` | Set pitch angle (degrees) |
+| `void setYaw(float)` | Set yaw angle (degrees) |
+| `void setFieldOfView(float)` | Set FOV (degrees) |
+| `void rotate(float deltaPitch, float deltaYaw)` | Rotate around target |
+| `void zoom(float delta)` | Zoom in/out |
+| `void pan(float deltaX, float deltaY)` | Pan (moves target) |
+| `void setZoomLimits(float min, float max)` | Set distance limits |
+| `void setPitchLimits(float min, float max)` | Set pitch limits |
+
+### Camera2D
+
+Orthographic camera for 2D games.
+
+```cpp
+Camera2D();
+Camera2D(float width, float height);
+```
+
+| Method | Description |
+|--------|-------------|
+| `void setPosition(float x, float y)` | Set camera center |
+| `glm::vec2 getPosition() const` | Get position |
+| `void setZoom(float)` | Set zoom level (1.0 = normal) |
+| `float getZoom() const` | Get zoom |
+| `void setRotation(float degrees)` | Set rotation |
+| `void setViewportSize(float w, float h)` | Set viewport size |
+| `void move(float dx, float dy)` | Move camera |
+
+---
+
+## vde::Material
+
+**Header**: `<vde/api/Material.h>`
+
+Surface material properties for mesh rendering (Blinn-Phong lighting model).
+
+### Constructor
+
+```cpp
+Material();
+Material(const Color& albedo, float roughness, float metallic, float emission = 0.0f);
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void setAlbedo(const Color&)` | Set base color |
+| `const Color& getAlbedo() const` | Get base color |
+| `void setRoughness(float)` | Set roughness (0-1) |
+| `void setMetallic(float)` | Set metalness (0-1) |
+| `void setEmission(float)` | Set emission intensity |
+| `void setEmissionColor(const Color&)` | Set emission color |
+
+### Factory Methods
+
+| Factory | Description |
+|---------|-------------|
+| `Material::createDefault()` | Standard gray material |
+| `Material::createColored(Color)` | Simple colored material |
+| `Material::createMetallic(Color, roughness)` | Metallic surface |
+| `Material::createEmissive(Color, intensity)` | Glowing material |
+| `Material::createGlass(opacity)` | Transparent glass |
+
+---
+
+## vde::LightBox
+
+**Header**: `<vde/api/LightBox.h>`
+
+Lighting configuration for a scene. Supports up to 8 lights.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void setAmbientColor(const Color&)` | Set ambient light color |
+| `void setAmbientIntensity(float)` | Set ambient intensity |
+| `size_t addLight(const Light&)` | Add a light (returns index) |
+| `void removeLight(size_t index)` | Remove a light |
+| `void clearLights()` | Remove all lights |
+
+### Presets
+
+| Class | Description |
+|-------|-------------|
+| `SimpleColorLightBox(Color)` | Single-color ambient with directional light |
+| `ThreePointLightBox()` | Classic key/fill/back 3-point lighting |
+
+### Light Types
+
+```cpp
+struct Light {
+    LightType type;     // Directional, Point, Spot
+    Color color;
+    float intensity;
+    Position position;  // Point/Spot only
+    Direction direction; // Directional/Spot only
+    float range;        // Point/Spot attenuation range
+    float spotInnerAngle, spotOuterAngle; // Spot only
+};
+```
+
+---
+
+## vde::InputHandler
+
+**Header**: `<vde/api/InputHandler.h>`
+
+Abstract interface for handling keyboard, mouse, and gamepad input. Subclass and attach to Game or Scene.
+
+### Virtual Methods
+
+#### Keyboard
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onKeyPress(int key)` | Key pressed |
+| `virtual void onKeyRelease(int key)` | Key released |
+| `virtual void onKeyRepeat(int key)` | Key held (repeat) |
+| `virtual void onCharInput(unsigned int codepoint)` | Character input (text entry) |
+
+#### Mouse
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onMouseButtonPress(int button, double x, double y)` | Mouse button pressed |
+| `virtual void onMouseButtonRelease(int button, double x, double y)` | Mouse button released |
+| `virtual void onMouseMove(double x, double y)` | Mouse moved |
+| `virtual void onMouseScroll(double xOffset, double yOffset)` | Mouse scroll |
+| `virtual void onMouseEnter()` | Mouse entered window |
+| `virtual void onMouseLeave()` | Mouse left window |
+
+#### Gamepad
+
+| Method | Description |
+|--------|-------------|
+| `virtual void onGamepadConnect(int gamepadId, const char* name)` | Gamepad connected |
+| `virtual void onGamepadDisconnect(int gamepadId)` | Gamepad disconnected |
+| `virtual void onGamepadButtonPress(int gamepadId, int button)` | Gamepad button pressed |
+| `virtual void onGamepadButtonRelease(int gamepadId, int button)` | Gamepad button released |
+| `virtual void onGamepadAxis(int gamepadId, int axis, float value)` | Gamepad axis changed |
+
+### Query Methods (Polling)
+
+| Method | Description |
+|--------|-------------|
+| `bool isKeyPressed(int key) const` | Check if key is pressed |
+| `bool isMouseButtonPressed(int button) const` | Check if mouse button is pressed |
+| `void getMousePosition(double& x, double& y) const` | Get mouse position |
+| `bool isGamepadConnected(int gamepadId) const` | Check if gamepad is connected |
+| `bool isGamepadButtonPressed(int gamepadId, int button) const` | Check if gamepad button is pressed |
+| `float getGamepadAxis(int gamepadId, int axis) const` | Get gamepad axis value (-1 to 1 for sticks, 0 to 1 for triggers) |
+| `float getDeadZone() const` | Get axis dead zone threshold |
+| `void setDeadZone(float deadZone)` | Set axis dead zone threshold (default 0.1) |
+
+### Constants
+
+Key, mouse button, and gamepad constants are defined in `<vde/api/KeyCodes.h>`:
+
+**Keyboard**: `KEY_A`-`KEY_Z`, `KEY_0`-`KEY_9`, `KEY_SPACE`, `KEY_ESCAPE`, `KEY_ENTER`, arrow keys, function keys, etc.  
+**Mouse**: `MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_RIGHT`, `MOUSE_BUTTON_MIDDLE`  
+**Gamepads**: `JOYSTICK_1`-`JOYSTICK_16` (slots), `GAMEPAD_BUTTON_A/B/X/Y`, `GAMEPAD_BUTTON_LEFT/RIGHT_BUMPER`, `GAMEPAD_BUTTON_DPAD_*`, `GAMEPAD_AXIS_LEFT_X/Y`, `GAMEPAD_AXIS_RIGHT_X/Y`, `GAMEPAD_AXIS_LEFT/RIGHT_TRIGGER`
+
+### Notes
+
+- Gamepad input uses GLFW's standardized gamepad mapping (Xbox/PlayStation layout)
+- Dead zone is applied to analog axes (values below threshold report as 0.0)
+- State is tracked internally for polling methods
+- Multiple gamepads (up to 16) are supported independently
+
+---
+
+## vde::ResourceManager
+
+**Header**: `<vde/api/ResourceManager.h>`
+
+Global resource cache with automatic deduplication using weak references.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `template<T> ResourcePtr<T> load(const std::string& path)` | Load or retrieve cached resource |
+| `template<T> ResourcePtr<T> add(const std::string& key, ResourcePtr<T>)` | Add pre-created resource |
+| `template<T> ResourcePtr<T> get(const std::string& path)` | Get cached resource |
+| `bool has(const std::string& path) const` | Check if resource is cached |
+| `void remove(const std::string& path)` | Remove from cache |
+| `void clear()` | Clear all cached resources |
+| `size_t getCachedCount() const` | Number of cached resources |
+
+---
+
+## vde::Scheduler
+
+**Header**: `<vde/api/Scheduler.h>`
+
+Task-graph scheduler that manages per-frame execution order. Tasks are topologically sorted with phase-based tiebreaking.
+
+### Task Phases
+
+```cpp
+enum class TaskPhase : uint8_t {
+    Input = 0,        // Input processing
+    GameLogic = 1,    // Scene update / game logic
+    Audio = 2,        // Audio processing
+    Physics = 3,      // Physics simulation
+    PostPhysics = 4,  // Post-physics sync
+    PreRender = 5,    // Camera apply, lights, UBO writes
+    Render = 6        // Vulkan command recording
+};
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `TaskId addTask(const TaskDescriptor&)` | Add a task (returns unique ID) |
+| `void removeTask(TaskId)` | Remove a task |
+| `void clear()` | Remove all tasks |
+| `void execute()` | Execute all tasks in sorted order |
+| `size_t getTaskCount() const` | Number of registered tasks |
+| `bool hasTask(TaskId) const` | Check task existence |
+| `std::string getTaskName(TaskId) const` | Get task name |
+| `const vector<TaskId>& getLastExecutionOrder() const` | Execution order from last run |
+| `void setWorkerThreadCount(size_t)` | Set parallel worker threads (0 = single-threaded) |
+| `size_t getWorkerThreadCount() const` | Get worker thread count |
+
+### TaskDescriptor
+
+```cpp
+struct TaskDescriptor {
+    std::string name;                        // Human-readable name
+    TaskPhase phase = TaskPhase::GameLogic;  // Execution phase (tiebreaker)
+    std::function<void()> work;              // Work function
+    std::vector<TaskId> dependsOn;           // Dependencies
+    bool mainThreadOnly = true;              // Must run on main thread
+};
+```
+
+---
+
+## vde::SceneGroup
+
+**Header**: `<vde/api/SceneGroup.h>`
+
+Describes a set of scenes active simultaneously for multi-scene rendering.
+
+### Factories
+
+```cpp
+// Simple group (all scenes get fullWindow viewport)
+auto group = SceneGroup::create("gameplay", {"world", "hud", "minimap"});
+
+// With explicit viewport layout for split-screen
+auto group = SceneGroup::createWithViewports("splitscreen", {
+    {"player1", ViewportRect::leftHalf()},
+    {"player2", ViewportRect::rightHalf()},
+});
+```
+
+### SceneGroupEntry
+
+```cpp
+struct SceneGroupEntry {
+    std::string sceneName;
+    ViewportRect viewport = ViewportRect::fullWindow();
+};
+```
+
+---
+
+## vde::ViewportRect
+
+**Header**: `<vde/api/ViewportRect.h>`
+
+Normalized viewport rectangle for split-screen rendering (origin top-left, [0,1] range).
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `float x, y` | Top-left corner (normalized) |
+| `float width, height` | Size (normalized) |
+
+### Static Factories
+
+| Factory | Description |
+|---------|-------------|
+| `fullWindow()` | `{0, 0, 1, 1}` — entire window |
+| `topLeft()` | `{0, 0, 0.5, 0.5}` |
+| `topRight()` | `{0.5, 0, 0.5, 0.5}` |
+| `bottomLeft()` | `{0, 0.5, 0.5, 0.5}` |
+| `bottomRight()` | `{0.5, 0.5, 0.5, 0.5}` |
+| `leftHalf()` | `{0, 0, 0.5, 1}` |
+| `rightHalf()` | `{0.5, 0, 0.5, 1}` |
+| `topHalf()` | `{0, 0, 1, 0.5}` |
+| `bottomHalf()` | `{0, 0.5, 1, 0.5}` |
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `bool contains(float x, float y) const` | Hit-test normalized point |
+| `VkViewport toVkViewport(uint32_t w, uint32_t h) const` | Convert to Vulkan viewport |
+| `VkRect2D toVkScissor(uint32_t w, uint32_t h) const` | Convert to Vulkan scissor |
+| `float getAspectRatio(uint32_t w, uint32_t h) const` | Compute pixel aspect ratio |
+
+---
+
+## vde::AudioEvent
+
+**Header**: `<vde/api/AudioEvent.h>`
+
+Describes an audio action queued from game logic and processed in the Audio phase.
+
+### Types
+
+```cpp
+enum class AudioEventType : uint8_t {
+    PlaySFX, PlaySFXAt, PlayMusic,
+    StopSound, StopAll, PauseSound, ResumeSound, SetVolume
+};
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `AudioEventType type` | Event type |
+| `shared_ptr<AudioClip> clip` | Audio clip (for Play events) |
+| `float volume, pitch` | Volume and pitch multipliers |
+| `bool loop` | Loop flag |
+| `float x, y, z` | 3D position (for PlaySFXAt) |
+| `uint32_t soundId` | Sound ID (for Stop/Pause/Resume) |
+
+### Factory Helpers
+
+```cpp
+AudioEvent::playSFX(clip, volume, pitch, loop);
+AudioEvent::playSFXAt(clip, x, y, z, volume, pitch);
+AudioEvent::playMusic(clip, volume, loop, fadeTime);
+AudioEvent::stopSound(soundId, fadeTime);
+AudioEvent::stopAll();
+```
+
+---
+
+## vde::AudioManager
+
+**Header**: `<vde/api/AudioManager.h>`
+
+Singleton audio system using miniaudio. Supports music, SFX, 3D spatial audio, and volume mixing.
+
+### Core
+
+| Method | Description |
+|--------|-------------|
+| `static AudioManager& getInstance()` | Get singleton |
+| `bool initialize(const AudioSettings&)` | Initialize audio engine |
+| `void shutdown()` | Shutdown audio |
+| `void update(float dt)` | Per-frame update |
+| `bool isInitialized() const` | Check initialization |
+
+### Playback
+
+| Method | Description |
+|--------|-------------|
+| `uint32_t playSFX(shared_ptr<AudioClip>, volume, pitch, loop)` | Play sound effect |
+| `uint32_t playMusic(shared_ptr<AudioClip>, volume, loop, fadeIn)` | Play music |
+| `void stopSound(uint32_t id, float fadeOut)` | Stop a sound |
+| `void stopAll()` | Stop all sounds |
+| `void stopAllMusic()` | Stop all music |
+| `void stopAllSFX()` | Stop all SFX |
+| `void pauseSound(uint32_t id)` | Pause a sound |
+| `void resumeSound(uint32_t id)` | Resume a sound |
+| `bool isPlaying(uint32_t id) const` | Check if sound is playing |
+
+### Volume & Mute
+
+| Method | Description |
+|--------|-------------|
+| `void setMasterVolume(float)` | Set master volume (0-1) |
+| `void setMusicVolume(float)` | Set music volume |
+| `void setSFXVolume(float)` | Set SFX volume |
+| `void setMuted(bool)` | Mute/unmute all |
+
+### 3D Audio
+
+| Method | Description |
+|--------|-------------|
+| `void setSoundPosition(uint32_t id, float x, float y, float z)` | Set sound position |
+| `void setListenerPosition(float x, float y, float z)` | Set listener position |
+| `void setListenerOrientation(float fx, fy, fz, ux, uy, uz)` | Set listener direction |
+
+---
+
+## vde::AudioClip
+
+**Header**: `<vde/api/AudioClip.h>`
+
+Audio resource for loading WAV, MP3, OGG, and FLAC files.
+
+| Method | Description |
+|--------|-------------|
+| `bool loadFromFile(const std::string& path)` | Load audio data |
+| `void setStreaming(bool)` | Enable streaming for large files |
+| `bool isStreaming() const` | Check streaming state |
+| `bool isLoaded() const` | Check if data is loaded |
+
+---
+
+## vde::PhysicsScene
+
+**Header**: `<vde/api/PhysicsScene.h>`
+
+2D physics simulation with fixed-timestep accumulator, AABB collision detection, and impulse-based resolution. Uses pimpl for header isolation.
+
+### Body Management
+
+| Method | Description |
+|--------|-------------|
+| `PhysicsBodyId createBody(const PhysicsBodyDef&)` | Create a physics body |
+| `void destroyBody(PhysicsBodyId)` | Destroy a body |
+| `PhysicsBodyState getBodyState(PhysicsBodyId) const` | Get body state |
+| `PhysicsBodyDef getBodyDef(PhysicsBodyId) const` | Get body definition |
+| `bool hasBody(PhysicsBodyId) const` | Check body existence |
+
+### Forces & Velocity
+
+| Method | Description |
+|--------|-------------|
+| `void applyForce(PhysicsBodyId, const glm::vec2&)` | Apply force (accumulated) |
+| `void applyImpulse(PhysicsBodyId, const glm::vec2&)` | Apply instant impulse |
+| `void setLinearVelocity(PhysicsBodyId, const glm::vec2&)` | Set velocity directly |
+| `void setBodyPosition(PhysicsBodyId, const glm::vec2&)` | Set position directly |
+
+### Simulation
+
+| Method | Description |
+|--------|-------------|
+| `void step(float dt)` | Step simulation (fixed-timestep accumulator) |
+| `float getInterpolationAlpha() const` | Get rendering interpolation alpha [0,1) |
+| `int getLastStepCount() const` | Sub-steps taken in last step() |
+
+### Collision Callbacks
+
+| Method | Description |
+|--------|-------------|
+| `void setOnCollisionBegin(CollisionCallback)` | Global collision begin |
+| `void setOnCollisionEnd(CollisionCallback)` | Global collision end |
+| `void setBodyOnCollisionBegin(PhysicsBodyId, CollisionCallback)` | Per-body begin |
+| `void setBodyOnCollisionEnd(PhysicsBodyId, CollisionCallback)` | Per-body end |
+
+### Raycast & Spatial Queries
+
+| Method | Description |
+|--------|-------------|
+| `bool raycast(origin, direction, maxDist, outHit) const` | Cast ray, get closest hit |
+| `vector<PhysicsBodyId> queryAABB(min, max) const` | Get bodies in AABB region |
+
+### Queries
+
+| Method | Description |
+|--------|-------------|
+| `size_t getBodyCount() const` | Total body count |
+| `size_t getActiveBodyCount() const` | Active body count |
+| `void setGravity(const glm::vec2&)` | Set gravity |
+| `glm::vec2 getGravity() const` | Get gravity |
+
+---
+
+## vde::PhysicsEntity
+
+**Header**: `<vde/api/PhysicsEntity.h>`
+
+Mixin class binding a visual entity to a physics body with automatic transform sync and interpolation.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `PhysicsBodyId createPhysicsBody(const PhysicsBodyDef&)` | Create physics body in scene |
+| `PhysicsBodyId getPhysicsBodyId() const` | Get body ID |
+| `PhysicsBodyState getPhysicsState() const` | Get current body state |
+| `void applyForce(const glm::vec2&)` | Apply force |
+| `void applyImpulse(const glm::vec2&)` | Apply impulse |
+| `void setLinearVelocity(const glm::vec2&)` | Set velocity |
+| `void syncFromPhysics(float alpha)` | Copy interpolated physics position to entity |
+| `void syncToPhysics()` | Copy entity position to physics body |
+| `void setAutoSync(bool)` | Enable/disable automatic PostPhysics sync |
+| `bool getAutoSync() const` | Check auto-sync state |
+
+### Derived Classes
+
+| Class | Description |
+|-------|-------------|
+| `PhysicsSpriteEntity` | SpriteEntity + PhysicsEntity (2D sprite driven by physics) |
+| `PhysicsMeshEntity` | MeshEntity + PhysicsEntity (3D mesh driven by physics) |
+
+---
+
+## vde::ThreadPool
+
+**Header**: `<vde/api/ThreadPool.h>`
+
+Fixed-size thread pool for parallel task execution. Used by Scheduler.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `explicit ThreadPool(size_t count = 0)` | Create pool (0 = inline execution) |
+| `std::future<void> submit(std::function<void()>)` | Submit task |
+| `void waitAll()` | Block until all tasks complete |
+| `size_t getThreadCount() const` | Get worker thread count |
+| `vector<thread::id> getWorkerThreadIds() const` | Get worker thread IDs |
+
+---
+
+## Physics Types
+
+**Header**: `<vde/api/PhysicsTypes.h>`
+
+### PhysicsConfig
+
+```cpp
+struct PhysicsConfig {
+    float fixedTimestep = 1.0f / 60.0f;  // Fixed step (seconds)
+    glm::vec2 gravity = {0.0f, -9.81f};  // Gravity vector
+    int maxSubSteps = 8;                 // Spiral-of-death cap
+    int iterations = 4;                  // Solver iterations
+};
+```
+
+### PhysicsBodyDef
+
+```cpp
+struct PhysicsBodyDef {
+    PhysicsBodyType type;    // Static, Dynamic, Kinematic
+    PhysicsShape shape;      // Box, Circle, Sphere, Capsule
+    glm::vec2 position;
+    float rotation;
+    glm::vec2 extents;       // Half-extents (box) or {radius, 0} (circle)
+    float mass, friction, restitution, linearDamping;
+    bool isSensor;           // Triggers callbacks but no collision response
+};
+```
+
+### PhysicsBodyState
+
+```cpp
+struct PhysicsBodyState {
+    glm::vec2 position;
+    float rotation;
+    glm::vec2 velocity;
+    bool isAwake;
+};
+```
+
+### CollisionEvent & RaycastHit
+
+```cpp
+struct CollisionEvent {
+    PhysicsBodyId bodyA, bodyB;
+    glm::vec2 contactPoint, normal;
+    float depth;
+};
+
+struct RaycastHit {
+    PhysicsBodyId bodyId;
+    glm::vec2 point, normal;
+    float distance;
+};
 ```

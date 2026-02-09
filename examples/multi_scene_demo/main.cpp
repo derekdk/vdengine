@@ -9,13 +9,9 @@
  * - Different camera types (orbit 3D vs 2D) per scene
  * - Switching between scenes with number keys
  * - Scene stacking with pushScene/popScene
- * - Simulated "continue running" for paused scenes
- *   (scenes accumulate missed time and catch up on resume)
- *
- * NOTE: See API_SUGGESTION_MULTI_SCENE.md for identified API gaps:
- *   - No background scene update (only active scene is updated)
- *   - No multi-viewport / split-screen rendering
- *   - No scene transition effects
+ * - Background scene updates (continueInBackground)
+ * - Multi-scene groups via setActiveSceneGroup() (Phase 2)
+ *   Press G to toggle dual-scene mode (Space + City simultaneously)
  */
 
 #include <vde/api/GameAPI.h>
@@ -63,6 +59,10 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
             m_spacePressed = true;
         if (key == KEY_TAB)
             m_tabPressed = true;
+        if (key == KEY_G)
+            m_groupPressed = true;
+        if (key == KEY_V)
+            m_viewportPressed = true;
 
         // Camera controls
         if (key == KEY_W)
@@ -121,6 +121,16 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
         m_tabPressed = false;
         return v;
     }
+    bool consumeGroup() {
+        bool v = m_groupPressed;
+        m_groupPressed = false;
+        return v;
+    }
+    bool consumeViewport() {
+        bool v = m_viewportPressed;
+        m_viewportPressed = false;
+        return v;
+    }
     float consumeScroll() {
         float v = m_scrollDelta;
         m_scrollDelta = 0.0f;
@@ -140,6 +150,8 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
     bool m_toggleBackground = false;
     bool m_spacePressed = false;
     bool m_tabPressed = false;
+    bool m_groupPressed = false;
+    bool m_viewportPressed = false;
     float m_scrollDelta = 0.0f;
     bool m_up = false, m_down = false, m_left = false, m_right = false;
 };
@@ -151,10 +163,10 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
 /**
  * @brief Extended scene base that tracks time-while-paused.
  *
- * Because the VDE API only updates/renders the active scene, we simulate
- * "continue running in background" by recording how long the scene was
- * paused. On resume, the scene's update() receives the accumulated time
- * so it can catch up, making it appear as though physics kept running.
+ * Uses the engine's Scene::setContinueInBackground() so the scheduler
+ * keeps updating this scene even when it's not the active/primary scene.
+ * Also provides catch-up logic for cases where a scene was truly
+ * suspended (e.g., pushed by another scene).
  */
 class DemoScene : public vde::examples::BaseExampleScene {
   public:
@@ -164,10 +176,14 @@ class DemoScene : public vde::examples::BaseExampleScene {
     // ------ Background simulation toggle ------
 
     /**
-     * @brief When true, the scene accumulates elapsed time while paused
-     *        and applies it as a large deltaTime on resume.
+     * @brief When true, the engine scheduler will keep calling update()
+     *        on this scene even when it's not in the active scene group.
      */
-    void setContinueInBackground(bool enabled) { m_continueInBackground = enabled; }
+    void setContinueInBackground(bool enabled) {
+        m_continueInBackground = enabled;
+        // Also set the engine-level flag so the scheduler knows
+        Scene::setContinueInBackground(enabled);
+    }
     bool getContinueInBackground() const { return m_continueInBackground; }
 
     // ------ Lifecycle overrides ------
@@ -185,6 +201,9 @@ class DemoScene : public vde::examples::BaseExampleScene {
     }
 
     void onEnter() override {
+        // Clear existing entities so subclass onEnter() doesn't duplicate them
+        clearEntities();
+
         // If we were previously exited (via setActiveScene), apply catch-up time
         if (m_wasExited) {
             applyBackgroundTime();
@@ -846,6 +865,45 @@ class MultiSceneDemo : public vde::Game {
                       << " background simulation: " << (newVal ? "ON" : "OFF") << std::endl;
         }
 
+        // --- G: toggle scene group mode (Space + City rendered together) ---
+        if (input->consumeGroup()) {
+            m_groupMode = !m_groupMode;
+            m_viewportMode = false;
+            if (m_groupMode) {
+                auto group = vde::SceneGroup::create("dual", {"space", "city"});
+                setActiveSceneGroup(group);
+                std::cout << "\n>> SCENE GROUP MODE: Space + City rendering simultaneously"
+                          << std::endl;
+                std::cout << "   (Space is primary camera/background, City entities overlay)"
+                          << std::endl;
+            } else {
+                // Return to single-scene mode
+                m_activeIndex = 0;
+                setActiveScene("space");
+                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << std::endl;
+            }
+        }
+
+        // --- V: toggle viewport split mode (Space left, City right) ---
+        if (input->consumeViewport()) {
+            m_viewportMode = !m_viewportMode;
+            m_groupMode = false;
+            if (m_viewportMode) {
+                auto group = vde::SceneGroup::createWithViewports(
+                    "split", {
+                                 {"space", vde::ViewportRect::leftHalf()},
+                                 {"city", vde::ViewportRect::rightHalf()},
+                             });
+                setActiveSceneGroup(group);
+                std::cout << "\n>> VIEWPORT MODE: Space (left) + City (right) in split-screen"
+                          << std::endl;
+            } else {
+                m_activeIndex = 0;
+                setActiveScene("space");
+                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << std::endl;
+            }
+        }
+
         // --- SPACE: print status ---
         if (input->consumeSpace()) {
             printStatus();
@@ -888,9 +946,21 @@ class MultiSceneDemo : public vde::Game {
         std::cout << "  Space = OFF (planets pause when you leave)" << std::endl;
         std::cout << "  Forest= OFF (trees pause when you leave)" << std::endl;
 
+        std::cout << "\nMulti-Scene Group (Phase 2):" << std::endl;
+        std::cout << "  G     - Toggle dual-scene group (Space + City rendered together)"
+                  << std::endl;
+        std::cout << "          Space is the primary scene (camera/background)" << std::endl;
+        std::cout << "          City entities are rendered as overlay" << std::endl;
+
+        std::cout << "\nSplit-Screen Viewports (Phase 3):" << std::endl;
+        std::cout << "  V     - Toggle viewport mode (Space left, City right)" << std::endl;
+        std::cout << "          Each scene has its own camera and viewport" << std::endl;
+
         std::cout << "\nControls:" << std::endl;
         std::cout << "  1-4   - Switch to scene 1/2/3/4" << std::endl;
         std::cout << "  TAB   - Cycle to next scene" << std::endl;
+        std::cout << "  G     - Toggle scene group mode (Space + City)" << std::endl;
+        std::cout << "  V     - Toggle split-screen viewport mode" << std::endl;
         std::cout << "  P     - Push HUD overlay (tests pushScene)" << std::endl;
         std::cout << "  O     - Pop overlay (tests popScene)" << std::endl;
         std::cout << "  B     - Toggle background simulation for current scene" << std::endl;
@@ -904,12 +974,34 @@ class MultiSceneDemo : public vde::Game {
 
     void printStatus() {
         std::cout << "\n--- Scene Status ---" << std::endl;
+        std::string modeStr = "SINGLE";
+        if (m_groupMode)
+            modeStr = "GROUP (Space + City)";
+        if (m_viewportMode)
+            modeStr = "VIEWPORT (Space | City)";
+        std::cout << "  Mode: " << modeStr << std::endl;
+        const auto& group = getActiveSceneGroup();
+        std::cout << "  Active group: \"" << group.name << "\" [";
+        for (size_t i = 0; i < group.sceneNames.size(); ++i) {
+            if (i > 0)
+                std::cout << ", ";
+            std::cout << group.sceneNames[i];
+        }
+        std::cout << "]" << std::endl;
         for (int i = 0; i < 4; ++i) {
-            const char* active = (sceneNames[i] == getActiveScene()->getName()) ? " [ACTIVE]" : "";
+            const char* active = (sceneNames[i] == getActiveScene()->getName()) ? " [PRIMARY]" : "";
+            // Check if scene is in the active group
+            bool inGroup = false;
+            for (const auto& gn : group.sceneNames) {
+                if (gn == sceneNames[i]) {
+                    inGroup = true;
+                    break;
+                }
+            }
             std::cout << "  " << (i + 1) << ") " << m_demoScenes[i]->getLabel() << " | background="
                       << (m_demoScenes[i]->getContinueInBackground() ? "ON " : "OFF")
                       << " | bounds=" << m_demoScenes[i]->getWorldBounds().width().value << "m wide"
-                      << active << std::endl;
+                      << (inGroup ? " [IN GROUP]" : "") << active << std::endl;
         }
         std::cout << "--------------------\n" << std::endl;
     }
@@ -920,6 +1012,8 @@ class MultiSceneDemo : public vde::Game {
     DemoScene* m_demoScenes[4] = {};
     int m_activeIndex = 0;
     int m_exitCode = 0;
+    bool m_groupMode = false;
+    bool m_viewportMode = false;
 };
 
 // ============================================================================

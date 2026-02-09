@@ -18,7 +18,9 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Input System](#input-system)
 - [Camera System](#camera-system)
 - [Lighting System](#lighting-system)
+- [Physics System](#physics-system)
 - [Audio System](#audio-system)
+- [Multi-Scene & Split-Screen](#multi-scene--split-screen)
 - [Common Types](#common-types)
 - [World Coordinates & Bounds](#world-coordinates--bounds)
 - [Examples](#examples)
@@ -34,10 +36,12 @@ The VDE Game API provides a clean, object-oriented interface for game developmen
 - **Scene Management**: Organize your game into discrete scenes (menus, levels, etc.)
 - **Entity System**: Manage game objects with transforms, meshes, and sprites
 - **Resource Management**: Load and share textures, meshes, and other assets
-- **Input Handling**: Unified keyboard and mouse input (gamepad hooks reserved for future expansion)
+- **Input Handling**: Unified keyboard, mouse, and gamepad/joystick input with event callbacks and polling
 - **Camera System**: Multiple camera types for different game styles
 - **Lighting**: Flexible lighting with ambient, directional, point, and spot lights
+- **Physics**: 2D AABB physics with collision detection, rigid body dynamics, and impulse-based resolution
 - **Audio**: Basic playback for music and sound effects
+- **Multi-Scene Support**: Run multiple scenes simultaneously with split-screen viewports
 
 ### Header Structure
 
@@ -54,12 +58,19 @@ include/vde/api/
 ├── Mesh.h           # 3D mesh resource
 ├── Material.h       # Material properties for meshes
 ├── InputHandler.h   # Input handling interface
-├── KeyCodes.h       # Key and mouse button constants
+├── KeyCodes.h       # Key, mouse, and gamepad constants
 ├── GameCamera.h     # Camera classes
 ├── LightBox.h       # Lighting system
+├── PhysicsScene.h   # 2D physics simulation
+├── PhysicsEntity.h  # Physics-driven entities
+├── PhysicsTypes.h   # Physics type definitions
 ├── AudioClip.h      # Audio resource (sounds/music)
 ├── AudioSource.h    # Audio emitter component
 ├── AudioManager.h   # Audio playback system
+├── AudioEvent.h     # Audio event queuing
+├── SceneGroup.h     # Multi-scene rendering
+├── ViewportRect.h   # Split-screen viewports
+├── Scheduler.h      # Task scheduling (advanced)
 ├── WorldUnits.h     # Type-safe units (Meters, Pixels)
 ├── WorldBounds.h    # 3D/2D world boundary definitions
 └── CameraBounds.h   # 2D camera with pixel-to-world mapping
@@ -543,19 +554,56 @@ public:
         m_zoom += yOffset;
     }
     
-    // Polling
-    bool isKeyPressed(int key) const override {
-        return m_keys[key];
+    // Gamepad (events fired automatically by engine)
+    void onGamepadConnect(int gamepadId, const char* name) override {
+        std::cout << "Gamepad " << gamepadId << " connected: " << name << "\n";
+    }
+    
+    void onGamepadButtonPress(int gamepadId, int button) override {
+        if (button == vde::GAMEPAD_BUTTON_A) {
+            jump();
+        }
+    }
+    
+    void onGamepadAxis(int gamepadId, int axis, float value) override {
+        if (axis == vde::GAMEPAD_AXIS_LEFT_X) {
+            m_moveX = value;
+        }
+        if (axis == vde::GAMEPAD_AXIS_LEFT_Y) {
+            m_moveY = value;
+        }
     }
     
 private:
     double m_mouseX = 0, m_mouseY = 0;
     float m_zoom = 1.0f;
-    bool m_keys[512] = {false};
+    float m_moveX = 0, m_moveY = 0;
 };
 ```
 
-> Note: Gamepad callbacks are defined on `InputHandler`, but built-in polling/dispatch is not wired yet.
+#### Gamepad Input
+
+Gamepad input uses GLFW's standardized gamepad mapping (Xbox/PlayStation layout). The engine automatically:
+- Detects connected gamepads at startup and during runtime (hot-plug)
+- Polls gamepad state each frame and dispatches press/release/axis events
+- Applies dead zone filtering to analog sticks (default 0.1, customizable)
+- Stores state for polling via `isGamepadButtonPressed()` and `getGamepadAxis()`
+
+**Polling Example:**
+
+```cpp
+void update(float deltaTime) {
+    if (isGamepadConnected(vde::JOYSTICK_1)) {
+        float x = getGamepadAxis(vde::JOYSTICK_1, vde::GAMEPAD_AXIS_LEFT_X);
+        float y = getGamepadAxis(vde::JOYSTICK_1, vde::GAMEPAD_AXIS_LEFT_Y);
+        movePlayer(x * speed * deltaTime, y * speed * deltaTime);
+        
+        if (isGamepadButtonPressed(vde::JOYSTICK_1, vde::GAMEPAD_BUTTON_A)) {
+            jump();
+        }
+    }
+}
+```
 
 ### Setting Input Handler
 
@@ -573,6 +621,8 @@ scene->setInputHandler(&inputHandler);
 
 Common key codes from `KeyCodes.h`:
 
+#### Keyboard
+
 | Constant | Description |
 |----------|-------------|
 | `KEY_A` - `KEY_Z` | Letter keys |
@@ -584,9 +634,40 @@ Common key codes from `KeyCodes.h`:
 | `KEY_LEFT/RIGHT/UP/DOWN` | Arrow keys |
 | `KEY_LEFT_SHIFT` | Left shift |
 | `KEY_LEFT_CONTROL` | Left control |
+
+#### Mouse
+
+| Constant | Description |
+|----------|-------------|
 | `MOUSE_BUTTON_LEFT` | Left mouse button |
 | `MOUSE_BUTTON_RIGHT` | Right mouse button |
 | `MOUSE_BUTTON_MIDDLE` | Middle mouse button |
+
+#### Gamepad
+
+| Constant | Description |
+|----------|-------------|
+| `JOYSTICK_1` - `JOYSTICK_16` | Gamepad slots (0-15) |
+| `GAMEPAD_BUTTON_A` | A button (Cross on PlayStation) |
+| `GAMEPAD_BUTTON_B` | B button (Circle on PlayStation) |
+| `GAMEPAD_BUTTON_X` | X button (Square on PlayStation) |
+| `GAMEPAD_BUTTON_Y` | Y button (Triangle on PlayStation) |
+| `GAMEPAD_BUTTON_LEFT_BUMPER` | Left bumper/shoulder |
+| `GAMEPAD_BUTTON_RIGHT_BUMPER` | Right bumper/shoulder |
+| `GAMEPAD_BUTTON_BACK` | Back/Select button |
+| `GAMEPAD_BUTTON_START` | Start button |
+| `GAMEPAD_BUTTON_GUIDE` | Guide/Home button |
+| `GAMEPAD_BUTTON_LEFT_THUMB` | Left stick click |
+| `GAMEPAD_BUTTON_RIGHT_THUMB` | Right stick click |
+| `GAMEPAD_BUTTON_DPAD_UP/DOWN/LEFT/RIGHT` | D-pad directions |
+| `GAMEPAD_AXIS_LEFT_X/Y` | Left analog stick axes |
+| `GAMEPAD_AXIS_RIGHT_X/Y` | Right analog stick axes |
+| `GAMEPAD_AXIS_LEFT_TRIGGER` | Left trigger (0.0 to 1.0) |
+| `GAMEPAD_AXIS_RIGHT_TRIGGER` | Right trigger (0.0 to 1.0) |
+
+**PlayStation Aliases:** `GAMEPAD_BUTTON_CROSS`, `CIRCLE`, `SQUARE`, `TRIANGLE`  
+**Limits:** `MAX_GAMEPADS` (16), `MAX_GAMEPAD_BUTTONS` (15), `MAX_GAMEPAD_AXES` (6)  
+**Dead Zone:** `GAMEPAD_AXIS_DEADZONE` (0.1)
 
 ---
 
@@ -737,6 +818,384 @@ auto spot = vde::Light::spot(
 
 ---
 
+## Physics System
+
+VDE provides a 2D physics engine with AABB (Axis-Aligned Bounding Box) collision detection, rigid body dynamics, and impulse-based collision resolution. Physics is opt-in per scene and runs on a fixed timestep with interpolation for smooth rendering.
+
+### Enabling Physics
+
+Enable physics in a scene with `enablePhysics()`:
+
+```cpp
+class GameScene : public vde::Scene {
+    void onEnter() override {
+        // Enable physics with default configuration
+        enablePhysics();
+        
+        // Or with custom configuration
+        vde::PhysicsConfig config;
+        config.gravity = {0.0f, -9.81f};  // 9.8 m/s² downward
+        config.fixedTimestep = 1.0f / 60.0f;  // 60 Hz
+        config.maxSubSteps = 8;
+        config.iterations = 4;
+        enablePhysics(config);
+    }
+};
+```
+
+### PhysicsConfig
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `gravity` | `{0, -9.81}` | Gravity vector (2D, Y-down is negative) |
+| `fixedTimestep` | `1/60` | Physics simulation timestep in seconds |
+| `maxSubSteps` | `8` | Maximum sub-steps per frame (spiral-of-death prevention) |
+| `iterations` | `4` | Solver iterations per step for stability |
+
+### Physics Body Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `Static` | Does not move; infinite mass | Walls, platforms, terrain |
+| `Dynamic` | Moves under forces and gravity | Player, enemies, boxes, projectiles |
+| `Kinematic` | Moves via user code; not affected by forces | Moving platforms, elevators |
+
+### Physics Shapes
+
+| Shape | Description | Extents |
+|-------|-------------|---------|
+| `Box` | Axis-aligned rectangle | `{halfWidth, halfHeight}` |
+| `Circle` | 2D circle | `{radius, 0}` |
+
+### PhysicsEntity - Physics-Driven Entities
+
+Use `PhysicsEntity` subclasses to create entities that are automatically synchronized with physics bodies:
+
+```cpp
+// PhysicsSpriteEntity - 2D sprite with physics
+auto entity = scene->addEntity<vde::PhysicsSpriteEntity>();
+entity->setTexture(spriteTexture);
+entity->setColor(vde::Color::red());
+
+// Create the physics body
+vde::PhysicsBodyDef def;
+def.type = vde::PhysicsBodyType::Dynamic;
+def.shape = vde::PhysicsShape::Box;
+def.position = {0.0f, 5.0f};  // Starting position
+def.extents = {0.5f, 0.5f};   // Half-width, half-height
+def.mass = 1.0f;              // 1 kg
+def.friction = 0.3f;
+def.restitution = 0.5f;       // Bounciness (0 = no bounce, 1 = perfect)
+entity->createPhysicsBody(def);
+
+// PhysicsMeshEntity - 3D mesh with 2D physics
+auto meshEntity = scene->addEntity<vde::PhysicsMeshEntity>();
+meshEntity->setMesh(cubeMesh);
+meshEntity->createPhysicsBody(def);
+```
+
+### Applying Forces and Impulses
+
+```cpp
+// Apply continuous force (accumulated over step)
+entity->applyForce({100.0f, 0.0f});  // 100N to the right
+
+// Apply instantaneous impulse (immediate velocity change)
+entity->applyImpulse({0.0f, 500.0f});  // Upward impulse
+
+// Set velocity directly
+entity->setLinearVelocity({5.0f, 0.0f});
+
+// Get current physics state
+vde::PhysicsBodyState state = entity->getPhysicsState();
+glm::vec2 pos = state.position;
+glm::vec2 vel = state.velocity;
+float rot = state.rotation;  // radians
+```
+
+### Creating Static Bodies (Platforms, Walls)
+
+```cpp
+// Create a static platform entity
+auto platform = scene->addEntity<vde::PhysicsSpriteEntity>();
+platform->setTexture(platformTexture);
+platform->setPosition(0.0f, -2.0f, 0.0f);
+
+vde::PhysicsBodyDef platformDef;
+platformDef.type = vde::PhysicsBodyType::Static;
+platformDef.shape = vde::PhysicsShape::Box;
+platformDef.position = {0.0f, -2.0f};
+platformDef.extents = {5.0f, 0.5f};  // 10m wide, 1m tall
+platform->createPhysicsBody(platformDef);
+```
+
+### PhysicsBodyDef Properties
+
+```cpp
+vde::PhysicsBodyDef def;
+def.type = vde::PhysicsBodyType::Dynamic;  // Body type
+def.shape = vde::PhysicsShape::Box;        // Collision shape
+def.position = {0.0f, 5.0f};               // Initial position
+def.rotation = 0.0f;                       // Initial rotation (radians)
+def.extents = {0.5f, 0.5f};                // Half-extents (box) or {radius, 0} (circle)
+def.mass = 1.0f;                           // Mass in kg (ignored for Static/Kinematic)
+def.friction = 0.3f;                       // Surface friction coefficient
+def.restitution = 0.2f;                    // Bounciness (0 = inelastic, 1 = perfectly elastic)
+def.linearDamping = 0.01f;                 // Linear velocity damping
+def.isSensor = false;                      // If true, triggers callbacks but no collision response
+```
+
+### Collision Detection & Callbacks
+
+Set up collision callbacks in your scene:
+
+```cpp
+class GameScene : public vde::Scene {
+    void onEnter() override {
+        enablePhysics();
+        
+        // Get the physics scene and set callbacks
+        if (auto* physics = getPhysicsScene()) {
+            physics->setOnCollisionBegin([this](const vde::CollisionEvent& evt) {
+                onCollision(evt);
+            });
+        }
+    }
+    
+    void onCollision(const vde::CollisionEvent& evt) {
+        // Find entities involved in the collision
+        auto* entityA = getEntityByPhysicsBody(evt.bodyA);
+        auto* entityB = getEntityByPhysicsBody(evt.bodyB);
+        
+        if (entityA && entityB) {
+            // Handle collision (play sound, apply damage, etc.)
+            glm::vec2 contactPoint = evt.contactPoint;
+            glm::vec2 normal = evt.normal;  // From A to B
+            float depth = evt.depth;
+        }
+    }
+};
+```
+
+### CollisionEvent
+
+```cpp
+struct CollisionEvent {
+    PhysicsBodyId bodyA;           // First body
+    PhysicsBodyId bodyB;           // Second body
+    glm::vec2 contactPoint;        // Approximate contact point
+    glm::vec2 normal;              // Collision normal (from A to B)
+    float depth;                   // Penetration depth
+};
+```
+
+### Direct PhysicsScene Access (Advanced)
+
+For advanced use cases, you can access the `PhysicsScene` directly:
+
+```cpp
+auto* physics = scene->getPhysicsScene();
+
+// Create bodies without entities
+vde::PhysicsBodyDef def;
+def.type = vde::PhysicsBodyType::Dynamic;
+def.shape = vde::PhysicsShape::Circle;
+def.position = {0.0f, 10.0f};
+def.extents = {0.5f, 0.0f};  // radius = 0.5
+def.mass = 2.0f;
+
+vde::PhysicsBodyId bodyId = physics->createBody(def);
+
+// Query body state
+vde::PhysicsBodyState state = physics->getBodyState(bodyId);
+
+// Apply forces
+physics->applyForce(bodyId, {100.0f, 0.0f});
+physics->applyImpulse(bodyId, {0.0f, 200.0f});
+physics->setLinearVelocity(bodyId, {5.0f, 0.0f});
+physics->setBodyPosition(bodyId, {10.0f, 5.0f});
+
+// Destroy body
+physics->destroyBody(bodyId);
+```
+
+### Automatic Synchronization
+
+Physics entities automatically synchronize their visual transform with the physics body:
+
+- **After Physics Step**: The entity's position/rotation is updated from the physics body with interpolation
+- **Auto-Sync**: Enabled by default; disable with `setAutoSync(false)` if you want manual control
+- **Manual Sync**: Call `syncFromPhysics(alpha)` or `syncToPhysics()` manually
+
+```cpp
+// Disable auto-sync for custom control
+entity->setAutoSync(false);
+
+// Manually sync from physics (in render or late update)
+entity->syncFromPhysics(interpolationAlpha);
+
+// Or sync entity position to physics (teleport)
+entity->setPosition(10.0f, 5.0f, 0.0f);
+entity->syncToPhysics();
+```
+
+### Advanced Physics Features
+
+#### Raycasting
+
+Perform raycasts to detect bodies along a line:
+
+```cpp
+auto* physics = scene->getPhysicsScene();
+
+glm::vec2 origin = {0.0f, 10.0f};
+glm::vec2 direction = {1.0f, -1.0f};  // Will be normalized
+float maxDistance = 20.0f;
+
+vde::RaycastHit hit;
+if (physics->raycast(origin, direction, maxDistance, hit)) {
+    // Hit something
+    auto* entity = getEntityByPhysicsBody(hit.bodyId);
+    glm::vec2 hitPoint = hit.point;
+    glm::vec2 hitNormal = hit.normal;
+    float distance = hit.distance;
+}
+```
+
+#### Spatial Queries (AABB)
+
+Query all bodies within a rectangular region:
+
+```cpp
+auto* physics = scene->getPhysicsScene();
+
+glm::vec2 queryMin = {-5.0f, -5.0f};
+glm::vec2 queryMax = {5.0f, 5.0f};
+
+auto bodies = physics->queryAABB(queryMin, queryMax);
+for (auto bodyId : bodies) {
+    auto* entity = getEntityByPhysicsBody(bodyId);
+    // Do something with entity
+}
+```
+
+#### Per-Body Collision Callbacks
+
+Set callbacks for specific bodies:
+
+```cpp
+auto* physics = scene->getPhysicsScene();
+
+// Per-body collision begin
+physics->setBodyOnCollisionBegin(playerBodyId, [this](const vde::CollisionEvent& evt) {
+    // Only called when playerBodyId collides
+    auto* other = getEntityByPhysicsBody(evt.bodyB);
+    if (other->getName() == "enemy") {
+        takeDamage();
+    }
+});
+
+// Per-body collision end
+physics->setBodyOnCollisionEnd(playerBodyId, [this](const vde::CollisionEvent& evt) {
+    // Called when playerBodyId stops colliding
+});
+```
+
+#### Global Collision Callbacks
+
+```cpp
+auto* physics = scene->getPhysicsScene();
+
+// All collision begin events
+physics->setOnCollisionBegin([this](const vde::CollisionEvent& evt) {
+    // Called for all collisions
+});
+
+// All collision end events
+physics->setOnCollisionEnd([this](const vde::CollisionEvent& evt) {
+    // Called when bodies stop colliding
+});
+```
+
+#### Physics Queries
+
+```cpp
+auto* physics = scene->getPhysicsScene();
+
+// Get body counts
+size_t totalBodies = physics->getBodyCount();       // Including destroyed slots
+size_t activeBodies = physics->getActiveBodyCount(); // Only active bodies
+
+// Per-frame stats
+int steps = physics->getLastStepCount();  // Sub-steps taken last frame
+float alpha = physics->getInterpolationAlpha();  // For interpolation
+
+// Check if body exists
+bool exists = physics->hasBody(bodyId);
+
+// Get body definition
+vde::PhysicsBodyDef def = physics->getBodyDef(bodyId);
+```
+
+### Complete Physics Example
+
+```cpp
+class PhysicsGameScene : public vde::Scene {
+public:
+    void onEnter() override {
+        // Enable physics
+        vde::PhysicsConfig config;
+        config.gravity = {0.0f, -20.0f};  // Stronger gravity
+        enablePhysics(config);
+        
+        // Setup camera and lighting
+        setCamera(new vde::Camera2D(1920, 1080));
+        setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
+        
+        // Load textures
+        auto boxTexture = getGame()->getResourceManager().load<vde::Texture>("box.png");
+        auto groundTexture = getGame()->getResourceManager().load<vde::Texture>("ground.png");
+        
+        // Create ground (static)
+        auto ground = addEntity<vde::PhysicsSpriteEntity>();
+        ground->setTexture(groundTexture);
+        ground->setPosition(0.0f, -5.0f, 0.0f);
+        
+        vde::PhysicsBodyDef groundDef;
+        groundDef.type = vde::PhysicsBodyType::Static;
+        groundDef.shape = vde::PhysicsShape::Box;
+        groundDef.position = {0.0f, -5.0f};
+        groundDef.extents = {10.0f, 1.0f};
+        ground->createPhysicsBody(groundDef);
+        
+        // Create falling boxes (dynamic)
+        for (int i = 0; i < 5; i++) {
+            auto box = addEntity<vde::PhysicsSpriteEntity>();
+            box->setTexture(boxTexture);
+            box->setColor(vde::Color::fromHex(0xFF0000 + i * 0x003300));
+            
+            vde::PhysicsBodyDef boxDef;
+            boxDef.type = vde::PhysicsBodyType::Dynamic;
+            boxDef.shape = vde::PhysicsShape::Box;
+            boxDef.position = {i * 2.0f - 4.0f, 10.0f + i * 2.0f};
+            boxDef.extents = {0.5f, 0.5f};
+            boxDef.mass = 1.0f;
+            boxDef.restitution = 0.6f;  // Bouncy
+            box->createPhysicsBody(boxDef);
+        }
+        
+        // Set collision callback
+        if (auto* physics = getPhysicsScene()) {
+            physics->setOnCollisionBegin([](const vde::CollisionEvent& evt) {
+                // Play collision sound, spawn particles, etc.
+            });
+        }
+    }
+};
+```
+
+---
+
 ## Audio System
 
 VDE includes basic audio playback via `AudioManager`, `AudioClip`, and `AudioSource`.
@@ -763,6 +1222,231 @@ source.setClip(clip);
 source.setSpatial(true);
 source.setPosition(0.0f, 1.0f, 0.0f);
 source.play(true);  // loop
+```
+
+---
+
+## Multi-Scene & Split-Screen
+
+VDE supports running multiple scenes simultaneously with independent viewports, enabling split-screen multiplayer, picture-in-picture minimaps, HUDs overlaid on gameplay, and other multi-scene rendering scenarios.
+
+### SceneGroup - Multiple Active Scenes
+
+A `SceneGroup` describes a set of scenes that should be active simultaneously. Each scene can have its own camera, viewport, and update logic.
+
+#### Basic Scene Group
+
+```cpp
+// Create a group with multiple scenes (all use full window)
+auto group = vde::SceneGroup::create("gameplay_with_hud", {
+    "world",    // Primary scene (rendered first)
+    "hud",      // UI overlay
+    "minimap"   // Picture-in-picture map
+});
+
+game.setActiveSceneGroup(group);
+```
+
+#### Scene Group with Split-Screen Viewports
+
+```cpp
+// Two-player split-screen (left/right)
+auto splitscreen = vde::SceneGroup::createWithViewports("splitscreen", {
+    {"player1", vde::ViewportRect::leftHalf()},
+    {"player2", vde::ViewportRect::rightHalf()}
+});
+
+game.setActiveSceneGroup(splitscreen);
+
+// Four-player split-screen (quadrants)
+auto fourPlayer = vde::SceneGroup::createWithViewports("four_player", {
+    {"player1", vde::ViewportRect::topLeft()},
+    {"player2", vde::ViewportRect::topRight()},
+    {"player3", vde::ViewportRect::bottomLeft()},
+    {"player4", vde::ViewportRect::bottomRight()}
+});
+
+game.setActiveSceneGroup(fourPlayer);
+```
+
+#### Custom Viewport Layouts
+
+```cpp
+// Picture-in-picture minimap (top-right corner)
+vde::SceneGroupEntry minimapEntry;
+minimapEntry.sceneName = "minimap";
+minimapEntry.viewport = vde::ViewportRect{0.75f, 0.0f, 0.25f, 0.25f};  // x, y, width, height
+
+auto group = vde::SceneGroup::createWithViewports("gameplay_minimap", {
+    {"world", vde::ViewportRect::fullWindow()},
+    minimapEntry
+});
+
+game.setActiveSceneGroup(group);
+```
+
+### ViewportRect - Normalized Viewport Coordinates
+
+`ViewportRect` defines a sub-region of the window using normalized [0, 1] coordinates, where (0, 0) is the top-left corner and (1, 1) is the bottom-right.
+
+```cpp
+vde::ViewportRect viewport;
+viewport.x = 0.0f;       // Left edge (0 = left, 1 = right)
+viewport.y = 0.0f;       // Top edge (0 = top, 1 = bottom)
+viewport.width = 0.5f;   // Width (0 to 1)
+viewport.height = 0.5f;  // Height (0 to 1)
+```
+
+#### Predefined Viewport Layouts
+
+| Factory Method | Description | Coordinates |
+|----------------|-------------|-------------|
+| `fullWindow()` | Entire window (default) | `{0, 0, 1, 1}` |
+| `leftHalf()` | Left half | `{0, 0, 0.5, 1}` |
+| `rightHalf()` | Right half | `{0.5, 0, 0.5, 1}` |
+| `topHalf()` | Top half | `{0, 0, 1, 0.5}` |
+| `bottomHalf()` | Bottom half | `{0, 0.5, 1, 0.5}` |
+| `topLeft()` | Top-left quadrant | `{0, 0, 0.5, 0.5}` |
+| `topRight()` | Top-right quadrant | `{0.5, 0, 0.5, 0.5}` |
+| `bottomLeft()` | Bottom-left quadrant | `{0, 0.5, 0.5, 0.5}` |
+| `bottomRight()` | Bottom-right quadrant | `{0.5, 0.5, 0.5, 0.5}` |
+
+#### Viewport Hit Testing
+
+```cpp
+vde::ViewportRect viewport = vde::ViewportRect::topRight();
+
+// Check if normalized coordinates are inside viewport
+bool hit = viewport.containsNormalized(0.6f, 0.2f);
+
+// Check if pixel coordinates are inside viewport (given window size)
+bool hitPixel = viewport.containsPixel(1200, 100, 1920, 1080);
+```
+
+### Scene Lifecycle in Groups
+
+When a `SceneGroup` is active:
+
+1. All scenes in the group receive `onEnter()` when the group becomes active
+2. Each scene's `update(deltaTime)` is called every frame
+3. Each scene can have its own camera and viewport
+4. The first scene in the group is the "primary" scene (controls background color)
+5. All scenes receive `onExit()` when the group is deactivated
+
+### Setting Viewports Per Scene
+
+You can also set viewports directly on scenes:
+
+```cpp
+class MinimapScene : public vde::Scene {
+    void onEnter() override {
+        // Set viewport for this scene (top-right corner)
+        setViewport(vde::ViewportRect{0.75f, 0.0f, 0.25f, 0.25f});
+        
+        // Setup camera for minimap view
+        setCamera(new vde::OrbitCamera(vde::Position(0, 100, 0), 150.0f, 89.0f, 0.0f));
+    }
+};
+```
+
+### Complete Split-Screen Example
+
+```cpp
+// Player scene with independent camera
+class PlayerScene : public vde::Scene {
+    int m_playerId;
+    
+public:
+    PlayerScene(int playerId) : m_playerId(playerId) {}
+    
+    void onEnter() override {
+        // Each player gets their own camera
+        setCamera(new vde::OrbitCamera(
+            vde::Position(0, 5, 0),
+            15.0f, 45.0f, m_playerId * 45.0f  // Different starting yaw
+        ));
+        
+        setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
+        
+        // Create player entity
+        auto player = addEntity<vde::MeshEntity>();
+        player->setMesh(getGame()->getResourceManager().load<vde::Mesh>("player.obj"));
+        player->setPosition(m_playerId * 5.0f, 0, 0);
+    }
+    
+    void update(float dt) override {
+        // Each player's scene updates independently
+        // Handle input, move camera, etc.
+        vde::Scene::update(dt);
+    }
+};
+
+// Main setup
+int main() {
+    vde::Game game;
+    vde::GameSettings settings;
+    settings.gameName = "Split-Screen Demo";
+    settings.setWindowSize(1920, 1080);
+    
+    if (!game.initialize(settings)) return 1;
+    
+    // Create player scenes
+    game.addScene("player1", new PlayerScene(0));
+    game.addScene("player2", new PlayerScene(1));
+    
+    // Create split-screen group
+    auto splitscreen = vde::SceneGroup::createWithViewports("splitscreen", {
+        {"player1", vde::ViewportRect::leftHalf()},
+        {"player2", vde::ViewportRect::rightHalf()}
+    });
+    
+    game.setActiveSceneGroup(splitscreen);
+    game.run();
+    
+    return 0;
+}
+```
+
+### Switching Between Single Scene and Groups
+
+```cpp
+// Switch to single scene
+game.setActiveScene("menu");
+
+// Switch to scene group
+auto gameplayGroup = vde::SceneGroup::create("gameplay", {"world", "hud"});
+game.setActiveSceneGroup(gameplayGroup);
+
+// Return to single scene
+game.setActiveScene("pause_menu");
+```
+
+### Input Handling with Multiple Scenes
+
+Each scene can have its own input handler. When multiple scenes are active, input events are dispatched to all active scenes in order:
+
+```cpp
+class Player1Scene : public vde::Scene {
+    MyInputHandler m_input;
+    
+    void onEnter() override {
+        setInputHandler(&m_input);
+        
+        // Player 1 uses WASD and Space
+        m_input.setKeybindings(vde::KEY_W, vde::KEY_S, vde::KEY_A, vde::KEY_D, vde::KEY_SPACE);
+    }
+};
+
+class Player2Scene : public vde::Scene {
+    MyInputHandler m_input;
+    
+    void onEnter() override {
+        setInputHandler(&m_input);
+        
+        // Player 2 uses arrow keys and Enter
+        m_input.setKeybindings(vde::KEY_UP, vde::KEY_DOWN, vde::KEY_LEFT, vde::KEY_RIGHT, vde::KEY_ENTER);
+    }
+};
 ```
 
 ---
@@ -1270,6 +1954,7 @@ public:
 | Version | Date | Notes |
 |---------|------|-------|
 | 0.1.0 | 2026-01-17 | Initial API design |
+| 0.2.0 | 2026-02-08 | Added Physics System and Multi-Scene/Split-Screen documentation |
 
 ---
 

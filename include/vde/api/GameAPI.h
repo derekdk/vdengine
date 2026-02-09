@@ -21,11 +21,19 @@
 #include "Game.h"
 #include "GameSettings.h"
 #include "GameTypes.h"
+#include "Scheduler.h"
+#include "ThreadPool.h"
 
 // Scene and entity system
+#include "AudioEvent.h"
 #include "Entity.h"
+#include "PhysicsEntity.h"
+#include "PhysicsScene.h"
+#include "PhysicsTypes.h"
 #include "Resource.h"
 #include "Scene.h"
+#include "SceneGroup.h"
+#include "ViewportRect.h"
 
 // Input handling
 #include "InputHandler.h"

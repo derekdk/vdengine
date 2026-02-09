@@ -11,11 +11,15 @@
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
 #include <vde/api/LightBox.h>
+#include <vde/api/PhysicsEntity.h>
+#include <vde/api/PhysicsScene.h>
 
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -118,11 +122,15 @@ void Game::shutdown() {
     // Call shutdown hook
     onShutdown();
 
-    // Deactivate current scene
-    if (m_activeScene) {
-        m_activeScene->onExit();
-        m_activeScene = nullptr;
+    // Deactivate all scenes in the active group
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end()) {
+            it->second->onExit();
+        }
     }
+    m_activeScene = nullptr;
+    m_activeSceneGroup = SceneGroup{};
 
     // Clear all scenes
     m_scenes.clear();
@@ -166,8 +174,20 @@ void Game::run() {
 
     // Enter active scene if one is set
     if (m_activeScene) {
+        // Ensure there's a scene group for the active scene
+        if (m_activeSceneGroup.empty()) {
+            for (auto& [name, scenePtr] : m_scenes) {
+                if (scenePtr.get() == m_activeScene) {
+                    m_activeSceneGroup = SceneGroup::create(name, {name});
+                    break;
+                }
+            }
+        }
         m_activeScene->onEnter();
     }
+
+    // Build the initial scheduler task graph
+    rebuildSchedulerGraph();
 
     // Main game loop
     while (m_running && !m_window->shouldClose()) {
@@ -183,41 +203,9 @@ void Game::run() {
         // Process input
         processInput();
 
-        // Call update hook
-        onUpdate(m_deltaTime);
-
-        // Update active scene
-        if (m_activeScene) {
-            // Apply scene camera to Vulkan context
-            if (m_activeScene->getCamera() && m_vulkanContext) {
-                m_activeScene->getCamera()->applyTo(*m_vulkanContext);
-            }
-
-            // Apply scene background color to Vulkan context
-            if (m_vulkanContext) {
-                const Color& bg = m_activeScene->getBackgroundColor();
-                m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
-            }
-
-            m_activeScene->update(m_deltaTime);
-        }
-
-        // Update audio system
-        AudioManager::getInstance().update(m_deltaTime);
-
-        // Render
-        if (m_vulkanContext) {
-            // Set render callback to render the active scene
-            m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
-                (void)cmd;  // Unused in Phase 1
-                if (m_activeScene) {
-                    m_activeScene->render();
-                }
-                onRender();
-            });
-
-            m_vulkanContext->drawFrame();
-        }
+        // Execute the scheduler task graph
+        // (covers: onUpdate, scene update, audio, pre-render, render)
+        m_scheduler.execute();
 
         m_frameCount++;
     }
@@ -276,9 +264,80 @@ Scene* Game::getScene(const std::string& name) {
 }
 
 void Game::setActiveScene(const std::string& name) {
-    // Defer scene switch to avoid issues during update/render
+    // Defer scene switch to avoid issues during update/render.
+    // Internally creates a single-scene group.
     m_pendingScene = name;
     m_sceneSwitchPending = true;
+}
+
+void Game::setActiveSceneGroup(const SceneGroup& group) {
+    // Validate that all scenes exist
+    for (const auto& sceneName : group.sceneNames) {
+        if (m_scenes.find(sceneName) == m_scenes.end()) {
+            return;  // Silently ignore invalid groups
+        }
+    }
+
+    // Build sets for old and new groups to diff them
+    auto isInList = [](const std::vector<std::string>& list, const std::string& name) {
+        for (const auto& n : list) {
+            if (n == name)
+                return true;
+        }
+        return false;
+    };
+
+    // Exit scenes that are in the OLD group but NOT in the NEW group
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (!isInList(group.sceneNames, sceneName)) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                it->second->onExit();
+            }
+        }
+    }
+
+    // Clear scene stack (group switch resets the stack)
+    m_sceneStack.clear();
+
+    // Remember old group for enter logic
+    SceneGroup oldGroup = m_activeSceneGroup;
+
+    // Set new group
+    m_activeSceneGroup = group;
+
+    // Set primary scene (first in the group)
+    if (!group.sceneNames.empty()) {
+        auto it = m_scenes.find(group.sceneNames[0]);
+        if (it != m_scenes.end()) {
+            m_activeScene = it->second.get();
+        }
+    } else {
+        m_activeScene = nullptr;
+    }
+
+    // Enter scenes that are in the NEW group but NOT in the OLD group
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (!isInList(oldGroup.sceneNames, sceneName)) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                it->second->onEnter();
+            }
+        }
+    }
+
+    // Apply per-scene viewport rects from group entries (if present)
+    if (m_activeSceneGroup.hasViewports()) {
+        for (const auto& entry : m_activeSceneGroup.entries) {
+            auto it = m_scenes.find(entry.sceneName);
+            if (it != m_scenes.end()) {
+                it->second->setViewportRect(entry.viewport);
+            }
+        }
+    }
+
+    // Rebuild the scheduler graph for the new group
+    rebuildSchedulerGraph();
 }
 
 void Game::pushScene(const std::string& name) {
@@ -355,8 +414,75 @@ void Game::setFocusCallback(std::function<void(bool)> callback) {
 // ============================================================================
 
 void Game::processInput() {
-    // Input is handled via GLFW callbacks set up in setupInputCallbacks
-    // The callbacks dispatch to the input handler
+    // Keyboard and mouse input is handled via GLFW callbacks (setupInputCallbacks).
+    // Gamepad input must be polled each frame since GLFW doesn't provide callbacks for it.
+    pollGamepads();
+}
+
+void Game::pollGamepads() {
+    // Collect all input handlers that should receive gamepad events
+    auto dispatchToHandlers = [&](auto callback) {
+        // Global handler
+        if (m_inputHandler) {
+            callback(m_inputHandler);
+        }
+        // Per-scene handlers
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                InputHandler* sceneHandler = it->second->getInputHandler();
+                if (sceneHandler && sceneHandler != m_inputHandler) {
+                    callback(sceneHandler);
+                }
+            }
+        }
+    };
+
+    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) {
+        bool present = glfwJoystickPresent(jid) == GLFW_TRUE;
+        bool isGamepad = present && glfwJoystickIsGamepad(jid) == GLFW_TRUE;
+
+        // Connection/disconnection is handled by the joystick callback
+        // (set in setupInputCallbacks). Here we only poll state for gamepads.
+        if (!isGamepad)
+            continue;
+
+        GLFWgamepadstate state;
+        if (glfwGetGamepadState(jid, &state) != GLFW_TRUE)
+            continue;
+
+        // Dispatch button press/release events by comparing with previous state
+        dispatchToHandlers([&](InputHandler* handler) {
+            float deadZone = handler->getDeadZone();
+
+            for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn) {
+                bool pressed = (state.buttons[btn] == GLFW_PRESS);
+                bool wasPressed = handler->isGamepadButtonPressed(jid, btn);
+
+                if (pressed && !wasPressed) {
+                    handler->_setGamepadButton(jid, btn, true);
+                    handler->onGamepadButtonPress(jid, btn);
+                } else if (!pressed && wasPressed) {
+                    handler->_setGamepadButton(jid, btn, false);
+                    handler->onGamepadButtonRelease(jid, btn);
+                }
+            }
+
+            // Dispatch axis changes
+            for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis) {
+                float raw = state.axes[axis];
+                // Apply dead zone
+                float value = (std::abs(raw) < deadZone) ? 0.0f : raw;
+                float prev = handler->getGamepadAxis(jid, axis);
+
+                // Only fire event if the value actually changed (with a small epsilon)
+                if (std::abs(value - prev) > 0.001f) {
+                    handler->_setGamepadAxis(jid, axis, value);
+                    handler->onGamepadAxis(jid, axis, value);
+                }
+            }
+        });
+    }
 }
 
 void Game::updateTiming() {
@@ -388,17 +514,39 @@ void Game::processPendingSceneChange() {
         return;
     }
 
-    // Exit current scene
-    if (m_activeScene) {
-        m_activeScene->onExit();
+    // Exit scenes in the current group that are NOT the pending scene
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (sceneName == m_pendingScene)
+            continue;  // Will stay active — don't exit
+        auto sceneIt = m_scenes.find(sceneName);
+        if (sceneIt != m_scenes.end()) {
+            sceneIt->second->onExit();
+        }
     }
 
     // Clear scene stack (setActiveScene resets the stack)
     m_sceneStack.clear();
 
-    // Enter new scene
+    // Check if the pending scene was already in the old group
+    bool wasAlreadyActive = false;
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (sceneName == m_pendingScene) {
+            wasAlreadyActive = true;
+            break;
+        }
+    }
+
+    // Create a single-scene group
+    m_activeSceneGroup = SceneGroup::create(m_pendingScene, {m_pendingScene});
+
+    // Enter new scene only if it wasn't already in the group
     m_activeScene = it->second.get();
-    m_activeScene->onEnter();
+    if (!wasAlreadyActive) {
+        m_activeScene->onEnter();
+    }
+
+    // Rebuild the scheduler graph for the new scene
+    rebuildSchedulerGraph();
 }
 
 void Game::setupInputCallbacks() {
@@ -418,10 +566,11 @@ void Game::setupInputCallbacks() {
         if (!game)
             return;
 
-        // Determine which input handler to use
+        // Determine which input handler to use — focused scene for split-screen
         InputHandler* handler = nullptr;
-        if (game->m_activeScene && game->m_activeScene->getInputHandler()) {
-            handler = game->m_activeScene->getInputHandler();
+        Scene* focusedScene = game->getFocusedScene();
+        if (focusedScene && focusedScene->getInputHandler()) {
+            handler = focusedScene->getInputHandler();
         } else if (game->m_inputHandler) {
             handler = game->m_inputHandler;
         }
@@ -507,6 +656,63 @@ void Game::setupInputCallbacks() {
             game->m_focusCallback(focused != 0);
         }
     });
+
+    // Joystick/gamepad connection callback
+    // Note: GLFW joystick callbacks are global (not per-window), so we use a static
+    // pointer to route events. This is safe because VDE only supports one Game instance.
+    static Game* s_gameForJoystick = nullptr;
+    s_gameForJoystick = this;
+
+    glfwSetJoystickCallback([](int jid, int event) {
+        Game* game = s_gameForJoystick;
+        if (!game)
+            return;
+
+        auto notifyHandler = [&](InputHandler* handler) {
+            if (event == GLFW_CONNECTED) {
+                const char* name = glfwGetJoystickName(jid);
+                bool isGamepad = glfwJoystickIsGamepad(jid) == GLFW_TRUE;
+                const char* displayName = isGamepad ? glfwGetGamepadName(jid) : name;
+                handler->_setGamepadConnected(jid, true);
+                handler->onGamepadConnect(jid, displayName ? displayName : "Unknown");
+            } else if (event == GLFW_DISCONNECTED) {
+                handler->_setGamepadConnected(jid, false);
+                handler->onGamepadDisconnect(jid);
+                // Clear the state for this gamepad
+                for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn)
+                    handler->_setGamepadButton(jid, btn, false);
+                for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis)
+                    handler->_setGamepadAxis(jid, axis, 0.0f);
+            }
+        };
+
+        if (game->m_inputHandler) {
+            notifyHandler(game->m_inputHandler);
+        }
+        for (const auto& [sceneName, scene] : game->m_scenes) {
+            InputHandler* sceneHandler = scene->getInputHandler();
+            if (sceneHandler && sceneHandler != game->m_inputHandler) {
+                notifyHandler(sceneHandler);
+            }
+        }
+    });
+
+    // Initialize connection state for gamepads that are already plugged in
+    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) {
+        if (glfwJoystickPresent(jid) == GLFW_TRUE) {
+            bool isGamepad = glfwJoystickIsGamepad(jid) == GLFW_TRUE;
+            const char* name = isGamepad ? glfwGetGamepadName(jid) : glfwGetJoystickName(jid);
+
+            auto initHandler = [&](InputHandler* handler) {
+                handler->_setGamepadConnected(jid, true);
+                handler->onGamepadConnect(jid, name ? name : "Unknown");
+            };
+
+            if (m_inputHandler) {
+                initHandler(m_inputHandler);
+            }
+        }
+    }
 }
 
 void Game::createMeshRenderingPipeline() {
@@ -1290,6 +1496,355 @@ void Game::updateLightingUBO(const Scene* scene) {
     }
 
     memcpy(m_lightingUBOMapped[currentFrame], &ubo, sizeof(LightingUBO));
+}
+
+void Game::setFocusedScene(const std::string& sceneName) {
+    m_focusedSceneName = sceneName;
+}
+
+Scene* Game::getFocusedScene() {
+    if (!m_focusedSceneName.empty()) {
+        auto it = m_scenes.find(m_focusedSceneName);
+        if (it != m_scenes.end()) {
+            return it->second.get();
+        }
+    }
+    return m_activeScene;  // Default to primary scene
+}
+
+const Scene* Game::getFocusedScene() const {
+    if (!m_focusedSceneName.empty()) {
+        auto it = m_scenes.find(m_focusedSceneName);
+        if (it != m_scenes.end()) {
+            return it->second.get();
+        }
+    }
+    return m_activeScene;
+}
+
+Scene* Game::getSceneAtScreenPosition(double mouseX, double mouseY) {
+    if (!m_window) {
+        return nullptr;
+    }
+
+    // Convert pixel coords to normalized [0,1]
+    uint32_t winW = m_settings.display.windowWidth;
+    uint32_t winH = m_settings.display.windowHeight;
+    if (winW == 0 || winH == 0) {
+        return nullptr;
+    }
+
+    float nx = static_cast<float>(mouseX) / static_cast<float>(winW);
+    float ny = static_cast<float>(mouseY) / static_cast<float>(winH);
+
+    // Check each scene in the active group (reverse order for overlays)
+    for (auto it = m_activeSceneGroup.sceneNames.rbegin();
+         it != m_activeSceneGroup.sceneNames.rend(); ++it) {
+        auto sceneIt = m_scenes.find(*it);
+        if (sceneIt != m_scenes.end()) {
+            if (sceneIt->second->getViewportRect().contains(nx, ny)) {
+                return sceneIt->second.get();
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+void Game::renderSingleViewport() {
+    // Apply primary scene's camera to VulkanContext (backwards compatible path)
+    if (m_activeScene && m_activeScene->getCamera()) {
+        m_activeScene->getCamera()->applyTo(*m_vulkanContext);
+    }
+
+    m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
+        (void)cmd;
+        // Render all scenes in the active group
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                it->second->render();
+            }
+        }
+        onRender();
+    });
+
+    m_vulkanContext->drawFrame();
+}
+
+void Game::renderMultiViewport() {
+    VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+
+    std::vector<VulkanContext::SceneRenderInfo> renderInfos;
+
+    for (size_t i = 0; i < m_activeSceneGroup.sceneNames.size(); ++i) {
+        const auto& sceneName = m_activeSceneGroup.sceneNames[i];
+        auto it = m_scenes.find(sceneName);
+        if (it == m_scenes.end()) {
+            continue;
+        }
+
+        Scene* scene = it->second.get();
+
+        VulkanContext::SceneRenderInfo info{};
+        info.clearPass = (i == 0);
+
+        // Get the scene's camera matrices
+        if (scene->getCamera()) {
+            // Apply camera to get internal state updated (positions etc.)
+            scene->getCamera()->applyTo(*m_vulkanContext);
+            info.viewMatrix = m_vulkanContext->getCamera().getViewMatrix();
+            info.projMatrix = m_vulkanContext->getCamera().getProjectionMatrix();
+        } else {
+            info.viewMatrix = glm::mat4(1.0f);
+            info.projMatrix = glm::mat4(1.0f);
+        }
+
+        // Compute viewport and scissor from the scene's ViewportRect
+        const ViewportRect& vpRect = scene->getViewportRect();
+        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
+        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
+
+        // Update camera aspect ratio based on viewport dimensions
+        if (scene->getCamera()) {
+            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
+            scene->getCamera()->setAspectRatio(vpAspect);
+        }
+
+        // Update lighting for this scene
+        updateLightingUBO(scene);
+
+        // Capture scene pointer for the lambda
+        info.renderCallback = [this, scene](VkCommandBuffer cmd) {
+            (void)cmd;
+            scene->render();
+        };
+
+        renderInfos.push_back(std::move(info));
+    }
+
+    // Add the onRender callback to the last scene's render
+    if (!renderInfos.empty()) {
+        auto originalCallback = renderInfos.back().renderCallback;
+        renderInfos.back().renderCallback = [this, originalCallback](VkCommandBuffer cmd) {
+            if (originalCallback) {
+                originalCallback(cmd);
+            }
+            onRender();
+        };
+    }
+
+    m_vulkanContext->drawFrameMultiScene(renderInfos);
+}
+
+void Game::rebuildSchedulerGraph() {
+    m_scheduler.clear();
+
+    // ---------------------------------------------------------------
+    // Collect scenes that need updating this frame:
+    //   1. All scenes in the active group
+    //   2. Any scene outside the group with continueInBackground==true
+    // ---------------------------------------------------------------
+    struct SceneEntry {
+        Scene* scene = nullptr;
+        std::string name;
+        int priority = 0;
+    };
+
+    std::vector<SceneEntry> updateScenes;
+
+    // Active group scenes
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end()) {
+            updateScenes.push_back({it->second.get(), sceneName, it->second->getUpdatePriority()});
+        }
+    }
+
+    // Background scenes (not already in the group)
+    for (auto& [name, scenePtr] : m_scenes) {
+        if (!scenePtr->getContinueInBackground()) {
+            continue;
+        }
+        // Skip if already in the active group
+        bool inGroup = false;
+        for (const auto& gn : m_activeSceneGroup.sceneNames) {
+            if (gn == name) {
+                inGroup = true;
+                break;
+            }
+        }
+        if (!inGroup) {
+            updateScenes.push_back({scenePtr.get(), name, scenePtr->getUpdatePriority()});
+        }
+    }
+
+    // Sort by update priority (lower value = earlier execution)
+    std::sort(updateScenes.begin(), updateScenes.end(),
+              [](const SceneEntry& a, const SceneEntry& b) { return a.priority < b.priority; });
+
+    // ---------------------------------------------------------------
+    // Task 1: GameLogic — onUpdate hook + all scene updates
+    // ---------------------------------------------------------------
+    // Chain: onUpdate -> update(scene1) | gameLogic(scene1) -> ...
+    TaskId prevTask = m_scheduler.addTask(
+        {"game.update", TaskPhase::GameLogic, [this]() { onUpdate(m_deltaTime); }});
+
+    // Track per-scene audio tasks so audio.global can depend on all of them
+    std::vector<TaskId> audioTasks;
+
+    for (size_t i = 0; i < updateScenes.size(); ++i) {
+        Scene* scene = updateScenes[i].scene;
+        const std::string& sceneName = updateScenes[i].name;
+
+        if (scene->usesPhaseCallbacks()) {
+            // --- Phase callbacks mode: three separate tasks ---
+
+            // GameLogic task
+            TaskId gameLogicTask =
+                m_scheduler.addTask({"scene.gameLogic." + sceneName,
+                                     TaskPhase::GameLogic,
+                                     [this, scene]() { scene->updateGameLogic(m_deltaTime); },
+                                     {prevTask}});
+
+            // Audio task (depends on gameLogic so queued events are available)
+            TaskId audioTask =
+                m_scheduler.addTask({"scene.audio." + sceneName,
+                                     TaskPhase::Audio,
+                                     [this, scene]() { scene->updateAudio(m_deltaTime); },
+                                     {gameLogicTask}});
+            audioTasks.push_back(audioTask);
+
+            // Visuals task (depends on gameLogic; can run concurrently with audio in future)
+            TaskId visualsTask =
+                m_scheduler.addTask({"scene.visuals." + sceneName,
+                                     TaskPhase::GameLogic,
+                                     [this, scene]() { scene->updateVisuals(m_deltaTime); },
+                                     {gameLogicTask}});
+
+            // The next scene's tasks depend on the last task of this scene
+            // (visuals, since it's the broadest output)
+            prevTask = visualsTask;
+        } else {
+            // --- Legacy mode: single update task ---
+            prevTask = m_scheduler.addTask({"scene.update." + sceneName,
+                                            TaskPhase::GameLogic,
+                                            [this, scene]() { scene->update(m_deltaTime); },
+                                            {prevTask}});
+        }
+    }
+
+    TaskId lastUpdateTask = prevTask;
+
+    // ---------------------------------------------------------------
+    // Task 1b: Physics — step physics for scenes that have it.
+    //          Physics depends on all game-logic/update tasks.
+    // ---------------------------------------------------------------
+    TaskId lastPhysicsTask = lastUpdateTask;
+    std::vector<TaskId> postPhysicsTasks;
+
+    for (size_t i = 0; i < updateScenes.size(); ++i) {
+        Scene* scene = updateScenes[i].scene;
+        const std::string& sceneName = updateScenes[i].name;
+
+        if (scene->hasPhysics()) {
+            TaskId physicsTask = m_scheduler.addTask({
+                "scene.physics." + sceneName,
+                TaskPhase::Physics,
+                [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
+                {lastUpdateTask},
+                false  // Physics step can run on worker threads
+            });
+
+            // PostPhysics: sync physics entity transforms with interpolation
+            TaskId postPhysicsTask = m_scheduler.addTask(
+                {"scene.postPhysics." + sceneName,
+                 TaskPhase::PostPhysics,
+                 [scene]() {
+                     if (!scene->hasPhysics())
+                         return;
+                     float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
+                     for (auto& entityRef : scene->getEntities()) {
+                         auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
+                         if (pe && pe->getAutoSync()) {
+                             pe->syncFromPhysics(alpha);
+                         }
+                     }
+                 },
+                 {physicsTask}});
+
+            postPhysicsTasks.push_back(postPhysicsTask);
+            lastPhysicsTask = postPhysicsTask;
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Task 2: Audio — global audio system update
+    //         Depends on all per-scene audio tasks AND the last
+    //         physics/update task so it always runs after all scene work.
+    // ---------------------------------------------------------------
+    std::vector<TaskId> audioDeps = {lastPhysicsTask};
+    for (TaskId id : audioTasks) {
+        audioDeps.push_back(id);
+    }
+    for (TaskId id : postPhysicsTasks) {
+        audioDeps.push_back(id);
+    }
+
+    TaskId audioTask = m_scheduler.addTask(
+        {"audio.global", TaskPhase::Audio,
+         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioDeps});
+
+    // ---------------------------------------------------------------
+    // Task 3: PreRender — apply clear color from primary scene.
+    //         Camera apply moves into the render loop (per-scene).
+    // ---------------------------------------------------------------
+    TaskId preRenderTask = m_scheduler.addTask(
+        {"scene.preRender",
+         TaskPhase::PreRender,
+         [this]() {
+             if (m_activeScene && m_vulkanContext) {
+                 // Apply scene background color to Vulkan context
+                 const Color& bg = m_activeScene->getBackgroundColor();
+                 m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
+             }
+         },
+         {audioTask}});
+
+    // ---------------------------------------------------------------
+    // Task 4: Render — draw frame.  If any scene has a non-fullWindow
+    //         viewport, use multi-pass rendering.  Otherwise, use the
+    //         original single-pass path for backwards compatibility.
+    // ---------------------------------------------------------------
+    m_scheduler.addTask({"scene.render",
+                         TaskPhase::Render,
+                         [this]() {
+                             if (!m_vulkanContext) {
+                                 return;
+                             }
+
+                             // Check if we need multi-viewport rendering
+                             bool needsMultiViewport = false;
+                             for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+                                 auto it = m_scenes.find(sceneName);
+                                 if (it != m_scenes.end()) {
+                                     if (it->second->getViewportRect() !=
+                                         ViewportRect::fullWindow()) {
+                                         needsMultiViewport = true;
+                                         break;
+                                     }
+                                 }
+                             }
+
+                             if (needsMultiViewport) {
+                                 // Multi-pass per-scene rendering
+                                 renderMultiViewport();
+                             } else {
+                                 // Original single-pass rendering (backwards compatible)
+                                 renderSingleViewport();
+                             }
+                         },
+                         {preRenderTask}});
 }
 
 }  // namespace vde

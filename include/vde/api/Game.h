@@ -22,6 +22,9 @@
 #include "InputHandler.h"
 #include "ResourceManager.h"
 #include "Scene.h"
+#include "SceneGroup.h"
+#include "Scheduler.h"
+#include "ViewportRect.h"
 
 namespace vde {
 
@@ -134,14 +137,62 @@ class Game {
     /**
      * @brief Set the active scene.
      * @param name Name of the scene to activate
+     *
+     * Internally creates a single-scene group so that
+     * setActiveSceneGroup-based scheduling works identically.
      */
     void setActiveScene(const std::string& name);
+
+    /**
+     * @brief Set a group of scenes to be active simultaneously.
+     *
+     * The first scene in the group is the primary scene (its camera
+     * and background color are used for rendering).  All scenes in
+     * the group receive update() calls each frame.  Scenes outside
+     * the group that have continueInBackground==true also receive
+     * update() calls.
+     *
+     * @param group The SceneGroup describing the scenes to activate
+     */
+    void setActiveSceneGroup(const SceneGroup& group);
+
+    /**
+     * @brief Get the currently active scene group.
+     */
+    const SceneGroup& getActiveSceneGroup() const { return m_activeSceneGroup; }
 
     /**
      * @brief Get the currently active scene.
      */
     Scene* getActiveScene() { return m_activeScene; }
     const Scene* getActiveScene() const { return m_activeScene; }
+
+    // Input focus (for split-screen)
+
+    /**
+     * @brief Set which scene receives keyboard input.
+     *
+     * When split-screen viewports are active, this controls which scene
+     * gets keyboard events.  Defaults to the primary scene.
+     *
+     * @param sceneName Name of the scene to focus
+     */
+    void setFocusedScene(const std::string& sceneName);
+
+    /**
+     * @brief Get the currently focused scene for keyboard input.
+     * @return Pointer to the focused scene, or the primary scene if none set
+     */
+    Scene* getFocusedScene();
+    const Scene* getFocusedScene() const;
+
+    /**
+     * @brief Get the scene whose viewport contains the given screen position.
+     * @param mouseX Mouse X position in pixels
+     * @param mouseY Mouse Y position in pixels
+     * @return Pointer to the scene under the cursor, or nullptr
+     */
+    Scene* getSceneAtScreenPosition(double mouseX, double mouseY);
 
     /**
      * @brief Push a scene onto the scene stack.
@@ -159,6 +210,17 @@ class Game {
     void popScene();
 
     // Input handling
+
+    // Scheduler
+
+    /**
+     * @brief Get the task scheduler.
+     *
+     * The scheduler manages the per-frame task graph. It is rebuilt
+     * automatically when scenes change.
+     */
+    Scheduler& getScheduler() { return m_scheduler; }
+    const Scheduler& getScheduler() const { return m_scheduler; }
 
     /**
      * @brief Set the global input handler.
@@ -380,6 +442,10 @@ class Game {
     std::vector<std::string> m_sceneStack;
     std::string m_pendingScene;
     bool m_sceneSwitchPending = false;
+    SceneGroup m_activeSceneGroup;
+
+    // Input focus for split-screen
+    std::string m_focusedSceneName;
 
     // Lighting infrastructure (Phase 4)
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
@@ -388,6 +454,9 @@ class Game {
     std::vector<VkBuffer> m_lightingUBOBuffers;             // One per frame-in-flight
     std::vector<VkDeviceMemory> m_lightingUBOMemory;        // One per frame-in-flight
     std::vector<void*> m_lightingUBOMapped;                 // Persistently mapped pointers
+
+    // Scheduler
+    Scheduler m_scheduler;
 
     // Input
     InputHandler* m_inputHandler = nullptr;
@@ -407,6 +476,7 @@ class Game {
 
     // Internal methods
     void processInput();
+    void pollGamepads();
     void updateTiming();
     void processPendingSceneChange();
     void setupInputCallbacks();
@@ -416,6 +486,9 @@ class Game {
     void destroySpriteRenderingPipeline();
     void createLightingResources();
     void destroyLightingResources();
+    void rebuildSchedulerGraph();
+    void renderSingleViewport();
+    void renderMultiViewport();
 };
 
 }  // namespace vde

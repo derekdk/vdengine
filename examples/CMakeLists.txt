@@ -37,6 +37,30 @@ add_executable(vde_sprite_demo
 target_link_libraries(vde_sprite_demo PRIVATE vde)
 add_dependencies(vde_sprite_demo copy_example_shaders)
 
+# Breakout demo - simple breakout clone demonstrating 2D gameplay and sprite collisions
+add_executable(vde_breakout_demo
+    breakout_demo/main.cpp
+)
+
+target_link_libraries(vde_breakout_demo PRIVATE vde)
+add_dependencies(vde_breakout_demo copy_example_shaders)
+
+# Asteroids demo - classic asteroids clone demonstrating spaceship control, collision detection, and game logic
+add_executable(vde_asteroids_demo
+    asteroids_demo/main.cpp
+)
+
+target_link_libraries(vde_asteroids_demo PRIVATE vde)
+add_dependencies(vde_asteroids_demo copy_example_shaders)
+
+# Asteroids demo (Physics) - Modern asteroids clone using physics-based gameplay with forces, collision callbacks, and entity management
+add_executable(vde_asteroids_physics_demo
+    asteroids_demo/main_new.cpp
+)
+
+target_link_libraries(vde_asteroids_physics_demo PRIVATE vde)
+add_dependencies(vde_asteroids_physics_demo copy_example_shaders)
+
 # World bounds demo example demonstrating Phase 2.5 features
 add_executable(vde_world_bounds_demo
     world_bounds_demo/main.cpp
@@ -100,4 +124,47 @@ add_executable(vde_multi_scene_demo
 
 target_link_libraries(vde_multi_scene_demo PRIVATE vde)
 add_dependencies(vde_multi_scene_demo copy_example_shaders)
+
+# Quad viewport demo example demonstrating four simultaneous scenes in split-screen
+add_executable(vde_quad_viewport_demo
+    quad_viewport_demo/main.cpp
+)
+
+target_link_libraries(vde_quad_viewport_demo PRIVATE vde)
+add_dependencies(vde_quad_viewport_demo copy_example_shaders)
+
+# Four Scene 3D demo - four simultaneous 3D scenes with focus indicator
+add_executable(vde_four_scene_3d_demo
+    four_scene_3d_demo/main.cpp
+)
+
+target_link_libraries(vde_four_scene_3d_demo PRIVATE vde)
+add_dependencies(vde_four_scene_3d_demo copy_example_shaders)
+
+# Physics demo example demonstrating PhysicsScene simulation
+add_executable(vde_physics_demo
+    physics_demo/main.cpp
+)
+
+target_link_libraries(vde_physics_demo PRIVATE vde)
+add_dependencies(vde_physics_demo copy_example_shaders)
+
+# Parallel physics demo demonstrating thread pool integration
+add_executable(vde_parallel_physics_demo
+    parallel_physics_demo/main.cpp
+)
+
+target_link_libraries(vde_parallel_physics_demo PRIVATE vde)
+add_dependencies(vde_parallel_physics_demo copy_example_shaders)
+
+# Physics + Audio demo demonstrating collision -> game logic -> audio pipeline
+add_executable(vde_physics_audio_demo
+    physics_audio_demo/main.cpp
+)
+
+target_link_libraries(vde_physics_audio_demo PRIVATE vde)
+add_dependencies(vde_physics_audio_demo copy_example_shaders)
+
+# Dear ImGui integration demo - demonstrates ImGui overlay on VDE scenes
+add_subdirectory(imgui_demo)
 

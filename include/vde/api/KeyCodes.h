@@ -154,4 +154,66 @@ constexpr int MOD_SUPER = 0x0008;
 constexpr int MOD_CAPS_LOCK = 0x0010;
 constexpr int MOD_NUM_LOCK = 0x0020;
 
+// Joystick IDs (compatible with GLFW)
+constexpr int JOYSTICK_1 = 0;
+constexpr int JOYSTICK_2 = 1;
+constexpr int JOYSTICK_3 = 2;
+constexpr int JOYSTICK_4 = 3;
+constexpr int JOYSTICK_5 = 4;
+constexpr int JOYSTICK_6 = 5;
+constexpr int JOYSTICK_7 = 6;
+constexpr int JOYSTICK_8 = 7;
+constexpr int JOYSTICK_9 = 8;
+constexpr int JOYSTICK_10 = 9;
+constexpr int JOYSTICK_11 = 10;
+constexpr int JOYSTICK_12 = 11;
+constexpr int JOYSTICK_13 = 12;
+constexpr int JOYSTICK_14 = 13;
+constexpr int JOYSTICK_15 = 14;
+constexpr int JOYSTICK_16 = 15;
+constexpr int JOYSTICK_LAST = JOYSTICK_16;
+
+// Gamepad buttons (compatible with GLFW gamepad mapping)
+constexpr int GAMEPAD_BUTTON_A = 0;
+constexpr int GAMEPAD_BUTTON_B = 1;
+constexpr int GAMEPAD_BUTTON_X = 2;
+constexpr int GAMEPAD_BUTTON_Y = 3;
+constexpr int GAMEPAD_BUTTON_LEFT_BUMPER = 4;
+constexpr int GAMEPAD_BUTTON_RIGHT_BUMPER = 5;
+constexpr int GAMEPAD_BUTTON_BACK = 6;
+constexpr int GAMEPAD_BUTTON_START = 7;
+constexpr int GAMEPAD_BUTTON_GUIDE = 8;
+constexpr int GAMEPAD_BUTTON_LEFT_THUMB = 9;
+constexpr int GAMEPAD_BUTTON_RIGHT_THUMB = 10;
+constexpr int GAMEPAD_BUTTON_DPAD_UP = 11;
+constexpr int GAMEPAD_BUTTON_DPAD_RIGHT = 12;
+constexpr int GAMEPAD_BUTTON_DPAD_DOWN = 13;
+constexpr int GAMEPAD_BUTTON_DPAD_LEFT = 14;
+constexpr int GAMEPAD_BUTTON_LAST = GAMEPAD_BUTTON_DPAD_LEFT;
+
+// Cross-platform aliases
+constexpr int GAMEPAD_BUTTON_CROSS = GAMEPAD_BUTTON_A;
+constexpr int GAMEPAD_BUTTON_CIRCLE = GAMEPAD_BUTTON_B;
+constexpr int GAMEPAD_BUTTON_SQUARE = GAMEPAD_BUTTON_X;
+constexpr int GAMEPAD_BUTTON_TRIANGLE = GAMEPAD_BUTTON_Y;
+
+// Gamepad axes (compatible with GLFW gamepad mapping)
+constexpr int GAMEPAD_AXIS_LEFT_X = 0;
+constexpr int GAMEPAD_AXIS_LEFT_Y = 1;
+constexpr int GAMEPAD_AXIS_RIGHT_X = 2;
+constexpr int GAMEPAD_AXIS_RIGHT_Y = 3;
+constexpr int GAMEPAD_AXIS_LEFT_TRIGGER = 4;
+constexpr int GAMEPAD_AXIS_RIGHT_TRIGGER = 5;
+constexpr int GAMEPAD_AXIS_LAST = GAMEPAD_AXIS_RIGHT_TRIGGER;
+
+// Maximum number of supported gamepads
+constexpr int MAX_GAMEPADS = 16;
+// Maximum number of gamepad buttons
+constexpr int MAX_GAMEPAD_BUTTONS = 15;
+// Maximum number of gamepad axes
+constexpr int MAX_GAMEPAD_AXES = 6;
+
+// Default dead zone for analog sticks
+constexpr float GAMEPAD_AXIS_DEADZONE = 0.1f;
+
 }  // namespace vde
