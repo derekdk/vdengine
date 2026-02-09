@@ -89,6 +89,12 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
     void onEnter() override {
         printExampleHeader();
 
+        // Store DPI scale for UI scaling
+        auto* game = getGame();
+        if (game) {
+            m_dpiScale = game->getDPIScale();
+        }
+
         // --- Camera ---
         setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 8.0f, 30.0f, 25.0f));
 
@@ -168,23 +174,27 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
 
     /// Called by the Game subclass during ImGui rendering phase.
     void drawImGui() {
+        // Apply DPI scale to all window positions and sizes
+        float scale = m_dpiScale;
+
         // --- Stats overlay ---
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260, 120), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(10 * scale, 10 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(260 * scale, 140 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Engine Stats")) {
             auto* game = getGame();
             ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
             ImGui::Text("Frame: %llu", game ? game->getFrameCount() : 0ULL);
             ImGui::Text("Delta: %.3f ms", game ? game->getDeltaTime() * 1000.0f : 0.0f);
             ImGui::Text("Entities: %zu", getEntities().size());
+            ImGui::Text("DPI Scale: %.2f", game ? game->getDPIScale() : 1.0f);
             ImGui::Separator();
             ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "ImGui integrated as overlay");
         }
         ImGui::End();
 
         // --- Cube Inspector ---
-        ImGui::SetNextWindowPos(ImVec2(10, 140), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(280, 300), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(10 * scale, 140 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(280 * scale, 300 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Cube Inspector")) {
             ImGui::DragFloat3("Position##cube", m_cubePos, 0.1f, -10.0f, 10.0f);
             ImGui::SliderFloat("Scale", &m_cubeScale, 0.1f, 5.0f);
@@ -199,8 +209,8 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         ImGui::End();
 
         // --- Sphere Inspector ---
-        ImGui::SetNextWindowPos(ImVec2(10, 450), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(280, 140), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(10 * scale, 450 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(280 * scale, 140 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Sphere Inspector")) {
             ImGui::DragFloat3("Position##sphere", m_spherePos, 0.1f, -10.0f, 10.0f);
             ImGui::ColorEdit3("Color##sphere", m_sphereColor);
@@ -208,8 +218,8 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         ImGui::End();
 
         // --- Lighting ---
-        ImGui::SetNextWindowPos(ImVec2(300, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260, 140), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(300 * scale, 10 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(260 * scale, 140 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Lighting")) {
             if (ImGui::ColorEdit3("Ambient", m_ambientColor)) {
                 m_lightingDirty = true;
@@ -221,8 +231,8 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         ImGui::End();
 
         // --- ImGui demo window (toggle with checkbox) ---
-        ImGui::SetNextWindowPos(ImVec2(300, 160), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260, 50), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(300 * scale, 160 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(260 * scale, 50 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Options")) {
             ImGui::Checkbox("Show ImGui Demo Window", &m_showDemoWindow);
         }
@@ -275,6 +285,7 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
 
     bool m_showDemoWindow = false;
     float m_totalTime = 0.0f;
+    float m_dpiScale = 1.0f;
 };
 
 // =============================================================================
@@ -325,6 +336,13 @@ class ImGuiDemoGame : public vde::examples::BaseExampleGame<ImGuiDemoInputHandle
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         ImGui::StyleColorsDark();
+
+        // Apply DPI scaling to fonts
+        float dpiScale = getDPIScale();
+        if (dpiScale > 0.0f) {
+            // Scale the global font size
+            io.FontGlobalScale = dpiScale;
+        }
 
         // Platform backend – GLFW.
         // install_callbacks=true lets ImGui capture input alongside VDE.
@@ -413,5 +431,13 @@ class ImGuiDemoGame : public vde::examples::BaseExampleGame<ImGuiDemoInputHandle
 
 int main() {
     ImGuiDemoGame demo;
-    return vde::examples::runExample(demo, "VDE ImGui Demo", 1280, 720);
+
+    // Adjust default resolution based on DPI
+    float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
+
+    // Scale the resolution for high DPI displays
+    uint32_t width = static_cast<uint32_t>(1280 * dpiScale);
+    uint32_t height = static_cast<uint32_t>(720 * dpiScale);
+
+    return vde::examples::runExample(demo, "VDE ImGui Demo", width, height);
 }

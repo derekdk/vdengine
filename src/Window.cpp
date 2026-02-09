@@ -123,20 +123,20 @@ void Window::notifyResize() {
 float Window::getPrimaryMonitorDPIScale() {
     // Check if GLFW is already initialized
     bool wasInitialized = (glfwGetCurrentContext() != nullptr);
-    
+
     if (!wasInitialized) {
         glfwInit();
     }
-    
+
     GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
     float xscale = 1.0f, yscale = 1.0f;
     glfwGetMonitorContentScale(primaryMonitor, &xscale, &yscale);
     float dpiScale = (xscale > yscale) ? xscale : yscale;
-    
+
     if (!wasInitialized) {
         glfwTerminate();
     }
-    
+
     return dpiScale;
 }
 
