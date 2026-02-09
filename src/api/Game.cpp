@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -413,8 +414,75 @@ void Game::setFocusCallback(std::function<void(bool)> callback) {
 // ============================================================================
 
 void Game::processInput() {
-    // Input is handled via GLFW callbacks set up in setupInputCallbacks
-    // The callbacks dispatch to the input handler
+    // Keyboard and mouse input is handled via GLFW callbacks (setupInputCallbacks).
+    // Gamepad input must be polled each frame since GLFW doesn't provide callbacks for it.
+    pollGamepads();
+}
+
+void Game::pollGamepads() {
+    // Collect all input handlers that should receive gamepad events
+    auto dispatchToHandlers = [&](auto callback) {
+        // Global handler
+        if (m_inputHandler) {
+            callback(m_inputHandler);
+        }
+        // Per-scene handlers
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end()) {
+                InputHandler* sceneHandler = it->second->getInputHandler();
+                if (sceneHandler && sceneHandler != m_inputHandler) {
+                    callback(sceneHandler);
+                }
+            }
+        }
+    };
+
+    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) {
+        bool present = glfwJoystickPresent(jid) == GLFW_TRUE;
+        bool isGamepad = present && glfwJoystickIsGamepad(jid) == GLFW_TRUE;
+
+        // Connection/disconnection is handled by the joystick callback
+        // (set in setupInputCallbacks). Here we only poll state for gamepads.
+        if (!isGamepad)
+            continue;
+
+        GLFWgamepadstate state;
+        if (glfwGetGamepadState(jid, &state) != GLFW_TRUE)
+            continue;
+
+        // Dispatch button press/release events by comparing with previous state
+        dispatchToHandlers([&](InputHandler* handler) {
+            float deadZone = handler->getDeadZone();
+
+            for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn) {
+                bool pressed = (state.buttons[btn] == GLFW_PRESS);
+                bool wasPressed = handler->isGamepadButtonPressed(jid, btn);
+
+                if (pressed && !wasPressed) {
+                    handler->_setGamepadButton(jid, btn, true);
+                    handler->onGamepadButtonPress(jid, btn);
+                } else if (!pressed && wasPressed) {
+                    handler->_setGamepadButton(jid, btn, false);
+                    handler->onGamepadButtonRelease(jid, btn);
+                }
+            }
+
+            // Dispatch axis changes
+            for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis) {
+                float raw = state.axes[axis];
+                // Apply dead zone
+                float value = (std::abs(raw) < deadZone) ? 0.0f : raw;
+                float prev = handler->getGamepadAxis(jid, axis);
+
+                // Only fire event if the value actually changed (with a small epsilon)
+                if (std::abs(value - prev) > 0.001f) {
+                    handler->_setGamepadAxis(jid, axis, value);
+                    handler->onGamepadAxis(jid, axis, value);
+                }
+            }
+        });
+    }
 }
 
 void Game::updateTiming() {
@@ -588,6 +656,63 @@ void Game::setupInputCallbacks() {
             game->m_focusCallback(focused != 0);
         }
     });
+
+    // Joystick/gamepad connection callback
+    // Note: GLFW joystick callbacks are global (not per-window), so we use a static
+    // pointer to route events. This is safe because VDE only supports one Game instance.
+    static Game* s_gameForJoystick = nullptr;
+    s_gameForJoystick = this;
+
+    glfwSetJoystickCallback([](int jid, int event) {
+        Game* game = s_gameForJoystick;
+        if (!game)
+            return;
+
+        auto notifyHandler = [&](InputHandler* handler) {
+            if (event == GLFW_CONNECTED) {
+                const char* name = glfwGetJoystickName(jid);
+                bool isGamepad = glfwJoystickIsGamepad(jid) == GLFW_TRUE;
+                const char* displayName = isGamepad ? glfwGetGamepadName(jid) : name;
+                handler->_setGamepadConnected(jid, true);
+                handler->onGamepadConnect(jid, displayName ? displayName : "Unknown");
+            } else if (event == GLFW_DISCONNECTED) {
+                handler->_setGamepadConnected(jid, false);
+                handler->onGamepadDisconnect(jid);
+                // Clear the state for this gamepad
+                for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn)
+                    handler->_setGamepadButton(jid, btn, false);
+                for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis)
+                    handler->_setGamepadAxis(jid, axis, 0.0f);
+            }
+        };
+
+        if (game->m_inputHandler) {
+            notifyHandler(game->m_inputHandler);
+        }
+        for (const auto& [sceneName, scene] : game->m_scenes) {
+            InputHandler* sceneHandler = scene->getInputHandler();
+            if (sceneHandler && sceneHandler != game->m_inputHandler) {
+                notifyHandler(sceneHandler);
+            }
+        }
+    });
+
+    // Initialize connection state for gamepads that are already plugged in
+    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) {
+        if (glfwJoystickPresent(jid) == GLFW_TRUE) {
+            bool isGamepad = glfwJoystickIsGamepad(jid) == GLFW_TRUE;
+            const char* name = isGamepad ? glfwGetGamepadName(jid) : glfwGetJoystickName(jid);
+
+            auto initHandler = [&](InputHandler* handler) {
+                handler->_setGamepadConnected(jid, true);
+                handler->onGamepadConnect(jid, name ? name : "Unknown");
+            };
+
+            if (m_inputHandler) {
+                initHandler(m_inputHandler);
+            }
+        }
+    }
 }
 
 void Game::createMeshRenderingPipeline() {

@@ -49,6 +49,8 @@ set(VDE_TEST_SOURCES
     PhysicsEntity_test.cpp
     # Phase 7 thread pool tests
     ThreadPool_test.cpp
+    # Joystick/gamepad tests
+    Joystick_test.cpp
 )
 
 # Create test executable

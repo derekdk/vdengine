@@ -476,6 +476,7 @@ class Game {
 
     // Internal methods
     void processInput();
+    void pollGamepads();
     void updateTiming();
     void processPendingSceneChange();
     void setupInputCallbacks();
