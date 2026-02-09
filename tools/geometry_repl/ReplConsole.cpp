@@ -27,8 +27,12 @@ void ReplConsole::addMessage(const std::string& message) {
 }
 
 void ReplConsole::draw() {
+    // Reserve space for input line and completion hints (always reserve 2 lines for hints)
+    float hintHeight = ImGui::GetTextLineHeightWithSpacing() * 2;
+    float reservedHeight = ImGui::GetFrameHeightWithSpacing() + 4 + hintHeight;
+
     // --- Output area (scrollable) ---
-    ImVec2 consoleSize = ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 4);
+    ImVec2 consoleSize = ImVec2(0, -reservedHeight);
     if (ImGui::BeginChild("##ConsoleOutput", consoleSize, true,
                           ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
         for (const auto& msg : m_log) {
@@ -59,25 +63,29 @@ void ReplConsole::draw() {
     }
     ImGui::EndChild();
 
-    // --- Completion hint bar (shown below output, above input) ---
-    if (!m_completions.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
-        std::string hint;
-        for (size_t i = 0; i < m_completions.size() && i < 10; ++i) {
-            if (i > 0)
-                hint += "  ";
-            if (static_cast<int>(i) == m_completionIndex) {
-                hint += "[" + m_completions[i] + "]";
-            } else {
-                hint += m_completions[i];
+    // --- Completion hint bar (always present to maintain stable ImGui ID stack) ---
+    // Use a fixed-height child region to prevent layout shifts
+    if (ImGui::BeginChild("##CompletionHints", ImVec2(0, hintHeight), false)) {
+        if (!m_completions.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+            std::string hint;
+            for (size_t i = 0; i < m_completions.size() && i < 10; ++i) {
+                if (i > 0)
+                    hint += "  ";
+                if (static_cast<int>(i) == m_completionIndex) {
+                    hint += "[" + m_completions[i] + "]";
+                } else {
+                    hint += m_completions[i];
+                }
             }
+            if (m_completions.size() > 10) {
+                hint += "  (+" + std::to_string(m_completions.size() - 10) + " more)";
+            }
+            ImGui::TextWrapped("%s", hint.c_str());
+            ImGui::PopStyleColor();
         }
-        if (m_completions.size() > 10) {
-            hint += "  (+" + std::to_string(m_completions.size() - 10) + " more)";
-        }
-        ImGui::TextWrapped("%s", hint.c_str());
-        ImGui::PopStyleColor();
     }
+    ImGui::EndChild();
 
     // --- Input line ---
     ImGui::Separator();
