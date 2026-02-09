@@ -37,6 +37,14 @@ add_executable(vde_sprite_demo
 target_link_libraries(vde_sprite_demo PRIVATE vde)
 add_dependencies(vde_sprite_demo copy_example_shaders)
 
+# Breakout demo - simple breakout clone demonstrating 2D gameplay and sprite collisions
+add_executable(vde_breakout_demo
+    breakout_demo/main.cpp
+)
+
+target_link_libraries(vde_breakout_demo PRIVATE vde)
+add_dependencies(vde_breakout_demo copy_example_shaders)
+
 # World bounds demo example demonstrating Phase 2.5 features
 add_executable(vde_world_bounds_demo
     world_bounds_demo/main.cpp
