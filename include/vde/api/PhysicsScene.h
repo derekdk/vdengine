@@ -11,6 +11,7 @@
  */
 
 #include <memory>
+#include <vector>
 
 #include "PhysicsTypes.h"
 
@@ -199,10 +200,57 @@ class PhysicsScene {
     void setOnCollisionBegin(CollisionCallback callback);
 
     /**
-     * @brief Set a callback for collision end events (reserved).
+     * @brief Set a callback for collision end events.
      * @param callback Function called when two bodies stop colliding
      */
     void setOnCollisionEnd(CollisionCallback callback);
+
+    /**
+     * @brief Set a per-body collision begin callback.
+     *
+     * The callback fires whenever the specified body begins overlapping
+     * any other body.  This is in addition to the global callback.
+     *
+     * @param id Body to watch
+     * @param callback Function called on collision begin
+     */
+    void setBodyOnCollisionBegin(PhysicsBodyId id, CollisionCallback callback);
+
+    /**
+     * @brief Set a per-body collision end callback.
+     *
+     * The callback fires whenever the specified body stops overlapping
+     * a body it was previously colliding with.
+     *
+     * @param id Body to watch
+     * @param callback Function called on collision end
+     */
+    void setBodyOnCollisionEnd(PhysicsBodyId id, CollisionCallback callback);
+
+    // ---------------------------------------------------------------
+    // Raycast & spatial queries
+    // ---------------------------------------------------------------
+
+    /**
+     * @brief Cast a ray and return the closest hit.
+     *
+     * @param origin Ray start point
+     * @param direction Ray direction (will be normalized internally)
+     * @param maxDistance Maximum distance to check
+     * @param[out] outHit Hit result (populated only on hit)
+     * @return true if a body was hit
+     */
+    bool raycast(const glm::vec2& origin, const glm::vec2& direction, float maxDistance,
+                 RaycastHit& outHit) const;
+
+    /**
+     * @brief Query all bodies whose AABB overlaps the given region.
+     *
+     * @param min Lower-left corner of the query rectangle
+     * @param max Upper-right corner of the query rectangle
+     * @return Vector of body IDs overlapping the region
+     */
+    std::vector<PhysicsBodyId> queryAABB(const glm::vec2& min, const glm::vec2& max) const;
 
     // ---------------------------------------------------------------
     // Queries

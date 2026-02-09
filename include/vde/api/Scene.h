@@ -272,6 +272,17 @@ class Scene {
     std::vector<std::shared_ptr<T>> getEntitiesOfType();
 
     /**
+     * @brief Find an entity that owns the given physics body.
+     *
+     * Iterates all entities, checking PhysicsEntity-derived objects
+     * for a matching body ID.
+     *
+     * @param bodyId Physics body ID to search for
+     * @return Pointer to the owning entity, or nullptr if not found
+     */
+    Entity* getEntityByPhysicsBody(PhysicsBodyId bodyId);
+
+    /**
      * @brief Remove an entity by ID.
      */
     void removeEntity(EntityId id);

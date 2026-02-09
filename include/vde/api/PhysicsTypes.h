@@ -132,4 +132,18 @@ struct CollisionEvent {
  */
 using CollisionCallback = std::function<void(const CollisionEvent&)>;
 
+// ============================================================================
+// Raycast
+// ============================================================================
+
+/**
+ * @brief Result of a raycast query.
+ */
+struct RaycastHit {
+    PhysicsBodyId bodyId = INVALID_PHYSICS_BODY_ID;  ///< Body that was hit
+    glm::vec2 point = {0.0f, 0.0f};                  ///< World-space hit point
+    glm::vec2 normal = {0.0f, 0.0f};                 ///< Surface normal at hit point
+    float distance = 0.0f;                           ///< Distance from ray origin to hit
+};
+
 }  // namespace vde

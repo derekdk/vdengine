@@ -5,6 +5,7 @@
 
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
+#include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
 #include <vde/api/Scene.h>
 
@@ -222,6 +223,33 @@ void Scene::setCamera(GameCamera* camera) {
 
 void Scene::removeResource(ResourceId id) {
     m_resources.erase(id);
+}
+
+// ============================================================================
+// Physics Body -> Entity Lookup
+// ============================================================================
+
+Entity* Scene::getEntityByPhysicsBody(PhysicsBodyId bodyId) {
+    if (bodyId == INVALID_PHYSICS_BODY_ID) {
+        return nullptr;
+    }
+    for (auto& entity : m_entities) {
+        if (!entity)
+            continue;
+        // Try PhysicsSpriteEntity
+        if (auto* pse = dynamic_cast<PhysicsSpriteEntity*>(entity.get())) {
+            if (pse->getPhysicsBodyId() == bodyId) {
+                return entity.get();
+            }
+        }
+        // Try PhysicsMeshEntity
+        if (auto* pme = dynamic_cast<PhysicsMeshEntity*>(entity.get())) {
+            if (pme->getPhysicsBodyId() == bodyId) {
+                return entity.get();
+            }
+        }
+    }
+    return nullptr;
 }
 
 // ============================================================================

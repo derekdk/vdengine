@@ -60,8 +60,13 @@ struct PhysicsScene::Impl {
     CollisionCallback onCollisionBegin;
     CollisionCallback onCollisionEnd;
 
-    // Track active collision pairs for collision-end detection (reserved)
+    // Per-body callbacks
+    std::unordered_map<PhysicsBodyId, CollisionCallback> bodyOnCollisionBegin;
+    std::unordered_map<PhysicsBodyId, CollisionCallback> bodyOnCollisionEnd;
+
+    // Track active collision pairs for collision-end detection
     CollisionPairSet activePairs;
+    CollisionPairSet previousPairs;  // Pairs from the last step
 
     // -----------------------------------------------------------------
     // Body management
@@ -339,9 +344,9 @@ struct PhysicsScene::Impl {
         }
 
         // Collision detection and resolution (multiple iterations)
-        for (int iter = 0; iter < config.iterations; ++iter) {
-            CollisionPairSet currentPairs;
+        CollisionPairSet currentFramePairs;
 
+        for (int iter = 0; iter < config.iterations; ++iter) {
             for (size_t i = 0; i < ids.size(); ++i) {
                 for (size_t j = i + 1; j < ids.size(); ++j) {
                     auto& bodyA = bodies[ids[i]];
@@ -357,29 +362,72 @@ struct PhysicsScene::Impl {
                     if (computeCollision(bodyA, bodyB, info)) {
                         auto pair = std::make_pair(std::min(info.idA, info.idB),
                                                    std::max(info.idA, info.idB));
-                        currentPairs.insert(pair);
+                        currentFramePairs.insert(pair);
 
-                        // Fire callback on first iteration only
-                        if (iter == 0 && onCollisionBegin) {
-                            CollisionEvent evt;
-                            evt.bodyA = info.idA;
-                            evt.bodyB = info.idB;
-                            evt.contactPoint = info.contactPoint;
-                            evt.normal = info.normal;
-                            evt.depth = info.depth;
-                            onCollisionBegin(evt);
+                        // Fire begin callbacks on first iteration only
+                        if (iter == 0) {
+                            // Only fire begin if this pair wasn't active last step
+                            bool isNew = (previousPairs.find(pair) == previousPairs.end());
+                            if (isNew) {
+                                CollisionEvent evt;
+                                evt.bodyA = info.idA;
+                                evt.bodyB = info.idB;
+                                evt.contactPoint = info.contactPoint;
+                                evt.normal = info.normal;
+                                evt.depth = info.depth;
+
+                                if (onCollisionBegin) {
+                                    onCollisionBegin(evt);
+                                }
+                                // Per-body callbacks
+                                auto itA = bodyOnCollisionBegin.find(info.idA);
+                                if (itA != bodyOnCollisionBegin.end()) {
+                                    itA->second(evt);
+                                }
+                                auto itB = bodyOnCollisionBegin.find(info.idB);
+                                if (itB != bodyOnCollisionBegin.end()) {
+                                    itB->second(evt);
+                                }
+                            }
                         }
 
                         resolveCollision(bodyA, bodyB, info);
                     }
                 }
             }
+        }
 
-            // Update active pairs (for potential future collision-end)
-            if (iter == 0) {
-                activePairs = currentPairs;
+        // Detect collision-end: pairs that were active previously but not now
+        for (const auto& oldPair : previousPairs) {
+            if (currentFramePairs.find(oldPair) == currentFramePairs.end()) {
+                // Both bodies must still exist for a meaningful end event
+                bool aExists = (bodies.find(oldPair.first) != bodies.end());
+                bool bExists = (bodies.find(oldPair.second) != bodies.end());
+                if (aExists && bExists) {
+                    CollisionEvent evt;
+                    evt.bodyA = oldPair.first;
+                    evt.bodyB = oldPair.second;
+                    // Contact point / normal / depth are zero for end events
+
+                    if (onCollisionEnd) {
+                        onCollisionEnd(evt);
+                    }
+                    // Per-body end callbacks
+                    auto itA = bodyOnCollisionEnd.find(oldPair.first);
+                    if (itA != bodyOnCollisionEnd.end()) {
+                        itA->second(evt);
+                    }
+                    auto itB = bodyOnCollisionEnd.find(oldPair.second);
+                    if (itB != bodyOnCollisionEnd.end()) {
+                        itB->second(evt);
+                    }
+                }
             }
         }
+
+        // Update active pairs for the next step
+        activePairs = currentFramePairs;
+        previousPairs = currentFramePairs;
     }
 
     void step(float deltaTime) {
@@ -491,6 +539,119 @@ void PhysicsScene::setOnCollisionBegin(CollisionCallback callback) {
 
 void PhysicsScene::setOnCollisionEnd(CollisionCallback callback) {
     m_impl->onCollisionEnd = std::move(callback);
+}
+
+void PhysicsScene::setBodyOnCollisionBegin(PhysicsBodyId id, CollisionCallback callback) {
+    m_impl->bodyOnCollisionBegin[id] = std::move(callback);
+}
+
+void PhysicsScene::setBodyOnCollisionEnd(PhysicsBodyId id, CollisionCallback callback) {
+    m_impl->bodyOnCollisionEnd[id] = std::move(callback);
+}
+
+bool PhysicsScene::raycast(const glm::vec2& origin, const glm::vec2& direction, float maxDistance,
+                           RaycastHit& outHit) const {
+    float dirLen = glm::length(direction);
+    if (dirLen < 1e-8f || maxDistance <= 0.0f) {
+        return false;
+    }
+    glm::vec2 dir = direction / dirLen;  // normalize
+
+    bool hit = false;
+    float closestDist = maxDistance;
+
+    for (const auto& [id, body] : m_impl->bodies) {
+        if (!body.alive)
+            continue;
+
+        PhysicsScene::Impl::AABB aabb = PhysicsScene::Impl::computeAABB(body);
+
+        // Ray-AABB intersection (slab method)
+        float tmin = 0.0f;
+        float tmax = closestDist;
+
+        // X slab
+        if (std::abs(dir.x) < 1e-8f) {
+            // Ray is parallel to X slab
+            if (origin.x < aabb.min.x || origin.x > aabb.max.x) {
+                continue;  // No intersection
+            }
+        } else {
+            float invD = 1.0f / dir.x;
+            float t1 = (aabb.min.x - origin.x) * invD;
+            float t2 = (aabb.max.x - origin.x) * invD;
+            if (t1 > t2)
+                std::swap(t1, t2);
+            tmin = std::max(tmin, t1);
+            tmax = std::min(tmax, t2);
+            if (tmin > tmax)
+                continue;
+        }
+
+        // Y slab
+        if (std::abs(dir.y) < 1e-8f) {
+            if (origin.y < aabb.min.y || origin.y > aabb.max.y) {
+                continue;
+            }
+        } else {
+            float invD = 1.0f / dir.y;
+            float t1 = (aabb.min.y - origin.y) * invD;
+            float t2 = (aabb.max.y - origin.y) * invD;
+            if (t1 > t2)
+                std::swap(t1, t2);
+            tmin = std::max(tmin, t1);
+            tmax = std::min(tmax, t2);
+            if (tmin > tmax)
+                continue;
+        }
+
+        // We have a valid intersection at tmin
+        if (tmin >= 0.0f && tmin < closestDist) {
+            closestDist = tmin;
+            outHit.bodyId = id;
+            outHit.point = origin + dir * tmin;
+            outHit.distance = tmin;
+
+            // Compute hit normal (which face was hit)
+            glm::vec2 hitPoint = outHit.point;
+            float eps = 0.001f;
+            if (std::abs(hitPoint.x - aabb.min.x) < eps)
+                outHit.normal = {-1.0f, 0.0f};
+            else if (std::abs(hitPoint.x - aabb.max.x) < eps)
+                outHit.normal = {1.0f, 0.0f};
+            else if (std::abs(hitPoint.y - aabb.min.y) < eps)
+                outHit.normal = {0.0f, -1.0f};
+            else if (std::abs(hitPoint.y - aabb.max.y) < eps)
+                outHit.normal = {0.0f, 1.0f};
+            else
+                outHit.normal = -dir;  // fallback
+
+            hit = true;
+        }
+    }
+
+    return hit;
+}
+
+std::vector<PhysicsBodyId> PhysicsScene::queryAABB(const glm::vec2& min,
+                                                   const glm::vec2& max) const {
+    std::vector<PhysicsBodyId> result;
+
+    PhysicsScene::Impl::AABB queryBox;
+    queryBox.min = min;
+    queryBox.max = max;
+
+    for (const auto& [id, body] : m_impl->bodies) {
+        if (!body.alive)
+            continue;
+
+        PhysicsScene::Impl::AABB bodyAABB = PhysicsScene::Impl::computeAABB(body);
+        if (PhysicsScene::Impl::aabbOverlap(queryBox, bodyAABB)) {
+            result.push_back(id);
+        }
+    }
+
+    return result;
 }
 
 size_t PhysicsScene::getBodyCount() const {

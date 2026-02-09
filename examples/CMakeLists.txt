@@ -133,3 +133,11 @@ add_executable(vde_parallel_physics_demo
 target_link_libraries(vde_parallel_physics_demo PRIVATE vde)
 add_dependencies(vde_parallel_physics_demo copy_example_shaders)
 
+# Physics + Audio demo demonstrating collision -> game logic -> audio pipeline
+add_executable(vde_physics_audio_demo
+    physics_audio_demo/main.cpp
+)
+
+target_link_libraries(vde_physics_audio_demo PRIVATE vde)
+add_dependencies(vde_physics_audio_demo copy_example_shaders)
+
