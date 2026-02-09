@@ -31,6 +31,9 @@ Scene::~Scene() {
 }
 
 void Scene::update(float deltaTime) {
+    // Flush any commands queued during the previous render phase
+    flushDeferredCommands();
+
     // Update all entities
     for (auto& entity : m_entities) {
         if (entity) {
@@ -53,6 +56,11 @@ void Scene::render() {
 // ============================================================================
 
 void Scene::updateGameLogic([[maybe_unused]] float deltaTime) {
+    // Flush any commands queued during the previous render phase.
+    // (Legacy-mode scenes get this from update(); phase-callback scenes
+    //  get it here since update() is not called for them.)
+    flushDeferredCommands();
+
     // Default: no-op.  Derived scenes override this when using phase callbacks.
 }
 
@@ -286,6 +294,40 @@ const InputHandler* Scene::getInputHandler() const {
         return m_game->getInputHandler();
     }
     return nullptr;
+}
+
+// ============================================================================
+// Deferred Command Queue
+// ============================================================================
+
+void Scene::deferCommand(std::function<void()> command) {
+    if (command) {
+        m_deferredCommands.push_back(std::move(command));
+    }
+}
+
+void Scene::retireResource(std::shared_ptr<void> resource) {
+    if (resource) {
+        m_retiredResources.push_back(std::move(resource));
+    }
+}
+
+void Scene::flushDeferredCommands() {
+    // Release resources that were kept alive for GPU lifetime safety.
+    // By the time the update phase runs, the previous frame's command
+    // buffer has completed (drawFrame waits on in-flight fences).
+    m_retiredResources.clear();
+
+    // Execute queued commands (entity add/remove, mesh swaps, etc.)
+    // Swap the queue to a local so that commands can safely queue more
+    // deferred work without invalidating the iterator.
+    if (!m_deferredCommands.empty()) {
+        std::vector<std::function<void()>> commands;
+        commands.swap(m_deferredCommands);
+        for (auto& cmd : commands) {
+            cmd();
+        }
+    }
 }
 
 }  // namespace vde

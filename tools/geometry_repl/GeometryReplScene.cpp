@@ -72,28 +72,6 @@ void GeometryReplScene::onEnter() {
 }
 
 // ============================================================================
-// Deferred visibility processing (runs before rendering)
-// ============================================================================
-
-void GeometryReplScene::update(float deltaTime) {
-    // Release entities and meshes that were kept alive for the previous
-    // frame's command buffer.  By the time we reach update() the GPU
-    // has finished executing the last frame (drawFrame waits on fences).
-    m_pendingEntityRemoval.clear();
-    m_pendingMeshRetire.clear();
-
-    // Apply any pending visibility changes queued during the previous frame's
-    // drawDebugUI / console commands (which run inside the render callback).
-    for (auto& pv : m_pendingVisibility) {
-        applyGeometryVisible(pv.name, pv.visible);
-    }
-    m_pendingVisibility.clear();
-
-    // Call base class (handles ESC, fullscreen, debug toggle, etc.)
-    BaseToolScene::update(deltaTime);
-}
-
-// ============================================================================
 // Command dispatch (delegates to CommandRegistry)
 // ============================================================================
 
@@ -574,17 +552,24 @@ void GeometryReplScene::cmdLoad(const std::string& args) {
         geo.points.push_back(v.position);
     }
 
-    // Create entity and assign the loaded mesh directly
-    auto entity = addEntity<vde::MeshEntity>();
-    entity->setMesh(mesh);
-    entity->setColor(vde::Color(geo.color.x, geo.color.y, geo.color.z));
-    entity->setName(name);
-    geo.entity = entity;
-
     m_geometryObjects[name] = std::move(geo);
 
     addConsoleMessage("Loaded '" + name + "' from " + filename + " (" +
                       std::to_string(verts.size()) + " vertices)");
+
+    // Defer entity creation to the update phase so we don't add entities
+    // while the Vulkan command buffer is being recorded.
+    deferCommand([this, name, mesh]() {
+        auto it = m_geometryObjects.find(name);
+        if (it == m_geometryObjects.end()) {
+            return;
+        }
+        auto entity = addEntity<vde::MeshEntity>();
+        entity->setMesh(mesh);
+        entity->setColor(vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+        entity->setName(name);
+        it->second.entity = entity;
+    });
 }
 
 void GeometryReplScene::cmdList(const std::string& /*args*/) {
@@ -620,10 +605,13 @@ void GeometryReplScene::cmdClear(const std::string& args) {
         return;
     }
 
-    // Remove entity from scene if visible (deferred to avoid GPU resource issues)
+    // Defer entity removal — the entity's GPU buffers may still be
+    // referenced by the in-flight command buffer.
     if (it->second.entity) {
-        removeEntity(it->second.entity->getId());
-        m_pendingEntityRemoval.push_back(std::move(it->second.entity));
+        auto entity = std::move(it->second.entity);
+        EntityId eid = entity->getId();
+        deferCommand([this, eid]() { removeEntity(eid); });
+        retireResource(std::move(entity));
         it->second.entity = nullptr;
     }
 
@@ -650,65 +638,56 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
             it->second.visible = false;  // revert the ImGui checkbox
             return;
         }
-    }
-
-    // Queue the change – it will be applied in updateGameLogic() before
-    // the next render, so we never modify entities during the Vulkan
-    // render callback.
-    m_pendingVisibility.push_back({name, visible});
-
-    if (visible) {
         addConsoleMessage("Made '" + name + "' visible");
     } else {
         addConsoleMessage("Hid '" + name + "'");
     }
-}
 
-void GeometryReplScene::applyGeometryVisible(const std::string& name, bool visible) {
-    auto it = m_geometryObjects.find(name);
-    if (it == m_geometryObjects.end()) {
-        return;
-    }
-
-    if (visible) {
-        // Re-check point count (could have changed between queue and apply)
-        if ((it->second.type == GeometryType::POLYGON && it->second.points.size() < 3) ||
-            (it->second.type == GeometryType::LINE && it->second.points.size() < 2)) {
-            it->second.visible = false;
+    // Defer the actual entity add/remove to the next update phase via
+    // Scene::deferCommand(), so we never mutate entities while the Vulkan
+    // command buffer is being recorded.
+    deferCommand([this, name, visible]() {
+        auto it = m_geometryObjects.find(name);
+        if (it == m_geometryObjects.end()) {
             return;
         }
 
-        // Create or update mesh
-        auto mesh = it->second.createMesh();
-        if (!mesh) {
-            it->second.visible = false;
-            return;
-        }
+        if (visible) {
+            // Re-check point count (could have changed between queue and apply)
+            if ((it->second.type == GeometryType::POLYGON && it->second.points.size() < 3) ||
+                (it->second.type == GeometryType::LINE && it->second.points.size() < 2)) {
+                it->second.visible = false;
+                return;
+            }
 
-        if (!it->second.entity) {
-            auto entity = addEntity<vde::MeshEntity>();
-            entity->setMesh(mesh);
-            entity->setColor(
-                vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
-            entity->setName(name);
-            it->second.entity = entity;
+            auto mesh = it->second.createMesh();
+            if (!mesh) {
+                it->second.visible = false;
+                return;
+            }
+
+            if (!it->second.entity) {
+                auto entity = addEntity<vde::MeshEntity>();
+                entity->setMesh(mesh);
+                entity->setColor(
+                    vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                entity->setName(name);
+                it->second.entity = entity;
+            } else {
+                it->second.entity->setMesh(mesh);
+                it->second.entity->setColor(
+                    vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+            }
+            it->second.visible = true;
         } else {
-            it->second.entity->setMesh(mesh);
-            it->second.entity->setColor(
-                vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+            if (it->second.entity) {
+                removeEntity(it->second.entity->getId());
+                retireResource(std::move(it->second.entity));
+                it->second.entity = nullptr;
+            }
+            it->second.visible = false;
         }
-
-        it->second.visible = true;
-    } else {
-        if (it->second.entity) {
-            removeEntity(it->second.entity->getId());
-            // Keep the entity alive until the next frame so its GPU buffers
-            // remain valid while the in-flight command buffer executes.
-            m_pendingEntityRemoval.push_back(std::move(it->second.entity));
-            it->second.entity = nullptr;
-        }
-        it->second.visible = false;
-    }
+    });
 }
 
 void GeometryReplScene::updateGeometryMesh(const std::string& name) {
@@ -717,18 +696,26 @@ void GeometryReplScene::updateGeometryMesh(const std::string& name) {
         return;
     }
 
-    auto mesh = it->second.createMesh();
-    if (mesh && it->second.entity) {
-        // Keep the old mesh alive until next frame so its GPU buffers
-        // remain valid for the in-flight command buffer.
-        auto oldMesh = it->second.entity->getMesh();
-        if (oldMesh) {
-            m_pendingMeshRetire.push_back(std::move(oldMesh));
+    // Defer the mesh swap to the update phase so we don't free GPU buffers
+    // while the command buffer is being recorded.
+    deferCommand([this, name]() {
+        auto it = m_geometryObjects.find(name);
+        if (it == m_geometryObjects.end() || !it->second.visible || !it->second.entity) {
+            return;
         }
-        it->second.entity->setMesh(mesh);
-        it->second.entity->setColor(
-            vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
-    }
+
+        auto mesh = it->second.createMesh();
+        if (mesh) {
+            // Retire the old mesh so its GPU buffers stay alive until next frame
+            auto oldMesh = it->second.entity->getMesh();
+            if (oldMesh) {
+                retireResource(std::move(oldMesh));
+            }
+            it->second.entity->setMesh(mesh);
+            it->second.entity->setColor(
+                vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+        }
+    });
 }
 
 size_t GeometryReplScene::countVisibleGeometry() const {

@@ -446,3 +446,112 @@ TEST_F(SceneTest, PhaseCallbackUpdateAudioDrainsQueue) {
     scene->updateAudio(0.016f);
     EXPECT_EQ(scene->getAudioEventQueueSize(), 0u);
 }
+
+// ============================================================================
+// Deferred Command Tests
+// ============================================================================
+
+TEST_F(SceneTest, DeferCommandBasicExecution) {
+    bool executed = false;
+    scene->deferCommand([&executed]() { executed = true; });
+
+    EXPECT_FALSE(executed);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 1u);
+
+    scene->update(0.016f);
+    EXPECT_TRUE(executed);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+TEST_F(SceneTest, DeferCommandFIFOOrder) {
+    std::vector<int> order;
+    scene->deferCommand([&order]() { order.push_back(1); });
+    scene->deferCommand([&order]() { order.push_back(2); });
+    scene->deferCommand([&order]() { order.push_back(3); });
+
+    scene->update(0.016f);
+
+    ASSERT_EQ(order.size(), 3u);
+    EXPECT_EQ(order[0], 1);
+    EXPECT_EQ(order[1], 2);
+    EXPECT_EQ(order[2], 3);
+}
+
+TEST_F(SceneTest, DeferCommandMultipleFlushCycles) {
+    int counter = 0;
+    scene->deferCommand([&counter]() { counter++; });
+    scene->update(0.016f);
+    EXPECT_EQ(counter, 1);
+
+    // Second update with no pending commands does nothing
+    scene->update(0.016f);
+    EXPECT_EQ(counter, 1);
+
+    // Queue more and flush again
+    scene->deferCommand([&counter]() { counter++; });
+    scene->update(0.016f);
+    EXPECT_EQ(counter, 2);
+}
+
+TEST_F(SceneTest, DeferCommandReentrant) {
+    // A deferred command queues another deferred command — must execute next update
+    int step = 0;
+    scene->deferCommand([this, &step]() {
+        step = 1;
+        scene->deferCommand([&step]() { step = 2; });
+    });
+
+    scene->update(0.016f);
+    // First command ran; second was queued during execution
+    EXPECT_EQ(step, 1);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 1u);
+
+    scene->update(0.016f);
+    EXPECT_EQ(step, 2);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+TEST_F(SceneTest, DeferCommandEntityAddRemove) {
+    scene->deferCommand([this]() {
+        auto entity = scene->addEntity<MeshEntity>();
+        entity->setName("Deferred");
+    });
+    EXPECT_EQ(scene->getEntities().size(), 0u);
+
+    scene->update(0.016f);
+    EXPECT_EQ(scene->getEntities().size(), 1u);
+    EXPECT_NE(scene->getEntityByName("Deferred"), nullptr);
+}
+
+TEST_F(SceneTest, RetireResourceKeepsAlive) {
+    auto resource = std::make_shared<int>(42);
+    std::weak_ptr<int> weak = resource;
+
+    scene->retireResource(std::move(resource));
+    // resource moved — but still alive in the retire queue
+    EXPECT_FALSE(weak.expired());
+
+    scene->update(0.016f);
+    // flushDeferredCommands clears retired resources
+    EXPECT_TRUE(weak.expired());
+}
+
+TEST_F(SceneTest, DeferCommandCount) {
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+    scene->deferCommand([]() {});
+    EXPECT_EQ(scene->getDeferredCommandCount(), 1u);
+    scene->deferCommand([]() {});
+    EXPECT_EQ(scene->getDeferredCommandCount(), 2u);
+
+    scene->update(0.016f);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+TEST_F(SceneTest, DeferCommandFlushedByUpdateGameLogic) {
+    bool executed = false;
+    scene->deferCommand([&executed]() { executed = true; });
+
+    scene->updateGameLogic(0.016f);
+    EXPECT_TRUE(executed);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}

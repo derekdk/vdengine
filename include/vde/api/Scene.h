@@ -10,6 +10,7 @@
 
 #include <vde/Texture.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <typeindex>
@@ -191,6 +192,53 @@ class Scene {
      * @brief Get the number of pending audio events in the queue.
      */
     size_t getAudioEventQueueSize() const { return m_audioEventQueue.size(); }
+
+    // Deferred command queue
+
+    /**
+     * @brief Queue a command for execution at the start of the next update.
+     *
+     * Use this to safely add/remove entities, swap meshes, or perform
+     * other mutations from code that runs during the render phase
+     * (e.g., ImGui callbacks in `drawDebugUI()` or `onRender()`).
+     *
+     * Queued commands are executed in FIFO order at the very start of
+     * `update()` (legacy path) or `updateGameLogic()` (phase-callback
+     * path), before any user logic runs.
+     *
+     * @param command  Callable with signature `void()` to execute later
+     *
+     * @example
+     * @code
+     * // Inside drawDebugUI() — runs during the Render phase:
+     * if (ImGui::Button("Spawn")) {
+     *     deferCommand([this]() {
+     *         auto e = addEntity<MeshEntity>();
+     *         e->setMesh(myMesh);
+     *     });
+     * }
+     * @endcode
+     */
+    void deferCommand(std::function<void()> command);
+
+    /**
+     * @brief Get the number of pending deferred commands.
+     */
+    size_t getDeferredCommandCount() const { return m_deferredCommands.size(); }
+
+    /**
+     * @brief Keep a shared resource alive until the next update.
+     *
+     * When an entity or mesh is removed during the render phase,
+     * its GPU buffers may still be referenced by the in-flight
+     * command buffer.  Call this to extend the resource lifetime
+     * until `flushDeferredCommands()` runs in the next frame,
+     * at which point the GPU has finished with those buffers.
+     *
+     * @param resource  Any shared_ptr whose destructor must be
+     *                  deferred (Entity, Mesh, etc.)
+     */
+    void retireResource(std::shared_ptr<void> resource);
 
     /**
      * @brief Render the scene.
@@ -548,6 +596,21 @@ class Scene {
 
     // Phase callbacks
     bool m_usePhaseCallbacks = false;
+
+    // Deferred command queue (flushed at the start of update / updateGameLogic)
+    std::vector<std::function<void()>> m_deferredCommands;
+
+    // Resources whose destruction is deferred until the next update
+    // (keeps GPU buffers alive while in-flight command buffers reference them)
+    std::vector<std::shared_ptr<void>> m_retiredResources;
+
+    /**
+     * @brief Flush the deferred command queue and retire list.
+     *
+     * Called automatically at the start of update() and
+     * updateGameLogic().  May also be called manually if needed.
+     */
+    void flushDeferredCommands();
 
     // Audio event queue
     std::vector<AudioEvent> m_audioEventQueue;

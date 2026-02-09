@@ -31,7 +31,6 @@ class GeometryReplScene : public BaseToolScene {
     ~GeometryReplScene() override = default;
 
     void onEnter() override;
-    void update(float deltaTime) override;
     void executeCommand(const std::string& cmdLine) override;
     void drawDebugUI() override;
     void addConsoleMessage(const std::string& message) override;
@@ -92,28 +91,9 @@ class GeometryReplScene : public BaseToolScene {
 
     // --- Scene helpers ---
     void setGeometryVisible(const std::string& name, bool visible);
-    void applyGeometryVisible(const std::string& name, bool visible);
     void updateGeometryMesh(const std::string& name);
     size_t countVisibleGeometry() const;
     void createReferenceAxes();
-
-    // --- Deferred visibility changes ---
-    // Entity add/remove must NOT happen during the Vulkan render callback
-    // (drawDebugUI runs inside command-buffer recording).  We queue visibility
-    // changes here and apply them in updateGameLogic(), which runs before
-    // rendering.
-    struct PendingVisibility {
-        std::string name;
-        bool visible;
-    };
-    std::vector<PendingVisibility> m_pendingVisibility;
-
-    // Entities scheduled for removal: kept alive until the frame boundary
-    // so their GPU buffers remain valid while the command buffer is in flight.
-    std::vector<std::shared_ptr<Entity>> m_pendingEntityRemoval;
-
-    // Old meshes whose GPU buffers are still referenced by in-flight commands.
-    std::vector<std::shared_ptr<Mesh>> m_pendingMeshRetire;
 };
 
 }  // namespace tools
