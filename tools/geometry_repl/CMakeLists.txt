@@ -9,6 +9,12 @@
 # The tool executable
 add_executable(vde_geometry_repl
     main.cpp
+    CommandRegistry.cpp
+    CommandRegistry.h
+    ReplConsole.cpp
+    ReplConsole.h
+    FileDialog.cpp
+    FileDialog.h
     GeometryReplScene.cpp
     GeometryReplScene.h
     GeometryObject.h
@@ -18,6 +24,11 @@ target_link_libraries(vde_geometry_repl PRIVATE
     vde
     imgui_backend
 )
+
+# Windows COM libraries for native file dialogs
+if(WIN32)
+    target_link_libraries(vde_geometry_repl PRIVATE ole32 uuid)
+endif()
 
 add_dependencies(vde_geometry_repl copy_tool_shaders)
 

@@ -1,6 +1,9 @@
 /**
  * @file GeometryReplScene.h
  * @brief Geometry REPL Scene - interactive and scriptable geometry creation
+ *
+ * Uses CommandRegistry for dynamic command management and ReplConsole
+ * for tab-completion and history in the interactive UI.
  */
 
 #pragma once
@@ -9,13 +12,18 @@
 #include <string>
 
 #include "../ToolBase.h"
+#include "CommandRegistry.h"
 #include "GeometryObject.h"
+#include "ReplConsole.h"
 
 namespace vde {
 namespace tools {
 
 /**
- * @brief Geometry REPL scene for creating and managing geometry objects
+ * @brief Geometry REPL scene for creating and managing geometry objects.
+ *
+ * Commands are registered dynamically via CommandRegistry and can be
+ * added, removed, enabled, or disabled at runtime.
  */
 class GeometryReplScene : public BaseToolScene {
   public:
@@ -23,36 +31,89 @@ class GeometryReplScene : public BaseToolScene {
     ~GeometryReplScene() override = default;
 
     void onEnter() override;
+    void update(float deltaTime) override;
     void executeCommand(const std::string& cmdLine) override;
     void drawDebugUI() override;
+    void addConsoleMessage(const std::string& message) override;
 
     std::string getToolName() const override { return "Geometry REPL"; }
 
     std::string getToolDescription() const override {
-        return "Interactive geometry creation and OBJ export tool";
+        return "Interactive geometry creation and OBJ import/export tool";
     }
 
+    /**
+     * @brief Get the command registry (e.g. for external command registration).
+     */
+    CommandRegistry& getCommandRegistry() { return m_commands; }
+
+    /**
+     * @brief Get the console (e.g. for external message logging).
+     */
+    ReplConsole& getConsole() { return m_console; }
+
+    /**
+     * @brief Get the names of all geometry objects (for tab-completion).
+     */
+    std::vector<std::string> getObjectNames() const;
+
   private:
+    CommandRegistry m_commands;
+    ReplConsole m_console;
     std::map<std::string, GeometryObject> m_geometryObjects;
-    char m_commandBuffer[256] = {0};
     float m_dpiScale = 1.0f;
 
-    // Command handlers
-    void cmdHelp();
-    void cmdCreate(std::istringstream& iss);
-    void cmdAddPoint(std::istringstream& iss);
-    void cmdSetColor(std::istringstream& iss);
-    void cmdSetVisible(std::istringstream& iss);
-    void cmdHide(std::istringstream& iss);
-    void cmdExport(std::istringstream& iss);
-    void cmdList();
-    void cmdClear(std::istringstream& iss);
+    // --- Command registration ---
+    void registerCoreCommands();
 
-    // Helper methods
+    // --- Command handlers ---
+    void cmdHelp(const std::string& args);
+    void cmdCreate(const std::string& args);
+    void cmdAddPoint(const std::string& args);
+    void cmdSetColor(const std::string& args);
+    void cmdSetVisible(const std::string& args);
+    void cmdHide(const std::string& args);
+    void cmdExport(const std::string& args);
+    void cmdLoad(const std::string& args);
+    void cmdList(const std::string& args);
+    void cmdClear(const std::string& args);
+
+    // --- Completion helpers ---
+
+    /**
+     * @brief Build a completer that completes existing object names.
+     */
+    CompletionCallback objectNameCompleter() const;
+
+    /**
+     * @brief Build a completer for the "create" command (type names).
+     */
+    CompletionCallback createCompleter() const;
+
+    // --- Scene helpers ---
     void setGeometryVisible(const std::string& name, bool visible);
+    void applyGeometryVisible(const std::string& name, bool visible);
     void updateGeometryMesh(const std::string& name);
     size_t countVisibleGeometry() const;
     void createReferenceAxes();
+
+    // --- Deferred visibility changes ---
+    // Entity add/remove must NOT happen during the Vulkan render callback
+    // (drawDebugUI runs inside command-buffer recording).  We queue visibility
+    // changes here and apply them in updateGameLogic(), which runs before
+    // rendering.
+    struct PendingVisibility {
+        std::string name;
+        bool visible;
+    };
+    std::vector<PendingVisibility> m_pendingVisibility;
+
+    // Entities scheduled for removal: kept alive until the frame boundary
+    // so their GPU buffers remain valid while the command buffer is in flight.
+    std::vector<std::shared_ptr<Entity>> m_pendingEntityRemoval;
+
+    // Old meshes whose GPU buffers are still referenced by in-flight commands.
+    std::vector<std::shared_ptr<Mesh>> m_pendingMeshRetire;
 };
 
 }  // namespace tools

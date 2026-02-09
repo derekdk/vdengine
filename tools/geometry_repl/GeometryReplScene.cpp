@@ -8,10 +8,15 @@
 #include <algorithm>
 #include <sstream>
 
+#include "FileDialog.h"
 #include <imgui.h>
 
 namespace vde {
 namespace tools {
+
+// ============================================================================
+// Construction / setup
+// ============================================================================
 
 GeometryReplScene::GeometryReplScene(ToolMode mode) : BaseToolScene(mode) {}
 
@@ -46,53 +51,195 @@ void GeometryReplScene::onEnter() {
         createReferenceAxes();
     }
 
+    // --- Register commands ---
+    registerCoreCommands();
+
+    // --- Wire up the REPL console ---
+    m_console.setCommandRegistry(&m_commands);
+    m_console.setSubmitCallback([this](const std::string& cmdLine) {
+        addConsoleMessage("> " + cmdLine);
+        executeCommand(cmdLine);
+    });
+
     // Welcome message
     addConsoleMessage("====================================================");
     addConsoleMessage("VDE Geometry REPL Tool");
     addConsoleMessage(
         "Mode: " + std::string(getToolMode() == ToolMode::INTERACTIVE ? "Interactive" : "Script"));
     addConsoleMessage("====================================================");
-    addConsoleMessage("Type 'help' for command reference");
+    addConsoleMessage("Type 'help' for command reference.  Press TAB to auto-complete.");
     addConsoleMessage("");
 }
 
+// ============================================================================
+// Deferred visibility processing (runs before rendering)
+// ============================================================================
+
+void GeometryReplScene::update(float deltaTime) {
+    // Release entities and meshes that were kept alive for the previous
+    // frame's command buffer.  By the time we reach update() the GPU
+    // has finished executing the last frame (drawFrame waits on fences).
+    m_pendingEntityRemoval.clear();
+    m_pendingMeshRetire.clear();
+
+    // Apply any pending visibility changes queued during the previous frame's
+    // drawDebugUI / console commands (which run inside the render callback).
+    for (auto& pv : m_pendingVisibility) {
+        applyGeometryVisible(pv.name, pv.visible);
+    }
+    m_pendingVisibility.clear();
+
+    // Call base class (handles ESC, fullscreen, debug toggle, etc.)
+    BaseToolScene::update(deltaTime);
+}
+
+// ============================================================================
+// Command dispatch (delegates to CommandRegistry)
+// ============================================================================
+
 void GeometryReplScene::executeCommand(const std::string& cmdLine) {
-    std::istringstream iss(cmdLine);
-    std::string cmd;
-    iss >> cmd;
-
-    // Convert to lowercase
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
-
-    if (cmd == "help") {
-        cmdHelp();
-    } else if (cmd == "create") {
-        cmdCreate(iss);
-    } else if (cmd == "addpoint") {
-        cmdAddPoint(iss);
-    } else if (cmd == "setcolor") {
-        cmdSetColor(iss);
-    } else if (cmd == "setvisible") {
-        cmdSetVisible(iss);
-    } else if (cmd == "hide") {
-        cmdHide(iss);
-    } else if (cmd == "export") {
-        cmdExport(iss);
-    } else if (cmd == "list") {
-        cmdList();
-    } else if (cmd == "clear") {
-        cmdClear(iss);
-    } else if (cmd.empty()) {
-        // Ignore empty commands
-    } else {
-        addConsoleMessage("ERROR: Unknown command '" + cmd + "'. Type 'help' for usage.");
+    if (!m_commands.execute(cmdLine)) {
+        // Trim to get the first token for the error message
+        std::istringstream iss(cmdLine);
+        std::string cmd;
+        iss >> cmd;
+        if (!cmd.empty()) {
+            addConsoleMessage("ERROR: Unknown command '" + cmd + "'. Type 'help' for usage.");
+        }
     }
 }
+
+void GeometryReplScene::addConsoleMessage(const std::string& message) {
+    // Forward to base class (stdout + base log)
+    BaseToolScene::addConsoleMessage(message);
+    // Also forward to the ReplConsole widget for display
+    m_console.addMessage(message);
+}
+
+// ============================================================================
+// Object name helper
+// ============================================================================
+
+std::vector<std::string> GeometryReplScene::getObjectNames() const {
+    std::vector<std::string> names;
+    names.reserve(m_geometryObjects.size());
+    for (const auto& [name, _] : m_geometryObjects) {
+        names.push_back(name);
+    }
+    return names;
+}
+
+// ============================================================================
+// Command registration
+// ============================================================================
+
+void GeometryReplScene::registerCoreCommands() {
+    using namespace std::placeholders;
+
+    // help
+    m_commands.add("help", "help [command]", "Show command reference",
+                   [this](const std::string& a) { cmdHelp(a); });
+
+    // create <name> <type>
+    m_commands.add(
+        "create", "create <name> <type>", "Create geometry (polygon/line)",
+        [this](const std::string& a) { cmdCreate(a); }, createCompleter());
+
+    // addpoint <name> <x> <y> <z>
+    m_commands.add(
+        "addpoint", "addpoint <name> <x> <y> <z>", "Add a point to geometry",
+        [this](const std::string& a) { cmdAddPoint(a); }, objectNameCompleter());
+
+    // setcolor <name> <r> <g> <b>
+    m_commands.add(
+        "setcolor", "setcolor <name> <r> <g> <b>", "Set color (0-1 range)",
+        [this](const std::string& a) { cmdSetColor(a); }, objectNameCompleter());
+
+    // setvisible <name>
+    m_commands.add(
+        "setvisible", "setvisible <name>", "Show geometry in scene",
+        [this](const std::string& a) { cmdSetVisible(a); }, objectNameCompleter());
+
+    // hide <name>
+    m_commands.add(
+        "hide", "hide <name>", "Hide geometry from scene",
+        [this](const std::string& a) { cmdHide(a); }, objectNameCompleter());
+
+    // export <name> <filename>
+    m_commands.add(
+        "export", "export <name> <filename>", "Export to OBJ file",
+        [this](const std::string& a) { cmdExport(a); }, objectNameCompleter());
+
+    // load <name> [filename]
+    m_commands.add("load", "load <name> [filename]",
+                   "Load OBJ file (omit filename for file browser)",
+                   [this](const std::string& a) { cmdLoad(a); });
+
+    // list
+    m_commands.add("list", "list", "List all objects",
+                   [this](const std::string& a) { cmdList(a); });
+
+    // clear <name>
+    m_commands.add(
+        "clear", "clear <name>", "Delete geometry object",
+        [this](const std::string& a) { cmdClear(a); }, objectNameCompleter());
+}
+
+// ============================================================================
+// Completion helpers
+// ============================================================================
+
+CompletionCallback GeometryReplScene::objectNameCompleter() const {
+    // Capture 'this' to access live object names at completion time
+    return
+        [this](
+            const std::string& partial,
+            [[maybe_unused]] const std::vector<std::string>& tokens) -> std::vector<std::string> {
+            std::vector<std::string> results;
+            std::string prefix = partial;
+            std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+
+            for (const auto& [name, _] : m_geometryObjects) {
+                std::string lower = name;
+                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                if (prefix.empty() || lower.substr(0, prefix.size()) == prefix) {
+                    results.push_back(name);
+                }
+            }
+            return results;
+        };
+}
+
+CompletionCallback GeometryReplScene::createCompleter() const {
+    return []([[maybe_unused]] const std::string& partial,
+              const std::vector<std::string>& tokens) -> std::vector<std::string> {
+        // Second argument is the type
+        if (tokens.size() >= 2) {
+            // Complete type names
+            std::vector<std::string> types = {"polygon", "line"};
+            std::string prefix = partial;
+            std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+
+            std::vector<std::string> results;
+            for (const auto& t : types) {
+                if (prefix.empty() || t.substr(0, prefix.size()) == prefix) {
+                    results.push_back(t);
+                }
+            }
+            return results;
+        }
+        return {};
+    };
+}
+
+// ============================================================================
+// ImGui UI
+// ============================================================================
 
 void GeometryReplScene::drawDebugUI() {
     float scale = m_dpiScale;
 
-    // Main REPL Console Window
+    // --- Main REPL Console Window ---
     ImGui::SetNextWindowPos(ImVec2(10 * scale, 10 * scale), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(600 * scale, 400 * scale), ImGuiCond_FirstUseEver);
 
@@ -101,63 +248,45 @@ void GeometryReplScene::drawDebugUI() {
         // Menu bar
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("Commands")) {
-                if (ImGui::MenuItem("Help")) {
-                    executeCommand("help");
+                // Build menu from enabled commands
+                for (const auto* cmd : m_commands.getEnabledCommands()) {
+                    if (ImGui::MenuItem(cmd->name.c_str())) {
+                        if (cmd->name == "help" || cmd->name == "list") {
+                            m_console.addMessage("> " + cmd->name);
+                            executeCommand(cmd->name);
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", cmd->description.c_str());
+                    }
                 }
-                if (ImGui::MenuItem("List Objects")) {
-                    executeCommand("list");
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Load OBJ...")) {
+                    // Trigger load with no filename to open file browser
+                    m_console.addMessage("> load (browse...)");
+                    cmdLoad("");
                 }
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
         }
 
-        // Console output area (scrollable)
-        ImVec2 consoleSize = ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2);
-        if (ImGui::BeginChild("ConsoleOutput", consoleSize, true,
-                              ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
-            for (const auto& msg : getConsoleLog()) {
-                ImGui::TextWrapped("%s", msg.c_str());
-            }
-
-            // Auto-scroll to bottom when new messages arrive
-            if (shouldScrollToBottom()) {
-                ImGui::SetScrollHereY(1.0f);
-            }
-        }
-        ImGui::EndChild();
-
-        // Command input area
-        ImGui::Separator();
-        ImGui::Text(">");
-        ImGui::SameLine();
-
-        ImGuiInputTextFlags inputFlags = ImGuiInputTextFlags_EnterReturnsTrue;
-        if (ImGui::InputText("##input", m_commandBuffer, sizeof(m_commandBuffer), inputFlags)) {
-            std::string command(m_commandBuffer);
-            if (!command.empty()) {
-                addConsoleMessage("> " + command);
-                executeCommand(command);
-                m_commandBuffer[0] = '\0';  // Clear input
-            }
-            ImGui::SetKeyboardFocusHere(-1);  // Keep focus on input
-        }
-
-        // Keep focus on input field
-        if (ImGui::IsWindowAppearing()) {
-            ImGui::SetKeyboardFocusHere(-1);
-        }
+        // Draw the console widget (output + input + completion)
+        m_console.draw();
     }
     ImGui::End();
 
-    // Geometry Inspector Window
+    // --- Geometry Inspector Window ---
     ImGui::SetNextWindowPos(ImVec2(620 * scale, 10 * scale), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300 * scale, 400 * scale), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Geometry Inspector")) {
         if (m_geometryObjects.empty()) {
             ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "No geometry created yet");
-            ImGui::TextWrapped("Use 'create <name> <type>' to create geometry");
+            ImGui::TextWrapped(
+                "Use 'create <name> <type>' or 'load <name> <file>' to add geometry");
         } else {
             for (auto& [name, geo] : m_geometryObjects) {
                 if (ImGui::CollapsingHeader(name.c_str())) {
@@ -167,7 +296,6 @@ void GeometryReplScene::drawDebugUI() {
                     ImGui::Text("Points: %zu", geo.points.size());
 
                     if (ImGui::ColorEdit3(("Color##" + name).c_str(), &geo.color.x)) {
-                        // Update mesh if visible
                         if (geo.visible && geo.entity) {
                             geo.entity->setColor(vde::Color(geo.color.x, geo.color.y, geo.color.z));
                         }
@@ -196,39 +324,59 @@ void GeometryReplScene::drawDebugUI() {
     }
     ImGui::End();
 
-    // Stats Window
+    // --- Stats Window ---
     ImGui::SetNextWindowPos(ImVec2(10 * scale, 420 * scale), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(280 * scale, 120 * scale), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(280 * scale, 140 * scale), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Stats")) {
         auto* game = getGame();
         ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
         ImGui::Text("Geometry Objects: %zu", m_geometryObjects.size());
         ImGui::Text("Visible Objects: %zu", countVisibleGeometry());
+        ImGui::Text("Registered Commands: %zu", m_commands.getEnabledCommands().size());
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "Press F1 to toggle UI");
+        ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "Press TAB in console to complete");
     }
     ImGui::End();
 }
 
+// ============================================================================
 // Command implementations
+// ============================================================================
 
-void GeometryReplScene::cmdHelp() {
+void GeometryReplScene::cmdHelp(const std::string& args) {
+    std::istringstream iss(args);
+    std::string topic;
+    iss >> topic;
+
+    if (!topic.empty()) {
+        // Show detailed help for a specific command
+        const auto* cmd = m_commands.getCommand(topic);
+        if (cmd) {
+            addConsoleMessage("  " + cmd->usage);
+            addConsoleMessage("  " + cmd->description);
+            addConsoleMessage("  Status: " + std::string(cmd->enabled ? "enabled" : "DISABLED"));
+        } else {
+            addConsoleMessage("ERROR: Unknown command '" + topic + "'");
+        }
+        return;
+    }
+
     addConsoleMessage("====================================================");
     addConsoleMessage("GEOMETRY REPL COMMANDS:");
-    addConsoleMessage("  create <name> <type>        - Create geometry (polygon/line)");
-    addConsoleMessage("  addpoint <name> <x> <y> <z> - Add point to geometry");
-    addConsoleMessage("  setcolor <name> <r> <g> <b> - Set color (0-1 range)");
-    addConsoleMessage("  setvisible <name>           - Show geometry in scene");
-    addConsoleMessage("  hide <name>                 - Hide geometry from scene");
-    addConsoleMessage("  export <name> <filename>    - Export to OBJ file");
-    addConsoleMessage("  list                        - List all objects");
-    addConsoleMessage("  clear <name>                - Delete geometry object");
-    addConsoleMessage("  help                        - Show this help");
+    for (const auto* cmd : m_commands.getAllCommands()) {
+        std::string status = cmd->enabled ? "" : " [DISABLED]";
+        addConsoleMessage("  " + cmd->usage + "   - " + cmd->description + status);
+    }
+    addConsoleMessage("");
+    addConsoleMessage("Type 'help <command>' for detailed info.");
+    addConsoleMessage("Press TAB in the input field to auto-complete.");
     addConsoleMessage("====================================================");
 }
 
-void GeometryReplScene::cmdCreate(std::istringstream& iss) {
+void GeometryReplScene::cmdCreate(const std::string& args) {
+    std::istringstream iss(args);
     std::string name, typeStr;
     iss >> name >> typeStr;
 
@@ -263,7 +411,8 @@ void GeometryReplScene::cmdCreate(std::istringstream& iss) {
     addConsoleMessage("Created " + typeStr + " geometry '" + name + "'");
 }
 
-void GeometryReplScene::cmdAddPoint(std::istringstream& iss) {
+void GeometryReplScene::cmdAddPoint(const std::string& args) {
+    std::istringstream iss(args);
     std::string name;
     float x, y, z;
     iss >> name >> x >> y >> z;
@@ -283,13 +432,13 @@ void GeometryReplScene::cmdAddPoint(std::istringstream& iss) {
     addConsoleMessage("Added point (" + std::to_string(x) + ", " + std::to_string(y) + ", " +
                       std::to_string(z) + ") to '" + name + "'");
 
-    // Update mesh if visible
     if (it->second.visible) {
         updateGeometryMesh(name);
     }
 }
 
-void GeometryReplScene::cmdSetColor(std::istringstream& iss) {
+void GeometryReplScene::cmdSetColor(const std::string& args) {
+    std::istringstream iss(args);
     std::string name;
     float r, g, b;
     iss >> name >> r >> g >> b;
@@ -310,13 +459,13 @@ void GeometryReplScene::cmdSetColor(std::istringstream& iss) {
     addConsoleMessage("Set color of '" + name + "' to (" + std::to_string(r) + ", " +
                       std::to_string(g) + ", " + std::to_string(b) + ")");
 
-    // Update mesh if visible
     if (it->second.visible) {
         updateGeometryMesh(name);
     }
 }
 
-void GeometryReplScene::cmdSetVisible(std::istringstream& iss) {
+void GeometryReplScene::cmdSetVisible(const std::string& args) {
+    std::istringstream iss(args);
     std::string name;
     iss >> name;
 
@@ -328,7 +477,8 @@ void GeometryReplScene::cmdSetVisible(std::istringstream& iss) {
     setGeometryVisible(name, true);
 }
 
-void GeometryReplScene::cmdHide(std::istringstream& iss) {
+void GeometryReplScene::cmdHide(const std::string& args) {
+    std::istringstream iss(args);
     std::string name;
     iss >> name;
 
@@ -340,7 +490,8 @@ void GeometryReplScene::cmdHide(std::istringstream& iss) {
     setGeometryVisible(name, false);
 }
 
-void GeometryReplScene::cmdExport(std::istringstream& iss) {
+void GeometryReplScene::cmdExport(const std::string& args) {
+    std::istringstream iss(args);
     std::string name, filename;
     iss >> name >> filename;
 
@@ -362,7 +513,81 @@ void GeometryReplScene::cmdExport(std::istringstream& iss) {
     }
 }
 
-void GeometryReplScene::cmdList() {
+void GeometryReplScene::cmdLoad(const std::string& args) {
+    std::istringstream iss(args);
+    std::string name, filename;
+    iss >> name >> filename;
+
+    // If no name at all, prompt via dialog for both name and file
+    if (name.empty()) {
+        // Open file browser first
+        filename = openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
+        if (filename.empty()) {
+            addConsoleMessage("Load cancelled.");
+            return;
+        }
+
+        // Derive name from filename (stem without extension)
+        size_t lastSlash = filename.find_last_of("/\\");
+        std::string stem =
+            (lastSlash != std::string::npos) ? filename.substr(lastSlash + 1) : filename;
+        size_t dot = stem.rfind('.');
+        if (dot != std::string::npos) {
+            stem = stem.substr(0, dot);
+        }
+        name = stem;
+    }
+
+    // If filename is still empty, open file browser
+    if (filename.empty()) {
+        filename = openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
+        if (filename.empty()) {
+            addConsoleMessage("Load cancelled.");
+            return;
+        }
+    }
+
+    // Check for duplicate name
+    if (m_geometryObjects.find(name) != m_geometryObjects.end()) {
+        addConsoleMessage("ERROR: Geometry '" + name + "' already exists. Use 'clear " + name +
+                          "' first.");
+        return;
+    }
+
+    // Load the mesh via Mesh::loadFromFile
+    auto mesh = std::make_shared<vde::Mesh>();
+    if (!mesh->loadFromFile(filename)) {
+        addConsoleMessage("ERROR: Failed to load OBJ file: " + filename);
+        return;
+    }
+
+    // Create a geometry object to track it
+    GeometryObject geo;
+    geo.name = name;
+    geo.type = GeometryType::POLYGON;
+    geo.visible = true;
+
+    // Copy vertex positions into points for the inspector
+    const auto& verts = mesh->getVertices();
+    geo.points.reserve(verts.size());
+    for (const auto& v : verts) {
+        geo.points.push_back(v.position);
+    }
+
+    // Create entity and assign the loaded mesh directly
+    auto entity = addEntity<vde::MeshEntity>();
+    entity->setMesh(mesh);
+    entity->setColor(vde::Color(geo.color.x, geo.color.y, geo.color.z));
+    entity->setName(name);
+    geo.entity = entity;
+
+    m_geometryObjects[name] = std::move(geo);
+
+    addConsoleMessage("Loaded '" + name + "' from " + filename + " (" +
+                      std::to_string(verts.size()) + " vertices)");
+}
+
+void GeometryReplScene::cmdList(const std::string& /*args*/) {
     if (m_geometryObjects.empty()) {
         addConsoleMessage("No geometry objects created");
         return;
@@ -379,7 +604,8 @@ void GeometryReplScene::cmdList() {
     addConsoleMessage("====================================================");
 }
 
-void GeometryReplScene::cmdClear(std::istringstream& iss) {
+void GeometryReplScene::cmdClear(const std::string& args) {
+    std::istringstream iss(args);
     std::string name;
     iss >> name;
 
@@ -394,16 +620,20 @@ void GeometryReplScene::cmdClear(std::istringstream& iss) {
         return;
     }
 
-    // Remove entity from scene if visible
+    // Remove entity from scene if visible (deferred to avoid GPU resource issues)
     if (it->second.entity) {
         removeEntity(it->second.entity->getId());
+        m_pendingEntityRemoval.push_back(std::move(it->second.entity));
+        it->second.entity = nullptr;
     }
 
     m_geometryObjects.erase(it);
     addConsoleMessage("Deleted geometry '" + name + "'");
 }
 
-// Helper methods
+// ============================================================================
+// Scene helpers
+// ============================================================================
 
 void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible) {
     auto it = m_geometryObjects.find(name);
@@ -413,22 +643,49 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
     }
 
     if (visible) {
-        // Check if geometry has enough points
+        // Early validation so the user gets immediate feedback
         if ((it->second.type == GeometryType::POLYGON && it->second.points.size() < 3) ||
             (it->second.type == GeometryType::LINE && it->second.points.size() < 2)) {
             addConsoleMessage("ERROR: '" + name + "' needs more points");
+            it->second.visible = false;  // revert the ImGui checkbox
+            return;
+        }
+    }
+
+    // Queue the change – it will be applied in updateGameLogic() before
+    // the next render, so we never modify entities during the Vulkan
+    // render callback.
+    m_pendingVisibility.push_back({name, visible});
+
+    if (visible) {
+        addConsoleMessage("Made '" + name + "' visible");
+    } else {
+        addConsoleMessage("Hid '" + name + "'");
+    }
+}
+
+void GeometryReplScene::applyGeometryVisible(const std::string& name, bool visible) {
+    auto it = m_geometryObjects.find(name);
+    if (it == m_geometryObjects.end()) {
+        return;
+    }
+
+    if (visible) {
+        // Re-check point count (could have changed between queue and apply)
+        if ((it->second.type == GeometryType::POLYGON && it->second.points.size() < 3) ||
+            (it->second.type == GeometryType::LINE && it->second.points.size() < 2)) {
+            it->second.visible = false;
             return;
         }
 
         // Create or update mesh
         auto mesh = it->second.createMesh();
         if (!mesh) {
-            addConsoleMessage("ERROR: Failed to create mesh for '" + name + "'");
+            it->second.visible = false;
             return;
         }
 
         if (!it->second.entity) {
-            // Create new entity
             auto entity = addEntity<vde::MeshEntity>();
             entity->setMesh(mesh);
             entity->setColor(
@@ -436,22 +693,21 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
             entity->setName(name);
             it->second.entity = entity;
         } else {
-            // Update existing entity
             it->second.entity->setMesh(mesh);
             it->second.entity->setColor(
                 vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
         }
 
         it->second.visible = true;
-        addConsoleMessage("Made '" + name + "' visible");
     } else {
-        // Hide geometry
         if (it->second.entity) {
             removeEntity(it->second.entity->getId());
+            // Keep the entity alive until the next frame so its GPU buffers
+            // remain valid while the in-flight command buffer executes.
+            m_pendingEntityRemoval.push_back(std::move(it->second.entity));
             it->second.entity = nullptr;
         }
         it->second.visible = false;
-        addConsoleMessage("Hid '" + name + "'");
     }
 }
 
@@ -463,6 +719,12 @@ void GeometryReplScene::updateGeometryMesh(const std::string& name) {
 
     auto mesh = it->second.createMesh();
     if (mesh && it->second.entity) {
+        // Keep the old mesh alive until next frame so its GPU buffers
+        // remain valid for the in-flight command buffer.
+        auto oldMesh = it->second.entity->getMesh();
+        if (oldMesh) {
+            m_pendingMeshRetire.push_back(std::move(oldMesh));
+        }
         it->second.entity->setMesh(mesh);
         it->second.entity->setColor(
             vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));

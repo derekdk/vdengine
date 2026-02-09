@@ -294,8 +294,10 @@ class BaseToolScene : public vde::Scene {
 
     /**
      * @brief Add a message to the console log.
+     *
+     * Virtual so derived scenes can forward messages to custom UI widgets.
      */
-    void addConsoleMessage(const std::string& message) {
+    virtual void addConsoleMessage(const std::string& message) {
         m_consoleLog.push_back(message);
 
         // Limit console log size
@@ -418,6 +420,12 @@ class BaseToolGame : public vde::Game {
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
         ImGui::StyleColorsDark();
+
+        // Apply DPI scaling to fonts
+        float dpiScale = getDPIScale();
+        if (dpiScale > 0.0f) {
+            io.FontGlobalScale = dpiScale;
+        }
 
         ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
 
