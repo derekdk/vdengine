@@ -6,6 +6,7 @@
 #include "GeometryReplScene.h"
 
 #include <algorithm>
+#include <optional>
 #include <sstream>
 
 #include "FileDialog.h"
@@ -69,6 +70,98 @@ void GeometryReplScene::onEnter() {
     addConsoleMessage("====================================================");
     addConsoleMessage("Type 'help' for command reference.  Press TAB to auto-complete.");
     addConsoleMessage("");
+}
+
+void GeometryReplScene::update(float deltaTime) {
+    // Call base update first
+    BaseToolScene::update(deltaTime);
+
+    // Handle pending file dialog (deferred to between frames to avoid ImGui focus issues)
+    if (m_pendingLoadDialog.has_value()) {
+        auto request = *m_pendingLoadDialog;
+        m_pendingLoadDialog.reset();
+
+        // Clear ImGui input state before opening dialog
+        ImGuiIO& io = ImGui::GetIO();
+        io.AddFocusEvent(false);
+
+        // Open the file dialog
+        std::string filename = request.filename;
+        if (filename.empty()) {
+            filename = openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
+        }
+
+        // Restore focus and clear all key states after dialog closes
+        io.AddFocusEvent(true);
+        io.ClearInputKeys();
+        io.ClearInputCharacters();
+
+        // Process the file load if not cancelled
+        if (!filename.empty()) {
+            std::string name = request.name;
+            
+            // If no name provided, derive from filename
+            if (name.empty()) {
+                size_t lastSlash = filename.find_last_of("/\\");
+                std::string stem =
+                    (lastSlash != std::string::npos) ? filename.substr(lastSlash + 1) : filename;
+                size_t dot = stem.rfind('.');
+                if (dot != std::string::npos) {
+                    stem = stem.substr(0, dot);
+                }
+                name = stem;
+            }
+
+            // Check for duplicate name
+            if (m_geometryObjects.find(name) != m_geometryObjects.end()) {
+                addConsoleMessage("ERROR: Geometry '" + name + "' already exists. Use 'clear " + name +
+                                  "' first.");
+            } else {
+                // Load the mesh via Mesh::loadFromFile
+                auto mesh = std::make_shared<vde::Mesh>();
+                if (!mesh->loadFromFile(filename)) {
+                    addConsoleMessage("ERROR: Failed to load OBJ file: " + filename);
+                } else {
+                    // Create a geometry object to track it
+                    GeometryObject geo;
+                    geo.name = name;
+                    geo.type = GeometryType::POLYGON;
+                    geo.visible = true;
+
+                    // Copy vertex positions into points for the inspector
+                    const auto& verts = mesh->getVertices();
+                    geo.points.reserve(verts.size());
+                    for (const auto& v : verts) {
+                        geo.points.push_back(v.position);
+                    }
+
+                    m_geometryObjects[name] = std::move(geo);
+
+                    addConsoleMessage("Loaded '" + name + "' from " + filename + " (" +
+                                      std::to_string(verts.size()) + " vertices)");
+
+                    // Defer entity creation to the update phase so we don't add entities
+                    // while the Vulkan command buffer is being recorded.
+                    deferCommand([this, name, mesh]() {
+                        auto it = m_geometryObjects.find(name);
+                        if (it == m_geometryObjects.end()) {
+                            return;
+                        }
+                        auto entity = addEntity<vde::MeshEntity>();
+                        entity->setMesh(mesh);
+                        entity->setColor(vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                        entity->setName(name);
+                        it->second.entity = entity;
+                    });
+                }
+            }
+        } else {
+            addConsoleMessage("Load cancelled.");
+        }
+
+        // Refocus the console input
+        m_console.focusInput();
+    }
 }
 
 // ============================================================================
@@ -496,80 +589,12 @@ void GeometryReplScene::cmdLoad(const std::string& args) {
     std::string name, filename;
     iss >> name >> filename;
 
-    // If no name at all, prompt via dialog for both name and file
-    if (name.empty()) {
-        // Open file browser first
-        filename = openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
-        if (filename.empty()) {
-            addConsoleMessage("Load cancelled.");
-            return;
-        }
-
-        // Derive name from filename (stem without extension)
-        size_t lastSlash = filename.find_last_of("/\\");
-        std::string stem =
-            (lastSlash != std::string::npos) ? filename.substr(lastSlash + 1) : filename;
-        size_t dot = stem.rfind('.');
-        if (dot != std::string::npos) {
-            stem = stem.substr(0, dot);
-        }
-        name = stem;
-    }
-
-    // If filename is still empty, open file browser
-    if (filename.empty()) {
-        filename = openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
-        if (filename.empty()) {
-            addConsoleMessage("Load cancelled.");
-            return;
-        }
-    }
-
-    // Check for duplicate name
-    if (m_geometryObjects.find(name) != m_geometryObjects.end()) {
-        addConsoleMessage("ERROR: Geometry '" + name + "' already exists. Use 'clear " + name +
-                          "' first.");
-        return;
-    }
-
-    // Load the mesh via Mesh::loadFromFile
-    auto mesh = std::make_shared<vde::Mesh>();
-    if (!mesh->loadFromFile(filename)) {
-        addConsoleMessage("ERROR: Failed to load OBJ file: " + filename);
-        return;
-    }
-
-    // Create a geometry object to track it
-    GeometryObject geo;
-    geo.name = name;
-    geo.type = GeometryType::POLYGON;
-    geo.visible = true;
-
-    // Copy vertex positions into points for the inspector
-    const auto& verts = mesh->getVertices();
-    geo.points.reserve(verts.size());
-    for (const auto& v : verts) {
-        geo.points.push_back(v.position);
-    }
-
-    m_geometryObjects[name] = std::move(geo);
-
-    addConsoleMessage("Loaded '" + name + "' from " + filename + " (" +
-                      std::to_string(verts.size()) + " vertices)");
-
-    // Defer entity creation to the update phase so we don't add entities
-    // while the Vulkan command buffer is being recorded.
-    deferCommand([this, name, mesh]() {
-        auto it = m_geometryObjects.find(name);
-        if (it == m_geometryObjects.end()) {
-            return;
-        }
-        auto entity = addEntity<vde::MeshEntity>();
-        entity->setMesh(mesh);
-        entity->setColor(vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
-        entity->setName(name);
-        it->second.entity = entity;
-    });
+    // Defer the file dialog to the update phase (between frames)
+    // This prevents ImGui focus/input issues when the OS dialog steals focus
+    PendingLoadDialog request;
+    request.name = name;
+    request.filename = filename;
+    m_pendingLoadDialog = request;
 }
 
 void GeometryReplScene::cmdList(const std::string& /*args*/) {

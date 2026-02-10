@@ -41,6 +41,8 @@ class GeometryReplScene : public BaseToolScene {
         return "Interactive geometry creation and OBJ import/export tool";
     }
 
+    void update(float deltaTime) override;
+
     /**
      * @brief Get the command registry (e.g. for external command registration).
      */
@@ -61,6 +63,13 @@ class GeometryReplScene : public BaseToolScene {
     ReplConsole m_console;
     std::map<std::string, GeometryObject> m_geometryObjects;
     float m_dpiScale = 1.0f;
+
+    // Deferred file dialog handling
+    struct PendingLoadDialog {
+        std::string name;
+        std::string filename;
+    };
+    std::optional<PendingLoadDialog> m_pendingLoadDialog;
 
     // --- Command registration ---
     void registerCoreCommands();
