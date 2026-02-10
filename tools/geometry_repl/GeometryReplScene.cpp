@@ -31,6 +31,9 @@ void GeometryReplScene::onEnter() {
     // --- Camera ---
     setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 10.0f, 30.0f, 20.0f));
 
+    // --- Background color to match ground plane ---
+    setBackgroundColor(vde::Color(0.0f, 0.0f, 0.0f));
+
     // --- Lighting ---
     auto lightBox = std::make_unique<vde::LightBox>();
     lightBox->setAmbientColor(vde::Color(0.3f, 0.3f, 0.35f));
@@ -40,15 +43,8 @@ void GeometryReplScene::onEnter() {
     lightBox->addLight(sun);
     setLightBox(std::move(lightBox));
 
-    // Add a ground plane for reference (only in interactive mode)
+    // Add coordinate axes for reference (only in interactive mode)
     if (getToolMode() == ToolMode::INTERACTIVE) {
-        auto plane = addEntity<vde::MeshEntity>();
-        plane->setMesh(vde::Mesh::createPlane(20.0f, 20.0f, 10, 10));
-        plane->setPosition(0.0f, -2.0f, 0.0f);
-        plane->setColor(vde::Color(0.2f, 0.2f, 0.25f));
-        plane->setName("Ground");
-
-        // Add coordinate axes for reference
         createReferenceAxes();
     }
 
