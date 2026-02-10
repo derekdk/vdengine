@@ -85,6 +85,9 @@ class GeometryReplScene : public BaseToolScene {
     void cmdLoad(const std::string& args);
     void cmdList(const std::string& args);
     void cmdClear(const std::string& args);
+    void cmdMove(const std::string& args);
+    void cmdShowWireframe(const std::string& args);
+    void cmdWireframeColor(const std::string& args);
 
     // --- Completion helpers ---
 

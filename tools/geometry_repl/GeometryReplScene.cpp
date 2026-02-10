@@ -88,7 +88,8 @@ void GeometryReplScene::update(float deltaTime) {
         // Open the file dialog
         std::string filename = request.filename;
         if (filename.empty()) {
-            filename = openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
+            filename =
+                openFileDialog("Open OBJ File", {{"OBJ Files", "*.obj"}, {"All Files", "*.*"}});
         }
 
         // Restore focus and clear all key states after dialog closes
@@ -99,7 +100,7 @@ void GeometryReplScene::update(float deltaTime) {
         // Process the file load if not cancelled
         if (!filename.empty()) {
             std::string name = request.name;
-            
+
             // If no name provided, derive from filename
             if (name.empty()) {
                 size_t lastSlash = filename.find_last_of("/\\");
@@ -114,8 +115,8 @@ void GeometryReplScene::update(float deltaTime) {
 
             // Check for duplicate name
             if (m_geometryObjects.find(name) != m_geometryObjects.end()) {
-                addConsoleMessage("ERROR: Geometry '" + name + "' already exists. Use 'clear " + name +
-                                  "' first.");
+                addConsoleMessage("ERROR: Geometry '" + name + "' already exists. Use 'clear " +
+                                  name + "' first.");
             } else {
                 // Load the mesh via Mesh::loadFromFile
                 auto mesh = std::make_shared<vde::Mesh>();
@@ -127,9 +128,15 @@ void GeometryReplScene::update(float deltaTime) {
                     geo.name = name;
                     geo.type = GeometryType::POLYGON;
                     geo.visible = true;
+                    geo.isLoadedMesh = true;
+
+                    // Store the original mesh data to preserve triangulation
+                    const auto& verts = mesh->getVertices();
+                    const auto& inds = mesh->getIndices();
+                    geo.loadedVertices = verts;
+                    geo.loadedIndices = inds;
 
                     // Copy vertex positions into points for the inspector
-                    const auto& verts = mesh->getVertices();
                     geo.points.reserve(verts.size());
                     for (const auto& v : verts) {
                         geo.points.push_back(v.position);
@@ -142,14 +149,23 @@ void GeometryReplScene::update(float deltaTime) {
 
                     // Defer entity creation to the update phase so we don't add entities
                     // while the Vulkan command buffer is being recorded.
-                    deferCommand([this, name, mesh]() {
+                    deferCommand([this, name]() {
                         auto it = m_geometryObjects.find(name);
                         if (it == m_geometryObjects.end()) {
                             return;
                         }
+
+                        // Create mesh from stored geometry data
+                        auto mesh = it->second.createMesh();
+                        if (!mesh) {
+                            return;
+                        }
+
                         auto entity = addEntity<vde::MeshEntity>();
                         entity->setMesh(mesh);
-                        entity->setColor(vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                        entity->setColor(
+                            vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                        entity->setPosition(it->second.position);
                         entity->setName(name);
                         it->second.entity = entity;
                     });
@@ -254,6 +270,21 @@ void GeometryReplScene::registerCoreCommands() {
     m_commands.add(
         "clear", "clear <name>", "Delete geometry object",
         [this](const std::string& a) { cmdClear(a); }, objectNameCompleter());
+
+    // move <name> <x> <y> <z>
+    m_commands.add(
+        "move", "move <name> <x> <y> <z>", "Move geometry by offset",
+        [this](const std::string& a) { cmdMove(a); }, objectNameCompleter());
+
+    // show-wireframe <name>
+    m_commands.add(
+        "show-wireframe", "show-wireframe <name>", "Show wireframe overlay",
+        [this](const std::string& a) { cmdShowWireframe(a); }, objectNameCompleter());
+
+    // wireframe-color <name> <r> <g> <b>
+    m_commands.add(
+        "wireframe-color", "wireframe-color <name> <r> <g> <b>", "Set wireframe color (0-1 range)",
+        [this](const std::string& a) { cmdWireframeColor(a); }, objectNameCompleter());
 }
 
 // ============================================================================
@@ -639,9 +670,113 @@ void GeometryReplScene::cmdClear(const std::string& args) {
         retireResource(std::move(entity));
         it->second.entity = nullptr;
     }
+    if (it->second.wireframeEntity) {
+        auto wireEntity = std::move(it->second.wireframeEntity);
+        EntityId wireId = wireEntity->getId();
+        deferCommand([this, wireId]() { removeEntity(wireId); });
+        retireResource(std::move(wireEntity));
+        it->second.wireframeEntity = nullptr;
+    }
 
     m_geometryObjects.erase(it);
     addConsoleMessage("Deleted geometry '" + name + "'");
+}
+
+void GeometryReplScene::cmdMove(const std::string& args) {
+    std::istringstream iss(args);
+    std::string name;
+    float x, y, z;
+    iss >> name >> x >> y >> z;
+
+    if (name.empty() || iss.fail()) {
+        addConsoleMessage("ERROR: Usage: move <name> <x> <y> <z>");
+        return;
+    }
+
+    auto it = m_geometryObjects.find(name);
+    if (it == m_geometryObjects.end()) {
+        addConsoleMessage("ERROR: Geometry '" + name + "' not found");
+        return;
+    }
+
+    it->second.position = glm::vec3(x, y, z);
+    addConsoleMessage("Moved '" + name + "' to offset (" + std::to_string(x) + ", " +
+                      std::to_string(y) + ", " + std::to_string(z) + ")");
+
+    // Update entity position if it exists
+    if (it->second.entity) {
+        it->second.entity->setPosition(it->second.position);
+    }
+    if (it->second.wireframeEntity) {
+        it->second.wireframeEntity->setPosition(it->second.position);
+    }
+}
+
+void GeometryReplScene::cmdShowWireframe(const std::string& args) {
+    std::istringstream iss(args);
+    std::string name;
+    iss >> name;
+
+    if (name.empty()) {
+        addConsoleMessage("ERROR: Usage: show-wireframe <name>");
+        return;
+    }
+
+    auto it = m_geometryObjects.find(name);
+    if (it == m_geometryObjects.end()) {
+        addConsoleMessage("ERROR: Geometry '" + name + "' not found");
+        return;
+    }
+
+    if (!it->second.visible) {
+        addConsoleMessage("ERROR: '" + name + "' must be visible first. Use 'setvisible " + name +
+                          "'");
+        return;
+    }
+
+    it->second.showWireframe = !it->second.showWireframe;
+
+    if (it->second.showWireframe) {
+        addConsoleMessage("Enabled wireframe for '" + name + "'");
+        updateGeometryMesh(name);  // This will create the wireframe entity
+    } else {
+        addConsoleMessage("Disabled wireframe for '" + name + "'");
+        // Remove wireframe entity
+        if (it->second.wireframeEntity) {
+            auto entity = std::move(it->second.wireframeEntity);
+            EntityId eid = entity->getId();
+            deferCommand([this, eid]() { removeEntity(eid); });
+            retireResource(std::move(entity));
+            it->second.wireframeEntity = nullptr;
+        }
+    }
+}
+
+void GeometryReplScene::cmdWireframeColor(const std::string& args) {
+    std::istringstream iss(args);
+    std::string name;
+    float r, g, b;
+    iss >> name >> r >> g >> b;
+
+    if (name.empty() || iss.fail()) {
+        addConsoleMessage("ERROR: Usage: wireframe-color <name> <r> <g> <b>");
+        addConsoleMessage("       Colors are in 0-1 range");
+        return;
+    }
+
+    auto it = m_geometryObjects.find(name);
+    if (it == m_geometryObjects.end()) {
+        addConsoleMessage("ERROR: Geometry '" + name + "' not found");
+        return;
+    }
+
+    it->second.wireframeColor = glm::vec3(r, g, b);
+    addConsoleMessage("Set wireframe color of '" + name + "' to (" + std::to_string(r) + ", " +
+                      std::to_string(g) + ", " + std::to_string(b) + ")");
+
+    if (it->second.showWireframe && it->second.visible) {
+        updateGeometryMesh(name);
+    }
 }
 
 // ============================================================================
@@ -696,12 +831,14 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
                 entity->setMesh(mesh);
                 entity->setColor(
                     vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                entity->setPosition(it->second.position);
                 entity->setName(name);
                 it->second.entity = entity;
             } else {
                 it->second.entity->setMesh(mesh);
                 it->second.entity->setColor(
                     vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                it->second.entity->setPosition(it->second.position);
             }
             it->second.visible = true;
         } else {
@@ -709,6 +846,11 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
                 removeEntity(it->second.entity->getId());
                 retireResource(std::move(it->second.entity));
                 it->second.entity = nullptr;
+            }
+            if (it->second.wireframeEntity) {
+                removeEntity(it->second.wireframeEntity->getId());
+                retireResource(std::move(it->second.wireframeEntity));
+                it->second.wireframeEntity = nullptr;
             }
             it->second.visible = false;
         }
@@ -739,6 +881,34 @@ void GeometryReplScene::updateGeometryMesh(const std::string& name) {
             it->second.entity->setMesh(mesh);
             it->second.entity->setColor(
                 vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+            it->second.entity->setPosition(it->second.position);
+
+            // Handle wireframe overlay
+            if (it->second.showWireframe) {
+                auto wireframeMesh = it->second.createWireframeMesh(0.015f);
+                if (wireframeMesh) {
+                    if (!it->second.wireframeEntity) {
+                        auto wireEntity = addEntity<vde::MeshEntity>();
+                        wireEntity->setMesh(wireframeMesh);
+                        wireEntity->setColor(vde::Color(it->second.wireframeColor.x,
+                                                        it->second.wireframeColor.y,
+                                                        it->second.wireframeColor.z));
+                        wireEntity->setPosition(it->second.position);
+                        wireEntity->setName(name + "_wireframe");
+                        it->second.wireframeEntity = wireEntity;
+                    } else {
+                        auto oldWireMesh = it->second.wireframeEntity->getMesh();
+                        if (oldWireMesh) {
+                            retireResource(std::move(oldWireMesh));
+                        }
+                        it->second.wireframeEntity->setMesh(wireframeMesh);
+                        it->second.wireframeEntity->setColor(
+                            vde::Color(it->second.wireframeColor.x, it->second.wireframeColor.y,
+                                       it->second.wireframeColor.z));
+                        it->second.wireframeEntity->setPosition(it->second.position);
+                    }
+                }
+            }
         }
     });
 }
