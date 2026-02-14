@@ -22,9 +22,14 @@
 #include <vde/Window.h>
 #include <vde/api/GameAPI.h>
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // ImGui includes (optional - only used if VDE_EXAMPLE_USE_IMGUI is defined)
 #ifdef VDE_EXAMPLE_USE_IMGUI
@@ -42,6 +47,22 @@
 
 namespace vde {
 namespace examples {
+
+inline void setWorkingDirectoryToExecutablePath() {
+#ifdef _WIN32
+    char exePathBuffer[MAX_PATH] = {};
+    DWORD len = GetModuleFileNameA(nullptr, exePathBuffer, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) {
+        return;
+    }
+
+    std::error_code error;
+    std::filesystem::path exeDir = std::filesystem::path(exePathBuffer).parent_path();
+    if (!exeDir.empty()) {
+        std::filesystem::current_path(exeDir, error);
+    }
+#endif
+}
 
 /**
  * @brief Base input handler with escape and fail key support.
@@ -563,6 +584,8 @@ class BaseExampleGame : public vde::Game {
 template <typename TGame>
 int runExample(TGame& game, const std::string& gameName, uint32_t width = 1280,
                uint32_t height = 720) {
+    setWorkingDirectoryToExecutablePath();
+
     vde::GameSettings settings;
     settings.gameName = gameName;
     settings.display.windowWidth = width;

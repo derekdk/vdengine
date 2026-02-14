@@ -170,6 +170,8 @@ class MyToolGame : public vde::tools::BaseToolGame<MyToolInputHandler, MyToolSce
 - Camera controls integration
 - Exit code handling
 
+**Note:** `runTool(...)` automatically sets the process working directory to the executable directory on startup. This keeps relative asset/shader paths working when tools are launched from outside their output folder.
+
 ## Scriptability
 
 **Every tool must support script mode** for batch processing and automation.

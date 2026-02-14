@@ -13,6 +13,9 @@ This skill describes the standard pattern for creating example programs in VDE t
 - Writing a visual demo for testing rendering functionality
 - Building interactive samples for documentation
 
+Always build and run the example to verify it works correctly and follows the expected pattern.
+
+
 ## Example Structure
 
 All VDE examples should follow this standard pattern to enable:
@@ -25,6 +28,8 @@ All VDE examples should follow this standard pattern to enable:
 ## Standard Pattern
 
 All examples should use the shared `ExampleBase.h` header which provides base classes and utilities to eliminate code duplication.
+
+**Note:** `runExample(...)` automatically sets the process working directory to the executable directory on startup. This makes relative paths (for example `shaders/...`) resolve correctly even when launching from another folder.
 
 ## Testing the Example
 1. Make sure the example builds and runs correctly.

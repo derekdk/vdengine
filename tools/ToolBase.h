@@ -22,11 +22,16 @@
 #include <vde/Window.h>
 #include <vde/api/GameAPI.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // ImGui includes (tools always use ImGui for interactive mode)
 #include <vde/VulkanContext.h>
@@ -42,6 +47,22 @@
 
 namespace vde {
 namespace tools {
+
+inline void setWorkingDirectoryToExecutablePath() {
+#ifdef _WIN32
+    char exePathBuffer[MAX_PATH] = {};
+    DWORD len = GetModuleFileNameA(nullptr, exePathBuffer, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) {
+        return;
+    }
+
+    std::error_code error;
+    std::filesystem::path exeDir = std::filesystem::path(exePathBuffer).parent_path();
+    if (!exeDir.empty()) {
+        std::filesystem::current_path(exeDir, error);
+    }
+#endif
+}
 
 /**
  * @brief Tool execution mode
@@ -522,6 +543,8 @@ class BaseToolGame : public vde::Game {
 template <typename TInputHandler, typename TScene>
 int runTool(BaseToolGame<TInputHandler, TScene>& tool, const std::string& title,
             uint32_t width = 1400, uint32_t height = 800) {
+    setWorkingDirectoryToExecutablePath();
+
     vde::GameSettings settings;
     settings.gameName = title;
     settings.display.windowWidth = width;
