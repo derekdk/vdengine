@@ -332,6 +332,14 @@ class BaseToolScene : public vde::Scene {
         // Default implementation - tools should override this
     }
 
+    /**
+     * @brief Called right before ImGui backend shutdown.
+     *
+     * Derived scenes can override this to release ImGui renderer resources
+     * (e.g., texture descriptor sets) while the backend is still valid.
+     */
+    virtual void onBeforeImGuiShutdown() {}
+
   protected:
     ToolMode m_toolMode;
     bool m_debugUIVisible = true;
@@ -378,6 +386,10 @@ class BaseToolGame : public vde::Game {
     }
 
     void onShutdown() override {
+        if (m_scenePtr && m_toolMode == ToolMode::INTERACTIVE) {
+            m_scenePtr->onBeforeImGuiShutdown();
+        }
+
         if (getVulkanContext()) {
             vkDeviceWaitIdle(getVulkanContext()->getDevice());
         }

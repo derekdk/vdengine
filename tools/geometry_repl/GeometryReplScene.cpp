@@ -18,6 +18,31 @@
 namespace vde {
 namespace tools {
 
+namespace {
+
+bool isImGuiVulkanBackendAvailable() {
+    if (ImGui::GetCurrentContext() == nullptr) {
+        return false;
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    return io.BackendRendererUserData != nullptr;
+}
+
+void removeImGuiTextureIfAvailable(VkDescriptorSet descriptor) {
+    if (descriptor == VK_NULL_HANDLE) {
+        return;
+    }
+
+    if (!isImGuiVulkanBackendAvailable()) {
+        return;
+    }
+
+    ImGui_ImplVulkan_RemoveTexture(descriptor);
+}
+
+}  // namespace
+
 // ============================================================================
 // Construction / setup
 // ============================================================================
@@ -27,6 +52,10 @@ GeometryReplScene::GeometryReplScene(ToolMode mode) : BaseToolScene(mode) {
 }
 
 GeometryReplScene::~GeometryReplScene() {
+    clearAllTexturePreviews();
+}
+
+void GeometryReplScene::onBeforeImGuiShutdown() {
     clearAllTexturePreviews();
 }
 
@@ -563,9 +592,7 @@ void GeometryReplScene::drawDebugUI() {
         for (auto it = m_textureInspectorDescriptors.begin();
              it != m_textureInspectorDescriptors.end();) {
             if (m_textures.find(it->first) == m_textures.end()) {
-                if (it->second != VK_NULL_HANDLE) {
-                    ImGui_ImplVulkan_RemoveTexture(it->second);
-                }
+                removeImGuiTextureIfAvailable(it->second);
                 it = m_textureInspectorDescriptors.erase(it);
             } else {
                 ++it;
@@ -1278,7 +1305,7 @@ size_t GeometryReplScene::countTexturedGeometry() const {
 ImTextureID
 GeometryReplScene::getOrCreateTexturePreview(const std::string& textureName,
                                              const std::shared_ptr<vde::Texture>& texture) {
-    if (!texture || !texture->isValid()) {
+    if (!texture || !texture->isValid() || !isImGuiVulkanBackendAvailable()) {
         return (ImTextureID)0;
     }
 
@@ -1303,17 +1330,13 @@ void GeometryReplScene::clearTexturePreview(const std::string& textureName) {
         return;
     }
 
-    if (it->second != VK_NULL_HANDLE) {
-        ImGui_ImplVulkan_RemoveTexture(it->second);
-    }
+    removeImGuiTextureIfAvailable(it->second);
     m_textureInspectorDescriptors.erase(it);
 }
 
 void GeometryReplScene::clearAllTexturePreviews() {
     for (const auto& [name, descriptor] : m_textureInspectorDescriptors) {
-        if (descriptor != VK_NULL_HANDLE) {
-            ImGui_ImplVulkan_RemoveTexture(descriptor);
-        }
+        removeImGuiTextureIfAvailable(descriptor);
     }
     m_textureInspectorDescriptors.clear();
 }

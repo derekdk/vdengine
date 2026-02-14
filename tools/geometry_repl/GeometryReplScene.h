@@ -32,6 +32,7 @@ class GeometryReplScene : public BaseToolScene {
     ~GeometryReplScene() override;
 
     void onEnter() override;
+    void onBeforeImGuiShutdown() override;
     void executeCommand(const std::string& cmdLine) override;
     void drawDebugUI() override;
     void addConsoleMessage(const std::string& message) override;
