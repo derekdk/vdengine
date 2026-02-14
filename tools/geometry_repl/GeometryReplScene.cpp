@@ -161,6 +161,9 @@ void GeometryReplScene::update(float deltaTime) {
                         entity->setMesh(mesh);
                         entity->setColor(
                             vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                        if (it->second.texture) {
+                            entity->setTexture(it->second.texture);
+                        }
                         entity->setPosition(it->second.position);
                         entity->setName(name);
                         it->second.entity = entity;
@@ -172,6 +175,63 @@ void GeometryReplScene::update(float deltaTime) {
         }
 
         // Refocus the console input
+        m_console.focusInput();
+    }
+
+    // Handle pending texture file dialog (deferred like mesh loading)
+    if (m_pendingTextureLoadDialog.has_value()) {
+        auto request = *m_pendingTextureLoadDialog;
+        m_pendingTextureLoadDialog.reset();
+
+        ImGuiIO& io = ImGui::GetIO();
+        io.AddFocusEvent(false);
+
+        std::string filename = request.filename;
+        if (filename.empty()) {
+            filename = openFileDialog("Open Texture File",
+                                      {{"Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.tga"},
+                                       {"PNG Files", "*.png"},
+                                       {"JPEG Files", "*.jpg;*.jpeg"},
+                                       {"BMP Files", "*.bmp"},
+                                       {"TGA Files", "*.tga"},
+                                       {"All Files", "*.*"}});
+        }
+
+        io.AddFocusEvent(true);
+        io.ClearInputKeys();
+        io.ClearInputCharacters();
+
+        if (!filename.empty()) {
+            std::string name = request.name;
+
+            if (name.empty()) {
+                size_t lastSlash = filename.find_last_of("/\\");
+                std::string stem =
+                    (lastSlash != std::string::npos) ? filename.substr(lastSlash + 1) : filename;
+                size_t dot = stem.rfind('.');
+                if (dot != std::string::npos) {
+                    stem = stem.substr(0, dot);
+                }
+                name = stem;
+            }
+
+            auto texture = std::make_shared<vde::Texture>();
+            if (!texture->loadFromFile(filename)) {
+                addConsoleMessage("ERROR: Failed to load texture file: " + filename);
+            } else {
+                auto* game = getGame();
+                auto* context = game ? game->getVulkanContext() : nullptr;
+                if (context) {
+                    texture->uploadToGPU(context);
+                }
+
+                m_textures[name] = texture;
+                addConsoleMessage("Loaded texture '" + name + "' from " + filename);
+            }
+        } else {
+            addConsoleMessage("Texture load cancelled.");
+        }
+
         m_console.focusInput();
     }
 }
@@ -258,6 +318,21 @@ void GeometryReplScene::registerCoreCommands() {
                    "Load OBJ file (omit filename for file browser)",
                    [this](const std::string& a) { cmdLoad(a); });
 
+    // load-texture <name> [filename]
+    m_commands.add("load-texture", "load-texture <name> [filename]",
+                   "Load texture and store by name (omit filename for file browser)",
+                   [this](const std::string& a) { cmdLoadTexture(a); });
+
+    // apply-texture <geometry> <texture>
+    m_commands.add(
+        "apply-texture", "apply-texture <geometry> <texture>",
+        "Apply named texture to geometry object",
+        [this](const std::string& a) { cmdApplyTexture(a); }, applyTextureCompleter());
+
+    // list-textures
+    m_commands.add("list-textures", "list-textures", "List all loaded textures",
+                   [this](const std::string& a) { cmdListTextures(a); });
+
     // list
     m_commands.add("list", "list", "List all objects",
                    [this](const std::string& a) { cmdList(a); });
@@ -330,6 +405,36 @@ CompletionCallback GeometryReplScene::createCompleter() const {
     };
 }
 
+CompletionCallback GeometryReplScene::textureNameCompleter() const {
+    return
+        [this](
+            const std::string& partial,
+            [[maybe_unused]] const std::vector<std::string>& tokens) -> std::vector<std::string> {
+            std::vector<std::string> results;
+            std::string prefix = partial;
+            std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+
+            for (const auto& [name, _] : m_textures) {
+                std::string lower = name;
+                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                if (prefix.empty() || lower.substr(0, prefix.size()) == prefix) {
+                    results.push_back(name);
+                }
+            }
+            return results;
+        };
+}
+
+CompletionCallback GeometryReplScene::applyTextureCompleter() const {
+    return [this](const std::string& partial,
+                  const std::vector<std::string>& tokens) -> std::vector<std::string> {
+        if (tokens.size() <= 2) {
+            return objectNameCompleter()(partial, tokens);
+        }
+        return textureNameCompleter()(partial, tokens);
+    };
+}
+
 // ============================================================================
 // ImGui UI
 // ============================================================================
@@ -366,6 +471,10 @@ void GeometryReplScene::drawDebugUI() {
                     m_console.addMessage("> load (browse...)");
                     cmdLoad("");
                 }
+                if (ImGui::MenuItem("Load Texture...")) {
+                    m_console.addMessage("> load-texture (browse...)");
+                    cmdLoadTexture("");
+                }
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -392,6 +501,8 @@ void GeometryReplScene::drawDebugUI() {
 
                     ImGui::Text("Type: %s", geo.type == GeometryType::POLYGON ? "Polygon" : "Line");
                     ImGui::Text("Points: %zu", geo.points.size());
+                    ImGui::Text("Texture: %s",
+                                geo.textureName.empty() ? "(none)" : geo.textureName.c_str());
 
                     if (ImGui::ColorEdit3(("Color##" + name).c_str(), &geo.color.x)) {
                         if (geo.visible && geo.entity) {
@@ -444,6 +555,8 @@ void GeometryReplScene::drawDebugUI() {
         ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
         ImGui::Text("Geometry Objects: %zu", m_geometryObjects.size());
         ImGui::Text("Visible Objects: %zu", countVisibleGeometry());
+        ImGui::Text("Textured Objects: %zu", countTexturedGeometry());
+        ImGui::Text("Loaded Textures: %zu", m_textures.size());
         ImGui::Text("Registered Commands: %zu", m_commands.getEnabledCommands().size());
         ImGui::Separator();
         ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "Press F1 to toggle UI");
@@ -637,6 +750,70 @@ void GeometryReplScene::cmdLoad(const std::string& args) {
     m_pendingLoadDialog = request;
 }
 
+void GeometryReplScene::cmdLoadTexture(const std::string& args) {
+    std::istringstream iss(args);
+    std::string name, filename;
+    iss >> name >> filename;
+
+    PendingTextureLoadDialog request;
+    request.name = name;
+    request.filename = filename;
+    m_pendingTextureLoadDialog = request;
+}
+
+void GeometryReplScene::cmdApplyTexture(const std::string& args) {
+    std::istringstream iss(args);
+    std::string geometryName;
+    std::string textureName;
+    iss >> geometryName >> textureName;
+
+    if (geometryName.empty() || textureName.empty()) {
+        addConsoleMessage("ERROR: Usage: apply-texture <geometry> <texture>");
+        return;
+    }
+
+    auto geoIt = m_geometryObjects.find(geometryName);
+    if (geoIt == m_geometryObjects.end()) {
+        addConsoleMessage("ERROR: Geometry '" + geometryName + "' not found");
+        return;
+    }
+
+    auto texIt = m_textures.find(textureName);
+    if (texIt == m_textures.end() || !texIt->second) {
+        addConsoleMessage("ERROR: Texture '" + textureName + "' not found. Use 'list-textures'.");
+        return;
+    }
+
+    geoIt->second.textureName = textureName;
+    geoIt->second.texture = texIt->second;
+
+    if (geoIt->second.entity) {
+        geoIt->second.entity->setTexture(geoIt->second.texture);
+    }
+
+    addConsoleMessage("Applied texture '" + textureName + "' to '" + geometryName + "'");
+}
+
+void GeometryReplScene::cmdListTextures(const std::string& /*args*/) {
+    if (m_textures.empty()) {
+        addConsoleMessage("No textures loaded");
+        return;
+    }
+
+    addConsoleMessage("====================================================");
+    addConsoleMessage("LOADED TEXTURES:");
+    for (const auto& [name, texture] : m_textures) {
+        if (!texture) {
+            addConsoleMessage("  " + name + " [invalid]");
+            continue;
+        }
+
+        addConsoleMessage("  " + name + " (" + std::to_string(texture->getWidth()) + "x" +
+                          std::to_string(texture->getHeight()) + ")");
+    }
+    addConsoleMessage("====================================================");
+}
+
 void GeometryReplScene::cmdList(const std::string& /*args*/) {
     if (m_geometryObjects.empty()) {
         addConsoleMessage("No geometry objects created");
@@ -648,8 +825,9 @@ void GeometryReplScene::cmdList(const std::string& /*args*/) {
     for (const auto& [name, geo] : m_geometryObjects) {
         std::string typeStr = (geo.type == GeometryType::POLYGON) ? "polygon" : "line";
         std::string visStr = geo.visible ? "[VISIBLE]" : "[hidden]";
+        std::string texStr = geo.textureName.empty() ? "" : (", tex=" + geo.textureName);
         addConsoleMessage("  " + name + " (" + typeStr + ", " + std::to_string(geo.points.size()) +
-                          " points) " + visStr);
+                          " points" + texStr + ") " + visStr);
     }
     addConsoleMessage("====================================================");
 }
@@ -840,6 +1018,9 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
                 entity->setMesh(mesh);
                 entity->setColor(
                     vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                if (it->second.texture) {
+                    entity->setTexture(it->second.texture);
+                }
                 entity->setPosition(it->second.position);
                 entity->setName(name);
                 it->second.entity = entity;
@@ -847,6 +1028,9 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
                 it->second.entity->setMesh(mesh);
                 it->second.entity->setColor(
                     vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+                if (it->second.texture) {
+                    it->second.entity->setTexture(it->second.texture);
+                }
                 it->second.entity->setPosition(it->second.position);
             }
             it->second.visible = true;
@@ -890,6 +1074,9 @@ void GeometryReplScene::updateGeometryMesh(const std::string& name) {
             it->second.entity->setMesh(mesh);
             it->second.entity->setColor(
                 vde::Color(it->second.color.x, it->second.color.y, it->second.color.z));
+            if (it->second.texture) {
+                it->second.entity->setTexture(it->second.texture);
+            }
             it->second.entity->setPosition(it->second.position);
 
             // Handle wireframe overlay
@@ -926,6 +1113,16 @@ size_t GeometryReplScene::countVisibleGeometry() const {
     size_t count = 0;
     for (const auto& [name, geo] : m_geometryObjects) {
         if (geo.visible) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+size_t GeometryReplScene::countTexturedGeometry() const {
+    size_t count = 0;
+    for (const auto& [name, geo] : m_geometryObjects) {
+        if (!geo.textureName.empty() && geo.texture) {
             ++count;
         }
     }

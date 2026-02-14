@@ -37,6 +37,8 @@ struct GeometryObject {
     glm::vec3 wireframeColor{0.0f, 1.0f, 0.0f};  // Default green wireframe
     std::shared_ptr<vde::MeshEntity> entity;
     std::shared_ptr<vde::MeshEntity> wireframeEntity;  // Wireframe overlay entity
+    std::string textureName;                // Name of applied texture from scene registry
+    std::shared_ptr<vde::Texture> texture;  // Applied texture resource
 
     // For loaded meshes, preserve original triangulation
     bool isLoadedMesh = false;
@@ -74,11 +76,18 @@ struct GeometryObject {
 
         if (type == GeometryType::POLYGON) {
             // Create vertices from points
-            for (const auto& point : points) {
+            const size_t pointCount = points.size();
+            for (size_t i = 0; i < pointCount; ++i) {
+                const auto& point = points[i];
                 vde::Vertex v;
                 v.position = point;
                 v.color = color;
-                v.texCoord = glm::vec2(0.0f, 0.0f);
+                if (pointCount > 1) {
+                    float t = static_cast<float>(i) / static_cast<float>(pointCount - 1);
+                    v.texCoord = glm::vec2(t, 0.0f);
+                } else {
+                    v.texCoord = glm::vec2(0.0f, 0.0f);
+                }
                 vertices.push_back(v);
             }
 
@@ -91,11 +100,17 @@ struct GeometryObject {
 
             // Add reverse faces for double-sided rendering
             size_t baseIndex = vertices.size();
-            for (const auto& point : points) {
+            for (size_t i = 0; i < pointCount; ++i) {
+                const auto& point = points[i];
                 vde::Vertex v;
                 v.position = point;
                 v.color = color;
-                v.texCoord = glm::vec2(0.0f, 0.0f);
+                if (pointCount > 1) {
+                    float t = static_cast<float>(i) / static_cast<float>(pointCount - 1);
+                    v.texCoord = glm::vec2(t, 1.0f);
+                } else {
+                    v.texCoord = glm::vec2(0.0f, 1.0f);
+                }
                 vertices.push_back(v);
             }
 
@@ -131,15 +146,15 @@ struct GeometryObject {
 
                 v2.position = p1 + perp;
                 v2.color = color;
-                v2.texCoord = glm::vec2(0, 0);
+                v2.texCoord = glm::vec2(1, 0);
 
                 v3.position = p2 + perp;
                 v3.color = color;
-                v3.texCoord = glm::vec2(0, 0);
+                v3.texCoord = glm::vec2(1, 1);
 
                 v4.position = p2 - perp;
                 v4.color = color;
-                v4.texCoord = glm::vec2(0, 0);
+                v4.texCoord = glm::vec2(0, 1);
 
                 vertices.push_back(v1);
                 vertices.push_back(v2);

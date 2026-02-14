@@ -9,6 +9,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "../ToolBase.h"
@@ -62,6 +63,7 @@ class GeometryReplScene : public BaseToolScene {
     CommandRegistry m_commands;
     ReplConsole m_console;
     std::map<std::string, GeometryObject> m_geometryObjects;
+    std::map<std::string, std::shared_ptr<vde::Texture>> m_textures;
     float m_dpiScale = 1.0f;
 
     // Deferred file dialog handling
@@ -70,6 +72,12 @@ class GeometryReplScene : public BaseToolScene {
         std::string filename;
     };
     std::optional<PendingLoadDialog> m_pendingLoadDialog;
+
+    struct PendingTextureLoadDialog {
+        std::string name;
+        std::string filename;
+    };
+    std::optional<PendingTextureLoadDialog> m_pendingTextureLoadDialog;
 
     // --- Command registration ---
     void registerCoreCommands();
@@ -83,6 +91,9 @@ class GeometryReplScene : public BaseToolScene {
     void cmdHide(const std::string& args);
     void cmdExport(const std::string& args);
     void cmdLoad(const std::string& args);
+    void cmdLoadTexture(const std::string& args);
+    void cmdApplyTexture(const std::string& args);
+    void cmdListTextures(const std::string& args);
     void cmdList(const std::string& args);
     void cmdClear(const std::string& args);
     void cmdMove(const std::string& args);
@@ -100,11 +111,14 @@ class GeometryReplScene : public BaseToolScene {
      * @brief Build a completer for the "create" command (type names).
      */
     CompletionCallback createCompleter() const;
+    CompletionCallback textureNameCompleter() const;
+    CompletionCallback applyTextureCompleter() const;
 
     // --- Scene helpers ---
     void setGeometryVisible(const std::string& name, bool visible);
     void updateGeometryMesh(const std::string& name);
     size_t countVisibleGeometry() const;
+    size_t countTexturedGeometry() const;
     void createReferenceAxes();
 };
 
