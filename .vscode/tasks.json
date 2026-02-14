@@ -1,4 +1,4 @@
- {
+{
   "version": "2.0.0",
   "tasks": [
     {
@@ -60,20 +60,14 @@
       "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/help.ps1"],
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": []
-    }
-  ]
-}{
-  "version": "2.0.0",
-  "tasks": [
+    },
     {
-      "label": "build",
+      "label": "scripts: run-vlauncher",
       "type": "shell",
-      "command": ".\\scripts\\build.ps1",
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/run-vlauncher.ps1"],
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
     }
   ]
 }

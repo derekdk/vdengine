@@ -11,12 +11,20 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
+| **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `\.\scripts\run-vlauncher.ps1` |
 
 ## Quick Start
 
 ### Build (Default: Ninja Debug)
 ```powershell
 .\.\scripts\build.ps1
+```
+
+### Launch VLauncher
+```powershell
+.\scripts\run-vlauncher.ps1
+# or root shortcut
+.\run-vlauncher.ps1
 ```
 
 ### Build with MSBuild
