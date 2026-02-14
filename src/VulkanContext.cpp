@@ -701,6 +701,9 @@ void VulkanContext::createRenderPass() {
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    std::array<VkAttachmentDescription, 2> loadAttachments = {colorAttachment, depthAttachment};
+    renderPassInfo.pAttachments = loadAttachments.data();
+
     if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPassLoad) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create load render pass!");
     }
