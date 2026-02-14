@@ -41,6 +41,9 @@ layout(set = 1, binding = 0) uniform LightingUBO {
     GPULight lights[MAX_LIGHTS];
 } lighting;
 
+// Albedo texture (Set 2, Binding 0)
+layout(set = 2, binding = 0) uniform sampler2D albedoTexture;
+
 // Output color
 layout(location = 0) out vec4 outColor;
 
@@ -155,10 +158,14 @@ void main() {
     if (length(albedo) < 0.01) {
         albedo = fragColor;
     }
+
+    // Sample texture and modulate albedo
+    vec4 textureSample = texture(albedoTexture, fragTexCoord);
+    albedo *= textureSample.rgb;
     
     // Calculate final lit color
     vec3 litColor = calculateLighting(normal, viewDir, albedo);
     
     // Output with opacity
-    outColor = vec4(litColor, material.albedo.a);
+    outColor = vec4(litColor, material.albedo.a * textureSample.a);
 }

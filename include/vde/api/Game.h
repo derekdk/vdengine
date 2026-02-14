@@ -334,6 +334,20 @@ class Game {
     VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
 
     /**
+     * @brief Allocate a mesh texture descriptor set (set 2).
+     */
+    VkDescriptorSet allocateMeshTextureDescriptorSet();
+
+    /**
+     * @brief Update a mesh texture descriptor set with texture binding.
+     * @param descriptorSet Descriptor set to update
+     * @param imageView Texture image view
+     * @param sampler Texture sampler
+     */
+    void updateMeshTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView,
+                                     VkSampler sampler);
+
+    /**
      * @brief Get the sprite rendering pipeline.
      */
     VkPipeline getSpritePipeline() const { return m_spritePipeline; }
@@ -436,6 +450,8 @@ class Game {
     VkPipelineLayout m_meshPipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_meshPipeline = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_meshTextureDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_meshTextureDescriptorPool = VK_NULL_HANDLE;
 
     // Sprite rendering infrastructure (Phase 3)
     VkPipelineLayout m_spritePipelineLayout = VK_NULL_HANDLE;

@@ -6,11 +6,14 @@
 #include "GeometryReplScene.h"
 
 #include <algorithm>
+#include <cfloat>
+#include <cstdint>
 #include <optional>
 #include <sstream>
 
 #include "FileDialog.h"
 #include <imgui.h>
+#include <imgui_impl_vulkan.h>
 
 namespace vde {
 namespace tools {
@@ -19,7 +22,13 @@ namespace tools {
 // Construction / setup
 // ============================================================================
 
-GeometryReplScene::GeometryReplScene(ToolMode mode) : BaseToolScene(mode) {}
+GeometryReplScene::GeometryReplScene(ToolMode mode) : BaseToolScene(mode) {
+    registerCoreCommands();
+}
+
+GeometryReplScene::~GeometryReplScene() {
+    clearAllTexturePreviews();
+}
 
 void GeometryReplScene::onEnter() {
     // Store DPI scale for UI scaling
@@ -47,9 +56,6 @@ void GeometryReplScene::onEnter() {
     if (getToolMode() == ToolMode::INTERACTIVE) {
         createReferenceAxes();
     }
-
-    // --- Register commands ---
-    registerCoreCommands();
 
     // --- Wire up the REPL console ---
     m_console.setCommandRegistry(&m_commands);
@@ -225,6 +231,8 @@ void GeometryReplScene::update(float deltaTime) {
                     texture->uploadToGPU(context);
                 }
 
+                // Recreate preview descriptor if texture with the same name was replaced
+                clearTexturePreview(name);
                 m_textures[name] = texture;
                 addConsoleMessage("Loaded texture '" + name + "' from " + filename);
             }
@@ -540,6 +548,144 @@ void GeometryReplScene::drawDebugUI() {
                     }
 
                     ImGui::Unindent();
+                }
+            }
+        }
+    }
+    ImGui::End();
+
+    // --- Texture Inspector Window ---
+    ImGui::SetNextWindowPos(ImVec2(930 * scale, 10 * scale), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(360 * scale, 400 * scale), ImGuiCond_FirstUseEver);
+
+    if (ImGui::Begin("Texture Inspector")) {
+        // Release preview descriptors for textures that no longer exist
+        for (auto it = m_textureInspectorDescriptors.begin();
+             it != m_textureInspectorDescriptors.end();) {
+            if (m_textures.find(it->first) == m_textures.end()) {
+                if (it->second != VK_NULL_HANDLE) {
+                    ImGui_ImplVulkan_RemoveTexture(it->second);
+                }
+                it = m_textureInspectorDescriptors.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        if (m_textures.empty()) {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "No textures loaded yet");
+            ImGui::TextWrapped("Use 'load-texture <name> <file>' or File -> Load Texture...");
+        } else {
+            // Keep selection valid
+            if (m_textureInspectorSelectedTexture.empty() ||
+                m_textures.find(m_textureInspectorSelectedTexture) == m_textures.end()) {
+                m_textureInspectorSelectedTexture = m_textures.begin()->first;
+            }
+
+            ImGui::Text("Loaded Textures: %zu", m_textures.size());
+
+            if (ImGui::BeginListBox("##TextureList", ImVec2(-FLT_MIN, 160 * scale))) {
+                for (const auto& [name, texture] : m_textures) {
+                    std::string label = name;
+                    if (texture) {
+                        label += " (" + std::to_string(texture->getWidth()) + "x" +
+                                 std::to_string(texture->getHeight()) + ")";
+                    } else {
+                        label += " (invalid)";
+                    }
+
+                    bool selected = (name == m_textureInspectorSelectedTexture);
+                    if (ImGui::Selectable(label.c_str(), selected)) {
+                        m_textureInspectorSelectedTexture = name;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndListBox();
+            }
+
+            auto selectedTextureIt = m_textures.find(m_textureInspectorSelectedTexture);
+            if (selectedTextureIt != m_textures.end() && selectedTextureIt->second) {
+                auto& texture = selectedTextureIt->second;
+                ImGui::Separator();
+                ImGui::Text("Name: %s", m_textureInspectorSelectedTexture.c_str());
+                ImGui::Text("Size: %ux%u", texture->getWidth(), texture->getHeight());
+                ImGui::Text("GPU: %s", texture->isValid() ? "uploaded" : "not uploaded");
+
+                ImGui::Separator();
+                ImGui::Text("Preview:");
+                ImTextureID previewId =
+                    getOrCreateTexturePreview(m_textureInspectorSelectedTexture, texture);
+                if (previewId && texture->getWidth() > 0 && texture->getHeight() > 0) {
+                    float availableWidth = ImGui::GetContentRegionAvail().x;
+                    float maxPreviewHeight = 220.0f * scale;
+
+                    float texWidth = static_cast<float>(texture->getWidth());
+                    float texHeight = static_cast<float>(texture->getHeight());
+
+                    float previewWidth = availableWidth;
+                    float previewHeight = previewWidth * (texHeight / texWidth);
+                    if (previewHeight > maxPreviewHeight) {
+                        float ratio = maxPreviewHeight / previewHeight;
+                        previewHeight = maxPreviewHeight;
+                        previewWidth *= ratio;
+                    }
+
+                    ImGui::Image(previewId, ImVec2(previewWidth, previewHeight));
+                } else {
+                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f),
+                                       "Preview unavailable (texture not GPU-ready)");
+                }
+
+                std::vector<std::string> users;
+                users.reserve(m_geometryObjects.size());
+                for (const auto& [geoName, geo] : m_geometryObjects) {
+                    if (geo.textureName == m_textureInspectorSelectedTexture) {
+                        users.push_back(geoName);
+                    }
+                }
+
+                ImGui::Text("Used By: %zu", users.size());
+                if (users.empty()) {
+                    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(no geometry objects)");
+                } else {
+                    for (const auto& user : users) {
+                        ImGui::BulletText("%s", user.c_str());
+                    }
+                }
+
+                ImGui::Separator();
+                if (m_geometryObjects.empty()) {
+                    ImGui::BeginDisabled();
+                    ImGui::Text("No geometry available to apply");
+                    ImGui::Button("Apply to Geometry", ImVec2(-FLT_MIN, 0));
+                    ImGui::EndDisabled();
+                } else {
+                    if (m_textureInspectorTargetGeometry.empty() ||
+                        m_geometryObjects.find(m_textureInspectorTargetGeometry) ==
+                            m_geometryObjects.end()) {
+                        m_textureInspectorTargetGeometry = m_geometryObjects.begin()->first;
+                    }
+
+                    if (ImGui::BeginCombo("Target Geometry",
+                                          m_textureInspectorTargetGeometry.c_str())) {
+                        for (const auto& [geoName, _] : m_geometryObjects) {
+                            bool selected = (geoName == m_textureInspectorTargetGeometry);
+                            if (ImGui::Selectable(geoName.c_str(), selected)) {
+                                m_textureInspectorTargetGeometry = geoName;
+                            }
+                            if (selected) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+
+                    if (ImGui::Button("Apply to Geometry", ImVec2(-FLT_MIN, 0))) {
+                        cmdApplyTexture(m_textureInspectorTargetGeometry + " " +
+                                        m_textureInspectorSelectedTexture);
+                    }
                 }
             }
         }
@@ -1127,6 +1273,49 @@ size_t GeometryReplScene::countTexturedGeometry() const {
         }
     }
     return count;
+}
+
+ImTextureID
+GeometryReplScene::getOrCreateTexturePreview(const std::string& textureName,
+                                             const std::shared_ptr<vde::Texture>& texture) {
+    if (!texture || !texture->isValid()) {
+        return (ImTextureID)0;
+    }
+
+    auto existing = m_textureInspectorDescriptors.find(textureName);
+    if (existing != m_textureInspectorDescriptors.end() && existing->second != VK_NULL_HANDLE) {
+        return (ImTextureID)existing->second;
+    }
+
+    VkDescriptorSet descriptor = ImGui_ImplVulkan_AddTexture(
+        texture->getSampler(), texture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    if (descriptor == VK_NULL_HANDLE) {
+        return (ImTextureID)0;
+    }
+
+    m_textureInspectorDescriptors[textureName] = descriptor;
+    return (ImTextureID)descriptor;
+}
+
+void GeometryReplScene::clearTexturePreview(const std::string& textureName) {
+    auto it = m_textureInspectorDescriptors.find(textureName);
+    if (it == m_textureInspectorDescriptors.end()) {
+        return;
+    }
+
+    if (it->second != VK_NULL_HANDLE) {
+        ImGui_ImplVulkan_RemoveTexture(it->second);
+    }
+    m_textureInspectorDescriptors.erase(it);
+}
+
+void GeometryReplScene::clearAllTexturePreviews() {
+    for (const auto& [name, descriptor] : m_textureInspectorDescriptors) {
+        if (descriptor != VK_NULL_HANDLE) {
+            ImGui_ImplVulkan_RemoveTexture(descriptor);
+        }
+    }
+    m_textureInspectorDescriptors.clear();
 }
 
 void GeometryReplScene::createReferenceAxes() {

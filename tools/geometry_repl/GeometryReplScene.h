@@ -29,7 +29,7 @@ namespace tools {
 class GeometryReplScene : public BaseToolScene {
   public:
     explicit GeometryReplScene(ToolMode mode = ToolMode::INTERACTIVE);
-    ~GeometryReplScene() override = default;
+    ~GeometryReplScene() override;
 
     void onEnter() override;
     void executeCommand(const std::string& cmdLine) override;
@@ -64,6 +64,9 @@ class GeometryReplScene : public BaseToolScene {
     ReplConsole m_console;
     std::map<std::string, GeometryObject> m_geometryObjects;
     std::map<std::string, std::shared_ptr<vde::Texture>> m_textures;
+    std::map<std::string, VkDescriptorSet> m_textureInspectorDescriptors;
+    std::string m_textureInspectorSelectedTexture;
+    std::string m_textureInspectorTargetGeometry;
     float m_dpiScale = 1.0f;
 
     // Deferred file dialog handling
@@ -119,6 +122,10 @@ class GeometryReplScene : public BaseToolScene {
     void updateGeometryMesh(const std::string& name);
     size_t countVisibleGeometry() const;
     size_t countTexturedGeometry() const;
+    ImTextureID getOrCreateTexturePreview(const std::string& textureName,
+                                          const std::shared_ptr<vde::Texture>& texture);
+    void clearTexturePreview(const std::string& textureName);
+    void clearAllTexturePreviews();
     void createReferenceAxes();
 };
 

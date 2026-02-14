@@ -814,11 +814,14 @@ void Game::createMeshRenderingPipeline() {
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Depth/stencil (no depth test for Phase 2)
+    // Depth/stencil
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_FALSE;
-    depthStencil.depthWriteEnable = VK_FALSE;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
 
     // Color blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
@@ -858,6 +861,39 @@ void Game::createMeshRenderingPipeline() {
         throw std::runtime_error("Failed to create mesh descriptor set layout");
     }
 
+    // Descriptor set layout (for mesh texture sampler at set 2)
+    VkDescriptorSetLayoutBinding textureLayoutBinding{};
+    textureLayoutBinding.binding = 0;
+    textureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textureLayoutBinding.descriptorCount = 1;
+    textureLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
+    textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    textureLayoutInfo.bindingCount = 1;
+    textureLayoutInfo.pBindings = &textureLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr,
+                                    &m_meshTextureDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh texture descriptor set layout");
+    }
+
+    // Create descriptor pool for mesh texture descriptor sets
+    VkDescriptorPoolSize meshTexturePoolSize{};
+    meshTexturePoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    meshTexturePoolSize.descriptorCount = 256;
+
+    VkDescriptorPoolCreateInfo meshTexturePoolInfo{};
+    meshTexturePoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    meshTexturePoolInfo.poolSizeCount = 1;
+    meshTexturePoolInfo.pPoolSizes = &meshTexturePoolSize;
+    meshTexturePoolInfo.maxSets = 256;
+
+    if (vkCreateDescriptorPool(device, &meshTexturePoolInfo, nullptr,
+                               &m_meshTextureDescriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh texture descriptor pool");
+    }
+
     // Push constant range (for model matrix + material properties)
     // Size: 64 (mat4) + 48 (MaterialPushConstants) = 112 bytes
     VkPushConstantRange pushConstantRange{};
@@ -865,10 +901,10 @@ void Game::createMeshRenderingPipeline() {
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(glm::mat4) + sizeof(MaterialPushConstants);
 
-    // Pipeline layout with two descriptor set layouts
-    // Set 0: UBO (view/projection), Set 1: Lighting UBO
-    std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts = {m_meshDescriptorSetLayout,
-                                                                 m_lightingDescriptorSetLayout};
+    // Pipeline layout with descriptor set layouts
+    // Set 0: UBO (view/projection), Set 1: Lighting UBO, Set 2: Texture sampler
+    std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
+        m_meshDescriptorSetLayout, m_lightingDescriptorSetLayout, m_meshTextureDescriptorSetLayout};
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -929,6 +965,16 @@ void Game::destroyMeshRenderingPipeline() {
     if (m_meshDescriptorSetLayout != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device, m_meshDescriptorSetLayout, nullptr);
         m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_meshTextureDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_meshTextureDescriptorSetLayout, nullptr);
+        m_meshTextureDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_meshTextureDescriptorPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, m_meshTextureDescriptorPool, nullptr);
+        m_meshTextureDescriptorPool = VK_NULL_HANDLE;
     }
 }
 
@@ -1281,6 +1327,50 @@ void Game::updateSpriteDescriptor(VkDescriptorSet descriptorSet, VkBuffer uboBuf
     vkUpdateDescriptorSets(m_vulkanContext->getDevice(),
                            static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(),
                            0, nullptr);
+}
+
+VkDescriptorSet Game::allocateMeshTextureDescriptorSet() {
+    if (!m_vulkanContext || m_meshTextureDescriptorPool == VK_NULL_HANDLE ||
+        m_meshTextureDescriptorSetLayout == VK_NULL_HANDLE) {
+        return VK_NULL_HANDLE;
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_meshTextureDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_meshTextureDescriptorSetLayout;
+
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    if (vkAllocateDescriptorSets(m_vulkanContext->getDevice(), &allocInfo, &descriptorSet) !=
+        VK_SUCCESS) {
+        return VK_NULL_HANDLE;
+    }
+
+    return descriptorSet;
+}
+
+void Game::updateMeshTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView,
+                                       VkSampler sampler) {
+    if (!m_vulkanContext || descriptorSet == VK_NULL_HANDLE) {
+        return;
+    }
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = sampler;
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = descriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(m_vulkanContext->getDevice(), 1, &descriptorWrite, 0, nullptr);
 }
 
 // ============================================================================

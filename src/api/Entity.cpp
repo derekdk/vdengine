@@ -31,6 +31,7 @@ static std::shared_ptr<Mesh> s_spriteQuad = nullptr;
 // when the pool is destroyed. This map just tracks which sets exist.
 static constexpr uint32_t MAX_FRAMES = 2;
 static std::unordered_map<Texture*, VkDescriptorSet> s_textureDescriptorSets[MAX_FRAMES];
+static std::unordered_map<Texture*, VkDescriptorSet> s_meshTextureDescriptorSets[MAX_FRAMES];
 
 /**
  * @brief Clear sprite descriptor set cache (called on Game shutdown).
@@ -41,6 +42,7 @@ static std::unordered_map<Texture*, VkDescriptorSet> s_textureDescriptorSets[MAX
 void clearSpriteDescriptorCache() {
     for (int i = 0; i < MAX_FRAMES; ++i) {
         s_textureDescriptorSets[i].clear();
+        s_meshTextureDescriptorSets[i].clear();
     }
     // Clean up the static sprite quad mesh to ensure its Vulkan buffers
     // are destroyed before the device is destroyed
@@ -162,6 +164,21 @@ void MeshEntity::render() {
         return;
     }
 
+    // Resolve texture (or fallback to default white)
+    std::shared_ptr<Texture> texture = m_texture;
+    if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
+        // TODO: Get texture from scene resources when resource management is implemented
+    }
+
+    if (texture && !texture->isOnGPU()) {
+        texture->uploadToGPU(context);
+    }
+
+    Texture* texturePtr = texture ? texture.get() : game->getDefaultWhiteTexture();
+    if (!texturePtr || !texturePtr->isValid()) {
+        return;
+    }
+
     // Upload mesh to GPU if needed
     if (!mesh->isOnGPU()) {
         mesh->uploadToGPU(context);
@@ -205,6 +222,31 @@ void MeshEntity::render() {
     if (lightingDescriptorSet != VK_NULL_HANDLE) {
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1,
                                 &lightingDescriptorSet, 0, nullptr);
+    }
+
+    // Bind texture descriptor set (set 2)
+    uint32_t currentFrame = context->getCurrentFrame();
+    if (currentFrame >= MAX_FRAMES) {
+        currentFrame = 0;
+    }
+
+    VkDescriptorSet meshTextureDescSet = VK_NULL_HANDLE;
+    auto& frameCache = s_meshTextureDescriptorSets[currentFrame];
+    auto textureSetIt = frameCache.find(texturePtr);
+    if (textureSetIt != frameCache.end()) {
+        meshTextureDescSet = textureSetIt->second;
+    } else {
+        meshTextureDescSet = game->allocateMeshTextureDescriptorSet();
+        if (meshTextureDescSet != VK_NULL_HANDLE) {
+            game->updateMeshTextureDescriptor(meshTextureDescSet, texturePtr->getImageView(),
+                                              texturePtr->getSampler());
+            frameCache[texturePtr] = meshTextureDescSet;
+        }
+    }
+
+    if (meshTextureDescSet != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2, 1,
+                                &meshTextureDescSet, 0, nullptr);
     }
 
     // Prepare push constants: model matrix + material properties

@@ -313,6 +313,12 @@ class VulkanContext {
     VkRenderPass m_renderPassLoad = VK_NULL_HANDLE;  // LOAD variant for multi-scene
     std::vector<VkFramebuffer> m_swapChainFramebuffers;
 
+    // Depth resources
+    VkImage m_depthImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_depthImageMemory = VK_NULL_HANDLE;
+    VkImageView m_depthImageView = VK_NULL_HANDLE;
+    VkFormat m_depthFormat = VK_FORMAT_UNDEFINED;
+
     // Descriptor management
     DescriptorManager m_descriptorManager;
 
@@ -415,7 +421,14 @@ class VulkanContext {
     void createImageViews();
 
     void createRenderPass();
+    void createDepthResources();
     void createFramebuffers();
+
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+                                 VkFormatFeatureFlags features);
+    VkFormat findDepthFormat();
+    bool hasStencilComponent(VkFormat format) const;
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     void createDescriptorSetLayouts();
     void createUniformBuffers();
