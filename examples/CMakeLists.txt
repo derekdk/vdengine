@@ -82,6 +82,9 @@ add_vde_example(vde_world_bounds_demo "world_bounds_demo/main.cpp")
 # Materials & Lighting demo example demonstrating Phase 4 features
 add_vde_example(vde_materials_lighting_demo "materials_lighting_demo/main.cpp")
 
+# Hex prism stacks demo example demonstrating mouse pick-and-drag interaction
+add_vde_example(vde_hex_prism_stacks_demo "hex_prism_stacks_demo/main.cpp")
+
 # Resource Management demo example demonstrating Phase 5 features
 add_vde_example(vde_resource_demo "resource_demo/main.cpp")
 
