@@ -406,6 +406,19 @@ void GeometryReplScene::drawDebugUI() {
                         setGeometryVisible(name, geo.visible);
                     }
 
+                    bool wireframeEnabled = geo.showWireframe;
+                    if (ImGui::Checkbox(("Wireframe##" + name).c_str(), &wireframeEnabled)) {
+                        cmdShowWireframe(name);
+                    }
+
+                    ImGui::BeginDisabled(!geo.showWireframe);
+                    if (ImGui::ColorEdit3(("Wire Color##" + name).c_str(), &geo.wireframeColor.x)) {
+                        cmdWireframeColor(name + " " + std::to_string(geo.wireframeColor.x) + " " +
+                                          std::to_string(geo.wireframeColor.y) + " " +
+                                          std::to_string(geo.wireframeColor.z));
+                    }
+                    ImGui::EndDisabled();
+
                     if (ImGui::Button(("Export##" + name).c_str())) {
                         std::string filename = name + ".obj";
                         if (geo.exportToOBJ(filename)) {
