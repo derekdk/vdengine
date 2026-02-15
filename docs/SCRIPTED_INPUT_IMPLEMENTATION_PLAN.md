@@ -8,20 +8,27 @@ The following decisions were resolved during the review and are codified here:
 
 | Decision | Resolution | Rationale |
 |---|---|---|
+| Command syntax | Verb-arg (space-separated) | Matches xdotool/AutoHotkey convention; simpler to parse and write than angle-bracket tags |
 | File extension | `.vdescript` | Distinct from generic `.txt`; enables tooling/file-association |
 | Namespace for helpers | `vde::` (not `vde::examples::`) | Shared by examples and tools; lives alongside `Game` |
 | Logging prefix | `[VDE:InputScript]` | Matches engine subsystem convention |
+| Modifier key syntax | `ctrl+`, `shift+`, `alt+` prefix | Matches xdotool/browser convention; composable with `+` separator |
+| Mouse coordinate space | Window-relative pixels | Matches GLFW callback coordinate space |
+| Loop syntax | `label NAME` / `loop NAME COUNT` | Named labels avoid nesting complexity; count=0 means infinite |
 | Input source priority | API call > CLI arg > env var | Standard convention; CLI always wins over env |
 | Error handling | Fail-fast; abort with line number | Prevents confusing partial script executions |
-| Script end behavior | App continues running after last command | Only `<exit>` terminates; allows setup-then-interact scripts |
+| Script end behavior | App continues running after last command | Only `exit` terminates; allows setup-then-interact scripts |
 | Tool batch processing | Not in scope — use proper CLI args | Keyboard simulation for batch ops is fragile |
-| Future enhancements | Not in scope — separate proposals | Keep the system simple: `<wait>`, `<press>`, `<exit>` |
 
 ## Scope
 
 **In scope (Phase 1):**
 - Script parser and command execution engine
-- Commands: `<wait for startup>`, `<wait N>`, `<press KEY>`, `<keydown KEY>`, `<keyup KEY>`, `<exit>`
+- Verb-arg command syntax (space-separated, no angle brackets)
+- Keyboard commands: `wait startup`, `wait N`, `press KEY`, `keydown KEY`, `keyup KEY`, `exit`
+- Modifier keys: `press ctrl+A`, `keydown shift+W`, `press ctrl+shift+S`
+- Mouse commands: `click X Y`, `click right X Y`, `mousedown X Y`, `mouseup X Y`, `mousemove X Y`, `scroll X Y DELTA`
+- Loop control: `label NAME`, `loop NAME COUNT`
 - `--input-script` CLI argument support on `Game`
 - `VDE_INPUT_SCRIPT` environment variable fallback (lowest priority)
 - `Game::setInputScriptFile()` direct API (highest priority)
@@ -29,7 +36,7 @@ The following decisions were resolved during the review and are codified here:
 - All 20 example `main()` + 1 tool `main()` updated to pass `argc`/`argv`
 - Smoke test `.vdescript` scripts for each example
 - Unit tests for the script parser
-- `<screenshot PATH>` command (save frame to PNG via stb_image_write)
+- `screenshot PATH` command (save frame to PNG via stb_image_write)
 - Script file extension: `.vdescript`
 - Console logging with `[VDE:InputScript]` prefix
 
@@ -37,8 +44,8 @@ The following decisions were resolved during the review and are codified here:
 - `extractpixels`, `hashpixels`, `comparepixels`
 - GPU-to-CPU pixel readback infrastructure
 - Hash computation / visual regression framework
-- Mouse/gamepad scripting
-- Conditional logic, variables, loops
+- Gamepad scripting
+- Conditional logic, variables
 
 ---
 
@@ -79,21 +86,44 @@ void configureInputScriptFromArgs(Game& game, int argc, char** argv);
 
 ```cpp
 enum class CommandType {
-    WaitForStartup,  // <wait for startup>
-    WaitMs,          // <wait 500>
-    Press,           // <press 'A'>  (keydown + keyup)
-    KeyDown,         // <keydown 'W'>
-    KeyUp,           // <keyup 'W'>
-    Screenshot,      // <screenshot path.png>
-    Exit             // <exit>
+    WaitStartup,   // wait startup
+    WaitMs,        // wait 500
+    Press,         // press A          (keydown + keyup, with optional modifiers)
+    KeyDown,       // keydown W        (with optional modifiers)
+    KeyUp,         // keyup W          (with optional modifiers)
+    Click,         // click 400 300    (left-click at position)
+    ClickRight,    // click right 400 300
+    MouseDown,     // mousedown 400 300
+    MouseUp,       // mouseup 400 300
+    MouseMove,     // mousemove 400 300
+    Scroll,        // scroll 400 300 -3
+    Screenshot,    // screenshot path.png
+    Label,         // label loop_start
+    Loop,          // loop loop_start 5
+    Exit           // exit
 };
 
 struct ScriptCommand {
     CommandType type;
     int keyCode = 0;              // for Press/KeyDown/KeyUp
+    int modifiers = 0;            // bitmask: MOD_CTRL | MOD_SHIFT | MOD_ALT
     double waitMs = 0.0;          // for WaitMs
-    std::string argument;         // for Screenshot path
+    double mouseX = 0.0;          // for Click/MouseDown/MouseUp/MouseMove/Scroll
+    double mouseY = 0.0;          // for Click/MouseDown/MouseUp/MouseMove/Scroll
+    double scrollDelta = 0.0;     // for Scroll
+    std::string argument;         // for Screenshot path, Label name, Loop target
+    int loopCount = 0;            // for Loop (0 = infinite)
     int lineNumber = 0;           // source line for error messages
+};
+
+// Modifier bitmask constants
+constexpr int MOD_CTRL  = 1 << 0;
+constexpr int MOD_SHIFT = 1 << 1;
+constexpr int MOD_ALT   = 1 << 2;
+
+struct LabelState {
+    size_t commandIndex = 0;      // index of the label command
+    int remainingIterations = -1; // -1 = not yet entered, 0 = infinite
 };
 
 struct InputScriptState {
@@ -104,37 +134,130 @@ struct InputScriptState {
     bool finished = false;
     std::string scriptPath;
     uint64_t frameNumber = 0;     // for screenshot frame tracking
+    std::unordered_map<std::string, LabelState> labels;  // label name → state
 };
 ```
+
+**Command syntax reference:**
+
+All commands use a verb-arg format with space-separated arguments. Commands are case-insensitive. Comments use `#` or `//`.
+
+```text
+# Timing
+wait startup                     # wait for first frame render
+wait 500                         # wait 500ms
+wait 2s                          # wait 2 seconds (optional suffix)
+
+# Keyboard — bare key names (no quotes needed)
+press A                          # keydown + keyup for A
+press SPACE                      # keydown + keyup for Space
+keydown W                        # hold W
+keyup W                          # release W
+
+# Keyboard — with modifiers (+ separator, order doesn't matter)
+press ctrl+S                     # Ctrl+S
+press ctrl+shift+Z               # Ctrl+Shift+Z
+press alt+F4                     # Alt+F4
+keydown shift+W                  # hold Shift+W
+
+# Mouse — window-relative pixel coordinates
+click 400 300                    # left-click at (400, 300)
+click right 400 300              # right-click at (400, 300)
+mousedown 400 300                # press left button at (400, 300)
+mouseup 500 300                  # release left button at (500, 300)
+mousemove 640 360                # move cursor to (640, 360)
+scroll 400 300 -3                # scroll down 3 units at (400, 300)
+scroll 400 300 5                 # scroll up 5 units at (400, 300)
+
+# Loops — named labels with counted repetition
+label my_loop                    # define a jump target
+press A
+wait 200
+loop my_loop 5                   # jump back to label, 5 total iterations
+loop my_loop 0                   # jump back to label, infinite (until exit)
+
+# Capture
+screenshot output.png            # save current frame to PNG
+
+# Control
+exit                             # quit the application
+```
+
+**Modifier key handling:**
+- Modifiers are parsed from the `+`-separated key argument: `ctrl+shift+A` → modifiers=`MOD_CTRL|MOD_SHIFT`, key=`A`
+- The key itself is always the last token after splitting on `+`
+- Modifier names are case-insensitive: `Ctrl`, `CTRL`, `ctrl` all match
+- Supported modifiers: `ctrl`, `shift`, `alt`
+- When executing a modified press: `onKeyPress(key, modifiers)` / `onKeyRelease(key, modifiers)` — modifiers are passed through to the handler
+- If the engine's `InputHandler` doesn't support a modifiers parameter, fall back to synthesizing individual modifier keydown/keyup events around the main key
+
+**Mouse input handling:**
+- Coordinates are window-relative pixels matching GLFW's callback coordinate space
+- `click X Y` synthesizes: `onMouseMove(X, Y)` → `onMouseButton(LEFT, PRESS)` → next-frame `onMouseButton(LEFT, RELEASE)`
+- `click right X Y` uses `RIGHT` button instead of `LEFT`
+- `mousedown`/`mouseup` give explicit control for drag sequences
+- `scroll X Y DELTA` maps to `onMouseScroll(X, Y, DELTA)` — positive = up, negative = down
+- Mouse events are dispatched through the same handler resolution as keyboard: focused scene handler → global input handler
+
+**Loop handling:**
+- `label NAME` records the command index for the given label name; does not execute anything
+- `loop NAME COUNT` jumps the command pointer back to the command after `label NAME`
+- COUNT is the total number of iterations. On first encounter, `remainingIterations` is set to COUNT. Each time `loop` is reached, remaining is decremented. When remaining reaches 0, execution falls through.
+- COUNT=0 means infinite loop (never decrements, always jumps). Only `exit` or external termination stops infinite loops.
+- Labels must be defined before the `loop` command that references them (forward references are parse errors)
+- Nested loops are supported by using different label names:
+  ```text
+  label outer
+    label inner
+    press A
+    wait 100
+    loop inner 3
+  press B
+  wait 200
+  loop outer 2
+  ```
 
 **Parser responsibilities:**
 - Read file line by line
 - Strip comments (`#`, `//`) and blank lines
-- Strip optional `<` `>` delimiters
-- Case-insensitive command matching
-- Map key names to `vde::KEY_*` constants
-- Handle `'A'` single-char syntax → ASCII code → KEY_* constant
+- Split each line into verb + arguments by whitespace
+- Case-insensitive verb matching
+- Map key names to `vde::KEY_*` constants (bare names, no quotes)
+- Parse modifier prefixes from `+`-separated key arguments
+- Parse mouse coordinates as doubles
+- Parse scroll delta as signed double
+- Resolve label references and validate no forward-reference loops
 - Handle named keys: `SPACE`, `ESC`/`ESCAPE`, `ENTER`/`RETURN`, `TAB`, `BACKSPACE`, `DELETE`, `INSERT`, `HOME`, `END`, `LEFT`, `RIGHT`, `UP`, `DOWN`, `PGUP`/`PAGEUP`, `PGDN`/`PAGEDOWN`, `F1`–`F12`
-- Optional `KEY_` prefix stripping
+- Single character key names map directly: `A` → `KEY_A`, `1` → `KEY_1`
+- Optional `KEY_` prefix stripping: `KEY_SPACE` and `SPACE` are equivalent
 - Report errors with line numbers
 
 **Execution responsibilities (called from `Game::run()`):**
 - Track current command index
-- `WaitForStartup`: set flag on first frame, advance
+- `WaitStartup`: set flag on first frame, advance
 - `WaitMs`: accumulate `deltaTime`, advance when elapsed
-- `Press`: call `handler->onKeyPress(key)` then `handler->onKeyRelease(key)`
-- `KeyDown`: call `handler->onKeyPress(key)`
-- `KeyUp`: call `handler->onKeyRelease(key)`
+- `Press`: call `handler->onKeyPress(key, modifiers)` then `handler->onKeyRelease(key, modifiers)`
+- `KeyDown`: call `handler->onKeyPress(key, modifiers)`
+- `KeyUp`: call `handler->onKeyRelease(key, modifiers)`
+- `Click`/`ClickRight`: move cursor, press button, schedule release on next frame
+- `MouseDown`/`MouseUp`: dispatch mouse button event at position
+- `MouseMove`: dispatch cursor position event
+- `Scroll`: dispatch scroll event at position
 - `Screenshot`: capture swapchain to PNG with frame number in filename (WI-5)
+- `Label`: no-op at execution time, advance
+- `Loop`: check remaining iterations, jump or fall through
 - `Exit`: call `Game::quit()`
 - Handler resolution: focused scene handler → global input handler (matching existing dispatch logic)
-- When all commands are consumed, do nothing (app continues running; only `<exit>` terminates)
+- When all commands are consumed, do nothing (app continues running; only `exit` terminates)
 - Frame counter incremented each frame for screenshot ordering
 
 **Logging:**
 - All console output uses the `[VDE:InputScript]` prefix
 - Script load: `[VDE:InputScript] Loaded 12 commands from path/to/script.vdescript`
-- Command execution: `[VDE:InputScript] press 'A'` (debug-level, optional)
+- Command execution: `[VDE:InputScript] press A` (debug-level, optional)
+- Modifier commands: `[VDE:InputScript] press ctrl+shift+S` (debug-level, optional)
+- Mouse commands: `[VDE:InputScript] click 400 300` (debug-level, optional)
+- Loop commands: `[VDE:InputScript] loop my_loop iteration 3/5` (debug-level, optional)
 - Errors: `[VDE:InputScript] Error at line 5: Invalid key name 'XYZ'`
 
 **Error handling:**
@@ -142,6 +265,9 @@ struct InputScriptState {
 - Log error with source line number and the offending text
 - `loadInputScript()` returns false; `Game::initialize()` logs warning but continues (no script replay)
 - File-not-found logs error to stderr and continues without a script
+- Undefined label in `loop` command is a parse error
+- Invalid mouse coordinates (non-numeric) are parse errors
+- Unknown modifier name is a parse error
 
 **CMake:** Add both files to `VDE_PUBLIC_HEADERS` and `VDE_SOURCES` in root `CMakeLists.txt`.
 
@@ -202,6 +328,9 @@ private:
 3. **New method `processInputScript()`** — delegates to `InputScriptState` logic:
    - If no script loaded, return immediately
    - Process commands using `deltaTime`, dispatch to resolved input handler
+   - Keyboard commands dispatch with modifier bitmask
+   - Mouse commands dispatch cursor position and button events
+   - Loop commands manage label jump state
    - On `Exit` command, call `quit()`
 
 4. **In `quit()`** or destructor — clean up `m_inputScriptState`.
@@ -298,15 +427,15 @@ int main(int argc, char** argv) {
 
 **Command syntax:**
 ```text
-<screenshot output.png>
-<screenshot screenshots/test.png>
+screenshot output.png
+screenshot screenshots/test.png
 ```
 
 **Frame number insertion:**
 Screenshots automatically include the frame number at which they were captured, enabling chronological ordering during review. The frame number is inserted before the file extension:
 
-- `<screenshot output.png>` → `output_frame_0042.png` (captured at frame 42)
-- `<screenshot screenshots/test.png>` → `screenshots/test_frame_0137.png` (captured at frame 137)
+- `screenshot output.png` → `output_frame_0042.png` (captured at frame 42)
+- `screenshot screenshots/test.png` → `screenshots/test_frame_0137.png` (captured at frame 137)
 
 Frame numbers are zero-padded to 6 digits to ensure proper lexicographic sorting.
 
@@ -328,23 +457,54 @@ Frame numbers are zero-padded to 6 digits to ensure proper lexicographic sorting
 **Test cases (no GPU needed):**
 
 ```
-ParsesWaitForStartup
+# Timing
+ParsesWaitStartup
 ParsesWaitMs
+ParsesWaitSecondsSuffix
+
+# Keyboard — basic
 ParsesPressCharacterKey  
 ParsesPressNamedKey
 ParsesPressWithKeyPrefix
 ParsesKeyDown
 ParsesKeyUp
+
+# Keyboard — modifiers
+ParsesCtrlModifier
+ParsesShiftModifier
+ParsesAltModifier
+ParsesMultipleModifiers
+ModifierOrderDoesNotMatter
+UnknownModifierReportsError
+
+# Mouse
+ParsesClick
+ParsesClickRight
+ParsesMouseDown
+ParsesMouseUp
+ParsesMouseMove
+ParsesScroll
+ParsesScrollNegativeDelta
+InvalidMouseCoordsReportsError
+
+# Loops
+ParsesLabel
+ParsesLoop
+ParsesLoopInfinite
+UndefinedLabelReportsError
+NestedLoopsWithDifferentLabels
+
+# Control
 ParsesExit
 ParsesQuit
+ParsesScreenshot
+
+# Syntax
 IgnoresComments
 IgnoresBlankLines
-StripsAngleBrackets
 CaseInsensitive
-InvalidKeyReportsError
+InvalidVerbReportsError
 MalformedCommandReportsError
-ParsesScreenshot
-WaitMsAcceptsOptionalMsSuffix
 ```
 
 **Register in `tests/CMakeLists.txt`** by adding to `VDE_TEST_SOURCES`.
@@ -363,22 +523,54 @@ These tests validate the parser logic against the `ScriptCommand` output — pur
 ```text
 # Universal smoke test
 # Verifies example launches, renders, and exits cleanly
-<wait for startup>
-<wait 3000>
-<exit>
+wait startup
+wait 3000
+exit
 ```
 
 **Per-example scripts** (optional, for examples with specific key bindings):
 ```text
 # scripts/input/smoke_physics_demo.vdescript
-<wait for startup>
-<wait 1000>
-<press '1'>
-<wait 500>
-<press '2'>
-<wait 500>
-<wait 2000>
-<exit>
+wait startup
+wait 1000
+press 1
+wait 500
+press 2
+wait 500
+wait 2000
+exit
+```
+
+**Script demonstrating modifiers, mouse, and loops:**
+```text
+# scripts/input/smoke_interactive_demo.vdescript
+wait startup
+wait 500
+
+# Click in the viewport, then use modifier keys
+click 640 360
+wait 200
+press ctrl+S
+wait 500
+
+# Drag sequence
+mousedown 100 100
+wait 100
+mousemove 300 300
+wait 100
+mouseup 300 300
+wait 200
+
+# Repeat a key sequence 3 times
+label key_loop
+press A
+wait 200
+press B
+wait 200
+loop key_loop 3
+
+wait 1000
+exit
 ```
 
 **Update `scripts/tmp_run_examples_check.ps1`** to use `--input-script scripts/input/smoke_test.vdescript` instead of relying on auto-timeout.
@@ -426,15 +618,15 @@ Phase 1d — Optional enhancement
 
 | Work Item | Complexity | Estimated Effort |
 |---|---|---|
-| WI-1: InputScript engine | Medium | 3–4 hours |
-| WI-2: Game integration | Low | 1 hour |
+| WI-1: InputScript engine | Medium–High | 5–7 hours |
+| WI-2: Game integration | Medium | 2–3 hours |
 | WI-3: Base class updates | Low | 30 min |
 | WI-4: 21 main() updates | Low (mechanical) | 1 hour |
 | WI-5: Screenshot command | Medium | 2–3 hours |
-| WI-6: Parser unit tests | Low | 1–2 hours |
-| WI-7: Smoke test scripts | Low | 30 min |
+| WI-6: Parser unit tests | Medium | 2–3 hours |
+| WI-7: Smoke test scripts | Low | 1 hour |
 | WI-8: Documentation | Low | 1–2 hours |
-| **Total (excluding screenshot)** | | **~8–10 hours** |
+| **Total (excluding screenshot)** | | **~13–18 hours** |
 
 ---
 
@@ -477,6 +669,18 @@ $env:VDE_INPUT_SCRIPT = "scripts/input/other.vdescript"
 # Given a script with a bad command on line 5:
 # Logs: [VDE:InputScript] Error at line 5: unrecognized command 'foobar'
 # Script not loaded; app runs without replay
+
+# 9. Modifier keys work
+# Script: press ctrl+S
+# Console shows: [VDE:InputScript] press ctrl+S
+
+# 10. Mouse input works
+# Script: click 400 300
+# Console shows: [VDE:InputScript] click 400 300
+
+# 11. Loops work
+# Script with: label test / press A / wait 100 / loop test 3
+# Console shows: [VDE:InputScript] loop test iteration 1/3 ... 2/3 ... 3/3
 ```
 
 ---
@@ -491,6 +695,12 @@ $env:VDE_INPUT_SCRIPT = "scripts/input/other.vdescript"
 
 ## Open Questions
 
-1. **Should `<press>` dispatch to ImGui as well?** If debug UI is active, scripted keys may need to go through GLFW's input path rather than directly calling `InputHandler`. This needs investigation during WI-2. If ImGui is consuming input, scripted presses routed only to `InputHandler` may be silently ignored by ImGui overlays.
+1. **Should `press` dispatch to ImGui as well?** If debug UI is active, scripted keys may need to go through GLFW's input path rather than directly calling `InputHandler`. This needs investigation during WI-2. If ImGui is consuming input, scripted presses routed only to `InputHandler` may be silently ignored by ImGui overlays. Mouse commands have the same concern — `click` may need to feed through GLFW's cursor callback for ImGui hit-testing to work.
 
 2. **Timing precision:** Waits use frame delta time. On a 60fps display, minimum granularity is ~16ms. This is sufficient for smoke testing. Sub-frame interpolation is not planned — if finer control becomes necessary, it can be proposed as a Phase 2 enhancement.
+
+3. **Modifier state leaking:** If a script uses `keydown shift+W` and the script ends or errors before `keyup shift+W`, the modifier state may leak. Consider resetting all pressed keys/modifiers when the script finishes or encounters an error.
+
+4. **Mouse coordinate scaling:** On high-DPI displays, GLFW content scale may differ from window coordinates. Decide whether script coordinates are in screen pixels or content-scale-adjusted pixels. Recommendation: use raw window coordinates (matching GLFW callbacks) and document this.
+
+5. **Infinite loop safety:** `loop NAME 0` runs forever. Consider adding a maximum iteration guard (e.g., 100,000) to prevent accidental hangs, with an override flag for intentionally infinite scripts.
