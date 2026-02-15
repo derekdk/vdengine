@@ -84,6 +84,7 @@ $smokeScriptMap = @{
 }
 
 # List of all example executables (excluding triangle which doesn't use Game API)
+# Note: geometry_repl is a tool in tools/, not an example
 $apps = @(
   'vde_sidescroller.exe',
   'vde_simple_game_example.exe',
@@ -103,8 +104,7 @@ $apps = @(
   'vde_quad_viewport_demo.exe',
   'vde_materials_lighting_demo.exe',
   'vde_resource_demo.exe',
-  'vde_hex_prism_stacks_demo.exe',
-  'vde_geometry_repl.exe'
+  'vde_hex_prism_stacks_demo.exe'
 )
 
 # Default smoke script
