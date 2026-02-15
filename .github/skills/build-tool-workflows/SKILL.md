@@ -27,6 +27,7 @@ This skill provides the essential workflows for building and testing the Vulkan 
 | `rebuild.ps1` | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator MSBuild -Config Release` |
 | `clean.ps1` | Clean build artifacts | `.\scripts\clean.ps1 -Generator Ninja -Full` |
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
+| `smoke-test.ps1` | Run smoke tests on examples | `.\scripts\smoke-test.ps1 -Build` |
 
 ### Common Build Tasks
 
@@ -75,6 +76,16 @@ This skill provides the essential workflows for building and testing the Vulkan 
 .\scripts\test.ps1 -Build
 ```
 
+**Run smoke tests on all examples:**
+```powershell
+.\scripts\smoke-test.ps1
+```
+
+**Build and smoke test:**
+```powershell
+.\scripts\smoke-test.ps1 -Build
+```
+
 ### Script Parameters Reference
 
 **build.ps1**
@@ -88,6 +99,12 @@ This skill provides the essential workflows for building and testing the Vulkan 
 - `-Config` - Debug (default) or Release
 
 **clean.ps1**
+
+**smoke-test.ps1**
+- `-Generator` - Ninja (default) or MSBuild
+- `-Config` - Debug (default) or Release
+- `-Build` - Build before running smoke tests
+- `-Verbose` - Verbose output with detailed error messages
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Full` - Remove entire build directory
@@ -228,6 +245,40 @@ test script (RECOMMENDED)
 # Run release tests with Ninja
 .\scripts\test.ps1 -Generator Ninja -Config Release -Build
 ```
+
+## Smoke Tests (Automated Example Testing)
+
+Smoke tests run all built examples with automated input scripts to verify they launch and exit cleanly.
+
+```powershell
+.\scripts\smoke-test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Verbose]
+```
+
+**Examples:**
+```powershell
+# Run all smoke tests (default Ninja Debug)
+.\scripts\smoke-test.ps1
+
+# Build and smoke test in one command
+.\scripts\smoke-test.ps1 -Build
+
+# Verbose mode shows detailed error output
+.\scripts\smoke-test.ps1 -Verbose
+
+# Smoke test with MSBuild Release configuration
+.\scripts\smoke-test.ps1 -Generator MSBuild -Config Release -Build
+```
+
+**VS Code Task:**
+- Run Task: `scripts: smoke-test`
+
+**What it does:**
+- Runs each example with its corresponding smoke test script from `scripts/input/`
+- Uses `smoke_quick.vdescript` for examples without custom scripts
+- Reports pass/fail for each example
+- Exits with code 1 if any example fails
+
+**See also:** The **scripted-input** skill for details on creating `.vdescript` test scripts.
 
 ### Using the legacy build-and-test script
 

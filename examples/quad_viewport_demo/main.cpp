@@ -782,8 +782,13 @@ class QuadViewportDemo : public vde::Game {
 // Main
 // ============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     QuadViewportDemo demo;
+
+    // Configure input script from CLI args if provided
+    if (argc > 0 && argv != nullptr) {
+        vde::configureInputScriptFromArgs(demo, argc, argv);
+    }
 
     vde::GameSettings settings;
     settings.gameName = "VDE Quad Viewport Demo";

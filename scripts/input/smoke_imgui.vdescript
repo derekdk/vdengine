@@ -1,0 +1,19 @@
+# Smoke test for ImGui demo
+# Tests UI interaction
+wait startup
+wait 1000
+
+# Toggle UI visibility
+press F1
+wait 500
+press F1
+wait 500
+
+# Click around in the window to trigger UI  
+click 400 300
+wait 300
+click 600 400
+wait 300
+
+wait 2s
+exit

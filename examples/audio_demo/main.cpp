@@ -439,7 +439,7 @@ using AudioGame = vde::examples::BaseExampleGame<AudioInputHandler, AudioDemoSce
 // Main
 // =============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     AudioGame game;
 
     GameSettings settings;
@@ -454,5 +454,5 @@ int main() {
     settings.audio.sfxVolume = 1.0f;
     settings.audio.muted = false;
 
-    return vde::examples::runExample(game, "VDE Audio Demo", 1280, 720);
+    return vde::examples::runExample(game, "VDE Audio Demo", 1280, 720, argc, argv);
 }

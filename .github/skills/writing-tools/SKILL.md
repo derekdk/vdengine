@@ -197,7 +197,8 @@ int main(int argc, char** argv) {
         uint32_t width = static_cast<uint32_t>(1400 * dpiScale);
         uint32_t height = static_cast<uint32_t>(800 * dpiScale);
         
-        return runTool(tool, "My Tool Name", width, height);
+        // Note: Passing argc/argv enables --input-script support for automated testing
+        return runTool(tool, "My Tool Name", width, height, argc, argv);
     } else {
         // Script mode - minimal window, no validation
         vde::GameSettings settings;
@@ -262,6 +263,17 @@ setcolor triangle 1.0 0.0 0.0
 # Export assets
 export triangle output/triangle.obj
 ```
+
+### Input Script Automation
+
+In addition to tool-specific script commands, tools support VDE's **scripted-input** system for UI automation and testing. This is orthogonal to the tool's own command script mode:
+
+- **Tool scripts** (above) define _what objects to create_ (geometry, materials, etc.)
+- **Input scripts** (`.vdescript` files) define _how to interact with the UI_ (clicks, keys, etc.)
+
+Example use case: Automate testing of the tool's UI by clicking buttons and verifying console output.
+
+See the **scripted-input** skill for details on `--input-script` support and creating smoke tests.
 
 ## CMakeLists.txt Template
 
@@ -438,6 +450,7 @@ ImGui::End();
 
 ## Testing Tools
 
+### Interactive Mode Testing
 1. **Interactive Mode:**
    ```bash
    ./vde_my_tool
@@ -447,6 +460,7 @@ ImGui::End();
    - Check mouse camera controls
    - Test F1, F11, ESC keys
 
+### Script Mode Testing
 2. **Script Mode:**
    ```bash
    ./vde_my_tool test_script.txt
@@ -456,6 +470,32 @@ ImGui::End();
    - Verify console output is readable
    - Test error handling
 
+### Smoke Testing (Automated Input)
+Tools can also use the **scripted-input** system for UI automation and smoke testing. This is separate from tool command scripts:
+
+- **Tool scripts** define _what to create_ (geometry, materials, etc.)
+- **Input scripts** (`.vdescript`) define _how to interact with UI_ (clicks, keys)
+
+**Create a smoke test for your tool:**
+1. Create `scripts/input/smoke_<tool_name>.vdescript`
+2. Test key UI interactions, command execution, etc.
+3. Add to smoke test runner (see writing-examples skill)
+
+**Example:**
+```vdescript
+# smoke_my_tool.vdescript
+wait startup
+wait 500
+press F1          # Toggle UI
+wait 500
+click 640 360     # Click in viewport
+wait 2s
+exit
+```
+
+**Note:** Input scripts test the UI interaction layer, while tool command scripts test the batch processing layer. Both are important for comprehensive testing.
+
+### Example Scripts
 3. **Create Example Scripts:**
    - Provide sample scripts in tool directory or README
    - Cover common use cases

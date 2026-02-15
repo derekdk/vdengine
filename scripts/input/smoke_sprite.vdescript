@@ -1,0 +1,13 @@
+# Smoke test for sprite demo
+# Tests sprite rendering and basic interactivity
+wait startup
+wait 1000
+
+# Move through a few frames
+press SPACE
+wait 300
+press SPACE
+wait 300
+
+wait 2s
+exit

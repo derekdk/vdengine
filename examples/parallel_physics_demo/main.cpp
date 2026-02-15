@@ -455,8 +455,13 @@ class ParallelPhysicsGame : public vde::Game {
 // Main
 // ============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     ParallelPhysicsGame game;
+
+    // Configure input script from CLI args if provided
+    if (argc > 0 && argv != nullptr) {
+        vde::configureInputScriptFromArgs(game, argc, argv);
+    }
 
     vde::GameSettings settings;
     settings.gameName = "VDE Parallel Physics Demo";

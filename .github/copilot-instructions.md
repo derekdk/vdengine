@@ -55,3 +55,8 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Purpose:** Guide for integrating Dear ImGui with VDE applications.  
 **Use when:** Adding debug UI, tools, or overlay interfaces to VDE games and examples.  
 **Location:** `.github/skills/imgui-integration/SKILL.md`
+
+### scripted-input
+**Purpose:** Guide for using scripted input automation in VDE games, examples, and tools.  
+**Use when:** Adding test automation, smoke tests, automated demos, or CI/CD integration.  
+**Location:** `.github/skills/scripted-input/SKILL.md`

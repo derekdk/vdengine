@@ -1,0 +1,18 @@
+# Smoke test for breakout demo
+# Tests paddle movement and ball interaction
+wait startup
+wait 500
+
+# Move paddle left and right
+keydown LEFT
+wait 1000
+keyup LEFT
+
+keydown RIGHT
+wait 1000
+keyup RIGHT
+
+# Let game run for a bit
+wait 3s
+
+exit

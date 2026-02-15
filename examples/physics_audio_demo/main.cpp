@@ -445,7 +445,8 @@ class PhysicsAudioGame
 // Main
 // ============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     PhysicsAudioGame game;
-    return vde::examples::runExample(game, "VDE Physics + Audio Pipeline Demo", 1280, 720);
+    return vde::examples::runExample(game, "VDE Physics + Audio Pipeline Demo", 1280, 720, argc,
+                                     argv);
 }

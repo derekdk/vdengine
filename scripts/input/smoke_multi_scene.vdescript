@@ -1,0 +1,17 @@
+# Smoke test for multi-scene demo
+# Tests scene switching
+wait startup
+wait 1000
+
+# Cycle through scenes (if keys are bound)
+press 1
+wait 500
+press 2
+wait 500
+press 3
+wait 500
+press 4
+wait 500
+
+wait 2s
+exit

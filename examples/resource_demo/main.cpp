@@ -415,7 +415,7 @@ class ResourceDemoGame
 /**
  * @brief Main entry point.
  */
-int main() {
+int main(int argc, char** argv) {
     ResourceDemoGame demo;
-    return vde::examples::runExample(demo, "VDE Resource Management Demo", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Resource Management Demo", 1280, 720, argc, argv);
 }

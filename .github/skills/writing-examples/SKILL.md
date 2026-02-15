@@ -32,10 +32,50 @@ All examples should use the shared `ExampleBase.h` header which provides base cl
 **Note:** `runExample(...)` automatically sets the process working directory to the executable directory on startup. This makes relative paths (for example `shaders/...`) resolve correctly even when launching from another folder.
 
 ## Testing the Example
+
+### Manual Testing
 1. Make sure the example builds and runs correctly.
 2. Verify that the console output correctly describes the expected visuals and controls.
 3. Run the example and have a user verify the output by pressing 'F' for failure, pressing 'ESC' to exit, or letting it auto-terminate.
 4. Check that the exit code is `0` for success and `1` for failure
+
+### Smoke Testing (Automated)
+All examples should have a smoke test script for automated verification. See the **scripted-input** skill for details on creating `.vdescript` files.
+
+**Create a smoke test:**
+1. Create a script in `scripts/input/smoke_<example_name>.vdescript`
+2. Use `wait startup` to wait for first frame
+3. Add interactions specific to your example (key presses, mouse clicks, etc.)
+4. Use `wait` commands to let the example run
+5. End with `exit` command
+
+**Example smoke test:**
+```vdescript
+# smoke_materials_demo.vdescript
+wait startup
+wait 500
+press 1            # Switch material
+wait 500
+press 2            # Switch material
+wait 2s
+exit
+```
+
+**Add to smoke test runner:**
+Edit `scripts/smoke-test.ps1` to map your example to its smoke script:
+```powershell
+$smokeScriptMap = @{
+  'vde_my_demo.exe' = 'smoke_my_demo.vdescript'
+}
+```
+
+**Run smoke tests:**
+```bash
+# Run all example smoke tests
+.\scripts\smoke-test.ps1
+
+# VS Code task: "scripts: smoke-test"
+```
 
 ### 1. Include the Base Header
 
@@ -142,11 +182,16 @@ public:
 ### 5. Main Function (Use runExample Helper)
 
 ```cpp
-int main() {
+int main(int argc, char** argv) {
     DemoGame demo;
-    return vde::examples::runExample(demo, "VDE Feature Demo", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Feature Demo", 1280, 720, argc, argv);
 }
 ```
+
+**Note:** Passing `argc` and `argv` to `runExample` enables:
+- `--input-script <path>` CLI argument for automated testing
+- Environment variable `VDE_INPUT_SCRIPT` support
+- See the **scripted-input** skill for details on creating smoke tests and automated demos
 
 ### Alternative: Simple Main (Manual Setup)
 

@@ -38,6 +38,15 @@
       "problemMatcher": []
     },
     {
+      "label": "scripts: smoke-test",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/smoke-test.ps1"],
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
       "label": "scripts: clean",
       "type": "shell",
       "command": "powershell",

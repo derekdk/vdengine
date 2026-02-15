@@ -363,7 +363,7 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
 class HexPrismStacksDemo
     : public vde::examples::BaseExampleGame<HexPrismStacksInputHandler, HexPrismStacksScene> {};
 
-int main() {
+int main(int argc, char** argv) {
     HexPrismStacksDemo demo;
-    return vde::examples::runExample(demo, "VDE Hex Prism Stacks Demo", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Hex Prism Stacks Demo", 1280, 720, argc, argv);
 }

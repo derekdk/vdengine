@@ -195,7 +195,7 @@ class MaterialsLightingDemo
     }
 };
 
-int main() {
+int main(int argc, char** argv) {
     MaterialsLightingDemo demo;
-    return vde::examples::runExample(demo, "VDE Materials & Lighting Demo", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Materials & Lighting Demo", 1280, 720, argc, argv);
 }

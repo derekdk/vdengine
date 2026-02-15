@@ -1,0 +1,15 @@
+# Smoke test for resource demo
+# Tests resource loading and management
+wait startup
+wait 1s
+
+# Test resource loading interactions
+press SPACE
+wait 500
+press SPACE
+wait 500
+
+# Let demo run to show resource management
+wait 2s
+
+exit

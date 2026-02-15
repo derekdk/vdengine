@@ -280,7 +280,7 @@ class ImGuiDemoGame : public vde::examples::BaseExampleGame<ImGuiDemoInputHandle
 // Main
 // =============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     ImGuiDemoGame demo;
 
     // Adjust default resolution based on DPI
@@ -290,5 +290,5 @@ int main() {
     uint32_t width = static_cast<uint32_t>(1280 * dpiScale);
     uint32_t height = static_cast<uint32_t>(720 * dpiScale);
 
-    return vde::examples::runExample(demo, "VDE ImGui Demo", width, height);
+    return vde::examples::runExample(demo, "VDE ImGui Demo", width, height, argc, argv);
 }

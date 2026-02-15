@@ -859,7 +859,7 @@ class GeometryReplGame
 // Main
 // =============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     GeometryReplGame tool;
 
     // Adjust default resolution based on DPI
@@ -867,5 +867,5 @@ int main() {
     uint32_t width = static_cast<uint32_t>(1400 * dpiScale);
     uint32_t height = static_cast<uint32_t>(800 * dpiScale);
 
-    return vde::examples::runExample(tool, "VDE Geometry REPL Tool", width, height);
+    return vde::examples::runExample(tool, "VDE Geometry REPL Tool", width, height, argc, argv);
 }

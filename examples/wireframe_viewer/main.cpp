@@ -416,7 +416,7 @@ class WireframeViewerGame
 // Main
 // =============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     WireframeViewerGame game;
-    return vde::examples::runExample(game, "VDE Wireframe Viewer", 1280, 720);
+    return vde::examples::runExample(game, "VDE Wireframe Viewer", 1280, 720, argc, argv);
 }

@@ -100,8 +100,11 @@ int main(int argc, char** argv) {
         uint32_t width = static_cast<uint32_t>(1400 * dpiScale);
         uint32_t height = static_cast<uint32_t>(800 * dpiScale);
 
-        return runTool(tool, "VDE Geometry REPL Tool", width, height);
+        return runTool(tool, "VDE Geometry REPL Tool", width, height, argc, argv);
     } else {
+        // Configure input script from CLI args if provided (beyond the script file arg)
+        vde::configureInputScriptFromArgs(tool, argc, argv);
+
         // For script mode, run headless (minimal window)
         vde::GameSettings settings;
         settings.gameName = "VDE Geometry REPL (Script Mode)";

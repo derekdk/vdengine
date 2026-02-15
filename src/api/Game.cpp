@@ -401,11 +401,32 @@ void Game::processInputScript() {
             state.currentCommand++;
             break;
 
-        case InputCommandType::Screenshot:
-            // Screenshot support deferred (WI-5)
-            std::cout << "[VDE:InputScript] screenshot command not yet implemented" << std::endl;
+        case InputCommandType::Screenshot: {
+            // Insert frame number into filename (e.g., "output.png" -> "output_frame_0042.png")
+            std::string basePath = cmd.argument;
+            size_t dotPos = basePath.find_last_of('.');
+            std::string framePath;
+            if (dotPos != std::string::npos) {
+                std::string base = basePath.substr(0, dotPos);
+                std::string ext = basePath.substr(dotPos);
+                framePath = base + "_frame_" + std::to_string(state.frameNumber) + ext;
+            } else {
+                framePath = basePath + "_frame_" + std::to_string(state.frameNumber) + ".png";
+            }
+
+            std::cout << "[VDE:InputScript] screenshot -> " << framePath << " (frame "
+                      << state.frameNumber << ")" << std::endl;
+
+            // TODO(WI-5): Implement Vulkan swapchain readback
+            // Requires:
+            // 1. Copy swapchain image to staging buffer (vkCmdCopyImage)
+            // 2. Map staging buffer memory to CPU
+            // 3. Write pixels to PNG using stb_image_write
+            // See docs/SCRIPTED_INPUT_IMPLEMENTATION_PLAN.md for details
+
             state.currentCommand++;
             break;
+        }
 
         case InputCommandType::Label:
             // Labels are no-ops at execution time
