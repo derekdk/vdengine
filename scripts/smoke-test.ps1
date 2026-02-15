@@ -74,6 +74,7 @@ $smokeScriptMap = @{
   'vde_physics_demo.exe' = 'smoke_physics_demo.vdescript'
   'vde_breakout_demo.exe' = 'smoke_breakout.vdescript'
   'vde_asteroids_demo.exe' = 'smoke_asteroids.vdescript'
+  'vde_asteroids_physics_demo.exe' = 'smoke_asteroids_physics.vdescript'
   'vde_sprite_demo.exe' = 'smoke_sprite.vdescript'
   'vde_multi_scene_demo.exe' = 'smoke_multi_scene.vdescript'
   'vde_imgui_demo.exe' = 'smoke_imgui.vdescript'

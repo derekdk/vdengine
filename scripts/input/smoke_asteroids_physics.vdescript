@@ -1,0 +1,71 @@
+# Smoke test for asteroids physics demo
+# Tests physics-based movement, collision, and bullet firing
+wait startup
+wait 500
+
+# Rotate ship left
+keydown LEFT
+wait 300
+keyup LEFT
+wait 200
+
+# Rotate ship right
+keydown RIGHT
+wait 300
+keyup RIGHT
+wait 200
+
+# Apply thrust to test physics-based movement
+keydown UP
+wait 800
+keyup UP
+wait 500
+
+# Fire multiple bullets to attempt destroying asteroids
+press SPACE
+wait 200
+press SPACE
+wait 200
+press SPACE
+wait 200
+
+# Move and fire more
+keydown RIGHT
+wait 200
+keyup RIGHT
+
+keydown UP
+wait 500
+keyup UP
+
+press SPACE
+wait 200
+press SPACE
+wait 200
+
+# Continue firing and moving
+keydown LEFT
+wait 300
+keyup LEFT
+
+press SPACE
+wait 200
+press SPACE
+wait 200
+
+# Final burst of movement and firing
+keydown UP
+press SPACE
+wait 300
+keyup UP
+wait 200
+
+press SPACE
+wait 200
+press SPACE
+
+# Wait for physics to settle and bullets to potentially hit
+wait 2s
+
+# Exit (may have destroyed all asteroids by now)
+exit

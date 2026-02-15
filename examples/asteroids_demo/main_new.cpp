@@ -668,7 +668,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
 class AsteroidsGame : public vde::examples::BaseExampleGame<AsteroidsInputHandler, AsteroidsScene> {
 };
 
-int main() {
+int main(int argc, char** argv) {
     AsteroidsGame demo;
-    return vde::examples::runExample(demo, "VDE Asteroids Demo (Physics)", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Asteroids Demo (Physics)", 1280, 720, argc, argv);
 }
