@@ -20,6 +20,7 @@
 
 #include "GameSettings.h"
 #include "InputHandler.h"
+#include "InputScript.h"
 #include "ResourceManager.h"
 #include "Scene.h"
 #include "SceneGroup.h"
@@ -105,6 +106,23 @@ class Game {
      * @brief Request the game to exit.
      */
     void quit();
+
+    // Input script
+
+    /**
+     * @brief Set the input script file path.
+     *
+     * This has the highest priority for input script discovery.
+     * Priority order: API call > CLI arg > environment variable.
+     *
+     * @param scriptPath Path to the .vdescript file
+     */
+    void setInputScriptFile(const std::string& scriptPath);
+
+    /**
+     * @brief Get the configured input script file path.
+     */
+    const std::string& getInputScriptFile() const;
 
     /**
      * @brief Check if the game is running.
@@ -495,12 +513,18 @@ class Game {
     double m_fpsAccumulator = 0.0;
     int m_fpsFrameCount = 0;
 
+    // Input script
+    std::string m_inputScriptFile;
+    std::unique_ptr<InputScriptState> m_inputScriptState;
+
     // Callbacks
     std::function<void(uint32_t, uint32_t)> m_resizeCallback;
     std::function<void(bool)> m_focusCallback;
 
     // Internal methods
     void processInput();
+    void processInputScript();
+    void loadInputScript();
     void pollGamepads();
     void updateTiming();
     void processPendingSceneChange();

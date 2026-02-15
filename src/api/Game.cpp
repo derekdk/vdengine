@@ -10,6 +10,7 @@
 #include <vde/Window.h>
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
+#include <vde/api/InputScript.h>
 #include <vde/api/LightBox.h>
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
@@ -102,6 +103,18 @@ bool Game::initialize(const GameSettings& settings) {
 
         m_initialized = true;
         m_lastFrameTime = glfwGetTime();
+
+        // Input script discovery: API call > CLI arg > env var
+        // (CLI arg is applied before initialize via configureInputScriptFromArgs)
+        if (m_inputScriptFile.empty()) {
+            const char* envScript = std::getenv("VDE_INPUT_SCRIPT");
+            if (envScript && envScript[0] != '\0') {
+                m_inputScriptFile = envScript;
+            }
+        }
+        if (!m_inputScriptFile.empty()) {
+            loadInputScript();
+        }
 
         return true;
 
@@ -203,6 +216,9 @@ void Game::run() {
         // Process input
         processInput();
 
+        // Process input script commands
+        processInputScript();
+
         // Execute the scheduler task graph
         // (covers: onUpdate, scene update, audio, pre-render, render)
         m_scheduler.execute();
@@ -220,6 +236,225 @@ void Game::run() {
 
 void Game::quit() {
     m_running = false;
+}
+
+void Game::setInputScriptFile(const std::string& scriptPath) {
+    m_inputScriptFile = scriptPath;
+}
+
+const std::string& Game::getInputScriptFile() const {
+    return m_inputScriptFile;
+}
+
+void Game::loadInputScript() {
+    m_inputScriptState = std::make_unique<InputScriptState>();
+    std::string errorMsg;
+
+    if (!parseInputScript(m_inputScriptFile, m_inputScriptState->commands,
+                          m_inputScriptState->labels, errorMsg)) {
+        std::cerr << "[VDE:InputScript] " << errorMsg << std::endl;
+        m_inputScriptState.reset();
+        return;
+    }
+
+    m_inputScriptState->scriptPath = m_inputScriptFile;
+    std::cout << "[VDE:InputScript] Loaded " << m_inputScriptState->commands.size()
+              << " commands from " << m_inputScriptFile << std::endl;
+}
+
+void Game::processInputScript() {
+    if (!m_inputScriptState || m_inputScriptState->finished) {
+        return;
+    }
+
+    auto& state = *m_inputScriptState;
+    state.frameNumber++;
+
+    // Handle pending mouse button release from previous frame (for click commands)
+    if (state.pendingMouseRelease) {
+        state.pendingMouseRelease = false;
+        // Resolve handler: focused scene handler → global handler
+        InputHandler* handler = nullptr;
+        Scene* focused = getFocusedScene();
+        if (focused) {
+            handler = focused->getInputHandler();
+        }
+        if (!handler) {
+            handler = m_inputHandler;
+        }
+        if (handler) {
+            handler->onMouseButtonRelease(state.pendingMouseButton, state.pendingMouseX,
+                                          state.pendingMouseY);
+        }
+    }
+
+    // Process commands until we hit a blocking command or run out
+    while (state.currentCommand < state.commands.size()) {
+        const auto& cmd = state.commands[state.currentCommand];
+
+        // Resolve handler: focused scene handler → global handler
+        InputHandler* handler = nullptr;
+        Scene* focused = getFocusedScene();
+        if (focused) {
+            handler = focused->getInputHandler();
+        }
+        if (!handler) {
+            handler = m_inputHandler;
+        }
+
+        switch (cmd.type) {
+        case InputCommandType::WaitStartup:
+            if (!state.startupComplete) {
+                state.startupComplete = true;
+                state.currentCommand++;
+                return;  // Wait until next frame
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::WaitMs:
+            state.waitAccumulator += static_cast<double>(m_deltaTime) * 1000.0;
+            if (state.waitAccumulator >= cmd.waitMs) {
+                state.waitAccumulator = 0.0;
+                state.currentCommand++;
+            } else {
+                return;  // Still waiting
+            }
+            break;
+
+        case InputCommandType::Press:
+            if (handler) {
+                handler->onKeyPress(cmd.keyCode);
+                handler->onKeyRelease(cmd.keyCode);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::KeyDown:
+            if (handler) {
+                handler->onKeyPress(cmd.keyCode);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::KeyUp:
+            if (handler) {
+                handler->onKeyRelease(cmd.keyCode);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Click: {
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseButtonPress(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+                // Schedule release for next frame
+                state.pendingMouseRelease = true;
+                state.pendingMouseButton = MOUSE_BUTTON_LEFT;
+                state.pendingMouseX = cmd.mouseX;
+                state.pendingMouseY = cmd.mouseY;
+            }
+            state.currentCommand++;
+            return;  // Wait for next frame for release
+        }
+
+        case InputCommandType::ClickRight: {
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseButtonPress(MOUSE_BUTTON_RIGHT, cmd.mouseX, cmd.mouseY);
+                state.pendingMouseRelease = true;
+                state.pendingMouseButton = MOUSE_BUTTON_RIGHT;
+                state.pendingMouseX = cmd.mouseX;
+                state.pendingMouseY = cmd.mouseY;
+            }
+            state.currentCommand++;
+            return;  // Wait for next frame for release
+        }
+
+        case InputCommandType::MouseDown:
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseButtonPress(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::MouseUp:
+            if (handler) {
+                handler->onMouseButtonRelease(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::MouseMove:
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Scroll:
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseScroll(0.0, cmd.scrollDelta);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Screenshot:
+            // Screenshot support deferred (WI-5)
+            std::cout << "[VDE:InputScript] screenshot command not yet implemented" << std::endl;
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Label:
+            // Labels are no-ops at execution time
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Loop: {
+            auto labelIt = state.labels.find(cmd.argument);
+            if (labelIt == state.labels.end()) {
+                std::cerr << "[VDE:InputScript] Error at line " << cmd.lineNumber
+                          << ": undefined label '" << cmd.argument << "'" << std::endl;
+                state.finished = true;
+                return;
+            }
+
+            auto& labelState = labelIt->second;
+
+            if (cmd.loopCount == 0) {
+                // Infinite loop
+                state.currentCommand = labelState.commandIndex + 1;
+            } else {
+                if (labelState.remainingIterations < 0) {
+                    // First encounter
+                    labelState.remainingIterations = cmd.loopCount - 1;
+                } else {
+                    labelState.remainingIterations--;
+                }
+
+                if (labelState.remainingIterations > 0) {
+                    state.currentCommand = labelState.commandIndex + 1;
+                } else {
+                    // Reset for potential re-entry (e.g., outer loop re-runs inner)
+                    labelState.remainingIterations = -1;
+                    state.currentCommand++;
+                }
+            }
+            break;
+        }
+
+        case InputCommandType::Exit:
+            std::cout << "[VDE:InputScript] exit" << std::endl;
+            state.finished = true;
+            quit();
+            return;
+        }
+    }
+
+    // All commands consumed — script is done, app continues
+    state.finished = true;
 }
 
 float Game::getDPIScale() const {

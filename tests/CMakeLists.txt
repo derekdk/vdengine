@@ -51,6 +51,8 @@ set(VDE_TEST_SOURCES
     ThreadPool_test.cpp
     # Joystick/gamepad tests
     Joystick_test.cpp
+    # Input script tests
+    InputScript_test.cpp
 )
 
 # Create test executable

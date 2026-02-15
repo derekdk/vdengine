@@ -303,7 +303,7 @@ class PhysicsDemoGame
 // Main
 // ============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     PhysicsDemoGame demo;
-    return vde::examples::runExample(demo, "VDE Physics Demo", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Physics Demo", 1280, 720, argc, argv);
 }

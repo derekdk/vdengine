@@ -1,0 +1,10 @@
+# Smoke test for physics demo
+# Tests scene switching and basic rendering
+wait startup
+wait 1000
+press 1
+wait 500
+press 2
+wait 500
+wait 2000
+exit

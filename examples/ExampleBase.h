@@ -579,11 +579,19 @@ class BaseExampleGame : public vde::Game {
  * @param gameName The name of the game/example
  * @param width Window width (default: 1280)
  * @param height Window height (default: 720)
+ * @param argc Argument count for CLI parsing (default: 0)
+ * @param argv Argument values for CLI parsing (default: nullptr)
  * @return Exit code (0 for success, 1 for failure)
  */
 template <typename TGame>
 int runExample(TGame& game, const std::string& gameName, uint32_t width = 1280,
-               uint32_t height = 720) {
+               uint32_t height = 720, int argc = 0, char** argv = nullptr) {
+    // Configure input script from CLI args BEFORE changing working directory
+    // so relative paths resolve from the user's CWD
+    if (argc > 0 && argv != nullptr) {
+        vde::configureInputScriptFromArgs(game, argc, argv);
+    }
+
     setWorkingDirectoryToExecutablePath();
 
     vde::GameSettings settings;

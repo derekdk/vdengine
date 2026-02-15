@@ -347,7 +347,7 @@ class WorldBoundsDemo : public vde::examples::BaseExampleGame<DemoInputHandler, 
 /**
  * @brief Main entry point
  */
-int main() {
+int main(int argc, char** argv) {
     WorldBoundsDemo demo;
-    return vde::examples::runExample(demo, "World Bounds Demo", 1280, 720);
+    return vde::examples::runExample(demo, "World Bounds Demo", 1280, 720, argc, argv);
 }

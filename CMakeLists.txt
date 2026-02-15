@@ -131,6 +131,8 @@ set(VDE_SOURCES
     src/api/AudioClip.cpp
     src/api/AudioManager.cpp
     src/api/AudioSource.cpp
+    # Input script
+    src/api/InputScript.cpp
 )
 
 # Public headers
@@ -181,6 +183,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/AudioEvent.h
     include/vde/api/AudioManager.h
     include/vde/api/AudioSource.h
+    # Input script
+    include/vde/api/InputScript.h
 )
 
 # Create library

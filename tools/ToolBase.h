@@ -538,11 +538,19 @@ class BaseToolGame : public vde::Game {
  * @param title Window title
  * @param width Window width
  * @param height Window height
+ * @param argc Argument count for CLI parsing (default: 0)
+ * @param argv Argument values for CLI parsing (default: nullptr)
  * @return Exit code (0 = success)
  */
 template <typename TInputHandler, typename TScene>
 int runTool(BaseToolGame<TInputHandler, TScene>& tool, const std::string& title,
-            uint32_t width = 1400, uint32_t height = 800) {
+            uint32_t width = 1400, uint32_t height = 800, int argc = 0, char** argv = nullptr) {
+    // Configure input script from CLI args BEFORE changing working directory
+    // so relative paths resolve from the user's CWD
+    if (argc > 0 && argv != nullptr) {
+        vde::configureInputScriptFromArgs(tool, argc, argv);
+    }
+
     setWorkingDirectoryToExecutablePath();
 
     vde::GameSettings settings;

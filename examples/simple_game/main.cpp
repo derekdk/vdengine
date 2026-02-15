@@ -391,7 +391,7 @@ class SimpleGameDemo : public vde::Game {
 /**
  * @brief Main entry point.
  */
-int main() {
+int main(int argc, char** argv) {
     SimpleGameDemo demo;
-    return vde::examples::runExample(demo, "VDE Simple Game Example", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Simple Game Example", 1280, 720, argc, argv);
 }

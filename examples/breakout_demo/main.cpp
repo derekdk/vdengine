@@ -335,7 +335,7 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
 
 class BreakoutGame : public vde::examples::BaseExampleGame<BreakoutInputHandler, BreakoutScene> {};
 
-int main() {
+int main(int argc, char** argv) {
     BreakoutGame demo;
-    return vde::examples::runExample(demo, "VDE Breakout Demo", 1024, 768);
+    return vde::examples::runExample(demo, "VDE Breakout Demo", 1024, 768, argc, argv);
 }

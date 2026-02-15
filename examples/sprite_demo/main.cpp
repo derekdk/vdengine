@@ -317,7 +317,7 @@ class SpriteDemo : public vde::examples::BaseExampleGame<SpriteInputHandler, Spr
 /**
  * @brief Main entry point.
  */
-int main() {
+int main(int argc, char** argv) {
     SpriteDemo demo;
-    return vde::examples::runExample(demo, "VDE Sprite Demo", 1024, 768);
+    return vde::examples::runExample(demo, "VDE Sprite Demo", 1024, 768, argc, argv);
 }
