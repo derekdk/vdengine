@@ -60,3 +60,8 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Purpose:** Guide for using scripted input automation in VDE games, examples, and tools.  
 **Use when:** Adding test automation, smoke tests, automated demos, or CI/CD integration.  
 **Location:** `.github/skills/scripted-input/SKILL.md`
+
+### smoke-testing
+**Purpose:** Guide for running smoke tests and interpreting the results.  
+**Use when:** Running, debugging, or extending automated smoke tests for examples and tools.  
+**Location:** `.github/skills/smoke-testing/SKILL.md`

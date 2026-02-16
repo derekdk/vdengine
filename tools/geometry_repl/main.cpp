@@ -81,7 +81,8 @@ int main(int argc, char** argv) {
     std::string scriptFile;
 
     // Parse command line arguments
-    if (argc > 1) {
+    // Skip --input-script (handled by runTool/configureInputScriptFromArgs)
+    if (argc > 1 && std::string(argv[1]) != "--input-script") {
         scriptFile = argv[1];
         mode = ToolMode::SCRIPT;
 

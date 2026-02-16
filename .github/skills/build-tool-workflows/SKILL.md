@@ -27,7 +27,7 @@ This skill provides the essential workflows for building and testing the Vulkan 
 | `rebuild.ps1` | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator MSBuild -Config Release` |
 | `clean.ps1` | Clean build artifacts | `.\scripts\clean.ps1 -Generator Ninja -Full` |
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
-| `smoke-test.ps1` | Run smoke tests on examples | `.\scripts\smoke-test.ps1 -Build` |
+| `smoke-test.ps1` | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Build` |
 
 ### Common Build Tasks
 
@@ -76,9 +76,24 @@ This skill provides the essential workflows for building and testing the Vulkan 
 .\scripts\test.ps1 -Build
 ```
 
-**Run smoke tests on all examples:**
+**Run smoke tests on all examples and tools:**
 ```powershell
 .\scripts\smoke-test.ps1
+```
+
+**Smoke test only examples:**
+```powershell
+.\scripts\smoke-test.ps1 -Category Examples
+```
+
+**Smoke test only tools:**
+```powershell
+.\scripts\smoke-test.ps1 -Category Tools
+```
+
+**Smoke test with filter:**
+```powershell
+.\scripts\smoke-test.ps1 -Filter "*physics*"
 ```
 
 **Build and smoke test:**
@@ -101,10 +116,14 @@ This skill provides the essential workflows for building and testing the Vulkan 
 **clean.ps1**
 
 **smoke-test.ps1**
+- `-Category` - All (default), Examples, or Tools
+- `-Filter` - Wildcard pattern for executable names (e.g. `"*physics*"`)
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Build` - Build before running smoke tests
 - `-Verbose` - Verbose output with detailed error messages
+
+**clean.ps1**
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Full` - Remove entire build directory
@@ -248,16 +267,26 @@ test script (RECOMMENDED)
 
 ## Smoke Tests (Automated Example Testing)
 
-Smoke tests run all built examples with automated input scripts to verify they launch and exit cleanly.
+Smoke tests auto-discover and run all built examples and tools with automated input scripts to verify they launch and exit cleanly.
 
 ```powershell
-.\scripts\smoke-test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Verbose]
+.\scripts\smoke-test.ps1 [-Category All|Examples|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Verbose]
 ```
 
 **Examples:**
 ```powershell
-# Run all smoke tests (default Ninja Debug)
+# Run all smoke tests — examples and tools (default Ninja Debug)
 .\scripts\smoke-test.ps1
+
+# Run only example smoke tests
+.\scripts\smoke-test.ps1 -Category Examples
+
+# Run only tool smoke tests
+.\scripts\smoke-test.ps1 -Category Tools
+
+# Filter to run specific tests by name pattern
+.\scripts\smoke-test.ps1 -Filter "*physics*"
+.\scripts\smoke-test.ps1 -Filter "vde_vlauncher*"
 
 # Build and smoke test in one command
 .\scripts\smoke-test.ps1 -Build
@@ -273,12 +302,13 @@ Smoke tests run all built examples with automated input scripts to verify they l
 - Run Task: `scripts: smoke-test`
 
 **What it does:**
-- Runs each example with its corresponding smoke test script from `scripts/input/`
-- Uses `smoke_quick.vdescript` for examples without custom scripts
-- Reports pass/fail for each example
-- Exits with code 1 if any example fails
+- Auto-discovers `vde_*.exe` in the build directory (examples and tools)
+- Runs each executable with its corresponding smoke test script from `scripts/input/`
+- Uses `smoke_quick.vdescript` for executables without custom scripts
+- Reports pass/fail per executable with category breakdown (Examples/Tools)
+- Exits with code 1 if any test fails
 
-**See also:** The **scripted-input** skill for details on creating `.vdescript` test scripts.
+**See also:** The **smoke-testing** and **scripted-input** skills for detailed guidance.
 
 ### Using the legacy build-and-test script
 
