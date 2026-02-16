@@ -641,7 +641,8 @@ void VulkanContext::createRenderPass() {
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    colorAttachment.finalLayout =
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;  // Changed for multi-scene support
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
@@ -695,8 +696,8 @@ void VulkanContext::createRenderPass() {
 
     // Create LOAD variant for multi-scene rendering (subsequent passes)
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -954,6 +955,28 @@ void VulkanContext::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t 
 
     vkCmdEndRenderPass(commandBuffer);
 
+    // Transition final layout from COLOR_ATTACHMENT_OPTIMAL to PRESENT_SRC_KHR
+    // This is needed because the render pass now keeps the image in COLOR_ATTACHMENT_OPTIMAL
+    // to support multi-scene rendering, but the swapchain expects PRESENT_SRC_KHR.
+    VkImageMemoryBarrier presentBarrier{};
+    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    presentBarrier.dstAccessMask = 0;
+    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    presentBarrier.image = m_swapChainImages[imageIndex];
+    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    presentBarrier.subresourceRange.baseMipLevel = 0;
+    presentBarrier.subresourceRange.levelCount = 1;
+    presentBarrier.subresourceRange.baseArrayLayer = 0;
+    presentBarrier.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &presentBarrier);
+
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer!");
     }
@@ -1169,6 +1192,19 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
         vkCmdSetViewport(commandBuffer, 0, 1, &info.viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &info.scissor);
 
+        // Clear depth for this viewport area (not just first scene)
+        // This ensures each scene has a clean depth buffer in its viewport
+        VkClearAttachment clearAttachment{};
+        clearAttachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        clearAttachment.clearValue.depthStencil = {1.0f, 0};
+
+        VkClearRect clearRect{};
+        clearRect.rect = info.scissor;
+        clearRect.baseArrayLayer = 0;
+        clearRect.layerCount = 1;
+
+        vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
+
         // Set viewport override so entity render methods use this viewport
         m_viewportOverride = info.viewport;
         m_scissorOverride = info.scissor;
@@ -1184,6 +1220,28 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
 
     // Clear viewport override after multi-scene rendering
     m_hasViewportOverride = false;
+
+    // Transition final layout from COLOR_ATTACHMENT_OPTIMAL to PRESENT_SRC_KHR
+    // This is needed because all our render passes now keep the image in COLOR_ATTACHMENT_OPTIMAL,
+    // but the swapchain expects PRESENT_SRC_KHR for presentation.
+    VkImageMemoryBarrier presentBarrier{};
+    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    presentBarrier.dstAccessMask = 0;  // No need to wait for anything after
+    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    presentBarrier.image = m_swapChainImages[imageIndex];
+    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    presentBarrier.subresourceRange.baseMipLevel = 0;
+    presentBarrier.subresourceRange.levelCount = 1;
+    presentBarrier.subresourceRange.baseArrayLayer = 0;
+    presentBarrier.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &presentBarrier);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record multi-scene command buffer!");
