@@ -94,6 +94,7 @@ $smokeScriptMap = @{
     'vde_audio_demo.exe'               = 'smoke_audio.vdescript'
     'vde_materials_lighting_demo.exe'  = 'smoke_materials.vdescript'
     'vde_resource_demo.exe'            = 'smoke_resource.vdescript'
+    'vde_four_scene_3d_demo.exe'       = 'smoke_four_scene_3d.vdescript'
     # Tools
     'vde_vlauncher.exe'                = 'smoke_vlauncher.vdescript'
     'vde_geometry_repl.exe'            = 'smoke_geometry_repl.vdescript'
