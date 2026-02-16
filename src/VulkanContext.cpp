@@ -1325,4 +1325,178 @@ VkShaderModule VulkanContext::createShaderModule(const std::vector<char>& code) 
     return shaderModule;
 }
 
+std::vector<uint8_t> VulkanContext::captureFramebuffer(uint32_t& outWidth, uint32_t& outHeight) {
+    outWidth = 0;
+    outHeight = 0;
+
+    if (m_device == VK_NULL_HANDLE || m_swapChainImages.empty()) {
+        return {};
+    }
+
+    // Wait for all GPU work to complete
+    vkDeviceWaitIdle(m_device);
+
+    uint32_t width = m_swapChainExtent.width;
+    uint32_t height = m_swapChainExtent.height;
+    VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
+
+    // Determine the last rendered swapchain image index.
+    // After drawFrame completes, m_currentFrame has been incremented, so the
+    // image that was just presented was rendered by the previous frame slot.
+    uint32_t prevFrame = (m_currentFrame + MAX_FRAMES_IN_FLIGHT - 1) % MAX_FRAMES_IN_FLIGHT;
+    // Find which swapchain image that frame used by checking m_imagesInFlight
+    uint32_t captureImageIndex = 0;
+    for (uint32_t i = 0; i < m_imagesInFlight.size(); ++i) {
+        if (m_imagesInFlight[i] == m_inFlightFences[prevFrame]) {
+            captureImageIndex = i;
+            break;
+        }
+    }
+
+    VkImage srcImage = m_swapChainImages[captureImageIndex];
+
+    // Create staging buffer
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = imageSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(m_device, &bufferInfo, nullptr, &stagingBuffer) != VK_SUCCESS) {
+        return {};
+    }
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(m_device, stagingBuffer, &memReqs);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReqs.size;
+    allocInfo.memoryTypeIndex =
+        findMemoryType(memReqs.memoryTypeBits,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &stagingMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+        return {};
+    }
+    vkBindBufferMemory(m_device, stagingBuffer, stagingMemory, 0);
+
+    // Allocate a one-time command buffer
+    VkCommandBufferAllocateInfo cmdAllocInfo{};
+    cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAllocInfo.commandPool = m_commandPool;
+    cmdAllocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer cmdBuf;
+    vkAllocateCommandBuffers(m_device, &cmdAllocInfo, &cmdBuf);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmdBuf, &beginInfo);
+
+    // Transition swapchain image: PRESENT_SRC_KHR -> TRANSFER_SRC_OPTIMAL
+    VkImageMemoryBarrier toTransferBarrier{};
+    toTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toTransferBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    toTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    toTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    toTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    toTransferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransferBarrier.image = srcImage;
+    toTransferBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toTransferBarrier.subresourceRange.baseMipLevel = 0;
+    toTransferBarrier.subresourceRange.levelCount = 1;
+    toTransferBarrier.subresourceRange.baseArrayLayer = 0;
+    toTransferBarrier.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr, 0, nullptr, 1, &toTransferBarrier);
+
+    // Copy image to staging buffer
+    VkBufferImageCopy copyRegion{};
+    copyRegion.bufferOffset = 0;
+    copyRegion.bufferRowLength = 0;
+    copyRegion.bufferImageHeight = 0;
+    copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copyRegion.imageSubresource.mipLevel = 0;
+    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.layerCount = 1;
+    copyRegion.imageOffset = {0, 0, 0};
+    copyRegion.imageExtent = {width, height, 1};
+
+    vkCmdCopyImageToBuffer(cmdBuf, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1,
+                           &copyRegion);
+
+    // Transition back: TRANSFER_SRC_OPTIMAL -> PRESENT_SRC_KHR
+    VkImageMemoryBarrier toPresentBarrier{};
+    toPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toPresentBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    toPresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    toPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    toPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    toPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toPresentBarrier.image = srcImage;
+    toPresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toPresentBarrier.subresourceRange.baseMipLevel = 0;
+    toPresentBarrier.subresourceRange.levelCount = 1;
+    toPresentBarrier.subresourceRange.baseArrayLayer = 0;
+    toPresentBarrier.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr, 0, nullptr, 1, &toPresentBarrier);
+
+    vkEndCommandBuffer(cmdBuf);
+
+    // Submit and wait
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuf;
+
+    vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_graphicsQueue);
+
+    vkFreeCommandBuffers(m_device, m_commandPool, 1, &cmdBuf);
+
+    // Map memory and read pixels
+    void* mappedData = nullptr;
+    vkMapMemory(m_device, stagingMemory, 0, imageSize, 0, &mappedData);
+
+    std::vector<uint8_t> pixels(imageSize);
+
+    // Handle BGRA -> RGBA conversion if needed
+    bool needSwizzle = (m_swapChainImageFormat == VK_FORMAT_B8G8R8A8_SRGB ||
+                        m_swapChainImageFormat == VK_FORMAT_B8G8R8A8_UNORM);
+
+    if (needSwizzle) {
+        const uint8_t* src = static_cast<const uint8_t*>(mappedData);
+        for (VkDeviceSize i = 0; i < imageSize; i += 4) {
+            pixels[i + 0] = src[i + 2];  // R <- B
+            pixels[i + 1] = src[i + 1];  // G
+            pixels[i + 2] = src[i + 0];  // B <- R
+            pixels[i + 3] = src[i + 3];  // A
+        }
+    } else {
+        std::memcpy(pixels.data(), mappedData, imageSize);
+    }
+
+    vkUnmapMemory(m_device, stagingMemory);
+
+    // Cleanup staging resources
+    vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+    vkFreeMemory(m_device, stagingMemory, nullptr);
+
+    outWidth = width;
+    outHeight = height;
+    return pixels;
+}
+
 }  // namespace vde

@@ -770,5 +770,492 @@ TEST(InputScriptCLI, ReturnsEmptyWhenArgMissesValue) {
     EXPECT_EQ(result, "");
 }
 
+// ============================================================================
+// A3: wait_frames command tests
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesWaitFrames) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("wait_frames 10", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::WaitFrames);
+    EXPECT_EQ(cmd.waitFrames, 10);
+}
+
+TEST(InputScriptParseLine, ParsesWaitFramesSingle) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("wait_frames 1", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::WaitFrames);
+    EXPECT_EQ(cmd.waitFrames, 1);
+}
+
+TEST(InputScriptParseLine, WaitFramesZeroIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("wait_frames 0", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, WaitFramesNegativeIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("wait_frames -5", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, WaitFramesMissingArgIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("wait_frames", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, WaitFramesInvalidArgIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("wait_frames abc", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+// ============================================================================
+// A1: assert command tests — rendered_scene_count
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesAssertSceneCountEq) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert rendered_scene_count == 4", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertOp, CompareOp::Eq);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 4.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneCountGt) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert rendered_scene_count > 0", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertOp, CompareOp::Gt);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 0.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneCountLe) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert rendered_scene_count <= 10", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertOp, CompareOp::Le);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 10.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneCountNe) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert rendered_scene_count != 0", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertOp, CompareOp::Ne);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 0.0);
+}
+
+TEST(InputScriptParseLine, AssertSceneCountMissingOpIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert rendered_scene_count", 3, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, AssertSceneCountInvalidOpIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert rendered_scene_count ~= 4", 3, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+// ============================================================================
+// A1: assert command tests — scene field checks
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesAssertSceneWasRendered) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"crystal\" was_rendered == true", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "crystal");
+    EXPECT_EQ(cmd.assertField, "was_rendered");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Eq);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 1.0);  // true -> 1.0
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneDrawCalls) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"metropolis\" draw_calls > 0", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "metropolis");
+    EXPECT_EQ(cmd.assertField, "draw_calls");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Gt);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 0.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneEntitiesDrawn) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"nature\" entities_drawn >= 3", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "nature");
+    EXPECT_EQ(cmd.assertField, "entities_drawn");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Ge);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 3.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneViewportWidth) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"main\" viewport_width > 0", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "main");
+    EXPECT_EQ(cmd.assertField, "viewport_width");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Gt);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 0.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneNotBlank) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"cosmos\" not_blank", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "cosmos");
+    EXPECT_EQ(cmd.assertField, "not_blank");
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneWasRenderedFalse) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"hidden\" was_rendered == false", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "hidden");
+    EXPECT_EQ(cmd.assertField, "was_rendered");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Eq);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 0.0);  // false -> 0.0
+}
+
+TEST(InputScriptParseLine, AssertSceneMissingQuoteIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert scene crystal was_rendered == true", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, AssertSceneUnterminatedQuoteIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert scene \"crystal was_rendered == true", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, AssertSceneUnknownFieldIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert scene \"x\" unknown_field == 0", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_NE(error.find("unknown assert field"), std::string::npos);
+}
+
+TEST(InputScriptParseLine, AssertSceneMissingFieldIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert scene \"x\"", 5, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, AssertUnknownTypeIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert foobar == 4", 5, cmd, error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_NE(error.find("unknown assert type"), std::string::npos);
+}
+
+// ============================================================================
+// A4: compare command tests
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesCompare) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("compare actual.png golden.png 0.02", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::Compare);
+    EXPECT_EQ(cmd.argument, "actual.png");
+    EXPECT_EQ(cmd.comparePath, "golden.png");
+    EXPECT_DOUBLE_EQ(cmd.compareThreshold, 0.02);
+}
+
+TEST(InputScriptParseLine, ParsesCompareZeroThreshold) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("compare a.png b.png 0", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::Compare);
+    EXPECT_DOUBLE_EQ(cmd.compareThreshold, 0.0);
+}
+
+TEST(InputScriptParseLine, ParsesCompareMaxThreshold) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("compare a.png b.png 1.0", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::Compare);
+    EXPECT_DOUBLE_EQ(cmd.compareThreshold, 1.0);
+}
+
+TEST(InputScriptParseLine, CompareMissingArgsIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("compare actual.png golden.png", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, CompareThresholdOutOfRangeIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("compare a.png b.png 1.5", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, CompareNegativeThresholdIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("compare a.png b.png -0.1", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, CompareInvalidThresholdIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("compare a.png b.png abc", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+// ============================================================================
+// A5: set command tests
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesSet) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("set VAR 42", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::Set);
+    EXPECT_EQ(cmd.setVarName, "VAR");
+    EXPECT_DOUBLE_EQ(cmd.setVarValue, 42.0);
+}
+
+TEST(InputScriptParseLine, ParsesSetFloat) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("set PI 3.14", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::Set);
+    EXPECT_EQ(cmd.setVarName, "PI");
+    EXPECT_NEAR(cmd.setVarValue, 3.14, 0.001);
+}
+
+TEST(InputScriptParseLine, ParsesSetNegative) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("set OFFSET -10", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::Set);
+    EXPECT_EQ(cmd.setVarName, "OFFSET");
+    EXPECT_DOUBLE_EQ(cmd.setVarValue, -10.0);
+}
+
+TEST(InputScriptParseLine, SetMissingArgsIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("set VAR", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, SetInvalidValueIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("set VAR abc", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+// ============================================================================
+// CompareOp helper tests
+// ============================================================================
+
+TEST(InputScriptCompareOp, ParsesAllOps) {
+    CompareOp op;
+    std::string error;
+
+    EXPECT_TRUE(parseCompareOp("==", op, error));
+    EXPECT_EQ(op, CompareOp::Eq);
+
+    EXPECT_TRUE(parseCompareOp("!=", op, error));
+    EXPECT_EQ(op, CompareOp::Ne);
+
+    EXPECT_TRUE(parseCompareOp("<", op, error));
+    EXPECT_EQ(op, CompareOp::Lt);
+
+    EXPECT_TRUE(parseCompareOp("<=", op, error));
+    EXPECT_EQ(op, CompareOp::Le);
+
+    EXPECT_TRUE(parseCompareOp(">", op, error));
+    EXPECT_EQ(op, CompareOp::Gt);
+
+    EXPECT_TRUE(parseCompareOp(">=", op, error));
+    EXPECT_EQ(op, CompareOp::Ge);
+}
+
+TEST(InputScriptCompareOp, InvalidOpReportsError) {
+    CompareOp op;
+    std::string error;
+    EXPECT_FALSE(parseCompareOp("~=", op, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptCompareOp, EvaluatesCorrectly) {
+    EXPECT_TRUE(evaluateComparison(4.0, CompareOp::Eq, 4.0));
+    EXPECT_FALSE(evaluateComparison(4.0, CompareOp::Eq, 5.0));
+
+    EXPECT_TRUE(evaluateComparison(4.0, CompareOp::Ne, 5.0));
+    EXPECT_FALSE(evaluateComparison(4.0, CompareOp::Ne, 4.0));
+
+    EXPECT_TRUE(evaluateComparison(3.0, CompareOp::Lt, 4.0));
+    EXPECT_FALSE(evaluateComparison(4.0, CompareOp::Lt, 4.0));
+
+    EXPECT_TRUE(evaluateComparison(4.0, CompareOp::Le, 4.0));
+    EXPECT_TRUE(evaluateComparison(3.0, CompareOp::Le, 4.0));
+    EXPECT_FALSE(evaluateComparison(5.0, CompareOp::Le, 4.0));
+
+    EXPECT_TRUE(evaluateComparison(5.0, CompareOp::Gt, 4.0));
+    EXPECT_FALSE(evaluateComparison(4.0, CompareOp::Gt, 4.0));
+
+    EXPECT_TRUE(evaluateComparison(4.0, CompareOp::Ge, 4.0));
+    EXPECT_TRUE(evaluateComparison(5.0, CompareOp::Ge, 4.0));
+    EXPECT_FALSE(evaluateComparison(3.0, CompareOp::Ge, 4.0));
+}
+
+TEST(InputScriptCompareOp, OpToString) {
+    EXPECT_STREQ(compareOpToString(CompareOp::Eq), "==");
+    EXPECT_STREQ(compareOpToString(CompareOp::Ne), "!=");
+    EXPECT_STREQ(compareOpToString(CompareOp::Lt), "<");
+    EXPECT_STREQ(compareOpToString(CompareOp::Le), "<=");
+    EXPECT_STREQ(compareOpToString(CompareOp::Gt), ">");
+    EXPECT_STREQ(compareOpToString(CompareOp::Ge), ">=");
+}
+
+// ============================================================================
+// File parser tests — new commands
+// ============================================================================
+
+TEST_F(InputScriptFileTest, ParsesScriptWithWaitFrames) {
+    writeScript("wait startup\n"
+                "wait_frames 10\n"
+                "print after 10 frames\n"
+                "exit\n");
+
+    std::vector<ScriptCommand> commands;
+    std::unordered_map<std::string, LabelState> labels;
+    std::string error;
+
+    EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
+    EXPECT_EQ(commands.size(), 4u);
+    EXPECT_EQ(commands[1].type, InputCommandType::WaitFrames);
+    EXPECT_EQ(commands[1].waitFrames, 10);
+}
+
+TEST_F(InputScriptFileTest, ParsesScriptWithAsserts) {
+    writeScript("wait startup\n"
+                "wait_frames 5\n"
+                "assert rendered_scene_count == 4\n"
+                "assert scene \"crystal\" was_rendered == true\n"
+                "assert scene \"crystal\" draw_calls > 0\n"
+                "print PASS\n"
+                "exit\n");
+
+    std::vector<ScriptCommand> commands;
+    std::unordered_map<std::string, LabelState> labels;
+    std::string error;
+
+    EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
+    EXPECT_EQ(commands.size(), 7u);
+    EXPECT_EQ(commands[2].type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(commands[3].type, InputCommandType::AssertScene);
+    EXPECT_EQ(commands[3].assertSceneName, "crystal");
+    EXPECT_EQ(commands[3].assertField, "was_rendered");
+    EXPECT_EQ(commands[4].type, InputCommandType::AssertScene);
+    EXPECT_EQ(commands[4].assertSceneName, "crystal");
+    EXPECT_EQ(commands[4].assertField, "draw_calls");
+}
+
+TEST_F(InputScriptFileTest, ParsesScriptWithCompare) {
+    writeScript("screenshot output.png\n"
+                "compare output_frame_1.png golden.png 0.05\n"
+                "exit\n");
+
+    std::vector<ScriptCommand> commands;
+    std::unordered_map<std::string, LabelState> labels;
+    std::string error;
+
+    EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
+    EXPECT_EQ(commands.size(), 3u);
+    EXPECT_EQ(commands[1].type, InputCommandType::Compare);
+    EXPECT_EQ(commands[1].argument, "output_frame_1.png");
+    EXPECT_EQ(commands[1].comparePath, "golden.png");
+    EXPECT_DOUBLE_EQ(commands[1].compareThreshold, 0.05);
+}
+
+TEST_F(InputScriptFileTest, ParsesScriptWithSet) {
+    writeScript("set X 100\n"
+                "set Y 200\n"
+                "exit\n");
+
+    std::vector<ScriptCommand> commands;
+    std::unordered_map<std::string, LabelState> labels;
+    std::string error;
+
+    EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
+    EXPECT_EQ(commands.size(), 3u);
+    EXPECT_EQ(commands[0].type, InputCommandType::Set);
+    EXPECT_EQ(commands[0].setVarName, "X");
+    EXPECT_DOUBLE_EQ(commands[0].setVarValue, 100.0);
+    EXPECT_EQ(commands[1].type, InputCommandType::Set);
+    EXPECT_EQ(commands[1].setVarName, "Y");
+    EXPECT_DOUBLE_EQ(commands[1].setVarValue, 200.0);
+}
+
+TEST_F(InputScriptFileTest, ParsesFullValidationScript) {
+    writeScript("# Full validation script test\n"
+                "wait startup\n"
+                "wait_frames 10\n"
+                "\n"
+                "# Scene count check\n"
+                "assert rendered_scene_count == 4\n"
+                "\n"
+                "# Per-scene checks\n"
+                "assert scene \"crystal\" was_rendered == true\n"
+                "assert scene \"crystal\" draw_calls > 0\n"
+                "assert scene \"metropolis\" was_rendered == true\n"
+                "assert scene \"nature\" entities_drawn >= 3\n"
+                "assert scene \"cosmos\" not_blank\n"
+                "\n"
+                "set THRESHOLD 0.02\n"
+                "print PASS: all assertions passed\n"
+                "exit\n");
+
+    std::vector<ScriptCommand> commands;
+    std::unordered_map<std::string, LabelState> labels;
+    std::string error;
+
+    EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
+    EXPECT_EQ(commands.size(), 11u);
+}
+
 }  // namespace test
 }  // namespace vde

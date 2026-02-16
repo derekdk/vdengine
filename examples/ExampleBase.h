@@ -419,8 +419,16 @@ class BaseExampleGame : public vde::Game {
 
     /**
      * @brief Get the exit code (0 for success, 1 for failure).
+     *
+     * Combines this game's exit code with the base Game class exit code
+     * (which tracks input script assertion failures).
      */
-    int getExitCode() const { return m_exitCode; }
+    int getExitCode() const {
+        // Check both ExampleGame failures and Game-level assertion failures
+        if (m_exitCode != 0)
+            return m_exitCode;
+        return Game::getExitCode();
+    }
 
   protected:
     /**

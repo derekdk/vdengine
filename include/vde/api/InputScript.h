@@ -45,7 +45,14 @@ enum class InputCommandType {
     Print,        ///< print message — output text to console
     Label,        ///< label loop_start — define jump target
     Loop,         ///< loop loop_start 5 — jump back to label
-    Exit          ///< exit — quit the application
+    Exit,         ///< exit — quit the application
+
+    // Track A extensions
+    WaitFrames,        ///< wait_frames 10 — wait N rendered frames
+    AssertSceneCount,  ///< assert rendered_scene_count == N
+    AssertScene,       ///< assert scene "name" <field> <op> <value>
+    Compare,           ///< compare actual.png golden.png 0.02 — image comparison
+    Set                ///< set VAR value — define a script variable
 };
 
 /**
@@ -56,6 +63,14 @@ enum class InputCommandType {
 constexpr int INPUT_SCRIPT_MOD_CTRL = 0x0002;
 constexpr int INPUT_SCRIPT_MOD_SHIFT = 0x0001;
 constexpr int INPUT_SCRIPT_MOD_ALT = 0x0004;
+
+/**
+ * @brief A single parsed command from an input script.
+ */
+/**
+ * @brief Comparison operators for assert commands.
+ */
+enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge };
 
 /**
  * @brief A single parsed command from an input script.
@@ -71,6 +86,23 @@ struct ScriptCommand {
     std::string argument;      ///< For Screenshot path, Print message, Label name, Loop target
     int loopCount = 0;         ///< For Loop (0 = infinite)
     int lineNumber = 0;        ///< Source line for error messages
+
+    // A3: wait_frames
+    int waitFrames = 0;  ///< For WaitFrames — number of frames to wait
+
+    // A1: assertion fields
+    std::string assertSceneName;         ///< For AssertScene — scene name to check
+    std::string assertField;             ///< "was_rendered", "draw_calls", etc.
+    CompareOp assertOp = CompareOp::Eq;  ///< Comparison operator
+    double assertValue = 0.0;            ///< RHS of comparison
+
+    // A4: compare fields
+    std::string comparePath;        ///< Golden reference image path
+    double compareThreshold = 0.0;  ///< RMSE threshold for Compare
+
+    // A5: set fields
+    std::string setVarName;    ///< Variable name for Set command
+    double setVarValue = 0.0;  ///< Variable value for Set command
 };
 
 /**
@@ -99,6 +131,15 @@ struct InputScriptState {
     int pendingMouseButton = 0;
     double pendingMouseX = 0.0;
     double pendingMouseY = 0.0;
+
+    /// A3: Frame-wait counter (decremented each frame until zero)
+    int frameWaitCounter = 0;
+
+    /// A5: Script variables (name -> value)
+    std::unordered_map<std::string, double> variables;
+
+    /// A1: Track whether any assertion has failed
+    bool assertionFailed = false;
 };
 
 // ============================================================================
@@ -147,6 +188,31 @@ int resolveKeyName(const std::string& keyName);
  */
 bool parseKeyWithModifiers(const std::string& keyArg, int& keyCode, int& modifiers,
                            std::string& errorMsg);
+
+/**
+ * @brief Parse a comparison operator string to CompareOp enum.
+ * @param opStr The operator string ("==", "!=", "<", "<=", ">", ">=")
+ * @param[out] op The parsed CompareOp
+ * @param[out] errorMsg Error message if parsing fails
+ * @return true if parsing succeeded
+ */
+bool parseCompareOp(const std::string& opStr, CompareOp& op, std::string& errorMsg);
+
+/**
+ * @brief Evaluate a comparison between two values.
+ * @param lhs Left-hand side value
+ * @param op Comparison operator
+ * @param rhs Right-hand side value
+ * @return true if the comparison is satisfied
+ */
+bool evaluateComparison(double lhs, CompareOp op, double rhs);
+
+/**
+ * @brief Get the string representation of a CompareOp.
+ * @param op The comparison operator
+ * @return String representation ("==", "!=", "<", "<=", ">", ">=")
+ */
+const char* compareOpToString(CompareOp op);
 
 /**
  * @brief Parse --input-script from command-line arguments.

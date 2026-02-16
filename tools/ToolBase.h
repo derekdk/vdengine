@@ -417,7 +417,11 @@ class BaseToolGame : public vde::Game {
         cleanupImGui();
     }
 
-    int getExitCode() const { return m_exitCode; }
+    int getExitCode() const {
+        if (m_exitCode != 0)
+            return m_exitCode;
+        return Game::getExitCode();
+    }
 
     TScene* getToolScene() { return m_scenePtr; }
 

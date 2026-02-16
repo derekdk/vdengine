@@ -281,6 +281,22 @@ class VulkanContext {
      */
     VkShaderModule createShaderModule(const std::vector<char>& code);
 
+    // =========================================================================
+    // Framebuffer Capture (A2)
+    // =========================================================================
+
+    /**
+     * @brief Capture the most recently presented framebuffer as RGBA pixel data.
+     *
+     * Waits for the GPU to finish, then copies the swapchain image to a
+     * staging buffer and returns the pixel data as RGBA uint8 values.
+     *
+     * @param[out] outWidth  Width of the captured image in pixels
+     * @param[out] outHeight Height of the captured image in pixels
+     * @return RGBA pixel data (4 bytes per pixel), or empty on failure
+     */
+    std::vector<uint8_t> captureFramebuffer(uint32_t& outWidth, uint32_t& outHeight);
+
   protected:
     // Protected for testing subclasses
     struct MockTag {};  ///< Tag for test constructor

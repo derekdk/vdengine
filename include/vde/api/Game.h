@@ -430,6 +430,41 @@ class Game {
      */
     void updateLightingUBO(const Scene* scene);
 
+    // =========================================================================
+    // Exit Code Management (B6 minimal — needed by Track A assertions)
+    // =========================================================================
+
+    /**
+     * @brief Set the process exit code.
+     *
+     * Used by assertion commands to signal test failure.
+     * Once set to non-zero, subsequent calls with 0 are ignored.
+     *
+     * @param code Exit code (0 = success, 1 = failure)
+     */
+    void setExitCode(int code);
+
+    /**
+     * @brief Get the current exit code.
+     * @return 0 for success, 1 for failure
+     */
+    int getExitCode() const { return m_exitCode; }
+
+    // =========================================================================
+    // Screenshot Capture (A2)
+    // =========================================================================
+
+    /**
+     * @brief Capture the current framebuffer to a PNG file.
+     *
+     * Reads back the most recently rendered frame from the GPU and writes
+     * it to the specified path as an RGBA PNG image.
+     *
+     * @param outputPath Path for the output PNG file
+     * @return true if capture and write succeeded
+     */
+    bool captureScreenshot(const std::string& outputPath);
+
   protected:
     // Virtual methods for subclassing
 
@@ -516,6 +551,9 @@ class Game {
     // Input script
     std::string m_inputScriptFile;
     std::unique_ptr<InputScriptState> m_inputScriptState;
+
+    // Exit code (B6 minimal)
+    int m_exitCode = 0;
 
     // Callbacks
     std::function<void(uint32_t, uint32_t)> m_resizeCallback;
