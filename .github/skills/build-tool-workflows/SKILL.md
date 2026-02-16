@@ -26,8 +26,12 @@ This skill provides the essential workflows for building and testing the Vulkan 
 | `build.ps1` | Build the project | `.\scripts\build.ps1 -Generator Ninja -Config Debug` |
 | `rebuild.ps1` | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator MSBuild -Config Release` |
 | `clean.ps1` | Clean build artifacts | `.\scripts\clean.ps1 -Generator Ninja -Full` |
+| `clean-all.ps1` | Clean both Ninja and MSBuild builds | `.\scripts\clean-all.ps1 -Full` |
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
 | `smoke-test.ps1` | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Build` |
+| `format.ps1` | Format C++ code with clang-format | `.\scripts\format.ps1 -Check` |
+| `run-vlauncher.ps1` | Launch VLauncher (builds if missing) | `.\scripts\run-vlauncher.ps1` |
+| `help.ps1` | Show quick help for build scripts | `.\scripts\help.ps1` |
 
 ### Common Build Tasks
 
@@ -101,6 +105,36 @@ This skill provides the essential workflows for building and testing the Vulkan 
 .\scripts\smoke-test.ps1 -Build
 ```
 
+**Clean both Ninja and MSBuild builds:**
+```powershell
+.\scripts\clean-all.ps1
+```
+
+**Full clean both build directories:**
+```powershell
+.\scripts\clean-all.ps1 -Full
+```
+
+**Format C++ code:**
+```powershell
+.\scripts\format.ps1
+```
+
+**Check formatting without modifying files:**
+```powershell
+.\scripts\format.ps1 -Check
+```
+
+**Launch VLauncher:**
+```powershell
+.\scripts\run-vlauncher.ps1
+```
+
+**Show quick help:**
+```powershell
+.\scripts\help.ps1
+```
+
 ### Script Parameters Reference
 
 **build.ps1**
@@ -114,6 +148,19 @@ This skill provides the essential workflows for building and testing the Vulkan 
 - `-Config` - Debug (default) or Release
 
 **clean.ps1**
+- `-Generator` - Ninja (default) or MSBuild
+- `-Config` - Debug (default) or Release
+- `-Full` - Remove entire build directory
+
+**clean-all.ps1**
+- `-Full` - Remove entire build directories for both Ninja and MSBuild
+
+**test.ps1**
+- `-Generator` - Ninja (default) or MSBuild
+- `-Config` - Debug (default) or Release
+- `-Filter` - GoogleTest filter pattern (default: "*")
+- `-Build` - Build before running tests
+- `-Verbose` - Verbose test output
 
 **smoke-test.ps1**
 - `-Category` - All (default), Examples, or Tools
@@ -123,21 +170,17 @@ This skill provides the essential workflows for building and testing the Vulkan 
 - `-Build` - Build before running smoke tests
 - `-Verbose` - Verbose output with detailed error messages
 
-**clean.ps1**
+**format.ps1**
+- `-Check` - Check formatting without modifying files (CI/pre-commit)
+- `-Help` - Show detailed help
+
+**run-vlauncher.ps1**
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
-- `-Full` - Remove entire build directory
+- `-Build` - Build VLauncher if it doesn't exist or is out of date
 
-**test.ps1**
-- `-Generator` - Ninja (default) or MSBuild
-- `-Config` - Debug (default) or Release
-- `-Filter` - GoogleTest filter pattern (default: "*")
-- `-Build` - Build before running tests
-- `-Verbose` - Verbose test output
-
-## Manual Build (Advanced)
-
-If you need finer control or are troubleshooting, you can use CMake directly:
+**help.ps1**
+- No parameters - displays quick reference for all build scripts
 
 ## Manual Build (Advanced)
 
@@ -171,12 +214,7 @@ cmake --build build --config Debug
 cmake --build build --config Debug --clean-first
 ```
 
-**Clean:**
-```powershell
-
 **Note:** The `build.ps1 -Generator Ninja` script handles VS environment setup automatically. Manual steps below are only needed if not using the script.
-
-Ninja provides faster incremental builds but requires additional setup.
 
 ### Build with Ninja (faster incremental builds)
 
@@ -373,35 +411,34 @@ ctest --test-dir build_ninja --output-on-failure
 - Ensure you've built first: `.\scripts\test.ps1 -Build`
 - Or build separately: `.\scripts\build.ps1` then `.\scripts\test.ps1`
 - Check the correct generator is specified if you have both build directories
-**Visual Studio build:**
-```powershell
-build/tests/Debug/vde_tests.exe [--gtest_filter=Pattern]
-```
-
-**Ninja build:**
-```powershell
-build_ninja/tests/vde_tests.exe [--gtest_filter=Pattern]
-```
 
 ## Best Practices
 
-- **Choose the right build system:**
-  - Visual Studio for multi-configuration workflows and debugging in the IDE
-  - Ninja for faster iterative development and CI/CD pipelines
+- **Use the build scripts for all standard tasks:**
+  - `.\scripts\build.ps1` - Primary build command
+  - `.\scripts\test.ps1` - Run tests efficiently
+  - `.\scripts\rebuild.ps1` - Clean rebuild when needed
+  - `.\scripts\clean.ps1` - Clean single build directory
+  - `.\scripts\clean-all.ps1` - Clean all build directories at once
+  - `.\scripts\format.ps1` - Format code before committing
+  - `.\scripts\help.ps1` - Quick reference when you need a reminder
   
-- **Ninja environment setup:**
-  - **ALWAYS verify the 64-bit VS Developer environment is loaded before running any ninja commands**
-  - Ninja will fail with "no include path set" errors if the environment is not loaded
-  - The environment must be reloaded in every new PowerShell session
-  - Check for `x64` or `amd64` in your PowerShell prompt after loading the environment
-  - If builds fail with "no include path" errors, load the VS environment and try again
-
+- **Choose the right build system:**
+  - Ninja (default) - Faster builds, better for development/iteration
+  - MSBuild - Multi-configuration, IDE integration, simple setup
+  
 - **Testing efficiently:**
-  - Run tests frequently during development with the `-NoBuild` flag to save time
-  - Use `--gtest_filter` to run specific tests during focused development
-  - Use CTest for CI/CD integration with detailed output
+  - Use `.\scripts\test.ps1` for quick test runs
+  - Use `-Filter` to run specific tests during focused development
+  - Use `-Build` flag to ensure latest code is tested
+  - Run tests frequently during development
+  - Use `.\scripts\smoke-test.ps1` to validate all examples and tools
+  
+- **Code formatting:**
+  - Run `.\scripts\format.ps1 -Check` before committing to verify formatting
+  - Use `.\scripts\format.ps1` to automatically fix formatting issues
   
 - **Build configurations:**
-  - Debug builds include symbols and assertions for development
-  - Release builds are optimized for performance testing
-  - Clean the build directory when switching between Debug and Release with Ninja
+  - Debug (default) - Includes symbols and assertions for development
+  - Release - Optimized for performance testing
+  - Scripts handle configuration switching automatically
