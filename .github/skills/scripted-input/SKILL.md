@@ -94,6 +94,12 @@ exit                  # Quit the application
 
 **Coordinates:** (0,0) is top-left; window-relative pixel coordinates.
 
+### Output
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `print <message>` | Print message to console | `print Hello World` |
+
 ### Control Flow
 
 | Command | Description | Example |
@@ -308,9 +314,10 @@ This script runs all examples with their smoke scripts and reports results.
 
 1. **Script Loading:** On `Game::initialize()`, checks API, CLI, then env var for script path
 2. **Parsing:** `parseInputScript()` reads the file and builds a command list
-3. **Execution:** Each frame, `Game::processInputScript()` dispatches pending commands to the active `InputHandler`
+3. **Execution:** Each frame, the scheduler runs `processInputScript()` as an Input-phase task before any game logic, ensuring input is fully committed before worker threads begin
 4. **Timing:** `WaitMs` commands accumulate delta time until the wait duration is reached
 5. **Exit:** The `exit` command sets a flag; `Game::run()` checks it and quits the loop
+6. **Print:** The `print` command outputs text to `stdout` with `[VDE:InputScript]` prefix
 
 ### Frame Timing
 

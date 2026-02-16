@@ -34,8 +34,12 @@ target_link_libraries(imgui_backend PUBLIC
 
 # Create a custom target to copy shaders once (avoids parallel copy conflicts with MSBuild)
 add_custom_target(copy_example_shaders ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Debug/shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/shaders
         ${CMAKE_CURRENT_BINARY_DIR}/Debug/shaders

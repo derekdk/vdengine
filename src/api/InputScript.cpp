@@ -452,6 +452,23 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
         cmd.type = InputCommandType::Screenshot;
         cmd.argument = tokens[1];
     }
+    // ---- print ----
+    else if (verb == "print") {
+        if (tokens.size() < 2) {
+            errorMsg =
+                "at line " + std::to_string(lineNumber) + ": 'print' requires a message argument";
+            return false;
+        }
+        cmd.type = InputCommandType::Print;
+        // Capture everything after "print " as the message (preserves original casing/spacing)
+        auto verbEnd = line.find_first_of(" \t");
+        if (verbEnd != std::string::npos) {
+            auto msgStart = line.find_first_not_of(" \t", verbEnd);
+            if (msgStart != std::string::npos) {
+                cmd.argument = line.substr(msgStart);
+            }
+        }
+    }
     // ---- label ----
     else if (verb == "label") {
         if (tokens.size() < 2) {

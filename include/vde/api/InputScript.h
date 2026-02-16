@@ -42,6 +42,7 @@ enum class InputCommandType {
     MouseMove,    ///< mousemove 640 360 — move cursor
     Scroll,       ///< scroll 400 300 -3 — scroll at position
     Screenshot,   ///< screenshot path.png — save frame to PNG
+    Print,        ///< print message — output text to console
     Label,        ///< label loop_start — define jump target
     Loop,         ///< loop loop_start 5 — jump back to label
     Exit          ///< exit — quit the application
@@ -67,7 +68,7 @@ struct ScriptCommand {
     double mouseX = 0.0;       ///< For Click/MouseDown/MouseUp/MouseMove/Scroll
     double mouseY = 0.0;       ///< For Click/MouseDown/MouseUp/MouseMove/Scroll
     double scrollDelta = 0.0;  ///< For Scroll
-    std::string argument;      ///< For Screenshot path, Label name, Loop target
+    std::string argument;      ///< For Screenshot path, Print message, Label name, Loop target
     int loopCount = 0;         ///< For Loop (0 = infinite)
     int lineNumber = 0;        ///< Source line for error messages
 };

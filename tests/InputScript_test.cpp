@@ -384,6 +384,50 @@ TEST(InputScriptParseLine, ParsesScreenshot) {
 }
 
 // ============================================================================
+// Line parser tests — Print
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesPrintSimple) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("print Hello", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::Print);
+    EXPECT_EQ(cmd.argument, "Hello");
+}
+
+TEST(InputScriptParseLine, ParsesPrintMultiWord) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("print Hello World", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::Print);
+    EXPECT_EQ(cmd.argument, "Hello World");
+}
+
+TEST(InputScriptParseLine, ParsesPrintPreservesCase) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("print Starting Phase 2", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::Print);
+    EXPECT_EQ(cmd.argument, "Starting Phase 2");
+}
+
+TEST(InputScriptParseLine, ParsesPrintCaseInsensitiveVerb) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("PRINT message text", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::Print);
+    EXPECT_EQ(cmd.argument, "message text");
+}
+
+TEST(InputScriptParseLine, PrintMissingMessageReportsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("print", 3, cmd, error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_NE(error.find("3"), std::string::npos);
+}
+
+// ============================================================================
 // Line parser tests — Syntax
 // ============================================================================
 
@@ -419,6 +463,7 @@ TEST(InputScriptParseLine, MissingArgsReportsError) {
     EXPECT_FALSE(parseScriptLine("label", 4, cmd, error));
     EXPECT_FALSE(parseScriptLine("loop", 5, cmd, error));
     EXPECT_FALSE(parseScriptLine("screenshot", 6, cmd, error));
+    EXPECT_FALSE(parseScriptLine("print", 7, cmd, error));
 }
 
 // ============================================================================
@@ -594,6 +639,32 @@ TEST_F(InputScriptFileTest, ParsesComplexScript) {
     EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
     EXPECT_EQ(commands.size(), 20u);
     EXPECT_EQ(labels.count("key_loop"), 1u);
+}
+
+TEST_F(InputScriptFileTest, ParsesScriptWithPrint) {
+    writeScript("wait startup\n"
+                "print Test started\n"
+                "press A\n"
+                "wait 100\n"
+                "print Phase 2 beginning\n"
+                "press B\n"
+                "print All done!\n"
+                "exit\n");
+
+    std::vector<ScriptCommand> commands;
+    std::unordered_map<std::string, LabelState> labels;
+    std::string error;
+
+    EXPECT_TRUE(parseInputScript(m_tempFile, commands, labels, error)) << error;
+    EXPECT_EQ(commands.size(), 8u);
+    EXPECT_EQ(commands[0].type, InputCommandType::WaitStartup);
+    EXPECT_EQ(commands[1].type, InputCommandType::Print);
+    EXPECT_EQ(commands[1].argument, "Test started");
+    EXPECT_EQ(commands[4].type, InputCommandType::Print);
+    EXPECT_EQ(commands[4].argument, "Phase 2 beginning");
+    EXPECT_EQ(commands[6].type, InputCommandType::Print);
+    EXPECT_EQ(commands[6].argument, "All done!");
+    EXPECT_EQ(commands[7].type, InputCommandType::Exit);
 }
 
 TEST_F(InputScriptFileTest, ParsesNestedLoops) {

@@ -216,11 +216,8 @@ void Game::run() {
         // Process input
         processInput();
 
-        // Process input script commands
-        processInputScript();
-
         // Execute the scheduler task graph
-        // (covers: onUpdate, scene update, audio, pre-render, render)
+        // (covers: input script, onUpdate, scene update, audio, pre-render, render)
         m_scheduler.execute();
 
         m_frameCount++;
@@ -427,6 +424,11 @@ void Game::processInputScript() {
             state.currentCommand++;
             break;
         }
+
+        case InputCommandType::Print:
+            std::cout << "[VDE:InputScript] " << cmd.argument << std::endl;
+            state.currentCommand++;
+            break;
 
         case InputCommandType::Label:
             // Labels are no-ops at execution time
@@ -2034,11 +2036,23 @@ void Game::rebuildSchedulerGraph() {
               [](const SceneEntry& a, const SceneEntry& b) { return a.priority < b.priority; });
 
     // ---------------------------------------------------------------
+    // Task 0: Input — process input script commands.
+    //         Runs in the Input phase (before GameLogic) so scripted
+    //         input is dispatched before any game logic reads it.
+    //         This avoids race conditions with worker threads: all
+    //         input is fully committed before game-logic tasks begin.
+    // ---------------------------------------------------------------
+    TaskId inputScriptTask =
+        m_scheduler.addTask({"input.script", TaskPhase::Input, [this]() { processInputScript(); }});
+
+    // ---------------------------------------------------------------
     // Task 1: GameLogic — onUpdate hook + all scene updates
     // ---------------------------------------------------------------
-    // Chain: onUpdate -> update(scene1) | gameLogic(scene1) -> ...
-    TaskId prevTask = m_scheduler.addTask(
-        {"game.update", TaskPhase::GameLogic, [this]() { onUpdate(m_deltaTime); }});
+    // Chain: inputScript -> onUpdate -> update(scene1) | gameLogic(scene1) -> ...
+    TaskId prevTask = m_scheduler.addTask({"game.update",
+                                           TaskPhase::GameLogic,
+                                           [this]() { onUpdate(m_deltaTime); },
+                                           {inputScriptTask}});
 
     // Track per-scene audio tasks so audio.global can depend on all of them
     std::vector<TaskId> audioTasks;
