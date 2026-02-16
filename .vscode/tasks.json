@@ -55,6 +55,14 @@
       "problemMatcher": []
     },
     {
+      "label": "scripts: clean-all",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/clean-all.ps1"],
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
       "label": "scripts: format",
       "type": "shell",
       "command": "powershell",
