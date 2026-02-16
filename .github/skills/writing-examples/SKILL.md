@@ -43,7 +43,7 @@ All examples should use the shared `ExampleBase.h` header which provides base cl
 All examples should have a smoke test script for automated verification. See the **scripted-input** skill for details on creating `.vdescript` files.
 
 **Create a smoke test:**
-1. Create a script in `scripts/input/smoke_<example_name>.vdescript`
+1. Create a script in `smoketests/scripts/smoke_<example_name>.vdescript`
 2. Use `wait startup` to wait for first frame
 3. Add interactions specific to your example (key presses, mouse clicks, etc.)
 4. Use `wait` commands to let the example run

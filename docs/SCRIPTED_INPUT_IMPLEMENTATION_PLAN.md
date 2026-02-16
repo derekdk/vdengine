@@ -515,11 +515,11 @@ These tests validate the parser logic against the `ScriptCommand` output — pur
 
 ### WI-7: Smoke Test Scripts
 
-**Directory:** `scripts/input/` (keep separate from build scripts)
+**Directory:** `smoketests/scripts/` (keep separate from build scripts)
 
 **File extension:** `.vdescript` — distinct from generic `.txt`, enables tooling and file-type association.
 
-**Universal smoke test** (`scripts/input/smoke_test.vdescript`):
+**Universal smoke test** (`smoketests/scripts/smoke_test.vdescript`):
 ```text
 # Universal smoke test
 # Verifies example launches, renders, and exits cleanly
@@ -530,7 +530,7 @@ exit
 
 **Per-example scripts** (optional, for examples with specific key bindings):
 ```text
-# scripts/input/smoke_physics_demo.vdescript
+# smoketests/scripts/smoke_physics_demo.vdescript
 wait startup
 wait 1000
 press 1
@@ -543,7 +543,7 @@ exit
 
 **Script demonstrating modifiers, mouse, and loops:**
 ```text
-# scripts/input/smoke_interactive_demo.vdescript
+# smoketests/scripts/smoke_interactive_demo.vdescript
 wait startup
 wait 500
 
@@ -573,7 +573,7 @@ wait 1000
 exit
 ```
 
-**Update `scripts/tmp_run_examples_check.ps1`** to use `--input-script scripts/input/smoke_test.vdescript` instead of relying on auto-timeout.
+**Update `scripts/tmp_run_examples_check.ps1`** to use `--input-script smoketests/scripts/smoke_test.vdescript` instead of relying on auto-timeout.
 
 ---
 
@@ -642,18 +642,18 @@ After implementation, the following should work:
 ./scripts/build-and-test.ps1 -Filter "InputScript*"
 
 # 3. Example runs with input script and exits cleanly
-./build_ninja/examples/vde_physics_demo.exe --input-script scripts/input/smoke_test.vdescript
+./build_ninja/examples/vde_physics_demo.exe --input-script smoketests/scripts/smoke_test.vdescript
 # Exit code: 0
-# Console shows: [VDE:InputScript] Loaded N commands from scripts/input/smoke_test.vdescript
+# Console shows: [VDE:InputScript] Loaded N commands from smoketests/scripts/smoke_test.vdescript
 
 # 4. Environment variable works (lowest priority)
-$env:VDE_INPUT_SCRIPT = "scripts/input/smoke_test.vdescript"
+$env:VDE_INPUT_SCRIPT = "smoketests/scripts/smoke_test.vdescript"
 ./build_ninja/examples/vde_physics_demo.exe
 # Exit code: 0
 
 # 5. CLI arg overrides env var
-$env:VDE_INPUT_SCRIPT = "scripts/input/other.vdescript"
-./build_ninja/examples/vde_physics_demo.exe --input-script scripts/input/smoke_test.vdescript
+$env:VDE_INPUT_SCRIPT = "smoketests/scripts/other.vdescript"
+./build_ninja/examples/vde_physics_demo.exe --input-script smoketests/scripts/smoke_test.vdescript
 # Uses smoke_test.vdescript, not other.vdescript
 
 # 6. All examples pass smoke test

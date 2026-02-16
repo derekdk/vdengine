@@ -477,7 +477,7 @@ Tools can also use the **scripted-input** system for UI automation and smoke tes
 - **Input scripts** (`.vdescript`) define _how to interact with UI_ (clicks, keys)
 
 **Create a smoke test for your tool:**
-1. Create `scripts/input/smoke_<tool_name>.vdescript`
+1. Create `smoketests/scripts/smoke_<tool_name>.vdescript`
 2. Test key UI interactions, command execution, etc.
 3. Add to smoke test runner (see writing-examples skill)
 

@@ -101,7 +101,7 @@ $smokeScriptMap = @{
 }
 
 $defaultSmoke = 'smoke_quick.vdescript'
-$scriptBaseDir = Join-Path $vdeRoot 'scripts\input'
+$scriptBaseDir = Join-Path $vdeRoot 'smoketests\scripts'
 
 # --- Executable Discovery ---
 

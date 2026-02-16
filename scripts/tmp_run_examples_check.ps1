@@ -41,7 +41,7 @@ $apps = @(
 $defaultSmoke = 'smoke_quick.vdescript'
 
 # Resolve script base directory (relative to workspace root)
-$scriptBaseDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\input'
+$scriptBaseDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'smoketests\scripts'
 
 $results = @()
 

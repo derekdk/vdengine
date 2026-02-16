@@ -665,7 +665,7 @@ Extend the existing smoke test runner to:
 2. Accept a `-Visual` flag that also runs the `compare` scripts (when
    golden images are available).
 3. Auto-discover example-specific scripts by matching
-   `scripts/input/smoke_<example_name>.vdescript`.
+   `smoketests/scripts/smoke_<example_name>.vdescript`.
 
 #### Acceptance criteria
 
@@ -788,10 +788,10 @@ A5 (variable substitution) ─── independent, low priority
 | `examples/quad_viewport_demo/main.cpp` | `onValidate()` override |
 | `examples/multi_scene_demo/main.cpp` | `onValidate()` override |
 | `examples/parallel_physics_demo/main.cpp` | `onValidate()` override |
-| `scripts/input/smoke_four_scene_3d.vdescript` | New validation script |
-| `scripts/input/smoke_quad_viewport.vdescript` | New validation script |
-| `scripts/input/smoke_parallel_physics.vdescript` | New validation script |
-| `scripts/input/smoke_multi_scene_viewport.vdescript` | New validation script |
+| `smoketests/scripts/smoke_four_scene_3d.vdescript` | New validation script |
+| `smoketests/scripts/smoke_quad_viewport.vdescript` | New validation script |
+| `smoketests/scripts/smoke_parallel_physics.vdescript` | New validation script |
+| `smoketests/scripts/smoke_multi_scene_viewport.vdescript` | New validation script |
 | `scripts/smoke-test.ps1` | Assert-failure detection, `-Visual` flag |
 | `tests/ViewportRect_test.cpp` | New test file |
 | `tests/SceneGroup_test.cpp` | New `createWithViewports()` tests |

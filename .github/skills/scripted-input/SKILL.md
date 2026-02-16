@@ -27,18 +27,18 @@ There are three ways to provide an input script:
 
 1. **Command-line argument (highest priority):**
    ```bash
-   vde_physics_demo.exe --input-script scripts/input/smoke_test.vdescript
+   vde_physics_demo.exe --input-script smoketests/scripts/smoke_test.vdescript
    ```
 
 2. **Environment variable (fallback):**
    ```bash
-   set VDE_INPUT_SCRIPT=scripts/input/smoke_test.vdescript
+   set VDE_INPUT_SCRIPT=smoketests/scripts/smoke_test.vdescript
    vde_physics_demo.exe
    ```
 
 3. **API call (in code):**
    ```cpp
-   game.setInputScriptFile("scripts/input/smoke_test.vdescript");
+   game.setInputScriptFile("smoketests/scripts/smoke_test.vdescript");
    ```
 
 **Priority:** API call > CLI arg > environment variable
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
     vde::configureInputScriptFromArgs(game, argc, argv);
     
     // Or set manually
-    game.setInputScriptFile("scripts/input/my_script.vdescript");
+    game.setInputScriptFile("smoketests/scripts/my_script.vdescript");
     
     // Initialize and run
     vde::GameSettings settings;
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
 
 ### Creating Smoke Tests
 
-1. **Create a smoke script** in `scripts/input/<example_name>.vdescript`:
+1. **Create a smoke script** in `smoketests/scripts/<example_name>.vdescript`:
    ```vdescript
    wait startup
    wait 100
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
 
 2. **Run the test:**
    ```bash
-   build_ninja\examples\vde_physics_demo.exe --input-script scripts/input/smoke_physics_demo.vdescript
+   build_ninja\examples\vde_physics_demo.exe --input-script smoketests/scripts/smoke_physics_demo.vdescript
    ```
 
 3. **Check exit code:** Exit code 0 = success.
@@ -355,4 +355,4 @@ See [src/api/Game.cpp](../../../src/api/Game.cpp) for:
 - [API-DOC.md](../../../API-DOC.md) - Full VDE API reference
 - [SCRIPTED_INPUT_IMPLEMENTATION_PLAN.md](../../../docs/SCRIPTED_INPUT_IMPLEMENTATION_PLAN.md) - Implementation details and design
 - [examples/](../../../examples/) - Example applications with smoke scripts
-- [scripts/input/](../../../scripts/input/) - Example input scripts
+- [smoketests/scripts/](../../../smoketests/scripts/) - Smoke test input scripts

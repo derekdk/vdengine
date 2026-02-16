@@ -62,7 +62,7 @@ Each executable is tested with a `.vdescript` input script:
 1. The script checks a **smoke script map** (in `smoke-test.ps1`) for executable-specific scripts
 2. If no specific script is mapped, it falls back to `smoke_quick.vdescript`
 
-Smoke scripts live in `scripts/input/` and follow the naming convention `smoke_<name>.vdescript`.
+Smoke scripts live in `smoketests/scripts/` and follow the naming convention `smoke_<name>.vdescript`.
 
 ### Current smoke script map
 
@@ -161,7 +161,7 @@ The new executable will be auto-discovered and tested with `smoke_quick.vdescrip
 
 If the executable needs specific interaction beyond "launch and exit":
 
-1. Create `scripts/input/smoke_<name>.vdescript`:
+1. Create `smoketests/scripts/smoke_<name>.vdescript`:
 
 ```vdescript
 # Smoke test for <name>
@@ -262,7 +262,7 @@ Run with `-Verbose` to see error output:
 Then run the executable manually to reproduce:
 
 ```powershell
-.\build_ninja\examples\vde_failing_example.exe --input-script scripts\input\smoke_quick.vdescript
+.\build_ninja\examples\vde_failing_example.exe --input-script smoketests\scripts\smoke_quick.vdescript
 ```
 
 ### Vulkan validation errors in output
