@@ -47,7 +47,7 @@ foreach ($buildInfo in $buildDirs) {
     if ($Full) {
         Write-Warn "Performing FULL CLEAN - removing entire build directory..."
         Remove-Item -Path $buildDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Success "$generatorName: Full clean complete - build directory removed"
+        Write-Success "${generatorName}: Full clean complete - build directory removed"
         $cleanedCount++
     } else {
         Push-Location $buildDir
@@ -72,9 +72,9 @@ foreach ($buildInfo in $buildDirs) {
                 }
                 
                 if ($LASTEXITCODE -ne 0) {
-                    Write-Warn "$generatorName: Clean command returned non-zero exit code"
+                    Write-Warn "${generatorName}: Clean command returned non-zero exit code"
                 } else {
-                    Write-Success "$generatorName: Clean complete"
+                    Write-Success "${generatorName}: Clean complete"
                     $cleanedCount++
                 }
             }
