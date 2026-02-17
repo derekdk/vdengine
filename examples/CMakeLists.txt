@@ -86,6 +86,9 @@ add_vde_example(vde_world_bounds_demo "world_bounds_demo/main.cpp")
 # Materials & Lighting demo example demonstrating Phase 4 features
 add_vde_example(vde_materials_lighting_demo "materials_lighting_demo/main.cpp")
 
+# Textured Cube demo - demonstrates texture atlas mapping with different textures per face
+add_vde_example(vde_textured_cube_demo "textured_cube_demo/main.cpp")
+
 # Hex prism stacks demo example demonstrating mouse pick-and-drag interaction
 add_vde_example(vde_hex_prism_stacks_demo "hex_prism_stacks_demo/main.cpp")
 
