@@ -85,6 +85,7 @@ $excludeFromTools = @(
 $smokeScriptMap = @{
     # Examples
     'vde_physics_demo.exe'             = 'smoke_physics_demo.vdescript'
+    'vde_physics_showcase_demo.exe'    = 'smoke_physics_showcase.vdescript'
     'vde_breakout_demo.exe'            = 'smoke_breakout.vdescript'
     'vde_asteroids_demo.exe'           = 'smoke_asteroids.vdescript'
     'vde_asteroids_physics_demo.exe'   = 'smoke_asteroids_physics.vdescript'

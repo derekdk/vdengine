@@ -127,6 +127,9 @@ add_vde_example(vde_physics_demo "physics_demo/main.cpp")
 # Parallel physics demo demonstrating thread pool integration
 add_vde_example(vde_parallel_physics_demo "parallel_physics_demo/main.cpp")
 
+# Physics Showcase demo - multiple physics tests (gravity, bouncing, dominoes, wrecking ball, etc.)
+add_vde_example(vde_physics_showcase_demo "physics_showcase_demo/main.cpp")
+
 # Physics + Audio demo demonstrating collision -> game logic -> audio pipeline
 add_vde_example(vde_physics_audio_demo "physics_audio_demo/main.cpp")
 
