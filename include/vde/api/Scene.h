@@ -505,6 +505,55 @@ class Scene {
      */
     const Color& getBackgroundColor() const { return m_backgroundColor; }
 
+    // 2D Convenience Methods
+
+    /**
+     * @brief One-call setup for a 2D scene.
+     *
+     * Creates a Camera2D with the given viewport size centered at (0, 0),
+     * sets white ambient lighting (SimpleColorLightBox), and applies the
+     * given background color.
+     *
+     * This is the recommended way to initialize any 2D scene.
+     *
+     * @param viewWidth   Visible world width in world units
+     * @param viewHeight  Visible world height in world units
+     * @param bgColor     Background/clear color (default: black)
+     *
+     * @example
+     * @code
+     * void onEnter() override {
+     *     setup2D(20.0f, 15.0f, Color(0.1f, 0.1f, 0.15f, 1.0f));
+     *     enablePhysics();
+     *     // ... create entities
+     * }
+     * @endcode
+     */
+    void setup2D(float viewWidth, float viewHeight, const Color& bgColor = Color::black());
+
+    /**
+     * @brief Create a 4-wall physics arena (floor, ceiling, left, right).
+     *
+     * Each wall is a static PhysicsSpriteEntity with a box collider.
+     * The arena is centered at (0, 0) so its extents span
+     * [-width/2, +width/2] × [-height/2, +height/2].
+     *
+     * Physics must be enabled before calling this method.
+     *
+     * @param width     Total arena width in world units
+     * @param height    Total arena height in world units
+     * @param thickness Wall thickness (default: 0.5)
+     * @param color     Wall color (default: dark gray)
+     *
+     * @example
+     * @code
+     * enablePhysics();
+     * createPhysicsWalls(18.0f, 13.0f, 0.5f, Color(0.3f, 0.5f, 0.3f, 1.0f));
+     * @endcode
+     */
+    void createPhysicsWalls(float width, float height, float thickness = 0.5f,
+                            const Color& color = Color(0.3f, 0.3f, 0.3f, 1.0f));
+
     // World Bounds
 
     /**

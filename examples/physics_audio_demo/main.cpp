@@ -91,13 +91,12 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
         config.fixedTimestep = 1.0f / 60.0f;
         enablePhysics(config);
 
-        // Camera
-        auto* cam = new vde::OrbitCamera(vde::Position(0.0f, 3.0f, 0.0f), 12.0f);
-        setCamera(std::unique_ptr<vde::GameCamera>(cam));
-
-        // Lighting
-        setLightBox(std::make_unique<vde::SimpleColorLightBox>(vde::Color::white()));
-        setBackgroundColor(vde::Color(0.05f, 0.05f, 0.1f, 1.0f));
+        // 2D scene: orthographic camera, flat lighting, dark background
+        setup2D(16.0f, 12.0f, vde::Color(0.05f, 0.05f, 0.1f, 1.0f));
+        // Center camera on the action (ground at y=-2, boxes fall from y=5-9)
+        if (auto* cam = dynamic_cast<vde::Camera2D*>(getCamera())) {
+            cam->setPosition(0.0f, 3.0f);
+        }
 
         // Create ground
         createGround();

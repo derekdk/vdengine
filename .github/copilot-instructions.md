@@ -65,3 +65,8 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Purpose:** Guide for running smoke tests and interpreting the results.  
 **Use when:** Running, debugging, or extending automated smoke tests for examples and tools.  
 **Location:** `.github/skills/smoke-testing/SKILL.md`
+
+### 2d-games
+**Purpose:** Guide for creating 2D games, demos, and examples with the VDE API.  
+**Use when:** Building 2D physics, sprite-based, or side-view applications. Setting up Camera2D, physics arenas, or choosing between manual and engine-powered collision detection.  
+**Location:** `.github/skills/2d-games/SKILL.md`
