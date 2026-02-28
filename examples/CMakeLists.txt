@@ -136,3 +136,6 @@ add_vde_example(vde_physics_audio_demo "physics_audio_demo/main.cpp")
 # Dear ImGui integration demo - demonstrates ImGui overlay on VDE scenes
 add_vde_example(vde_imgui_demo "imgui_demo/main.cpp")
 
+# Persistent storage demo - demonstrates StorageManager API with an ImGui panel UI
+add_vde_example(vde_storage_demo "storage_demo/main.cpp")
+
