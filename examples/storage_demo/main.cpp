@@ -137,7 +137,14 @@ class OperationLog {
 
 class StorageDemoInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
-    void onKeyPress(int key) override { BaseExampleInputHandler::onKeyPress(key); }
+    void onKeyPress(int key) override {
+        // Suppress all base-class hotkeys (ESC, F, F1, F11, …) while ImGui
+        // has keyboard focus so typing into text fields works normally.
+        if (ImGui::GetIO().WantCaptureKeyboard) {
+            return;
+        }
+        BaseExampleInputHandler::onKeyPress(key);
+    }
 };
 
 // =============================================================================
