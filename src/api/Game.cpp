@@ -14,6 +14,7 @@
 #include <vde/api/LightBox.h>
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
+#include <vde/api/StorageManager.h>
 
 #include <GLFW/glfw3.h>
 
@@ -157,6 +158,9 @@ void Game::shutdown() {
 
     // Shutdown audio system
     AudioManager::getInstance().shutdown();
+
+    // Shutdown persistent storage
+    StorageManager::getInstance().shutdown();
 
     // Cleanup rendering pipelines
     destroyLightingResources();

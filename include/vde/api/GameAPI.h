@@ -40,6 +40,9 @@
 #include "InputScript.h"
 #include "KeyCodes.h"
 
+// Storage
+#include "StorageManager.h"
+
 // Graphics
 #include "GameCamera.h"
 #include "LightBox.h"
