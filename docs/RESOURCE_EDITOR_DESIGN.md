@@ -196,7 +196,7 @@ command arg1 arg2 ...               ← targets the active canvas (set by set_ac
 ```
 
 - The `@` prefix is **only** meaningful as the first token on a command line.
-- Global commands (`help`, `exit`, `list`, `set_active`, `log`, `run`, `new`, `open`, `dsl_load`) ignore the canvas prefix (and produce a warning if one is supplied).
+- Global commands (`help`, `exit`, `list`, `set_active`, `log`, `run`, `new`, `load`, `create image`, `dsl_load`) ignore the canvas prefix (and produce a warning if one is supplied).
 - Canvas-targeted commands (`paint`, `fill`, `save`, `undo`, etc.) require a valid resolved canvas. If no canvas is active and no `@canvasId` is given, they return an error.
 - When a command is logged, the full text including the `@canvasId` prefix (if explicit) is recorded. This means replaying the log reproduces the exact targeting.
 
@@ -208,7 +208,8 @@ command arg1 arg2 ...               ← targets the active canvas (set by set_ac
 |---------|------|-------------|
 | `help` | `[command]` | List commands or show help for one |
 | `new` | `<width> <height> [name]` | Create a new blank canvas. `name` defaults to `"untitled_N"`. Assigns the next available `uint32_t` ID. Becomes the active canvas. |
-| `open` | `<filepath> [name]` | Load an image from disk into a new canvas. `name` defaults to the filename stem. Becomes the active canvas. |
+| `load` | `<canvasname> "<filepath>" [imagename]` | Load an image file as a named resource in a canvas. If `canvasname` doesn't exist, creates a new canvas sized to the image. `imagename` defaults to filename stem. See §12.1 in CANVAS_DSL_DESIGN.md. |
+| `create image` | `<name> <canvasname>[layers...] <areaname>` | Composite specified layers within an area into a new undisplayed image resource. Omit layers to use all. |
 | `list` | | List all open canvases with their numeric IDs, names, dimensions, and dirty flags |
 | `set_active` | `<name\|id>` | Set the active canvas by name or numeric ID |
 | `log save` | `<filepath> [startIdx] [endIdx]` | Save command log to script file |
@@ -238,13 +239,14 @@ command arg1 arg2 ...               ← targets the active canvas (set by set_ac
 | `line` | `<x1> <y1> <x2> <y2> <color> [size]` | Draw a line |
 | `rect` | `<x> <y> <w> <h> <color> [filled]` | Draw a rectangle |
 | `circle` | `<cx> <cy> <r> <color> [filled]` | Draw a circle |
+| `draw` | `<imagename> [layer] <x> <y> <w> <h>` | Draw (blit) a named image resource at position and size. `imagename` can use `canvasname::imagename` for cross-canvas access. `[layer]` is an optional layer index in brackets. |
 | `pick` | `<x> <y>` | Pick color from pixel (sets global brush color) |
 | `zoom` | `<level>` | Set canvas zoom level |
 | `pan` | `<dx> <dy>` | Pan the canvas view |
 | `fliph` | | Flip image horizontally |
 | `flipv` | | Flip image vertically |
 | `dsl_export` | `<filepath.vdecanvas>` | Export the canvas's command history as a `.vdecanvas` DSL script (best-effort reconstruction). |
-| `layer add` | `<name> [above\|below] [<ref>]` | Add a named layer to the compositing stack |
+| `layer add` | `<name> [above\|below <ref> \| at <index>]` | Add a named layer to the compositing stack. `at <index>` inserts at that position (pushing existing layers up). |
 | `layer remove` | `<name>` | Remove a layer |
 | `layer select` | `<name\|index>` | Switch the active drawing layer |
 | `layer opacity` | `<name> <0-100>` | Set layer opacity |
@@ -327,13 +329,19 @@ private:
 
 ### 2b. Canvas — The Per-Resource Container
 
-Each open resource is wrapped in a **Canvas** that bundles the `ImageDocument` with its display state and unique ID. The scene maintains a `CanvasRegistry` (map of ID → Canvas). One canvas is marked **active** at a time.
+Each open resource is wrapped in a **Canvas** that bundles the `ImageDocument` with its display state, unique ID, and named image resources. The scene maintains a `CanvasRegistry` (map of ID → Canvas). One canvas is marked **active** at a time.
+
+Each canvas also maintains an **operation history** — the ordered sequence of commands (including `load`) that produced its current pixel state. This enables deterministic recreation, script export, and undo/redo.
+
+Resources (images) within a canvas are accessed from other canvases with the `::` double-colon accessor: `canvasname::imagename`. Within the owning canvas, bare `imagename` suffices.
 
 ```cpp
 struct Canvas {
     uint32_t id;                                 // Unique numeric canvas ID (auto-assigned)
     std::string name;                             // Human-readable name (e.g. "hero", "tiles")
     std::unique_ptr<ImageDocument> document;      // Pixel data + undo
+    std::map<std::string, std::unique_ptr<ImageDocument>> resources;  // Named image resources (loaded or composited)
+    std::vector<std::string> operationHistory;    // Ordered commands for deterministic recreation
     std::shared_ptr<vde::Texture> gpuTexture;     // VDE texture for rendering
     VkDescriptorSet imguiTextureId = VK_NULL_HANDLE; // ImGui display handle
     uint64_t lastUploadedGeneration = 0;          // Track when GPU texture is stale
@@ -342,6 +350,7 @@ struct Canvas {
 };
 
 /// Owns all open canvases and provides lookup by numeric ID or string name.
+/// Supports cross-canvas resource resolution via the `::` accessor.
 class CanvasRegistry {
 public:
     Canvas* create(const std::string& name, std::unique_ptr<ImageDocument> doc);
@@ -354,6 +363,14 @@ public:
     bool hasName(const std::string& name) const;
     std::vector<uint32_t> getIds() const;         // Ordered list of canvas IDs
     size_t count() const;
+
+    /// Resolve a resource reference. Accepts bare "imagename" (searches active canvas)
+    /// or "canvasname::imagename" (explicit canvas). Returns {canvas, imageDoc} or nulls.
+    struct ResourceRef {
+        Canvas* canvas = nullptr;
+        ImageDocument* image = nullptr;
+    };
+    ResourceRef resolveResource(const std::string& ref, uint32_t activeCanvasId);
 
     // Generates a unique name like "untitled_1", "untitled_2", ...
     std::string generateUniqueName(const std::string& base = "untitled");
@@ -535,15 +552,15 @@ namespace vde::tools::dsl {
 
 /// All DSL object types that can be created with 'create <type> <name>'
 enum class ObjectType {
-    Canvas, Color, Palette, Point, Area, Layer, Gradient, Pattern, Macro
+    Canvas, Image, Color, Palette, Point, Area, Layer, Gradient, Pattern, Macro
 };
 
 /// AST node tags
 enum class NodeType {
-    CreateCanvas, CreateColor, CreatePalette, CreatePoint, CreateArea,
+    CreateCanvas, CreateImage, CreateColor, CreatePalette, CreatePoint, CreateArea,
     CreateLayer, CreateGradient, CreatePattern, CreateMacro,
     Metadata, SelectStmt, PaletteOp, LayerProp, VariableDef,
-    DrawLine, DrawRect, DrawCircle, DrawEllipse, DrawArc, DrawBezier,
+    DrawLine, DrawRect, DrawCircle, DrawEllipse, DrawArc, DrawBezier, DrawImage,
     FillCmd, SetPixel, FloodFill,
     CopyArea, MoveArea, ClearArea, TileArea,
     LoadImage, Resize, Crop, Flip, Rotate,
@@ -655,24 +672,29 @@ private:
 | `create canvas hero 32 32` | `new 32 32 hero` |
 | `create color skin #FFCC99` | *(symbol table only — no command)* |
 | `create palette hero_pal ...` | *(symbol table only — no command)* |
+| `load hero "assets/face.png" face` | `load hero "assets/face.png" face` |
+| `create image torso hero[base] body` | `create image torso hero[base] body` |
 | `background bg` | `fill #00000000` (resolved color) |
 | `set 10, 5 skin` | `paint 10 5 #FFCC99FF 1` |
 | `fill body armor` | Sequence of `paint` or bulk `fill` within area bounds |
 | `draw line p1 to p2 with c` | `line x1 y1 x2 y2 #color 1` |
 | `draw rect p1 to p2 with c filled` | `rect x y w h #color filled` |
 | `draw circle cx, cy radius r with c` | `circle cx cy r #color filled` |
+| `draw face hero[0] 0, 0 32, 32` | `draw face [0] 0 0 32 32` (on resolved canvas) |
 | `fill gradient sky` | Per-pixel `paint` commands (or future bulk gradient op) |
 | `create layer highlights above` | `layer add highlights above` |
+| `create layer overlay at 2` | `layer add overlay at 2` |
 | `select layer highlights` | `layer select highlights` |
 | `export png "output/hero.png"` | `export output/hero.png png` |
 | `copy area to x, y` | Batch of `paint` commands (or `copy_area` command) |
 
 **Integration with the editor:**
 
-1. **Load DSL into editor** — The `dsl_load` command parses a `.vdecanvas` file and replays it through the `CommandSystem`. The resulting canvas appears as a normal editable canvas in the registry. All emitted commands appear in the log.
-2. **Export canvas as DSL** — The `dsl_export` command reconstructs a `.vdecanvas` script from a canvas's command history. This is a best-effort reconstruction that maps logged commands back to DSL statements.
+1. **Load DSL into editor** — The `dsl_load` command parses a `.vdecanvas` file and replays it through the `CommandSystem`. The resulting canvas appears as a normal editable canvas in the registry. All emitted commands appear in the log. `load` commands within the script are replayed to reload the image resources.
+2. **Export canvas as DSL** — The `dsl_export` command reconstructs a `.vdecanvas` script from a canvas's operation history. This is a best-effort reconstruction that maps logged commands back to DSL statements.
 3. **Batch execution** — When a `.vdecanvas` file is passed on the command line, the editor parses and executes it, then exits. This enables CI/CD asset generation from DSL scripts.
 4. **REPL integration** — Individual DSL statements can be entered in the command console with a `dsl` prefix (e.g., `dsl create color red #FF0000FF`). This lets users test DSL snippets interactively.
+5. **Cross-canvas resource access** — Image resources in one canvas can be referenced from another using the `::` double-colon accessor (e.g., `hero::face_img`). Within the owning canvas, bare names resolve directly.
 
 **Error reporting:**
 
@@ -983,6 +1005,41 @@ Test DSL statements one at a time in the REPL console:
   [test] circle 8 8 5 #0000FFFF filled
 ```
 
+### Example 8: Loading Images and Cross-Canvas Drawing
+
+Load external images as resources and compose them across canvases:
+
+```
+# Load an image — creates canvas 'hero' sized to the image:
+> load hero "assets/face_template.png"
+  Loaded 'assets/face_template.png' as 'face_template' in new canvas 'hero' (32x32).
+  Active canvas set to 'hero'.
+
+# Load another image into the same canvas (added as undisplayed resource):
+> load hero "assets/badge.png" badge
+  Loaded 'assets/badge.png' as 'badge' into canvas 'hero'.
+
+# Draw the badge onto the hero canvas at a specific position:
+> draw badge [0] 2 2 8 8
+  [hero] Drew 'badge' at (2,2) size 8x8 on layer 0
+
+# Create a sprite sheet canvas and draw images from hero into it:
+> new 128 128 sheet
+  Created canvas 'sheet' (128x128). Active canvas set to 'sheet'.
+> draw hero::face_template [0] 0 0 32 32
+  [sheet] Drew 'hero::face_template' at (0,0) size 32x32 on layer 0
+> draw hero::badge [0] 32 0 8 8
+  [sheet] Drew 'hero::badge' at (32,0) size 8x8 on layer 0
+
+# Create an image resource by compositing layers:
+> create image torso_sprite hero[base, outline] body_area
+  Created image 'torso_sprite' in canvas 'hero' from layers [base, outline] area 'body_area'.
+
+# Save the sheet:
+> save assets/spritesheet.png
+  [sheet] Saved to assets/spritesheet.png
+```
+
 ---
 
 ## Phased Implementation Plan
@@ -1024,8 +1081,9 @@ The goal is a running tool that can create, edit, save, and reload simple pixel 
 - [ ] Implement `saveToFile()` via stb_image_write (PNG)
 - [ ] Implement `loadFromFile()` via stb_image
 - [ ] Implement generation counter for GPU sync
-- [ ] Create `Canvas` struct with `uint32_t id`, `std::string name`, ImageDocument + GPU texture + zoom/pan state
+- [ ] Create `Canvas` struct with `uint32_t id`, `std::string name`, ImageDocument + GPU texture + zoom/pan state + resources map + operation history
 - [ ] Create `CanvasRegistry` class with `create()`, `getById()`, `getByName()`, `resolve()`, `remove()`, `has()`, `hasName()`, `getIds()`, `generateUniqueName()`
+- [ ] Implement `::` resource resolution — `resolveResource(token)` parses `canvasname::imagename` or bare `imagename` against active canvas
 - [ ] Maintain `m_nameIndex` (name → id) in `CanvasRegistry` for O(1) name lookups
 - [ ] Write unit tests for pixel operations, undo/redo, and canvas registry (including name/id resolution)
 
@@ -1059,11 +1117,12 @@ The goal is a running tool that can create, edit, save, and reload simple pixel 
 
 #### Step 1.7: Scene Integration
 - [ ] Wire `CommandSystem` and `CanvasRegistry` into `ResourceEditorScene`
-- [ ] Register global commands: `new`, `open`, `list`, `set_active`, `setcolor`, `settool`, `setsize`, `help`, `exit`, `log save`, `log clear`, `run`
-- [ ] Register canvas-targeted commands: `save`, `saveas`, `export`, `close`, `undo`, `redo`, `fill`, `paint`, `line`, `rect`, `circle`, `pick`, `zoom`, `pan`, `fliph`, `flipv`, `resize`, `crop`, `floodfill`, `copy_area`, `gradient_fill`
-- [ ] Register layer commands: `layer add`, `layer remove`, `layer select`, `layer opacity`, `layer visibility`
-- [ ] In `new` / `open` handlers: create `Canvas` in `CanvasRegistry` (assigns uint32_t id + name) and call `cmd.setActiveCanvasId(id)`
+- [ ] Register global commands: `new`, `load`, `create image`, `list`, `set_active`, `setcolor`, `settool`, `setsize`, `help`, `exit`, `log save`, `log clear`, `run`
+- [ ] Register canvas-targeted commands: `save`, `saveas`, `export`, `close`, `undo`, `redo`, `fill`, `paint`, `line`, `rect`, `circle`, `draw` (image blit), `pick`, `zoom`, `pan`, `fliph`, `flipv`, `resize`, `crop`, `floodfill`, `copy_area`, `gradient_fill`
+- [ ] Register layer commands: `layer add` (with `above`/`below`/`at <index>` support), `layer remove`, `layer select`, `layer opacity`, `layer visibility`
+- [ ] In `new` / `load` handlers: create `Canvas` in `CanvasRegistry` (assigns uint32_t id + name) and call `cmd.setActiveCanvasId(id)`. `load` records the operation in canvas history.
 - [ ] In canvas-targeted handlers: look up `Canvas` from `CanvasRegistry` by resolved uint32_t `canvasId`; return error if not found
+- [ ] Implement `::` resource resolution in `draw` handler — parse `canvasname::imagename` to locate resources across canvases
 - [ ] Create VDE `Texture` per canvas, re-upload when document generation exceeds `canvas.lastUploadedGeneration`
 - [ ] Create/cache ImGui texture descriptor sets per canvas for display
 - [ ] Call `EditorPanels` functions from `drawDebugUI()`
@@ -1109,14 +1168,16 @@ The Canvas DSL enables declarative, replayable, text-based image authoring. This
 - [ ] Create `dsl/CanvasDSLParser.h/.cpp` — tokenizer, AST builder, include resolution
 - [ ] Implement Pass 1: tokenize lines, handle comments (`//`, `/* */`), blank lines
 - [ ] Parse `create canvas`, `create color`, `create palette` statements
-- [ ] Parse `create point`, `create area`, `create layer` statements
+- [ ] Parse `create point`, `create area` (both `to` and `size` forms, optional canvas), `create layer` (with `above`/`below`/`at <index>`, optional canvas), `create image` statements
 - [ ] Parse `create gradient`, `create pattern`, `create macro` statements
-- [ ] Parse drawing commands: `set`, `fill`, `draw line/rect/circle/ellipse/arc/bezier`, `floodfill`
+- [ ] Parse drawing commands: `set`, `fill`, `draw line/rect/circle/ellipse/arc/bezier`, `draw <imagename>` (image blit), `floodfill`
+- [ ] Parse `load <canvasname> "<filepath>" [imagename]` statements
 - [ ] Parse area operations: `copy`, `move`, `clear`, `tile`
 - [ ] Parse control flow: `repeat`, `for`, `if/else`, `in <area>` scoped blocks
 - [ ] Parse `include`, macro calls, `export` directives
 - [ ] Implement symbol table — register named objects, detect duplicates, suggest corrections
-- [ ] Implement reference validation — verify colors, palettes, points, areas are defined before use
+- [ ] Implement reference validation — verify colors, palettes, points, areas, images are defined before use
+- [ ] Implement `::` cross-canvas resource resolution (e.g., `hero::face_img`)
 - [ ] Implement `include` resolution — read included files, detect circular includes
 - [ ] Error reporting with file path, line number, and descriptive messages
 - [ ] Write unit tests for parser: valid scripts, syntax errors, undefined references, circular includes
@@ -1125,7 +1186,8 @@ The Canvas DSL enables declarative, replayable, text-based image authoring. This
 - [ ] Create `dsl/CanvasDSLExprEval.h/.cpp` — stack-based expression evaluator
 - [ ] Evaluate integer literals, bound references (`lb`, `rb`, `tb`, `bb`, `cx`, `cy`, `w`, `h`)
 - [ ] Evaluate arithmetic (`+`, `-`, `*`, `/`), percentage expressions (`50%w`)
-- [ ] Evaluate dot-notation property access (`head.cx`, `mypal.count`)
+- [ ] Evaluate dot-notation property access (`head.cx`, `mypal.count`, `my_sprite.width`)
+- [ ] Evaluate `::` cross-canvas accessor (`hero::badge`, `sheet::texture`)
 - [ ] Evaluate palette index lookups (`mypal[armor]`, `mypal[0]`)
 - [ ] Implement scope stack — push/pop for `in <area>` blocks
 - [ ] Implement variable storage and expansion
@@ -1137,7 +1199,11 @@ The Canvas DSL enables declarative, replayable, text-based image authoring. This
 - [ ] Map `background` / `fill` → `fill <resolved_color>`
 - [ ] Map `set <point> <color>` → `paint <x> <y> <resolved_color> 1`
 - [ ] Map `draw line/rect/circle` → `line`/`rect`/`circle` commands
-- [ ] Map `create layer` / `select layer` → `layer add`/`layer select` commands
+- [ ] Map `load <canvas> "<path>" [name]` → `load <canvas> "<path>" [name]` command
+- [ ] Map `create image <name> <canvas>[layers] <area>` → `create image` command
+- [ ] Map `draw <imagename> <canvas>[layer] <pos> <size>` → `draw` (image blit) command
+- [ ] Map `create layer` / `select layer` → `layer add`/`layer select` commands (including `at <index>` form)
+- [ ] Map `create area` → area registration (both `to` and `size` syntax, optional canvas)
 - [ ] Map `export` → `export <path> <format>`
 - [ ] Handle `in <area>` scope pushing/popping during execution
 - [ ] Handle `repeat`/`for` loops — unroll and emit commands
@@ -1162,7 +1228,8 @@ The Canvas DSL enables declarative, replayable, text-based image authoring. This
 
 #### Step 3.5: DSL Smoke Tests
 - [ ] Create `tools/resource_editor/scripts/test_dsl_basic.vdecanvas` — simple canvas with colors, shapes
-- [ ] Create `tools/resource_editor/scripts/test_dsl_layers.vdecanvas` — multi-layer canvas
+- [ ] Create `tools/resource_editor/scripts/test_dsl_load_draw.vdecanvas` — load images, draw cross-canvas, create image compositing
+- [ ] Create `tools/resource_editor/scripts/test_dsl_layers.vdecanvas` — multi-layer canvas with `at <index>` positioning
 - [ ] Create `tools/resource_editor/scripts/test_dsl_macros.vdecanvas` — macro definitions and calls
 - [ ] Create `tools/resource_editor/scripts/test_dsl_include.vdecanvas` — include directive test
 - [ ] Create `tools/resource_editor/scripts/shared_colors.vdepalette` — shared palette file
@@ -1220,15 +1287,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test.ps1
 10. **Error handling** — All commands must validate arguments and return clear error messages. Never crash on bad input.
 11. **DSL integration** — The Canvas DSL subsystem lives under `dsl/` and only interfaces with the rest of the editor through `CommandSystem`. The parser and executor never directly mutate `ImageDocument` or `CanvasRegistry` — they always emit commands. This keeps the command log as the single source of truth.
 12. **DSL file extensions** — `.vdecanvas` for canvas scripts, `.vdepalette` for shared palette definitions. Both are UTF-8 text files.
+13. **Cross-canvas resource access (`::`)** — Use `canvasname::imagename` to reference image resources owned by another canvas. Within the active canvas, bare `imagename` suffices. Resolution order: local scope → active canvas resources → global objects.
+14. **Canvas operation history** — Every canvas maintains an ordered log of the commands that produced its state. The `load` command is recorded so canvases can be recreated deterministically. This log is the basis for `dsl_export` script generation and undo/redo.
+15. **Image resources** — Each canvas has a `std::map<std::string, std::unique_ptr<ImageDocument>> resources` map for loaded/composited images. These are not automatically displayed — use the `draw` command to blit them onto a layer.
 
 ### Testing Strategy
 
-- **Unit tests** for `CommandSystem` (register, execute, canvas resolution with `@canvasId`, active canvas fallback, log, script I/O)
-- **Unit tests** for `CanvasRegistry` (create, getById, getByName, resolve, remove, generateUniqueName)
+- **Unit tests** for `CommandSystem` (register, execute, canvas resolution with `@canvasId`, active canvas fallback, log, script I/O, `::` resource resolution)
+- **Unit tests** for `CanvasRegistry` (create, getById, getByName, resolve, remove, generateUniqueName, resource map management)
 - **Unit tests** for `ImageDocument` (create, pixel ops, undo/redo, save/load)
 - **Unit tests** for `ToolPalette` (mouse-to-command translation with canvasId)
-- **Unit tests** for `CanvasDSLParser` (tokenization, AST construction, include resolution, symbol validation, error messages)
-- **Unit tests** for `CanvasDSLExprEval` (bound arithmetic, dot-notation, palette lookups, scope stack push/pop)
+- **Unit tests** for `CanvasDSLParser` (tokenization, AST construction, include resolution, symbol validation, error messages, `::` accessor parsing)
+- **Unit tests** for `CanvasDSLExprEval` (bound arithmetic, dot-notation, `::` accessor, palette lookups, scope stack push/pop)
 - **Unit tests** for `CanvasDSLExecutor` (command emission for each DSL statement type, loop unrolling, macro expansion, error handling)
 - **Integration tests** for DSL round-trip (load `.vdecanvas` → verify canvas pixels → export → reload → compare)
 - **Smoke test** (`.vdescript`) for interactive launch verification

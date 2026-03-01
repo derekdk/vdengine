@@ -10,6 +10,14 @@ Scripts are intended to be:
 - **Composable** — scripts can include other scripts and reference shared palettes.
 - **Editable** — users can hand-author scripts or have them recorded from interactive editor actions.
 
+### Canvas Operation History
+
+Every canvas stores the ordered sequence of commands that produced its current state. This means a canvas can be reconstructed deterministically by replaying its operation log. The `load` command, for example, is recorded as an operation — when the canvas is replayed from its history, the same file is loaded again. This design enables:
+
+- **Deterministic recreation** — the same history always produces the same result.
+- **Script export** — the operation log can be serialized as a `.vdecanvas` DSL script.
+- **Undo/redo** — operations can be rolled back by trimming the history.
+
 ### Relationship to the Command System
 
 The Resource Editor's `CommandSystem` processes imperative commands at runtime (`paint 10 5 #FF0000FF`, `fill #000000FF`, etc.). The Canvas DSL is a **higher-level authoring language** that compiles down to sequences of those low-level commands. A DSL script can be:
@@ -55,12 +63,13 @@ All objects have a **name** (unique within their type namespace) and an implicit
 
 | Type | Create Syntax | Description |
 |------|---------------|-------------|
-| `canvas` | `create canvas <name> <w> <h>` | Image canvas with pixel buffer |
+| `canvas` | `create canvas <name> <w> <h>` | Image canvas with pixel buffer and resource collection |
+| `image` | `create image <name> <canvas>[layers...] <area>` | Named image resource composited from canvas layers |
 | `color` | `create color <name> <hex>` | Named RGBA color value |
 | `palette` | `create palette <name> <color>, ...` | Ordered collection of color references |
 | `point` | `create point <name> at <x>, <y>` | Named 2D coordinate |
-| `area` | `create area <name> at <x1>,<y1> to <x2>,<y2>` | Named rectangular region |
-| `layer` | `create layer <name> [above\|below] [<ref>]` | Canvas layer in the compositing stack |
+| `area` | `create area <name> [canvas] at <x>,<y> to <x2>,<y2>` | Named rectangular region (canvas-scoped) |
+| `layer` | `create layer <name> [canvas] [above\|below <ref> \| at <index>]` | Canvas layer in the compositing stack |
 | `gradient` | `create gradient <name> <params>` | Reusable gradient definition |
 | `pattern` | `create pattern <name> <w> <h> { ... }` | Repeating tile pattern |
 | `macro` | `create macro <name>(<params>) { ... }` | Reusable command sequence |
@@ -77,7 +86,7 @@ draw line 0, 31 to 31, 0 with #FF0000FF       // raw hex literal is also allowed
 
 ### Object Properties
 
-All objects expose properties via dot notation:
+All objects expose **member properties** via dot notation:
 
 ```
 <objectname>.<property>
@@ -87,7 +96,35 @@ All objects expose properties via dot notation:
 head.cx         // center x of area 'head'
 mypal.count     // number of colors in palette 'mypal'
 base.opacity    // opacity of layer 'base'
+my_sprite.width // width of image 'my_sprite'
 ```
+
+Dot notation is **reserved for member properties only**. The right-hand token must be a known property name (see per-type property tables below).
+
+### Cross-Resource Access (`::`)
+
+To reference a named resource owned by a specific canvas, use the **double-colon** accessor:
+
+```
+<canvasname>::<resourcename>
+```
+
+This applies to image resources, areas, and layers that are scoped to a canvas. Within the active canvas, the `<canvasname>::` prefix is optional — bare names resolve against the active canvas first.
+
+```
+create canvas hero 32 32
+load hero "assets/face.png" face_img     // face_img is a resource of 'hero'
+
+create canvas sheet 128 128
+draw hero::face_img sheet[0] 0, 0 32, 32  // reference hero's image from sheet
+```
+
+**Resolution order** when a bare name is used:
+1. Local scope (variables, loop counters)
+2. Active canvas resources (images, areas, layers)
+3. Global objects (colors, palettes, points, macros)
+
+The `::` accessor bypasses this and always targets the specified canvas explicitly.
 
 ---
 
@@ -104,6 +141,12 @@ create canvas <name> <width> <height>
 | `name`    | ident | Unique canvas name (also used as default filename stem) |
 | `width`   | int  | Width in pixels |
 | `height`  | int  | Height in pixels |
+
+A canvas owns:
+- A **pixel buffer** (the composited result of all layers)
+- An ordered **layer stack** (at least one layer, `"base"`, at index 0)
+- A collection of **named image resources** (loaded or composited images that can be drawn into the canvas)
+- An **operation history** (the ordered sequence of commands that produced the current state)
 
 **Optional metadata directives** (must appear before the first drawing operation):
 
@@ -386,15 +429,28 @@ create point below_center at center + 0, 8      // same x, 8 pixels down
 
 Define a named rectangular region. Like points, areas persist for the script duration and can be reused.
 
+### Corner-to-Corner Syntax
+
 ```
-create area <name> at <x1>, <y1> to <x2>, <y2>
+create area <name> [canvas] at <x1>, <y1> to <x2>, <y2>
 ```
 
 The two corners are the top-left and bottom-right (inclusive).
 
+### Position + Size Syntax
+
+```
+create area <name> [canvas] at <x>, <y> size <w>, <h>
+```
+
+Defines the area by its top-left corner and dimensions.
+
+Both forms are equivalent. The optional `[canvas]` parameter scopes the area to a specific canvas (defaults to the active canvas). Canvas-scoped areas can be referenced from other canvases using `canvasname::areaname`.
+
 ```
 create area body at lb+10, tb+20 to rb-10, bb-10
-create area head at lb+8, tb+2 to rb-8, tb+18
+create area head at lb+8, tb+2 size 16, 16
+create area badge mycanvas at 0, 0 to 7, 7         // explicit canvas scoping
 ```
 
 ### Area Properties
@@ -446,16 +502,19 @@ Each canvas has an ordered stack of layers. By default, a canvas starts with **l
 ### Creating Layers
 
 ```
-create layer <name> [above|below] [<ref_layer>]
+create layer <name> [canvas] [above|below <ref_layer> | at <index>]
 ```
 
 - `above` / `below` — position relative to the current layer (default) or relative to `<ref_layer>`.
-- If omitted, the layer is added above the current layer.
+- `at <index>` — insert the layer at a specific stack position. If a layer already occupies that position, existing layers shift up.
+- If no positioning is specified, the layer is added above the current layer.
+- The optional `[canvas]` parameter targets a specific canvas (defaults to the active canvas).
 
 ```
 create layer outline_layer above
 create layer background below base
 create layer effects above outline_layer
+create layer overlay mycanvas at 2          // insert at index 2 in 'mycanvas'
 ```
 
 ### Layer Commands
@@ -607,6 +666,35 @@ draw bezier <p1> <p2> <p3> [<p4>] with <color> [width <n>]
 ```
 draw bezier lb+4,cy  cx,tb+2  rb-4,cy with outline
 ```
+
+### 8.9 Draw Image (Blit)
+
+Display a named image resource in a canvas at a specified position and size.
+
+```
+draw <imagename> <canvasname>[layer] <position> <size>
+draw <imagename> [layer] <position> <size>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `imagename` | ident | Name of the image resource (loaded or composited). Can use `canvasname::imagename` for cross-canvas access. |
+| `canvasname` | ident (optional) | Target canvas. Defaults to the active canvas. |
+| `[layer]` | int (optional) | Target layer index in square brackets. Defaults to 0. |
+| `position` | `x, y` | Top-left corner position for the drawn image. |
+| `size` | `w, h` | Width and height to draw (supports scaling — can differ from the original image dimensions). |
+
+**Disambiguation:** The `draw` keyword dispatches based on the second token. If the second token is a reserved shape keyword (`line`, `rect`, `circle`, `ellipse`, `arc`, `bezier`), it's a shape draw. Otherwise, it's an image blit.
+
+```
+load hero "assets/face.png" face
+draw face hero[0] 0, 0 32, 32                // draw face into hero, layer 0
+draw face 0, 0 32, 32                         // draw face into active canvas, layer 0
+draw face [1] 0, 0 32, 32                     // draw face into active canvas, layer 1
+draw hero::face sheet[0] 100, 200 50, 50      // cross-canvas: draw hero's face into sheet
+```
+
+If the specified image or canvas does not exist, or if the position/size arguments are malformed, the command returns an error.
 
 ---
 
@@ -766,22 +854,58 @@ fill body pattern bricks
 
 ### 12.1 Load Image
 
-Load an external image file onto the current layer.
+Load an external image file as a **named image resource** in a canvas. The loaded image is not automatically displayed — use the `draw` command (§8.9) to place it on a layer.
 
 ```
-load <filepath>
-load <filepath> at <x>, <y>
-load <filepath> into <area>
+load <canvasname> "<filepath>" [imagename]
 ```
 
-- Plain `load` resizes the layer/canvas to the image dimensions.
-- `at` places the image at a specific position (top-left corner).
-- `into` scales the image to fit the named area.
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `canvasname` | ident | Target canvas. If it doesn't exist, a new canvas is created with the image's dimensions. |
+| `filepath` | string (quoted) | Path to the image file. Absolute or relative to CWD. Must be in quotes. |
+| `imagename` | ident (optional) | Name for the resource. Defaults to the filename stem (without extension). Must be unique within the canvas. |
+
+**Behavior:**
+- If `canvasname` does not exist in the canvas registry, a new canvas is created with the loaded image’s dimensions. The image is added as a resource and automatically displayed at position (0, 0) on layer 0.
+- If `canvasname` already exists, the image is added as an undisplayed resource. Use `draw` to place it.
+- The load operation is recorded in the canvas’s operation history so the canvas can be recreated deterministically.
+- Resources within a canvas are accessed with `canvasname::imagename` from other canvases, or bare `imagename` within the owning canvas.
 
 ```
-load "assets/face_template.png"
-load "assets/badge.png" at rb-16, tb+2
-load "assets/texture.png" into body
+load hero "assets/face_template.png"           // imagename defaults to "face_template"
+load hero "assets/badge.png" badge             // explicit name
+load sheet "assets/texture.png" tex            // new canvas 'sheet' if it doesn't exist
+
+// Access from another canvas:
+draw hero::badge sheet[0] 10, 10 16, 16
+```
+
+### 12.1b Create Image (Compositing)
+
+Create a new named image resource by compositing specified layers of a canvas within a named area.
+
+```
+create image <name> <canvasname>[layer1, layer2, ...] <areaname>
+create image <name> <canvasname> <areaname>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | ident | Name for the new image resource |
+| `canvasname` | ident | Source canvas |
+| `[layers]` | ident list (optional) | Layers to composite. Omit to use all layers. |
+| `areaname` | ident | Area to crop from |
+
+The resulting image is stored as an undisplayed resource in the canvas. It can then be drawn into any canvas using `draw`.
+
+```
+create area torso at 8, 12 to 24, 24
+create image torso_sprite hero[base, outline_layer] torso
+create image full_hero hero torso                              // all layers
+
+// Draw the composited image elsewhere:
+draw hero::torso_sprite sheet[0] 0, 0 16, 12
 ```
 
 ### 12.2 Resize
@@ -1072,16 +1196,22 @@ statement       = create_stmt | metadata | select_stmt | palette_op | layer_prop
                 | export_cmd | comment ;
 
 (* --- Object Creation: unified 'create' keyword --- *)
-create_stmt     = "create" ( canvas_def | color_def | palette_def | point_def
+create_stmt     = "create" ( canvas_def | image_def | color_def | palette_def | point_def
                            | area_def | layer_def | gradient_def | pattern_def
                            | macro_def ) ;
 
 canvas_def      = "canvas" IDENT INT INT ;
+image_def       = "image" IDENT IDENT ["[" IDENT { "," IDENT } "]"] IDENT ;
+                  (* create image <name> <canvas>[layer,...] <area> *)
 color_def       = "color" IDENT COLOR_LITERAL ;
 palette_def     = "palette" IDENT IDENT { "," IDENT } ;
 point_def       = "point" IDENT "at" expr "," expr ;
-area_def        = "area" IDENT "at" expr "," expr "to" expr "," expr ;
-layer_def       = "layer" IDENT [DIRECTION] [IDENT] ;
+area_def        = "area" IDENT [IDENT] "at" expr "," expr
+                  ( "to" expr "," expr | "size" expr "," expr ) ;
+                  (* optional canvas name; corner-to-corner or position+size *)
+layer_def       = "layer" IDENT [IDENT]
+                  [DIRECTION [IDENT] | "at" INT] ;
+                  (* optional canvas name; above/below ref or at index *)
 gradient_def    = "gradient" IDENT ( "vector" expr "," expr | "radial" point "radius" expr )
                   "stops" stop { "," stop } ;
 pattern_def     = "pattern" IDENT INT INT "{" { pattern_row } "}" ;
@@ -1106,12 +1236,15 @@ variable_def    = IDENT "=" expr
                 | IDENT "=" palette_ref "[" (IDENT | INT) "]" ;   (* palette index lookup *)
 
 (* --- Drawing --- *)
-draw_cmd        = "draw" ( "line" point "to" point "with" COLOR_REF ["width" INT]
-                         | "rect" point "to" point "with" COLOR_REF [FILL_MODE ["width" INT]]
-                         | "circle" point "radius" expr "with" COLOR_REF [FILL_MODE ["width" INT]]
-                         | "ellipse" point "radius" expr "," expr "with" COLOR_REF [FILL_MODE ["width" INT]]
-                         | "arc" point "radius" expr "from" expr "to" expr "with" COLOR_REF ["width" INT]
-                         | "bezier" point point point [point] "with" COLOR_REF ["width" INT] ) ;
+draw_cmd        = "draw" ( shape_draw | image_draw ) ;
+shape_draw      = "line" point "to" point "with" COLOR_REF ["width" INT]
+                | "rect" point "to" point "with" COLOR_REF [FILL_MODE ["width" INT]]
+                | "circle" point "radius" expr "with" COLOR_REF [FILL_MODE ["width" INT]]
+                | "ellipse" point "radius" expr "," expr "with" COLOR_REF [FILL_MODE ["width" INT]]
+                | "arc" point "radius" expr "from" expr "to" expr "with" COLOR_REF ["width" INT]
+                | "bezier" point point point [point] "with" COLOR_REF ["width" INT] ;
+image_draw      = resource_ref [IDENT] ["[" INT "]"] point point ;
+                  (* draw <image> [canvas][layer] <position> <size> *)
 
 fill_cmd        = "fill" [IDENT] ( COLOR_REF | "gradient" IDENT | "pattern" IDENT ) ;
 set_cmd         = "set" point COLOR_REF ;
@@ -1124,7 +1257,8 @@ clear_cmd       = "clear" IDENT ["with" COLOR_REF] ;
 tile_cmd        = "tile" IDENT "over" ( IDENT | expr "," expr "to" expr "," expr ) ;
 
 (* --- Image Operations --- *)
-load_cmd        = "load" STRING ["at" expr "," expr | "into" IDENT] ;
+load_cmd        = "load" IDENT STRING [IDENT] ;
+                  (* load <canvasname> "<filepath>" [imagename] *)
 resize_cmd      = "resize" INT INT [INTERP] ;
 crop_cmd        = "crop" ( expr "," expr "to" expr "," expr | IDENT ) ;
 flip_cmd        = "flip" ( "horizontal" | "vertical" ) ;
@@ -1151,8 +1285,11 @@ comment         = "//" TEXT | "/*" TEXT "*/" ;
 stop            = FLOAT COLOR_REF ;
 pattern_row     = { ( IDENT | "." ) } ;
 point           = expr "," expr | IDENT ;
+resource_ref    = IDENT | IDENT "::" IDENT ;
+                  (* bare name or canvasname::resourcename *)
 expr            = INT | FLOAT | IDENT | BOUND
                 | IDENT "." PROPERTY
+                | IDENT "::" IDENT        (* cross-canvas resource access *)
                 | palette_ref "[" ( IDENT | INT ) "]"
                 | expr ( "+" | "-" | "*" | "/" ) expr
                 | INT "%" ( "w" | "h" ) ;
@@ -1163,6 +1300,7 @@ COLOR_LITERAL   = "#" HEX{6} | "#" HEX{8} ;
 BOUND           = "lb" | "rb" | "tb" | "bb" | "cx" | "cy" | "w" | "h" ;
 PROPERTY        = "lb" | "rb" | "tb" | "bb" | "cx" | "cy" | "w" | "h"
                 | "x" | "y" | "r" | "g" | "b" | "a" | "hex"
+                | "width" | "height"
                 | "count" | "colors" | "name" | "visible" | "opacity" | "blend" ;
 LAYER_PROP      = "opacity" | "blend" | "visible" | "bounds" | "order" ;
 DIRECTION       = "above" | "below" ;
@@ -1206,6 +1344,9 @@ Each DSL drawing operation maps to one or more `CommandSystem` commands:
 |---|---|
 | `create color skin #FFCC99` | Registers color in symbol table (no command emitted) |
 | `create palette mypal skin, outline` | Registers palette (no command emitted) |
+| `load hero "face.png" face` | `load hero "face.png" face` (recorded in canvas operation history) |
+| `create image torso hero[base] body` | `create image torso hero[base] body` (composites and registers) |
+| `draw face hero[0] 0, 0 32, 32` | `draw face hero[0] 0,0 32,32` (blit image resource) |
 | `set 10, 5 skin` | `paint 10 5 #FFCC99FF 1` |
 | `fill body armor` | Sequence of `paint` or a bulk `fill` within area bounds |
 | `draw line ...` | `line x1 y1 x2 y2 #color thickness` |
@@ -1258,7 +1399,10 @@ hero_sprite.vdecanvas:35: error: duplicate name 'body' — an area with this nam
 | **Named points and areas** | Reduces magic numbers, makes intent clear, enables area-scoped operations. |
 | **`in <area>` scoping** | Lets you write drawing code relative to a sub-region without manual offset math. |
 | **Layers as ordered stack with names** | Matches artist mental model. Named layers are easier to script than indices. |
-| **Dot-notation properties** | Uniform access to object state (`head.cx`, `mypal.count`, `base.opacity`). No special functions needed. |
+| **Dot-notation for member properties** | Uniform access to object state (`head.cx`, `mypal.count`, `base.opacity`). No special functions needed. Dot is reserved exclusively for member properties. |
+| **`::` for cross-resource access** | `canvasname::imagename` accesses a named resource in another canvas. Clearly separated from dot-notation property access, avoiding ambiguity between `hero.width` (property) and `hero::face` (resource). |
+| **Image resources as named objects** | Images loaded via `load` or composited via `create image` are stored as named resources in a canvas. They can be drawn into any canvas, enabling composition workflows like sprite sheets, tilesets, and layered compositing. |
+| **Canvas stores operation history** | Every canvas records the ordered sequence of commands that produced it, enabling deterministic recreation, script export, and undo/redo. The `load` command itself is stored in the history. |
 | **No operator precedence** | Keeps the expression grammar trivial to parse. Complex math belongs in variables. |
 | **Macros over functions** | Macros are text-expansion — simpler to implement, no stack frames or return values needed. |
 | **`.vdecanvas` extension** | Distinguishes from `.vdescript` (input automation) and `.vdepalette` (shared palettes). |

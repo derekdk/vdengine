@@ -13,6 +13,7 @@
 #include <vde/api/Game.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 
@@ -117,18 +118,22 @@ void ResourceEditorScene::registerGlobalCommands() {
                                           [this](const std::string& args) { cmdHelp(args); });
 
     m_commandSystem.registerGlobalCommand(
-        "create", "Create an object: create canvas <name> <w> <h> | create color <name> <hex>",
+        "create",
+        "Create an object: create canvas <name> <w> <h> | create color <name> <hex> | "
+        "create image <name> <canvas>[layers] <area>",
         [this](const std::string& args) { cmdCreate(args); });
 
-    m_commandSystem.registerGlobalCommand("load", "Load an image file: load [filepath] [name]",
-                                          [this](const std::string& args) { cmdLoad(args); });
+    m_commandSystem.registerGlobalCommand(
+        "load",
+        "Load image: load <canvasname> \"<filepath>\" [imagename]. "
+        "Creates canvas if it doesn't exist; adds as resource otherwise.",
+        [this](const std::string& args) { cmdLoad(args); });
 
     m_commandSystem.registerGlobalCommand("list", "List all canvases",
                                           [this](const std::string& args) { cmdList(args); });
 
-    m_commandSystem.registerGlobalCommand(
-        "select", "Select active object: select canvas <name|id>",
-        [this](const std::string& args) { cmdSelect(args); });
+    m_commandSystem.registerGlobalCommand("select", "Select active object: select canvas <name|id>",
+                                          [this](const std::string& args) { cmdSelect(args); });
 
     m_commandSystem.registerGlobalCommand("setcolor", "Set drawing color: setcolor <#RRGGBBAA>",
                                           [this](const std::string& args) { cmdSetColor(args); });
@@ -165,9 +170,8 @@ void ResourceEditorScene::registerCanvasCommands() {
 
     m_commandSystem.registerCanvasCommand(
         "draw",
-        "Draw shape: draw line <x1> <y1> to <x2> <y2> with <color> | "
-        "draw rect <x1> <y1> to <x2> <y2> with <color> [filled|outline] | "
-        "draw circle <cx> <cy> radius <r> with <color> [filled|outline]",
+        "Draw shape or image: draw line|rect|circle ... | "
+        "draw <imagename> [layer] <x> <y> <w> <h>",
         [this](uint32_t id, const std::string& args) { cmdDraw(id, args); });
 
     m_commandSystem.registerCanvasCommand(
@@ -288,52 +292,242 @@ void ResourceEditorScene::cmdCreate(const std::string& args) {
         }
 
         m_namedColors[name] = color;
-        m_commandSystem.setLastResult("Created color '" + name + "' = " +
-                                      ToolPalette::colorToHex(color));
+        m_commandSystem.setLastResult("Created color '" + name +
+                                      "' = " + ToolPalette::colorToHex(color));
+    } else if (objectType == "image") {
+        // create image <name> <canvasname>[layer1, layer2, ...] <areaname>
+        // For now: create image <name> <canvasname> <areaname>
+        // Layers and areas are Phase 2/3 features; this registers the stub.
+        std::string name, canvasToken, areaName;
+        iss >> name >> canvasToken >> areaName;
+
+        if (name.empty() || canvasToken.empty()) {
+            m_commandSystem.setLastResult(
+                "Usage: create image <name> <canvasname>[layers...] <areaname>", false);
+            return;
+        }
+
+        // Parse optional [layers] from canvas token
+        std::string canvasName = canvasToken;
+        // TODO: Parse layer list from canvasname[layer1, layer2] syntax in Phase 3
+
+        Canvas* canvas = m_canvasRegistry.getByName(canvasName);
+        if (!canvas) {
+            m_commandSystem.setLastResult("Error: Canvas '" + canvasName + "' not found", false);
+            return;
+        }
+
+        if (canvas->resources.find(name) != canvas->resources.end()) {
+            m_commandSystem.setLastResult("Error: Resource '" + name +
+                                              "' already exists in canvas '" + canvasName + "'",
+                                          false);
+            return;
+        }
+
+        // For now, create image as a copy of the canvas document (full area, all layers)
+        // TODO: Implement area cropping and layer compositing in Phase 3
+        auto imgDoc = std::make_unique<ImageDocument>();
+        imgDoc->createNew(canvas->document->getWidth(), canvas->document->getHeight());
+
+        // Copy pixels from canvas
+        const auto* srcPixels = canvas->document->getPixelData();
+        uint32_t w = canvas->document->getWidth();
+        uint32_t h = canvas->document->getHeight();
+        for (uint32_t y = 0; y < h; ++y) {
+            for (uint32_t x = 0; x < w; ++x) {
+                size_t idx = (y * w + x) * 4;
+                RGBAColor color{srcPixels[idx], srcPixels[idx + 1], srcPixels[idx + 2],
+                                srcPixels[idx + 3]};
+                imgDoc->setPixel(static_cast<int>(x), static_cast<int>(y), color);
+            }
+        }
+
+        canvas->resources[name] = std::move(imgDoc);
+        canvas->operationHistory.push_back("create image " + name + " " + canvasToken +
+                                           (areaName.empty() ? "" : " " + areaName));
+        m_commandSystem.setLastResult("Created image '" + name + "' in canvas '" + canvasName +
+                                      "'");
     } else {
         m_commandSystem.setLastResult(
-            "Usage: create canvas <name> <w> <h> | create color <name> <hex>", false);
+            "Usage: create canvas <name> <w> <h> | create color <name> <hex> | "
+            "create image <name> <canvas>[layers] <area>",
+            false);
     }
 }
 
 void ResourceEditorScene::cmdLoad(const std::string& args) {
-    std::istringstream iss(args);
-    std::string filepath, name;
-    iss >> filepath >> name;
+    // New signature: load <canvasname> "<filepath>" [imagename]
+    // Parse canvasname first, then extract quoted filepath
+    std::string remaining = args;
 
-    if (filepath.empty()) {
-        // Open file dialog
-        filepath = openImageFileDialog("Open Image");
+    // Trim leading whitespace
+    size_t start = remaining.find_first_not_of(" \t");
+    if (start == std::string::npos || remaining.empty()) {
+        // No args — open file dialog for backward compatibility
+        std::string filepath = openImageFileDialog("Open Image");
         if (filepath.empty()) {
             m_commandSystem.setLastResult("Cancelled");
             return;
         }
+
+        // Auto-generate canvas name from filename
+        std::filesystem::path p(filepath);
+        std::string canvasName = p.stem().string();
+        if (m_canvasRegistry.hasName(canvasName)) {
+            canvasName = m_canvasRegistry.generateUniqueName(canvasName);
+        }
+
+        auto doc = std::make_unique<ImageDocument>();
+        if (!doc->loadFromFile(filepath)) {
+            m_commandSystem.setLastResult("Error: Failed to load image: " + filepath, false);
+            return;
+        }
+        doc->setFilePath(filepath);
+
+        std::string imageName = p.stem().string();
+        Canvas* canvas = m_canvasRegistry.create(canvasName, std::move(doc));
+        if (!canvas) {
+            m_commandSystem.setLastResult("Error: Canvas name '" + canvasName + "' already exists",
+                                          false);
+            return;
+        }
+
+        // Add the loaded image as the primary resource
+        auto resourceDoc = std::make_unique<ImageDocument>();
+        resourceDoc->loadFromFile(filepath);
+        canvas->resources[imageName] = std::move(resourceDoc);
+        canvas->operationHistory.push_back("load " + canvasName + " \"" + filepath + "\"");
+
+        m_commandSystem.setActiveCanvasId(canvas->id);
+        m_commandSystem.setLastResult("Loaded '" + filepath + "' as '" + imageName +
+                                      "' in new canvas '" + canvasName + "'");
+        return;
     }
 
+    remaining = remaining.substr(start);
+
+    // Parse canvas name (first token)
+    std::istringstream iss(remaining);
+    std::string canvasName;
+    iss >> canvasName;
+
+    if (canvasName.empty()) {
+        m_commandSystem.setLastResult("Usage: load <canvasname> \"<filepath>\" [imagename]", false);
+        return;
+    }
+
+    // Extract filepath — may be quoted or unquoted
+    std::string restOfLine;
+    std::getline(iss, restOfLine);
+    size_t restStart = restOfLine.find_first_not_of(" \t");
+    if (restStart == std::string::npos) {
+        m_commandSystem.setLastResult("Usage: load <canvasname> \"<filepath>\" [imagename]", false);
+        return;
+    }
+    restOfLine = restOfLine.substr(restStart);
+
+    std::string filepath;
+    std::string imageName;
+
+    if (restOfLine.front() == '"') {
+        // Quoted filepath
+        size_t closeQuote = restOfLine.find('"', 1);
+        if (closeQuote == std::string::npos) {
+            m_commandSystem.setLastResult("Error: Unterminated quote in filepath", false);
+            return;
+        }
+        filepath = restOfLine.substr(1, closeQuote - 1);
+        // Parse optional imagename after the closing quote
+        std::string afterQuote = restOfLine.substr(closeQuote + 1);
+        std::istringstream afterIss(afterQuote);
+        afterIss >> imageName;
+    } else {
+        // Unquoted filepath (single token)
+        std::istringstream pathIss(restOfLine);
+        pathIss >> filepath >> imageName;
+    }
+
+    if (filepath.empty()) {
+        m_commandSystem.setLastResult("Usage: load <canvasname> \"<filepath>\" [imagename]", false);
+        return;
+    }
+
+    // Default imagename to filename stem
+    if (imageName.empty()) {
+        std::filesystem::path p(filepath);
+        imageName = p.stem().string();
+    }
+
+    // Load the image
     auto doc = std::make_unique<ImageDocument>();
     if (!doc->loadFromFile(filepath)) {
         m_commandSystem.setLastResult("Error: Failed to load image: " + filepath, false);
         return;
     }
 
-    if (name.empty()) {
-        // Extract filename without extension
-        std::filesystem::path p(filepath);
-        name = p.stem().string();
-        if (m_canvasRegistry.hasName(name)) {
-            name = m_canvasRegistry.generateUniqueName(name);
-        }
+    // Record the command for operation history
+    std::string historyCmd = "load " + canvasName + " \"" + filepath + "\"";
+    if (imageName != std::filesystem::path(filepath).stem().string()) {
+        historyCmd += " " + imageName;
     }
 
-    doc->setFilePath(filepath);
-    Canvas* canvas = m_canvasRegistry.create(name, std::move(doc));
+    // Check if canvas exists
+    Canvas* canvas = m_canvasRegistry.getByName(canvasName);
     if (!canvas) {
-        m_commandSystem.setLastResult("Error: Canvas name '" + name + "' already exists", false);
-        return;
-    }
+        // Create a new canvas sized to the image
+        auto canvasDoc = std::make_unique<ImageDocument>();
+        canvasDoc->createNew(doc->getWidth(), doc->getHeight());
+        canvasDoc->setFilePath(filepath);
 
-    m_commandSystem.setActiveCanvasId(canvas->id);
-    m_commandSystem.setLastResult("Opened '" + filepath + "' as '" + name + "'");
+        canvas = m_canvasRegistry.create(canvasName, std::move(canvasDoc));
+        if (!canvas) {
+            m_commandSystem.setLastResult("Error: Failed to create canvas '" + canvasName + "'",
+                                          false);
+            return;
+        }
+
+        // Check for duplicate resource name
+        if (canvas->resources.find(imageName) != canvas->resources.end()) {
+            m_commandSystem.setLastResult("Error: Resource '" + imageName +
+                                              "' already exists in canvas '" + canvasName + "'",
+                                          false);
+            return;
+        }
+
+        // Add as resource and auto-display: blit onto the canvas document at (0,0)
+        auto* canvasDocument = canvas->document.get();
+        const auto* srcPixels = doc->getPixelData();
+        uint32_t srcW = doc->getWidth();
+        uint32_t srcH = doc->getHeight();
+        for (uint32_t y = 0; y < srcH && y < canvasDocument->getHeight(); ++y) {
+            for (uint32_t x = 0; x < srcW && x < canvasDocument->getWidth(); ++x) {
+                size_t idx = (y * srcW + x) * 4;
+                RGBAColor color{srcPixels[idx], srcPixels[idx + 1], srcPixels[idx + 2],
+                                srcPixels[idx + 3]};
+                canvasDocument->setPixel(static_cast<int>(x), static_cast<int>(y), color);
+            }
+        }
+
+        canvas->resources[imageName] = std::move(doc);
+        canvas->operationHistory.push_back(historyCmd);
+        m_commandSystem.setActiveCanvasId(canvas->id);
+        m_commandSystem.setLastResult("Loaded '" + filepath + "' as '" + imageName +
+                                      "' in new canvas '" + canvasName + "' (" +
+                                      std::to_string(srcW) + "x" + std::to_string(srcH) + ")");
+    } else {
+        // Canvas exists — add as undisplayed resource
+        if (canvas->resources.find(imageName) != canvas->resources.end()) {
+            m_commandSystem.setLastResult("Error: Resource '" + imageName +
+                                              "' already exists in canvas '" + canvasName + "'",
+                                          false);
+            return;
+        }
+
+        canvas->resources[imageName] = std::move(doc);
+        canvas->operationHistory.push_back(historyCmd);
+        m_commandSystem.setLastResult("Loaded '" + filepath + "' as '" + imageName +
+                                      "' into canvas '" + canvasName + "'");
+    }
 }
 
 void ResourceEditorScene::cmdList(const std::string& /*args*/) {
@@ -562,10 +756,10 @@ void ResourceEditorScene::cmdFloodFill(uint32_t canvasId, const std::string& arg
 
 void ResourceEditorScene::cmdDraw(uint32_t canvasId, const std::string& args) {
     std::istringstream iss(args);
-    std::string shapeType;
-    iss >> shapeType;
+    std::string firstToken;
+    iss >> firstToken;
 
-    // Pass remaining args after the shape type
+    // Pass remaining args after the first token
     std::string rest;
     std::getline(iss, rest);
     size_t s = rest.find_first_not_of(" \t");
@@ -574,15 +768,19 @@ void ResourceEditorScene::cmdDraw(uint32_t canvasId, const std::string& args) {
     else
         rest.clear();
 
-    if (shapeType == "line") {
+    // Disambiguation: shape keywords → shape draw; anything else → image blit
+    if (firstToken == "line") {
         cmdDrawLine(canvasId, rest);
-    } else if (shapeType == "rect") {
+    } else if (firstToken == "rect") {
         cmdDrawRect(canvasId, rest);
-    } else if (shapeType == "circle") {
+    } else if (firstToken == "circle") {
         cmdDrawCircle(canvasId, rest);
+    } else if (!firstToken.empty()) {
+        // Treat as image name (image blit)
+        cmdDrawImage(canvasId, firstToken, rest);
     } else {
         m_commandSystem.setLastResult(
-            "Usage: draw line|rect|circle ... (see 'help draw' for details)", false);
+            "Usage: draw line|rect|circle ... | draw <imagename> [layer] <x> <y> <w> <h>", false);
     }
 }
 
@@ -707,6 +905,104 @@ void ResourceEditorScene::cmdDrawCircle(uint32_t canvasId, const std::string& ar
     canvas->document->snapshotForUndo();
     canvas->document->drawCircle(cx, cy, r, color, filled);
     m_commandSystem.setLastResult("OK");
+}
+
+void ResourceEditorScene::cmdDrawImage(uint32_t canvasId, const std::string& imageName,
+                                       const std::string& args) {
+    Canvas* canvas = m_canvasRegistry.getById(canvasId);
+    if (!canvas || !canvas->document) {
+        m_commandSystem.setLastResult("Error: Invalid canvas", false);
+        return;
+    }
+
+    // Parse: [layer] <x> <y> <w> <h>
+    // Layer is in square brackets: [0], [1], etc.
+    std::string remaining = args;
+    int layer = 0;  // Default layer 0
+    // TODO: Use layer index when layer system is implemented (Phase 2)
+
+    // Check for optional [layer] prefix
+    size_t start = remaining.find_first_not_of(" \t");
+    if (start != std::string::npos && remaining[start] == '[') {
+        size_t closeBracket = remaining.find(']', start);
+        if (closeBracket != std::string::npos) {
+            std::string layerStr = remaining.substr(start + 1, closeBracket - start - 1);
+            try {
+                layer = std::stoi(layerStr);
+            } catch (...) {
+                m_commandSystem.setLastResult("Error: Invalid layer index: " + layerStr, false);
+                return;
+            }
+            remaining = remaining.substr(closeBracket + 1);
+        }
+    }
+
+    // Parse position and size: <x> <y> <w> <h>
+    std::istringstream iss(remaining);
+    int x, y, w, h;
+    if (!(iss >> x >> y >> w >> h)) {
+        m_commandSystem.setLastResult("Usage: draw <imagename> [layer] <x> <y> <w> <h>", false);
+        return;
+    }
+
+    if (w <= 0 || h <= 0) {
+        m_commandSystem.setLastResult("Error: Width and height must be positive", false);
+        return;
+    }
+
+    // Resolve the image resource via :: accessor
+    auto ref = m_canvasRegistry.resolveResource(imageName, m_commandSystem.getActiveCanvasId());
+    if (!ref.image) {
+        m_commandSystem.setLastResult("Error: Image resource '" + imageName +
+                                          "' not found. "
+                                          "Use canvasname::imagename for cross-canvas access.",
+                                      false);
+        return;
+    }
+
+    // Blit the image onto the canvas document
+    canvas->document->snapshotForUndo();
+
+    const auto* srcPixels = ref.image->getPixelData();
+    uint32_t srcW = ref.image->getWidth();
+    uint32_t srcH = ref.image->getHeight();
+    uint32_t dstW = canvas->document->getWidth();
+    uint32_t dstH = canvas->document->getHeight();
+
+    for (int dy = 0; dy < h; ++dy) {
+        for (int dx = 0; dx < w; ++dx) {
+            int destX = x + dx;
+            int destY = y + dy;
+
+            // Skip pixels outside canvas bounds
+            if (destX < 0 || destX >= static_cast<int>(dstW) || destY < 0 ||
+                destY >= static_cast<int>(dstH)) {
+                continue;
+            }
+
+            // Sample from source with nearest-neighbor scaling
+            int srcX = static_cast<int>(static_cast<float>(dx) / w * srcW);
+            int srcY = static_cast<int>(static_cast<float>(dy) / h * srcH);
+
+            if (srcX >= static_cast<int>(srcW))
+                srcX = srcW - 1;
+            if (srcY >= static_cast<int>(srcH))
+                srcY = srcH - 1;
+
+            size_t idx = (srcY * srcW + srcX) * 4;
+            RGBAColor color{srcPixels[idx], srcPixels[idx + 1], srcPixels[idx + 2],
+                            srcPixels[idx + 3]};
+
+            // Only draw non-transparent pixels (simple alpha test)
+            if (color.a > 0) {
+                canvas->document->setPixel(destX, destY, color);
+            }
+        }
+    }
+
+    m_commandSystem.setLastResult("Drew '" + imageName + "' at (" + std::to_string(x) + "," +
+                                  std::to_string(y) + ") size " + std::to_string(w) + "x" +
+                                  std::to_string(h) + " on layer " + std::to_string(layer));
 }
 
 void ResourceEditorScene::cmdPick(uint32_t canvasId, const std::string& args) {

@@ -98,5 +98,42 @@ std::string CanvasRegistry::generateUniqueName(const std::string& base) {
     }
 }
 
+CanvasRegistry::ResourceRef CanvasRegistry::resolveResource(const std::string& ref,
+                                                            uint32_t activeCanvasId) {
+    ResourceRef result;
+
+    // Check for :: accessor (canvasname::imagename)
+    auto sep = ref.find("::");
+    if (sep != std::string::npos) {
+        std::string canvasName = ref.substr(0, sep);
+        std::string imageName = ref.substr(sep + 2);
+
+        Canvas* canvas = getByName(canvasName);
+        if (!canvas || imageName.empty()) {
+            return result;
+        }
+
+        auto it = canvas->resources.find(imageName);
+        if (it != canvas->resources.end()) {
+            result.canvas = canvas;
+            result.image = it->second.get();
+        }
+        return result;
+    }
+
+    // Bare name — search active canvas first
+    Canvas* active = getById(activeCanvasId);
+    if (active) {
+        auto it = active->resources.find(ref);
+        if (it != active->resources.end()) {
+            result.canvas = active;
+            result.image = it->second.get();
+            return result;
+        }
+    }
+
+    return result;
+}
+
 }  // namespace tools
 }  // namespace vde

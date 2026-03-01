@@ -28,11 +28,27 @@ namespace tools {
 
 /**
  * @brief Per-canvas state including document, GPU texture, and view parameters.
+ *
+ * Each canvas also holds a collection of named image resources (loaded or
+ * composited). Resources are accessed within the owning canvas by bare name,
+ * or from other canvases via the `::` double-colon accessor
+ * (e.g., `hero::face_img`).
+ *
+ * An operation history records the ordered sequence of commands that produced
+ * the canvas's current pixel state, enabling deterministic recreation and
+ * DSL export.
  */
 struct Canvas {
     uint32_t id = 0;
     std::string name;
     std::unique_ptr<ImageDocument> document;
+
+    /// Named image resources (loaded or composited). Key = resource name.
+    std::map<std::string, std::unique_ptr<ImageDocument>> resources;
+
+    /// Ordered commands that produced current state (for deterministic recreation).
+    std::vector<std::string> operationHistory;
+
     std::shared_ptr<vde::Texture> gpuTexture;         ///< nullptr until scene creates
     VkDescriptorSet imguiTextureId = VK_NULL_HANDLE;  ///< nullptr until scene creates
     uint64_t lastUploadedGeneration = 0;
@@ -108,6 +124,26 @@ class CanvasRegistry {
      * @brief Get number of canvases.
      */
     size_t count() const { return m_canvases.size(); }
+
+    /**
+     * @brief Result of resolving a `canvasname::imagename` or bare `imagename` reference.
+     */
+    struct ResourceRef {
+        Canvas* canvas = nullptr;
+        ImageDocument* image = nullptr;
+    };
+
+    /**
+     * @brief Resolve a resource reference.
+     *
+     * Accepts bare "imagename" (searches active canvas first) or
+     * "canvasname::imagename" (explicit canvas target).
+     *
+     * @param ref       The resource reference string
+     * @param activeCanvasId  ID of the currently active canvas (for bare name fallback)
+     * @return ResourceRef with canvas and image pointers, or nulls if not found
+     */
+    ResourceRef resolveResource(const std::string& ref, uint32_t activeCanvasId);
 
     /**
      * @brief Generate a unique name based on the given base string.

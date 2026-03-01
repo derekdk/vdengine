@@ -107,6 +107,7 @@ class ResourceEditorScene : public BaseToolScene {
     void cmdDrawLine(uint32_t canvasId, const std::string& args);
     void cmdDrawRect(uint32_t canvasId, const std::string& args);
     void cmdDrawCircle(uint32_t canvasId, const std::string& args);
+    void cmdDrawImage(uint32_t canvasId, const std::string& imageName, const std::string& args);
 
     // --- GPU helpers ---
     void uploadCanvasTexture(Canvas& canvas);
