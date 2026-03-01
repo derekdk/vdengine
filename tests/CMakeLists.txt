@@ -55,10 +55,24 @@ set(VDE_TEST_SOURCES
     InputScript_test.cpp
     # Storage tests
     StorageManager_test.cpp
+    # Resource Editor tool tests
+    ImageDocument_test.cpp
+    CanvasRegistry_test.cpp
+    CommandSystem_test.cpp
+    ToolPalette_test.cpp
+)
+
+# Resource Editor tool sources needed by tests
+set(RESOURCE_EDITOR_TEST_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tools/resource_editor/ImageDocument.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tools/resource_editor/CanvasRegistry.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tools/resource_editor/CommandSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tools/resource_editor/ToolPalette.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tools/resource_editor/FileOperations.cpp
 )
 
 # Create test executable
-add_executable(vde_tests ${VDE_TEST_SOURCES})
+add_executable(vde_tests ${VDE_TEST_SOURCES} ${RESOURCE_EDITOR_TEST_SOURCES})
 
 target_link_libraries(vde_tests PRIVATE
     vde
@@ -66,8 +80,15 @@ target_link_libraries(vde_tests PRIVATE
     GTest::gtest_main
 )
 
+# Windows COM libraries needed by Resource Editor FileOperations
+if(WIN32)
+    target_link_libraries(vde_tests PRIVATE ole32 uuid)
+endif()
+
 target_include_directories(vde_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tools/resource_editor
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb
 )
 
 # Register tests with CTest

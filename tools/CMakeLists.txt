@@ -52,3 +52,4 @@ add_custom_target(copy_tool_shaders ALL
 # Add tool subdirectories
 add_subdirectory(geometry_repl)
 add_subdirectory(vlauncher)
+add_subdirectory(resource_editor)
