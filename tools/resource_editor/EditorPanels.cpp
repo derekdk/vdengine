@@ -188,7 +188,7 @@ void EditorPanels::drawCanvasTabs(CanvasRegistry& canvases, CommandSystem& cmd, 
 
                 if (ImGui::BeginTabItem(label.c_str())) {
                     if (!isActive) {
-                        cmd.execute("set_active " + canvas->name);
+                        cmd.execute("select canvas " + canvas->name);
                     }
                     ImGui::EndTabItem();
                 }
@@ -253,7 +253,7 @@ void EditorPanels::drawCanvasViewport(Canvas& canvas, ToolPalette& palette, Comm
                 // Handle mouse events
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                     if (!isActive) {
-                        cmd.execute("set_active " + canvas.name);
+                        cmd.execute("select canvas " + canvas.name);
                     }
                     std::string action = palette.onCanvasMouseDown(canvas.id, pixelX, pixelY);
                     if (!action.empty()) {
@@ -342,7 +342,7 @@ void EditorPanels::drawMenuBar(CommandSystem& cmd, CanvasRegistry& canvases) {
                               canvases.generateUniqueName().c_str());
             }
             if (ImGui::MenuItem("Open...", "Ctrl+O")) {
-                cmd.execute("open");
+                cmd.execute("load");
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Save", "Ctrl+S")) {
@@ -352,7 +352,7 @@ void EditorPanels::drawMenuBar(CommandSystem& cmd, CanvasRegistry& canvases) {
                 cmd.execute("saveas");
             }
             if (ImGui::MenuItem("Export...")) {
-                cmd.execute("export");
+                cmd.execute("export png");
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Exit", "ESC")) {
@@ -415,8 +415,9 @@ void EditorPanels::drawMenuBar(CommandSystem& cmd, CanvasRegistry& canvases) {
             if (name.empty()) {
                 name = canvases.generateUniqueName();
             }
-            cmd.execute("new " + std::to_string(m_newCanvasWidth) + " " +
-                        std::to_string(m_newCanvasHeight) + " " + name);
+            cmd.execute("create canvas " + name + " " +
+                        std::to_string(m_newCanvasWidth) + " " +
+                        std::to_string(m_newCanvasHeight));
             ImGui::CloseCurrentPopup();
         }
 

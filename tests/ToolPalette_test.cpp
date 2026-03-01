@@ -125,15 +125,15 @@ TEST(ToolPaletteStaticTest, ToolStringRoundTrip) {
 TEST_F(ToolPaletteTest, BrushMouseDownReturnsCommand) {
     std::string cmd = palette.onCanvasMouseDown(1, 5, 10);
     EXPECT_FALSE(cmd.empty());
-    // Should contain "paint" with coordinates and color
-    EXPECT_NE(cmd.find("paint"), std::string::npos);
+    // Should contain "set" with coordinates and color
+    EXPECT_NE(cmd.find("set"), std::string::npos);
 }
 
 TEST_F(ToolPaletteTest, BrushMouseDragReturnsCommand) {
     palette.onCanvasMouseDown(1, 5, 10);
     std::string cmd = palette.onCanvasMouseDrag(1, 6, 11);
     EXPECT_FALSE(cmd.empty());
-    EXPECT_NE(cmd.find("paint"), std::string::npos);
+    EXPECT_NE(cmd.find("set"), std::string::npos);
 }
 
 // ============================================================================
@@ -144,8 +144,8 @@ TEST_F(ToolPaletteTest, EraserUsesTransparentColor) {
     palette.setTool(EditorTool::Eraser);
     std::string cmd = palette.onCanvasMouseDown(1, 5, 10);
     EXPECT_FALSE(cmd.empty());
-    // Eraser should paint with transparent (00000000)
-    EXPECT_NE(cmd.find("paint"), std::string::npos);
+    // Eraser should set pixel with transparent (00000000)
+    EXPECT_NE(cmd.find("set"), std::string::npos);
     EXPECT_NE(cmd.find("#00000000"), std::string::npos);
 }
 
@@ -168,7 +168,8 @@ TEST_F(ToolPaletteTest, FillReturnsFillCommand) {
     palette.setTool(EditorTool::Fill);
     std::string cmd = palette.onCanvasMouseDown(1, 3, 7);
     EXPECT_FALSE(cmd.empty());
-    EXPECT_NE(cmd.find("fill"), std::string::npos);
+    EXPECT_NE(cmd.find("floodfill"), std::string::npos);
+    EXPECT_NE(cmd.find("with"), std::string::npos);
 }
 
 // ============================================================================
@@ -189,7 +190,9 @@ TEST_F(ToolPaletteTest, LineToolMouseUpProducesCommand) {
     std::string cmd = palette.onCanvasMouseUp(1, 10, 12);
 
     EXPECT_FALSE(cmd.empty());
-    EXPECT_NE(cmd.find("line"), std::string::npos);
+    EXPECT_NE(cmd.find("draw line"), std::string::npos);
+    EXPECT_NE(cmd.find("to"), std::string::npos);
+    EXPECT_NE(cmd.find("with"), std::string::npos);
     EXPECT_FALSE(palette.isDrawingShape());
 }
 
@@ -199,7 +202,9 @@ TEST_F(ToolPaletteTest, RectToolMouseUpProducesCommand) {
     std::string cmd = palette.onCanvasMouseUp(1, 5, 5);
 
     EXPECT_FALSE(cmd.empty());
-    EXPECT_NE(cmd.find("rect"), std::string::npos);
+    EXPECT_NE(cmd.find("draw rect"), std::string::npos);
+    EXPECT_NE(cmd.find("to"), std::string::npos);
+    EXPECT_NE(cmd.find("with"), std::string::npos);
 }
 
 TEST_F(ToolPaletteTest, CircleToolMouseUpProducesCommand) {
@@ -208,7 +213,9 @@ TEST_F(ToolPaletteTest, CircleToolMouseUpProducesCommand) {
     std::string cmd = palette.onCanvasMouseUp(1, 12, 8);
 
     EXPECT_FALSE(cmd.empty());
-    EXPECT_NE(cmd.find("circle"), std::string::npos);
+    EXPECT_NE(cmd.find("draw circle"), std::string::npos);
+    EXPECT_NE(cmd.find("radius"), std::string::npos);
+    EXPECT_NE(cmd.find("with"), std::string::npos);
 }
 
 // ============================================================================

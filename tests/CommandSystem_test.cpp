@@ -79,34 +79,34 @@ TEST_F(CommandSystemTest, GlobalCommandTakesPriorityOverCanvas) {
 
 TEST_F(CommandSystemTest, ExplicitCanvasPrefixById) {
     uint32_t receivedId = 0;
-    cmdSys.registerCanvasCommand("paint", "Test",
+    cmdSys.registerCanvasCommand("set", "Test",
                                  [&](uint32_t id, const std::string&) { receivedId = id; });
 
-    std::string cmd = "@" + std::to_string(testCanvas->id) + " paint 0 0";
+    std::string cmd = "@" + std::to_string(testCanvas->id) + " set 0 0";
     EXPECT_TRUE(cmdSys.execute(cmd));
     EXPECT_EQ(receivedId, testCanvas->id);
 }
 
 TEST_F(CommandSystemTest, ExplicitCanvasPrefixByName) {
     uint32_t receivedId = 0;
-    cmdSys.registerCanvasCommand("paint", "Test",
+    cmdSys.registerCanvasCommand("set", "Test",
                                  [&](uint32_t id, const std::string&) { receivedId = id; });
 
-    EXPECT_TRUE(cmdSys.execute("@hero paint 0 0"));
+    EXPECT_TRUE(cmdSys.execute("@hero set 0 0"));
     EXPECT_EQ(receivedId, testCanvas->id);
 }
 
 TEST_F(CommandSystemTest, InvalidCanvasPrefixFails) {
-    cmdSys.registerCanvasCommand("paint", "Test", [](uint32_t, const std::string&) {});
+    cmdSys.registerCanvasCommand("set", "Test", [](uint32_t, const std::string&) {});
 
-    EXPECT_FALSE(cmdSys.execute("@nonexistent paint 0 0"));
+    EXPECT_FALSE(cmdSys.execute("@nonexistent set 0 0"));
 }
 
 TEST_F(CommandSystemTest, CanvasCommandWithoutActiveCanvasFails) {
     cmdSys.setActiveCanvasId(0);
-    cmdSys.registerCanvasCommand("paint", "Test", [](uint32_t, const std::string&) {});
+    cmdSys.registerCanvasCommand("set", "Test", [](uint32_t, const std::string&) {});
 
-    EXPECT_FALSE(cmdSys.execute("paint 0 0"));
+    EXPECT_FALSE(cmdSys.execute("set 0 0"));
 }
 
 TEST_F(CommandSystemTest, UnknownCommandFails) {

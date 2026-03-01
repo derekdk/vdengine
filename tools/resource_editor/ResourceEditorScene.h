@@ -16,6 +16,7 @@
 #include "CanvasRegistry.h"
 #include "CommandSystem.h"
 #include "EditorPanels.h"
+#include "ImageDocument.h"
 #include "ToolPalette.h"
 
 namespace vde {
@@ -61,31 +62,34 @@ class ResourceEditorScene : public BaseToolScene {
     EditorPanels m_editorPanels;
     float m_dpiScale = 1.0f;
 
+    /// Named color store (DSL §3.1: create color <name> <hex>)
+    std::map<std::string, RGBAColor> m_namedColors;
+
+    /// Resolve a color token — named color first, then hex literal.
+    bool resolveColor(const std::string& token, RGBAColor& out) const;
+
     // --- Command registration ---
     void registerGlobalCommands();
     void registerCanvasCommands();
 
     // --- Global command handlers ---
     void cmdHelp(const std::string& args);
-    void cmdNew(const std::string& args);
-    void cmdOpen(const std::string& args);
+    void cmdCreate(const std::string& args);
+    void cmdLoad(const std::string& args);
     void cmdList(const std::string& args);
-    void cmdSetActive(const std::string& args);
+    void cmdSelect(const std::string& args);
     void cmdSetColor(const std::string& args);
     void cmdSetTool(const std::string& args);
     void cmdSetSize(const std::string& args);
     void cmdLogSave(const std::string& args);
-    void cmdLogClear(const std::string& args);
     void cmdRun(const std::string& args);
     void cmdExit(const std::string& args);
 
     // --- Canvas command handlers ---
-    void cmdPaint(uint32_t canvasId, const std::string& args);
+    void cmdSet(uint32_t canvasId, const std::string& args);
     void cmdFill(uint32_t canvasId, const std::string& args);
     void cmdFloodFill(uint32_t canvasId, const std::string& args);
-    void cmdLine(uint32_t canvasId, const std::string& args);
-    void cmdRect(uint32_t canvasId, const std::string& args);
-    void cmdCircle(uint32_t canvasId, const std::string& args);
+    void cmdDraw(uint32_t canvasId, const std::string& args);
     void cmdPick(uint32_t canvasId, const std::string& args);
     void cmdUndo(uint32_t canvasId, const std::string& args);
     void cmdRedo(uint32_t canvasId, const std::string& args);
@@ -95,10 +99,14 @@ class ResourceEditorScene : public BaseToolScene {
     void cmdClose(uint32_t canvasId, const std::string& args);
     void cmdZoom(uint32_t canvasId, const std::string& args);
     void cmdPan(uint32_t canvasId, const std::string& args);
-    void cmdFlipH(uint32_t canvasId, const std::string& args);
-    void cmdFlipV(uint32_t canvasId, const std::string& args);
+    void cmdFlip(uint32_t canvasId, const std::string& args);
     void cmdResize(uint32_t canvasId, const std::string& args);
     void cmdCrop(uint32_t canvasId, const std::string& args);
+
+    // --- Draw sub-handlers ---
+    void cmdDrawLine(uint32_t canvasId, const std::string& args);
+    void cmdDrawRect(uint32_t canvasId, const std::string& args);
+    void cmdDrawCircle(uint32_t canvasId, const std::string& args);
 
     // --- GPU helpers ---
     void uploadCanvasTexture(Canvas& canvas);

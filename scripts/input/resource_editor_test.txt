@@ -1,50 +1,59 @@
 # =============================================================
-# Resource Editor — Functional Test Script
+# Resource Editor — Functional Test Script (DSL Syntax)
 # =============================================================
 # Run this with:
 #   build_ninja\tools\resource_editor\vde_resource_editor.exe scripts\input\resource_editor_test.txt
 #
-# This exercises all Phase 1 commands. The editor runs in
-# script mode — no window interaction required. Watch the
-# console output for OK / ERROR on each command.
+# This exercises all Phase 1 commands using the unified DSL
+# syntax. The editor runs in script mode — no window
+# interaction required. Watch the console output for
+# OK / ERROR on each command.
 # =============================================================
 
 # --- Help ---
 help
-help new
-help paint
+help create
+help set
 
-# --- Canvas management ---
-new 32 32 hero
-new 16 16 enemy
-new 64 64 background
+# --- Create canvases (DSL §2) ---
+create canvas hero 32 32
+create canvas enemy 16 16
+create canvas background 64 64
 list
 
-# --- Switch active canvas ---
-set_active hero
+# --- Named colors (DSL §3.1) ---
+create color red #FF0000FF
+create color green #00FF00FF
+create color blue #0000FFFF
+create color skin #FFCC99
+create color outline #333333FF
 
-# --- Drawing color / tool / brush size ---
+# --- Select active canvas (DSL pattern) ---
+select canvas hero
+
+# --- Drawing color / tool / brush size (REPL utilities) ---
 setcolor #FF0000FF
 settool brush
 setsize 3
 
-# --- Paint some pixels (on active canvas "hero") ---
-paint 5 5 #FF0000FF
-paint 10 10 #00FF00FF 2
-paint 0 0 #0000FFFF
+# --- Set pixels (DSL §8.1 — on active canvas "hero") ---
+set 5 5 #FF0000FF
+set 10 10 red
+set 0 0 blue
 
-# --- Fill entire canvas ---
+# --- Fill entire canvas (DSL §8.2) ---
 fill #222222FF
 
-# --- Flood fill ---
-floodfill 0 0 #AAAAAAFF
+# --- Flood fill (DSL §8.7) ---
+floodfill 0 0 with #AAAAAAFF
 
-# --- Shapes ---
-line 0 0 31 31 #FFFF00FF
-rect 2 2 10 8 #FF00FFFF 1
-rect 14 14 6 6 #00FFFFFF 0
-circle 16 16 5 #FF8800FF 1
-circle 24 24 3 #8800FFFF 0
+# --- Draw shapes (DSL §8.3–8.5) ---
+draw line 0 0 to 31 31 with #FFFF00FF
+draw line 0 31 to 31 0 with outline width 2
+draw rect 2 2 to 12 10 with #FF00FFFF filled
+draw rect 14 14 to 20 20 with #00FFFFFF outline
+draw circle 16 16 radius 5 with #FF8800FF filled
+draw circle 24 24 radius 3 with #8800FFFF outline
 
 # --- Undo / Redo ---
 undo
@@ -54,28 +63,28 @@ redo
 # --- Color picker ---
 pick 5 5
 
-# --- Transforms ---
-fliph
-flipv
+# --- Transforms (DSL §12.4) ---
+flip horizontal
+flip vertical
 resize 64 64
-crop 0 0 32 32
+crop 0 0 to 31 31
 
-# --- Zoom / Pan ---
+# --- Zoom / Pan (REPL utilities) ---
 zoom 4
 pan 10 10
 
 # --- Target other canvas by name with @prefix ---
 @enemy fill #880000FF
-@enemy paint 8 8 #FFFFFFFF
-@enemy line 0 0 15 15 #00FF00FF
+@enemy set 8 8 #FFFFFFFF
+@enemy draw line 0 0 to 15 15 with green
 
 # --- Target by numeric ID (canvas 3 = background) ---
 @3 fill #335577FF
-@background rect 10 10 20 20 #FFFFFFAA 1
+@background draw rect 10 10 to 30 30 with #FFFFFFAA filled
 
-# --- Export / Save ---
-@hero export hero_test_output.png
-@enemy export enemy_test_output.png
+# --- Export (DSL §17) ---
+@hero export png hero_test_output.png
+@enemy export png enemy_test_output.png
 
 # --- Close a canvas ---
 @enemy close

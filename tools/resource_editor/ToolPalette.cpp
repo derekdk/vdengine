@@ -22,18 +22,16 @@ std::string ToolPalette::onCanvasMouseDown(uint32_t /*canvasId*/, int pixelX, in
 
     switch (m_state.activeTool) {
     case EditorTool::Brush:
-        return "paint " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " " + hexColor +
-               " " + std::to_string(m_state.brushSize);
+        return "set " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " " + hexColor;
 
     case EditorTool::Eraser:
-        return "paint " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " #00000000 " +
-               std::to_string(m_state.brushSize);
+        return "set " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " #00000000";
 
     case EditorTool::ColorPicker:
         return "pick " + std::to_string(pixelX) + " " + std::to_string(pixelY);
 
     case EditorTool::Fill:
-        return "floodfill " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " " +
+        return "floodfill " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " with " +
                hexColor;
 
     case EditorTool::Line:
@@ -54,13 +52,11 @@ std::string ToolPalette::onCanvasMouseDrag(uint32_t /*canvasId*/, int pixelX, in
     switch (m_state.activeTool) {
     case EditorTool::Brush: {
         std::string hexColor = colorToHex(m_state.color);
-        return "paint " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " " + hexColor +
-               " " + std::to_string(m_state.brushSize);
+        return "set " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " " + hexColor;
     }
 
     case EditorTool::Eraser:
-        return "paint " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " #00000000 " +
-               std::to_string(m_state.brushSize);
+        return "set " + std::to_string(pixelX) + " " + std::to_string(pixelY) + " #00000000";
 
     default:
         // Shapes, color picker, fill — no drag action
@@ -77,28 +73,25 @@ std::string ToolPalette::onCanvasMouseUp(uint32_t /*canvasId*/, int pixelX, int 
 
     switch (m_state.activeTool) {
     case EditorTool::Line:
-        return "line " + std::to_string(m_state.shapeStartX) + " " +
-               std::to_string(m_state.shapeStartY) + " " + std::to_string(pixelX) + " " +
-               std::to_string(pixelY) + " " + hexColor + " " + std::to_string(m_state.brushSize);
+        return "draw line " + std::to_string(m_state.shapeStartX) + " " +
+               std::to_string(m_state.shapeStartY) + " to " + std::to_string(pixelX) + " " +
+               std::to_string(pixelY) + " with " + hexColor;
 
     case EditorTool::Rect: {
-        int x = std::min(m_state.shapeStartX, pixelX);
-        int y = std::min(m_state.shapeStartY, pixelY);
-        int w = std::abs(pixelX - m_state.shapeStartX) + 1;
-        int h = std::abs(pixelY - m_state.shapeStartY) + 1;
-        std::string fillStr = m_state.fillShape ? " filled" : "";
-        return "rect " + std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(w) +
-               " " + std::to_string(h) + " " + hexColor + fillStr;
+        std::string fillStr = m_state.fillShape ? " filled" : " outline";
+        return "draw rect " + std::to_string(m_state.shapeStartX) + " " +
+               std::to_string(m_state.shapeStartY) + " to " + std::to_string(pixelX) + " " +
+               std::to_string(pixelY) + " with " + hexColor + fillStr;
     }
 
     case EditorTool::Circle: {
         int dx = pixelX - m_state.shapeStartX;
         int dy = pixelY - m_state.shapeStartY;
         int r = static_cast<int>(std::sqrt(dx * dx + dy * dy));
-        std::string fillStr = m_state.fillShape ? " filled" : "";
-        return "circle " + std::to_string(m_state.shapeStartX) + " " +
-               std::to_string(m_state.shapeStartY) + " " + std::to_string(r) + " " + hexColor +
-               fillStr;
+        std::string fillStr = m_state.fillShape ? " filled" : " outline";
+        return "draw circle " + std::to_string(m_state.shapeStartX) + " " +
+               std::to_string(m_state.shapeStartY) + " radius " + std::to_string(r) + " with " +
+               hexColor + fillStr;
     }
 
     default:

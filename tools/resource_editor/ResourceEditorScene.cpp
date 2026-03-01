@@ -46,7 +46,7 @@ void ResourceEditorScene::onEnter() {
 
     addConsoleMessage("VDE Resource Editor — Phase 1");
     addConsoleMessage("Type 'help' for a list of commands.");
-    addConsoleMessage("Type 'new 32 32 mycanvas' to create a canvas.");
+    addConsoleMessage("Type 'create canvas mycanvas 32 32' to create a canvas.");
 }
 
 void ResourceEditorScene::onBeforeImGuiShutdown() {
@@ -116,17 +116,19 @@ void ResourceEditorScene::registerGlobalCommands() {
                                           "Show available commands or help for a specific command",
                                           [this](const std::string& args) { cmdHelp(args); });
 
-    m_commandSystem.registerGlobalCommand("new", "Create a new canvas: new <w> <h> [name]",
-                                          [this](const std::string& args) { cmdNew(args); });
+    m_commandSystem.registerGlobalCommand(
+        "create", "Create an object: create canvas <name> <w> <h> | create color <name> <hex>",
+        [this](const std::string& args) { cmdCreate(args); });
 
-    m_commandSystem.registerGlobalCommand("open", "Open an image file: open [filepath] [name]",
-                                          [this](const std::string& args) { cmdOpen(args); });
+    m_commandSystem.registerGlobalCommand("load", "Load an image file: load [filepath] [name]",
+                                          [this](const std::string& args) { cmdLoad(args); });
 
     m_commandSystem.registerGlobalCommand("list", "List all canvases",
                                           [this](const std::string& args) { cmdList(args); });
 
-    m_commandSystem.registerGlobalCommand("set_active", "Set active canvas: set_active <name|id>",
-                                          [this](const std::string& args) { cmdSetActive(args); });
+    m_commandSystem.registerGlobalCommand(
+        "select", "Select active object: select canvas <name|id>",
+        [this](const std::string& args) { cmdSelect(args); });
 
     m_commandSystem.registerGlobalCommand("setcolor", "Set drawing color: setcolor <#RRGGBBAA>",
                                           [this](const std::string& args) { cmdSetColor(args); });
@@ -146,48 +148,27 @@ void ResourceEditorScene::registerGlobalCommands() {
 
     m_commandSystem.registerGlobalCommand("exit", "Exit the editor",
                                           [this](const std::string& args) { cmdExit(args); });
-
-    // Phase 1 stubs for DSL commands
-    m_commandSystem.registerGlobalCommand(
-        "dsl_load", "Load a DSL file (not yet implemented)", [this](const std::string&) {
-            m_commandSystem.setLastResult("Not yet implemented (Phase 3)", false);
-        });
-
-    m_commandSystem.registerGlobalCommand(
-        "dsl", "Execute DSL command (not yet implemented)", [this](const std::string&) {
-            m_commandSystem.setLastResult("Not yet implemented (Phase 3)", false);
-        });
-
-    m_commandSystem.registerGlobalCommand(
-        "dsl_export", "Export DSL (not yet implemented)", [this](const std::string&) {
-            m_commandSystem.setLastResult("Not yet implemented (Phase 3)", false);
-        });
 }
 
 void ResourceEditorScene::registerCanvasCommands() {
     m_commandSystem.registerCanvasCommand(
-        "paint", "Paint at position: paint <x> <y> <color> [size]",
-        [this](uint32_t id, const std::string& args) { cmdPaint(id, args); });
+        "set", "Set pixel: set <x> <y> <color>",
+        [this](uint32_t id, const std::string& args) { cmdSet(id, args); });
 
     m_commandSystem.registerCanvasCommand(
         "fill", "Fill entire canvas: fill <color>",
         [this](uint32_t id, const std::string& args) { cmdFill(id, args); });
 
     m_commandSystem.registerCanvasCommand(
-        "floodfill", "Flood fill at position: floodfill <x> <y> <color>",
+        "floodfill", "Flood fill: floodfill <x> <y> with <color>",
         [this](uint32_t id, const std::string& args) { cmdFloodFill(id, args); });
 
     m_commandSystem.registerCanvasCommand(
-        "line", "Draw line: line <x1> <y1> <x2> <y2> <color> [size]",
-        [this](uint32_t id, const std::string& args) { cmdLine(id, args); });
-
-    m_commandSystem.registerCanvasCommand(
-        "rect", "Draw rectangle: rect <x> <y> <w> <h> <color> [filled]",
-        [this](uint32_t id, const std::string& args) { cmdRect(id, args); });
-
-    m_commandSystem.registerCanvasCommand(
-        "circle", "Draw circle: circle <cx> <cy> <r> <color> [filled]",
-        [this](uint32_t id, const std::string& args) { cmdCircle(id, args); });
+        "draw",
+        "Draw shape: draw line <x1> <y1> to <x2> <y2> with <color> | "
+        "draw rect <x1> <y1> to <x2> <y2> with <color> [filled|outline] | "
+        "draw circle <cx> <cy> radius <r> with <color> [filled|outline]",
+        [this](uint32_t id, const std::string& args) { cmdDraw(id, args); });
 
     m_commandSystem.registerCanvasCommand(
         "pick", "Pick color at position: pick <x> <y>",
@@ -210,7 +191,7 @@ void ResourceEditorScene::registerCanvasCommands() {
         [this](uint32_t id, const std::string& args) { cmdSaveAs(id, args); });
 
     m_commandSystem.registerCanvasCommand(
-        "export", "Export canvas: export [filepath]",
+        "export", "Export canvas: export <format> [filepath] (format: png, bmp, tga)",
         [this](uint32_t id, const std::string& args) { cmdExport(id, args); });
 
     m_commandSystem.registerCanvasCommand(
@@ -218,7 +199,7 @@ void ResourceEditorScene::registerCanvasCommands() {
         [this](uint32_t id, const std::string& args) { cmdClose(id, args); });
 
     m_commandSystem.registerCanvasCommand(
-        "zoom", "Set zoom level: zoom <level>",
+        "zoom", "Set zoom level: zoom <level|in|out>",
         [this](uint32_t id, const std::string& args) { cmdZoom(id, args); });
 
     m_commandSystem.registerCanvasCommand(
@@ -226,41 +207,16 @@ void ResourceEditorScene::registerCanvasCommands() {
         [this](uint32_t id, const std::string& args) { cmdPan(id, args); });
 
     m_commandSystem.registerCanvasCommand(
-        "fliph", "Flip canvas horizontally",
-        [this](uint32_t id, const std::string& args) { cmdFlipH(id, args); });
-
-    m_commandSystem.registerCanvasCommand(
-        "flipv", "Flip canvas vertically",
-        [this](uint32_t id, const std::string& args) { cmdFlipV(id, args); });
+        "flip", "Flip canvas: flip horizontal | flip vertical",
+        [this](uint32_t id, const std::string& args) { cmdFlip(id, args); });
 
     m_commandSystem.registerCanvasCommand(
         "resize", "Resize canvas: resize <w> <h>",
         [this](uint32_t id, const std::string& args) { cmdResize(id, args); });
 
     m_commandSystem.registerCanvasCommand(
-        "crop", "Crop canvas: crop <x> <y> <w> <h>",
+        "crop", "Crop canvas: crop <x1> <y1> to <x2> <y2>",
         [this](uint32_t id, const std::string& args) { cmdCrop(id, args); });
-
-    // Phase 1 layer stubs
-    for (const auto& name :
-         {"layer_add", "layer_remove", "layer_select", "layer_opacity", "layer_visibility"}) {
-        m_commandSystem.registerCanvasCommand(
-            name, "Layer command (not yet implemented)", [this](uint32_t, const std::string&) {
-                m_commandSystem.setLastResult("Not yet implemented (Phase 2)", false);
-            });
-    }
-
-    // Phase 1 stubs for advanced commands
-    m_commandSystem.registerCanvasCommand("gradient_fill", "Gradient fill (not yet implemented)",
-                                          [this](uint32_t, const std::string&) {
-                                              m_commandSystem.setLastResult(
-                                                  "Not yet implemented (Phase 2)", false);
-                                          });
-
-    m_commandSystem.registerCanvasCommand(
-        "copy_area", "Copy area (not yet implemented)", [this](uint32_t, const std::string&) {
-            m_commandSystem.setLastResult("Not yet implemented (Phase 2)", false);
-        });
 }
 
 // =============================================================================
@@ -286,36 +242,61 @@ void ResourceEditorScene::cmdHelp(const std::string& args) {
     }
 }
 
-void ResourceEditorScene::cmdNew(const std::string& args) {
+void ResourceEditorScene::cmdCreate(const std::string& args) {
     std::istringstream iss(args);
-    int w = 0, h = 0;
-    std::string name;
-    iss >> w >> h >> name;
+    std::string objectType;
+    iss >> objectType;
 
-    if (w <= 0 || h <= 0) {
-        m_commandSystem.setLastResult("Usage: new <width> <height> [name]", false);
-        return;
+    if (objectType == "canvas") {
+        // create canvas <name> <w> <h>
+        std::string name;
+        int w = 0, h = 0;
+        iss >> name >> w >> h;
+
+        if (name.empty() || w <= 0 || h <= 0) {
+            m_commandSystem.setLastResult("Usage: create canvas <name> <width> <height>", false);
+            return;
+        }
+
+        auto doc = std::make_unique<ImageDocument>();
+        doc->createNew(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+
+        Canvas* canvas = m_canvasRegistry.create(name, std::move(doc));
+        if (!canvas) {
+            m_commandSystem.setLastResult("Error: Canvas name '" + name + "' already exists",
+                                          false);
+            return;
+        }
+
+        m_commandSystem.setActiveCanvasId(canvas->id);
+        m_commandSystem.setLastResult("Created canvas '" + name + "' (" + std::to_string(w) + "x" +
+                                      std::to_string(h) + ")");
+    } else if (objectType == "color") {
+        // create color <name> <hex>
+        std::string name, hexValue;
+        iss >> name >> hexValue;
+
+        if (name.empty() || hexValue.empty()) {
+            m_commandSystem.setLastResult("Usage: create color <name> <#RRGGBB[AA]>", false);
+            return;
+        }
+
+        RGBAColor color;
+        if (!ToolPalette::hexToColor(hexValue, color)) {
+            m_commandSystem.setLastResult("Error: Invalid color value: " + hexValue, false);
+            return;
+        }
+
+        m_namedColors[name] = color;
+        m_commandSystem.setLastResult("Created color '" + name + "' = " +
+                                      ToolPalette::colorToHex(color));
+    } else {
+        m_commandSystem.setLastResult(
+            "Usage: create canvas <name> <w> <h> | create color <name> <hex>", false);
     }
-
-    if (name.empty()) {
-        name = m_canvasRegistry.generateUniqueName();
-    }
-
-    auto doc = std::make_unique<ImageDocument>();
-    doc->createNew(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
-
-    Canvas* canvas = m_canvasRegistry.create(name, std::move(doc));
-    if (!canvas) {
-        m_commandSystem.setLastResult("Error: Canvas name '" + name + "' already exists", false);
-        return;
-    }
-
-    m_commandSystem.setActiveCanvasId(canvas->id);
-    m_commandSystem.setLastResult("Created canvas '" + name + "' (" + std::to_string(w) + "x" +
-                                  std::to_string(h) + ")");
 }
 
-void ResourceEditorScene::cmdOpen(const std::string& args) {
+void ResourceEditorScene::cmdLoad(const std::string& args) {
     std::istringstream iss(args);
     std::string filepath, name;
     iss >> filepath >> name;
@@ -383,20 +364,28 @@ void ResourceEditorScene::cmdList(const std::string& /*args*/) {
     m_commandSystem.setLastResult(result);
 }
 
-void ResourceEditorScene::cmdSetActive(const std::string& args) {
-    if (args.empty()) {
-        m_commandSystem.setLastResult("Usage: set_active <name|id>", false);
-        return;
-    }
+void ResourceEditorScene::cmdSelect(const std::string& args) {
+    std::istringstream iss(args);
+    std::string objectType, nameOrId;
+    iss >> objectType >> nameOrId;
 
-    Canvas* canvas = m_canvasRegistry.resolve(args);
-    if (!canvas) {
-        m_commandSystem.setLastResult("Error: Canvas '" + args + "' not found", false);
-        return;
-    }
+    if (objectType == "canvas") {
+        if (nameOrId.empty()) {
+            m_commandSystem.setLastResult("Usage: select canvas <name|id>", false);
+            return;
+        }
 
-    m_commandSystem.setActiveCanvasId(canvas->id);
-    m_commandSystem.setLastResult("Active canvas: " + canvas->name);
+        Canvas* canvas = m_canvasRegistry.resolve(nameOrId);
+        if (!canvas) {
+            m_commandSystem.setLastResult("Error: Canvas '" + nameOrId + "' not found", false);
+            return;
+        }
+
+        m_commandSystem.setActiveCanvasId(canvas->id);
+        m_commandSystem.setLastResult("Active canvas: " + canvas->name);
+    } else {
+        m_commandSystem.setLastResult("Usage: select canvas <name|id>", false);
+    }
 }
 
 void ResourceEditorScene::cmdSetColor(const std::string& args) {
@@ -492,7 +481,7 @@ void ResourceEditorScene::cmdExit(const std::string& /*args*/) {
 // Canvas command handlers
 // =============================================================================
 
-void ResourceEditorScene::cmdPaint(uint32_t canvasId, const std::string& args) {
+void ResourceEditorScene::cmdSet(uint32_t canvasId, const std::string& args) {
     Canvas* canvas = m_canvasRegistry.getById(canvasId);
     if (!canvas || !canvas->document) {
         m_commandSystem.setLastResult("Error: Invalid canvas", false);
@@ -501,18 +490,17 @@ void ResourceEditorScene::cmdPaint(uint32_t canvasId, const std::string& args) {
 
     std::istringstream iss(args);
     int x, y;
-    std::string hexColor;
-    int size = 0;
-    iss >> x >> y >> hexColor >> size;
+    std::string colorToken;
+    iss >> x >> y >> colorToken;
 
     RGBAColor color;
-    if (!ToolPalette::hexToColor(hexColor, color)) {
-        m_commandSystem.setLastResult("Usage: paint <x> <y> <#color> [size]", false);
+    if (!resolveColor(colorToken, color)) {
+        m_commandSystem.setLastResult("Usage: set <x> <y> <color>", false);
         return;
     }
 
     canvas->document->snapshotForUndo();
-    canvas->document->drawBrush(x, y, size, color);
+    canvas->document->setPixel(x, y, color);
     m_commandSystem.setLastResult("OK");
 }
 
@@ -523,9 +511,18 @@ void ResourceEditorScene::cmdFill(uint32_t canvasId, const std::string& args) {
         return;
     }
 
+    std::string colorToken = args;
+    // Trim
+    size_t s = colorToken.find_first_not_of(" \t");
+    if (s != std::string::npos)
+        colorToken = colorToken.substr(s);
+    size_t e = colorToken.find_last_not_of(" \t");
+    if (e != std::string::npos)
+        colorToken = colorToken.substr(0, e + 1);
+
     RGBAColor color;
-    if (!ToolPalette::hexToColor(args, color)) {
-        m_commandSystem.setLastResult("Usage: fill <#color>", false);
+    if (!resolveColor(colorToken, color)) {
+        m_commandSystem.setLastResult("Usage: fill <color>", false);
         return;
     }
 
@@ -541,14 +538,20 @@ void ResourceEditorScene::cmdFloodFill(uint32_t canvasId, const std::string& arg
         return;
     }
 
+    // Parse: floodfill <x> <y> with <color>
     std::istringstream iss(args);
     int x, y;
-    std::string hexColor;
-    iss >> x >> y >> hexColor;
+    std::string withKw, colorToken;
+    iss >> x >> y >> withKw >> colorToken;
+
+    if (withKw != "with" || colorToken.empty()) {
+        m_commandSystem.setLastResult("Usage: floodfill <x> <y> with <color>", false);
+        return;
+    }
 
     RGBAColor color;
-    if (!ToolPalette::hexToColor(hexColor, color)) {
-        m_commandSystem.setLastResult("Usage: floodfill <x> <y> <#color>", false);
+    if (!resolveColor(colorToken, color)) {
+        m_commandSystem.setLastResult("Error: Invalid color: " + colorToken, false);
         return;
     }
 
@@ -557,24 +560,64 @@ void ResourceEditorScene::cmdFloodFill(uint32_t canvasId, const std::string& arg
     m_commandSystem.setLastResult("OK");
 }
 
-void ResourceEditorScene::cmdLine(uint32_t canvasId, const std::string& args) {
+void ResourceEditorScene::cmdDraw(uint32_t canvasId, const std::string& args) {
+    std::istringstream iss(args);
+    std::string shapeType;
+    iss >> shapeType;
+
+    // Pass remaining args after the shape type
+    std::string rest;
+    std::getline(iss, rest);
+    size_t s = rest.find_first_not_of(" \t");
+    if (s != std::string::npos)
+        rest = rest.substr(s);
+    else
+        rest.clear();
+
+    if (shapeType == "line") {
+        cmdDrawLine(canvasId, rest);
+    } else if (shapeType == "rect") {
+        cmdDrawRect(canvasId, rest);
+    } else if (shapeType == "circle") {
+        cmdDrawCircle(canvasId, rest);
+    } else {
+        m_commandSystem.setLastResult(
+            "Usage: draw line|rect|circle ... (see 'help draw' for details)", false);
+    }
+}
+
+void ResourceEditorScene::cmdDrawLine(uint32_t canvasId, const std::string& args) {
     Canvas* canvas = m_canvasRegistry.getById(canvasId);
     if (!canvas || !canvas->document) {
         m_commandSystem.setLastResult("Error: Invalid canvas", false);
         return;
     }
 
+    // Parse: <x1> <y1> to <x2> <y2> with <color> [width <n>]
     std::istringstream iss(args);
     int x1, y1, x2, y2;
-    std::string hexColor;
-    int thickness = 1;
-    iss >> x1 >> y1 >> x2 >> y2 >> hexColor >> thickness;
+    std::string toKw, withKw, colorToken;
+    iss >> x1 >> y1 >> toKw >> x2 >> y2 >> withKw >> colorToken;
+
+    if (toKw != "to" || withKw != "with" || colorToken.empty()) {
+        m_commandSystem.setLastResult(
+            "Usage: draw line <x1> <y1> to <x2> <y2> with <color> [width <n>]", false);
+        return;
+    }
 
     RGBAColor color;
-    if (!ToolPalette::hexToColor(hexColor, color)) {
-        m_commandSystem.setLastResult("Usage: line <x1> <y1> <x2> <y2> <#color> [thickness]",
-                                      false);
+    if (!resolveColor(colorToken, color)) {
+        m_commandSystem.setLastResult("Error: Invalid color: " + colorToken, false);
         return;
+    }
+
+    // Optional: width <n>
+    int thickness = 1;
+    std::string optKw;
+    if (iss >> optKw) {
+        if (optKw == "width") {
+            iss >> thickness;
+        }
     }
 
     canvas->document->snapshotForUndo();
@@ -582,51 +625,85 @@ void ResourceEditorScene::cmdLine(uint32_t canvasId, const std::string& args) {
     m_commandSystem.setLastResult("OK");
 }
 
-void ResourceEditorScene::cmdRect(uint32_t canvasId, const std::string& args) {
+void ResourceEditorScene::cmdDrawRect(uint32_t canvasId, const std::string& args) {
     Canvas* canvas = m_canvasRegistry.getById(canvasId);
     if (!canvas || !canvas->document) {
         m_commandSystem.setLastResult("Error: Invalid canvas", false);
         return;
     }
 
+    // Parse: <x1> <y1> to <x2> <y2> with <color> [filled|outline]
     std::istringstream iss(args);
-    int x, y, w, h;
-    std::string hexColor;
-    std::string fillStr;
-    iss >> x >> y >> w >> h >> hexColor >> fillStr;
+    int x1, y1, x2, y2;
+    std::string toKw, withKw, colorToken;
+    iss >> x1 >> y1 >> toKw >> x2 >> y2 >> withKw >> colorToken;
 
-    RGBAColor color;
-    if (!ToolPalette::hexToColor(hexColor, color)) {
-        m_commandSystem.setLastResult("Usage: rect <x> <y> <w> <h> <#color> [filled]", false);
+    if (toKw != "to" || withKw != "with" || colorToken.empty()) {
+        m_commandSystem.setLastResult(
+            "Usage: draw rect <x1> <y1> to <x2> <y2> with <color> [filled|outline]", false);
         return;
     }
 
-    bool filled = (fillStr == "filled");
+    RGBAColor color;
+    if (!resolveColor(colorToken, color)) {
+        m_commandSystem.setLastResult("Error: Invalid color: " + colorToken, false);
+        return;
+    }
+
+    // Optional: filled or outline (default = filled)
+    bool filled = true;
+    std::string fillStr;
+    if (iss >> fillStr) {
+        if (fillStr == "outline") {
+            filled = false;
+        }
+    }
+
+    // Convert corner-to-corner to x, y, w, h
+    int x = std::min(x1, x2);
+    int y = std::min(y1, y2);
+    int w = std::abs(x2 - x1) + 1;
+    int h = std::abs(y2 - y1) + 1;
+
     canvas->document->snapshotForUndo();
     canvas->document->drawRect(x, y, w, h, color, filled);
     m_commandSystem.setLastResult("OK");
 }
 
-void ResourceEditorScene::cmdCircle(uint32_t canvasId, const std::string& args) {
+void ResourceEditorScene::cmdDrawCircle(uint32_t canvasId, const std::string& args) {
     Canvas* canvas = m_canvasRegistry.getById(canvasId);
     if (!canvas || !canvas->document) {
         m_commandSystem.setLastResult("Error: Invalid canvas", false);
         return;
     }
 
+    // Parse: <cx> <cy> radius <r> with <color> [filled|outline]
     std::istringstream iss(args);
     int cx, cy, r;
-    std::string hexColor;
-    std::string fillStr;
-    iss >> cx >> cy >> r >> hexColor >> fillStr;
+    std::string radiusKw, withKw, colorToken;
+    iss >> cx >> cy >> radiusKw >> r >> withKw >> colorToken;
 
-    RGBAColor color;
-    if (!ToolPalette::hexToColor(hexColor, color)) {
-        m_commandSystem.setLastResult("Usage: circle <cx> <cy> <r> <#color> [filled]", false);
+    if (radiusKw != "radius" || withKw != "with" || colorToken.empty()) {
+        m_commandSystem.setLastResult(
+            "Usage: draw circle <cx> <cy> radius <r> with <color> [filled|outline]", false);
         return;
     }
 
-    bool filled = (fillStr == "filled");
+    RGBAColor color;
+    if (!resolveColor(colorToken, color)) {
+        m_commandSystem.setLastResult("Error: Invalid color: " + colorToken, false);
+        return;
+    }
+
+    // Optional: filled or outline (default = filled)
+    bool filled = true;
+    std::string fillStr;
+    if (iss >> fillStr) {
+        if (fillStr == "outline") {
+            filled = false;
+        }
+    }
+
     canvas->document->snapshotForUndo();
     canvas->document->drawCircle(cx, cy, r, color, filled);
     m_commandSystem.setLastResult("OK");
@@ -752,13 +829,25 @@ void ResourceEditorScene::cmdExport(uint32_t canvasId, const std::string& args) 
         return;
     }
 
-    std::string filepath = args;
-    size_t s = filepath.find_first_not_of(" \t");
-    if (s != std::string::npos)
-        filepath = filepath.substr(s);
-    size_t e = filepath.find_last_not_of(" \t");
-    if (e != std::string::npos)
-        filepath = filepath.substr(0, e + 1);
+    // Parse: export <format> [filepath]   (format: png, bmp, tga)
+    std::istringstream iss(args);
+    std::string format, filepath;
+    iss >> format >> filepath;
+
+    // If only one token and it looks like a path (has dot), treat as legacy filepath
+    if (!format.empty() && filepath.empty() && format.find('.') != std::string::npos) {
+        filepath = format;
+        format = "png";  // Default format
+    }
+
+    if (format.empty()) {
+        filepath = saveImageFileDialog("Export Image");
+        if (filepath.empty()) {
+            m_commandSystem.setLastResult("Cancelled");
+            return;
+        }
+        format = "png";
+    }
 
     if (filepath.empty()) {
         filepath = saveImageFileDialog("Export Image");
@@ -766,6 +855,11 @@ void ResourceEditorScene::cmdExport(uint32_t canvasId, const std::string& args) 
             m_commandSystem.setLastResult("Cancelled");
             return;
         }
+    }
+
+    // Ensure filepath has the correct extension
+    if (filepath.find('.') == std::string::npos) {
+        filepath += "." + format;
     }
 
     if (canvas->document->exportToFile(filepath)) {
@@ -848,28 +942,33 @@ void ResourceEditorScene::cmdPan(uint32_t canvasId, const std::string& args) {
                                   std::to_string(canvas->panY) + ")");
 }
 
-void ResourceEditorScene::cmdFlipH(uint32_t canvasId, const std::string& /*args*/) {
+void ResourceEditorScene::cmdFlip(uint32_t canvasId, const std::string& args) {
     Canvas* canvas = m_canvasRegistry.getById(canvasId);
     if (!canvas || !canvas->document) {
         m_commandSystem.setLastResult("Error: Invalid canvas", false);
         return;
     }
 
-    canvas->document->snapshotForUndo();
-    canvas->document->flipHorizontal();
-    m_commandSystem.setLastResult("Flipped horizontally");
-}
+    std::string direction = args;
+    // Trim
+    size_t s = direction.find_first_not_of(" \t");
+    if (s != std::string::npos)
+        direction = direction.substr(s);
+    size_t e = direction.find_last_not_of(" \t");
+    if (e != std::string::npos)
+        direction = direction.substr(0, e + 1);
 
-void ResourceEditorScene::cmdFlipV(uint32_t canvasId, const std::string& /*args*/) {
-    Canvas* canvas = m_canvasRegistry.getById(canvasId);
-    if (!canvas || !canvas->document) {
-        m_commandSystem.setLastResult("Error: Invalid canvas", false);
-        return;
+    if (direction == "horizontal") {
+        canvas->document->snapshotForUndo();
+        canvas->document->flipHorizontal();
+        m_commandSystem.setLastResult("Flipped horizontally");
+    } else if (direction == "vertical") {
+        canvas->document->snapshotForUndo();
+        canvas->document->flipVertical();
+        m_commandSystem.setLastResult("Flipped vertically");
+    } else {
+        m_commandSystem.setLastResult("Usage: flip horizontal | flip vertical", false);
     }
-
-    canvas->document->snapshotForUndo();
-    canvas->document->flipVertical();
-    m_commandSystem.setLastResult("Flipped vertically");
 }
 
 void ResourceEditorScene::cmdResize(uint32_t canvasId, const std::string& args) {
@@ -905,12 +1004,25 @@ void ResourceEditorScene::cmdCrop(uint32_t canvasId, const std::string& args) {
         return;
     }
 
+    // Parse: crop <x1> <y1> to <x2> <y2>
     std::istringstream iss(args);
-    int x, y, w, h;
-    iss >> x >> y >> w >> h;
+    int x1, y1, x2, y2;
+    std::string toKw;
+    iss >> x1 >> y1 >> toKw >> x2 >> y2;
+
+    if (toKw != "to") {
+        m_commandSystem.setLastResult("Usage: crop <x1> <y1> to <x2> <y2>", false);
+        return;
+    }
+
+    // Convert corner-to-corner to x, y, w, h
+    int x = std::min(x1, x2);
+    int y = std::min(y1, y2);
+    int w = std::abs(x2 - x1) + 1;
+    int h = std::abs(y2 - y1) + 1;
 
     if (w <= 0 || h <= 0) {
-        m_commandSystem.setLastResult("Usage: crop <x> <y> <w> <h>", false);
+        m_commandSystem.setLastResult("Error: Invalid crop region", false);
         return;
     }
 
@@ -991,6 +1103,21 @@ void ResourceEditorScene::cleanupCanvasTexture(Canvas& canvas) {
     if (canvas.gpuTexture) {
         canvas.gpuTexture.reset();
     }
+}
+
+// =============================================================================
+// Color resolution
+// =============================================================================
+
+bool ResourceEditorScene::resolveColor(const std::string& token, RGBAColor& out) const {
+    // Try named color first
+    auto it = m_namedColors.find(token);
+    if (it != m_namedColors.end()) {
+        out = it->second;
+        return true;
+    }
+    // Fall back to hex literal
+    return ToolPalette::hexToColor(token, out);
 }
 
 }  // namespace tools
