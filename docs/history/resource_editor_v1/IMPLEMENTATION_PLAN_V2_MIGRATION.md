@@ -1,4 +1,20 @@
-# VDE Resource Editor — Implementation Plan
+# [ARCHIVED] VDE Resource Editor v2 — Migration-Based Implementation Plan
+
+> **Status:** Archived  
+> **Archived:** 2026-03-01  
+> **Reason:** Replaced by a standalone implementation plan that does not reference the v1 editor.  
+> **Replacement:** [Implementation Plan](../../resource_editor_v2/IMPLEMENTATION_PLAN.md)
+
+This file preserves the original v2 implementation plan which was structured as an incremental
+migration from the v1 editor codebase. The replacement plan treats the Resource Editor as a
+greenfield project with no dependency on prior implementations.
+
+---
+
+_Original content follows for historical reference only. Do not use this document for planning._
+
+---
+# VDE Resource Editor v2 — Implementation Plan
 
 > **Status:** Plan  
 > **Related:** [Editor Design](EDITOR_DESIGN.md) · [Canvas DSL](CANVAS_DSL.md) · [Parser & Command System](PARSER_AND_COMMAND_SYSTEM.md)
@@ -7,35 +23,29 @@
 
 ## Overview
 
-This plan builds the VDE Resource Editor in **four phases**, each delivering a usable increment. Each phase is broken into numbered steps with file deliverables, verification criteria, and dependency chains.
+This plan builds the Resource Editor v2 in **four phases**, each delivering a usable increment. Each phase is broken into numbered steps with file deliverables, verification criteria, and dependency chains.
 
-The Resource Editor is a 2D pixel art editor built on the VDE Game API with a full ImGui interface. It is structured around a **metadata-driven command system** where every mutation flows through named, typed commands. The tool supports interactive GUI editing, a command console (REPL), script execution, and a declarative Canvas DSL for procedural asset generation.
+**Starting state:** A working v1 scaffolding exists in `tools/resource_editor/` with:
+- `main.cpp` — working entry point using `BaseToolGame`
+- `ResourceEditorScene.h/.cpp` — scene with command system, canvas registry
+- `ImageDocument.h/.cpp` — pixel buffer with undo/redo, draw primitives
+- `CanvasRegistry.h/.cpp` — canvas storage with uint32_t IDs + names
+- `CommandSystem.h/.cpp` — string dispatch with handler map
+- `ToolPalette.h/.cpp` — tool state (tool type, brush, color)
+- `EditorPanels.h/.cpp` — ImGui panels
+- `FileOperations.h/.cpp` — load/save/export with COM dialogs
 
-### Core Architecture
-
-- **Command-First** — Every state mutation is a named command with typed parameters. GUI actions generate command strings. Nothing changes state outside the command pipeline.
-- **One Command = One File** — Each command is a self-contained class with structured metadata. Adding a command means creating one file and one CMake entry.
-- **Metadata-Driven** — Command metadata powers auto-generated help, pre-dispatch validation, REPL autocomplete, and ImGui tooltip hints.
-- **Canvas-Per-Resource** — Each open image gets its own Canvas with a unique ID and name. One canvas is active at a time; others are addressed via `@name` prefix.
-
-### Strategy
-
-Build the editor from the ground up in four phases:
-
-1. **Phase 1 — Core Architecture (MVP):** Command infrastructure, editor subsystems, all core commands, and smoke tests. Delivers a fully functional multi-canvas pixel editor.
-2. **Phase 2 — Features & Polish:** Named colors, REPL autocomplete, cross-canvas operations, and advanced drawing primitives.
-3. **Phase 3 — Canvas DSL:** The `.vdecanvas` declarative language — parser, expression evaluator, and executor.
-4. **Phase 4 — Advanced & Production:** Persistent settings, GPU optimization, comprehensive test suite, and CI integration.
+**Strategy:** Incrementally replace v1 internals while keeping the tool functional at each step. Existing files are refactored in place when possible. New subsystems (metadata types, command classes, DSL) are added alongside and wired in once ready.
 
 ---
 
-## Phase 1: Core Architecture (MVP)
+## Phase 1: Core Command System Refactor (MVP)
 
-**Goal:** Build the complete editor with a clean metadata-driven command system. After this phase, the editor is a fully functional multi-canvas pixel art tool with GUI, REPL, script execution, and undo/redo.
+**Goal:** Replace the ad-hoc command dispatch with the metadata-driven system. After this phase the editor has the same feature set as v1, but with clean architecture.
 
 ### Step 1 — Command Infrastructure Types
 
-Create the foundational types that the entire command system depends on.
+Create the foundational types that everything else depends on.
 
 **Files to create:**
 ```
@@ -51,7 +61,7 @@ tools/resource_editor/commands/
     EditorContext.h        # EditorContext façade struct
 ```
 
-**Files to create/modify:**
+**Files to modify:**
 ```
 tools/resource_editor/CMakeLists.txt   # Add new sources
 ```
@@ -77,94 +87,45 @@ tools/resource_editor/CMakeLists.txt   # Add new sources
 
 ---
 
-### Step 2 — Editor Subsystems
+### Step 2 — EditorContext & Wiring
 
-Build the core editor modules that commands will operate on.
+Wire `EditorContext` into the existing scene so commands can access shared state without referencing `ResourceEditorScene`.
 
-**Files to create:**
+**Files to modify:**
 ```
-tools/resource_editor/
-    ImageDocument.h        # Pixel buffer, drawing primitives, undo/redo
-    ImageDocument.cpp      # stb_image load/save, Bresenham line, flood fill, etc.
-    CanvasRegistry.h       # Canvas struct, multi-document container (ID → Canvas)
-    CanvasRegistry.cpp     # Create/remove/resolve canvases, cross-canvas resource refs
-    ToolPalette.h          # Tool state (active tool, color, brush size)
-    ToolPalette.cpp        # Mouse-to-command translation
-    FileOperations.h       # OS file dialogs, image I/O wrappers
-    FileOperations.cpp     # COM dialogs (Windows), stb_image I/O
+tools/resource_editor/ResourceEditorScene.h/.cpp
+    # Add EditorContext member
+    # Initialize it in scene setup
+    # Pass it to CommandSystem
+tools/resource_editor/CommandSystem.h/.cpp
+    # Add CommandRegistry pointer and EditorContext pointer
+    # Add new execute(commandLine) path that uses registry+parser
+    # Keep old dispatch path temporarily (dual-path dispatch)
 ```
-
-**Key design decisions:**
-- `ImageDocument` is a pure pixel data model — no knowledge of canvases, commands, or GPU textures.
-- `Canvas` bundles an `ImageDocument` with display state (zoom, pan), GPU texture handle, named resources, and operation history.
-- `CanvasRegistry` manages multi-document editing with unique IDs and names.
-- `ToolPalette` translates mouse interactions into command strings without executing them.
-- `FileOperations` isolates platform-specific file dialog code.
 
 **Verification:**
-- `ImageDocument` can create, load, save, draw primitives, and undo/redo.
-- `CanvasRegistry` can create, find, rename, and remove canvases.
-- `ToolPalette` produces correct command strings for each tool type.
-- All modules compile independently with no circular dependencies.
+- Editor launches and works as before (old path still active)
+- `EditorContext` is fully populated and accessible
 
-**Dependencies:** None (parallel with Step 1)
+**Dependencies:** Step 1
 
 ---
 
-### Step 3 — Scene, Panels & Command System
+### Step 3 — Migrate Core Commands
 
-Wire the subsystems into a functioning editor with ImGui UI and command dispatch.
+Convert the most-used command handlers from inline scene methods to standalone command classes. Migrate in batches, testing after each.
 
-**Files to create:**
-```
-tools/resource_editor/
-    ResourceEditorScene.h      # Scene: owns all subsystems, wires everything
-    ResourceEditorScene.cpp    # Initialization, per-frame GPU sync, panel delegation
-    EditorPanels.h             # All ImGui panel rendering
-    EditorPanels.cpp           # Canvas viewports, tool palette, color picker, console, etc.
-    CommandSystem.h            # Thin dispatch (registry + parser + logging)
-    CommandSystem.cpp          # @canvas prefix resolution, execute(), script execution
-    main.cpp                   # Entry point, interactive/script mode selection
-```
-
-**Panels:**
-
-| Panel | Purpose |
-|-------|---------|
-| Canvas Viewport(s) | Render GPU texture with zoom/pan, mouse interaction, pixel grid |
-| Canvas Tabs | Tab bar for open canvases |
-| Tool Palette | Tool buttons, brush size slider, color swatch |
-| Color Picker | RGBA color editor with hex input |
-| Properties | Canvas info (dimensions, path, dirty flag, zoom) |
-| Command Console | REPL input + scrollable command/output log |
-| Menu Bar | File, Edit, View menus |
-
-**Verification:**
-- Editor launches with ImGui UI visible
-- Command console accepts text input and dispatches to `CommandSystem`
-- `CommandSystem` resolves `@canvasName` prefix and routes to registry
-- Script mode: `vde_resource_editor.exe script.txt` executes line-by-line and exits
-- GPU textures sync for dirty canvases each frame
-
-**Dependencies:** Steps 1, 2
-
----
-
-### Step 4 — Core Commands
-
-Implement all commands needed for a fully functional pixel editor. Built in four batches, each tested before moving on.
-
-**Batch 4a — Canvas Management (Global):**
+**Batch 3a — Canvas Management (Global):**
 ```
 tools/resource_editor/commands/global/
-    CreateCanvasCommand.h      # "create canvas <name> (w, h)"
-    SelectCommand.h            # "select <name>"
-    ListCommand.h              # "list"
-    DeleteCanvasCommand.h      # "delete <name>"
-    RenameCanvasCommand.h      # "rename <old> <new>"
+    CreateCanvasCommand.h      # "create canvas <name> (w, h)"  
+    SelectCommand.h            # "select <name>"  
+    ListCommand.h              # "list"  
+    DeleteCanvasCommand.h      # "delete <name>"  
+    RenameCanvasCommand.h      # "rename <old> <new>"  
 ```
 
-**Batch 4b — Drawing (Canvas):**
+**Batch 3b — Drawing (Canvas):**
 ```
 tools/resource_editor/commands/canvas/
     FillCommand.h              # "fill <color>"
@@ -176,7 +137,7 @@ tools/resource_editor/commands/canvas/
     FloodFillCommand.h         # "flood (x, y) <color>"
 ```
 
-**Batch 4c — Edit Operations (Canvas):**
+**Batch 3c — Edit Operations (Canvas):**
 ```
 tools/resource_editor/commands/canvas/
     UndoCommand.h              # "undo"
@@ -188,7 +149,7 @@ tools/resource_editor/commands/canvas/
     ClearCommand.h             # "clear"
 ```
 
-**Batch 4d — File & Utility (Global):**
+**Batch 3d — File & Utility (Global):**
 ```
 tools/resource_editor/commands/global/
     LoadCommand.h/.cpp         # "load [canvas] \"path\" [name]" (complex, needs .cpp)
@@ -204,16 +165,40 @@ tools/resource_editor/commands/global/
 **Files to modify per batch:**
 ```
 tools/resource_editor/CMakeLists.txt     # Add each new file
+tools/resource_editor/CommandSystem.cpp  # Switch dispatch for migrated commands to registry path
+tools/resource_editor/ResourceEditorScene.cpp  # Remove migrated handler methods
 ```
 
 **Verification (per batch):**
-- Each command validates parameters before execution
+- Each migrated command works identically to its v1 version
 - `help <command>` prints auto-generated help from metadata
 - Parameter validation catches type errors before dispatch
-- All commands work through the REPL console and via script execution
-- Undo/redo works correctly for all drawing and edit operations
+- Old and new commands coexist during migration
 
-**Dependencies:** Step 3
+**Dependencies:** Step 2
+
+---
+
+### Step 4 — Remove Legacy Dispatch
+
+Once all commands are migrated, remove the old `std::map<std::string, HandlerFn>` dispatch.
+
+**Files to modify:**
+```
+tools/resource_editor/CommandSystem.h/.cpp
+    # Remove old handler map and registerCommand(name, fn) method
+    # All dispatch goes through CommandRegistry + CommandArgParser
+tools/resource_editor/ResourceEditorScene.h/.cpp
+    # Remove all former handler method declarations
+    # Scene becomes a thin coordinator
+```
+
+**Verification:**
+- All commands work through the new pipeline
+- `ResourceEditorScene` is significantly smaller
+- No compilation warnings about unused methods
+
+**Dependencies:** Step 3 (all batches)
 
 ---
 
@@ -238,9 +223,9 @@ smoketests/
 
 ---
 
-## Phase 2: Features & Polish
+## Phase 2: Editor Polish & New Features
 
-**Goal:** Add features that leverage the clean command architecture — named colors, autocomplete, cross-canvas operations, and advanced drawing.
+**Goal:** Add features that were designed but not implemented in v1, leveraging the clean command architecture.
 
 ### Step 6 — Named Colors & Color Palette
 
@@ -255,7 +240,7 @@ tools/resource_editor/commands/global/
 **Files to modify:**
 ```
 tools/resource_editor/EditorContext.h
-    # namedColors map for custom color definitions
+    # namedColors map is already there; ensure persistent storage via StorageManager
 tools/resource_editor/EditorPanels.cpp
     # Add color palette UI panel showing named colors
 ```
@@ -292,9 +277,9 @@ tools/resource_editor/EditorPanels.cpp
 
 ---
 
-### Step 8 — Cross-Canvas Operations
+### Step 8 — Draw Image, Rehost & Copyhost
 
-Implement resource transfer and compositing between canvases.
+Implement cross-canvas operations.
 
 **Files to create:**
 ```
@@ -349,7 +334,7 @@ tools/resource_editor/CMakeLists.txt
 
 ## Phase 3: Canvas DSL
 
-**Goal:** Implement the `.vdecanvas` declarative language as described in [Canvas DSL](CANVAS_DSL.md).
+**Goal:** Implement the `.vdecanvas` language as described in [Canvas DSL](CANVAS_DSL.md).
 
 ### Step 10 — DSL Parser & AST
 
@@ -445,7 +430,7 @@ Implement control flow, macros, and complex object types.
 
 ---
 
-## Phase 4: Advanced & Production
+## Phase 4: Advanced & Polish
 
 **Goal:** Production-quality features, performance, and CI integration.
 
@@ -469,7 +454,7 @@ tools/resource_editor/ResourceEditorScene.cpp
 
 ### Step 15 — GPU Texture Pipeline Optimization
 
-`ImageDocument` stores CPU pixels and uploads to a GPU texture on every change.
+Currently `ImageDocument` stores CPU pixels and uploads to a GPU texture on every change.
 
 **Files to modify:**
 ```
@@ -533,23 +518,21 @@ scripts/smoke-test.ps1
 ## Dependency Graph
 
 ```
-Step 1 ───┐
-           ├── Step 3 ─── Step 4 (a,b,c,d) ─── Step 5
-Step 2 ───┘                                       │
-                                       ┌───────────┘
-                                       ▼
-                                  Step 6 ─── Step 7
-                                       │         │
-                                  Step 8    Step 9
-                                       │         │
-                                       ▼         ▼
-                                  Step 10 ─── Step 11 ─── Step 12 ─── Step 13
-                                                               │
-                                       ┌───────────────────────┘
-                                       ▼
-                             Step 14, 15, 16, 17
+Step 1 ─── Step 2 ─── Step 3 (a,b,c,d) ─── Step 4 ─── Step 5
+                                                          │
+                                              ┌───────────┘
+                                              ▼
+                                         Step 6 ─── Step 7
+                                              │         │
+                                         Step 8    Step 9
+                                              │         │
+                                              ▼         ▼
+                                         Step 10 ─── Step 11 ─── Step 12 ─── Step 13
+                                                                      │
+                                              ┌───────────────────────┘
+                                              ▼
+                                    Step 14, 15, 16, 17
 
-Steps 1 and 2 can proceed in parallel.
 Tests (Step 16) grow incrementally alongside all phases.
 ```
 
@@ -572,10 +555,10 @@ Tests (Step 16) grow incrementally alongside all phases.
 
 | Phase | Steps | Estimated Effort | Cumulative |
 |-------|-------|-----------------|------------|
-| **Phase 1** — Core Architecture | 1–5 | 6–8 sessions | 6–8 |
-| **Phase 2** — Features & Polish | 6–9 | 4–5 sessions | 10–13 |
-| **Phase 3** — Canvas DSL | 10–13 | 6–8 sessions | 16–21 |
-| **Phase 4** — Advanced | 14–17 | 3–4 sessions | 19–25 |
+| **Phase 1** — Core Refactor | 1–5 | 5–7 sessions | 5–7 |
+| **Phase 2** — Polish & Features | 6–9 | 4–5 sessions | 9–12 |
+| **Phase 3** — Canvas DSL | 10–13 | 6–8 sessions | 15–20 |
+| **Phase 4** — Advanced | 14–17 | 3–4 sessions | 18–24 |
 
 A "session" is one focused working block. The estimates assume AI-assisted implementation.
 
@@ -585,12 +568,11 @@ A "session" is one focused working block. The estimates assume AI-assisted imple
 
 ```
 tools/resource_editor/
-    CMakeLists.txt
-    main.cpp                           # Entry point, interactive/script mode
+    main.cpp
     ResourceEditorScene.h/.cpp         # Thin scene coordinator
     ImageDocument.h/.cpp               # Pixel buffer, undo/redo, draw primitives
     CanvasRegistry.h/.cpp              # Canvas storage, cross-canvas access
-    CommandSystem.h/.cpp               # Thin dispatch (registry + parser + log)
+    CommandSystem.h/.cpp               # Thin dispatch (registry + parser)
     EditorContext.h                     # Shared state façade
     ToolPalette.h/.cpp                 # Active tool, brush, color state
     EditorPanels.h/.cpp                # ImGui panel rendering
@@ -652,18 +634,13 @@ tools/resource_editor/
 
 ## Getting Started
 
-**Begin with Steps 1 and 2 in parallel.** The command infrastructure types (Step 1) and editor subsystems (Step 2) are independent foundations that can be built simultaneously. They converge in Step 3 where the scene wires everything together.
+**Begin with Step 1.** The command infrastructure types are the foundation that unblocks everything else. They can be written and tested in isolation before touching any existing code.
 
-Step 1 implementation order:
+Implementation order:
 1. Create `commands/` directory structure
 2. Implement `CommandTypes.h` — all enums, structs, descriptors
 3. Implement `CommandBase.h` — base classes with virtual interface
 4. Implement `CommandArgParser` — tokenizer + tuple parsing + validation
 5. Implement `CommandRegistry` — singleton + macro + compound lookup
 6. Write unit tests for parser and registry
-
-Step 2 implementation order:
-1. Implement `ImageDocument` — pixel buffer + drawing primitives + undo/redo
-2. Implement `CanvasRegistry` — Canvas struct + multi-document container
-3. Implement `ToolPalette` — tool state + mouse-to-command translation
-4. Implement `FileOperations` — image I/O + native file dialogs
+7. Proceed to Step 2 (wiring EditorContext)

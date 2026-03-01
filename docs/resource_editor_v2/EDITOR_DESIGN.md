@@ -1,7 +1,6 @@
-# VDE Resource Editor v2 — Editor Design
+# VDE Resource Editor — Editor Design
 
 > **Status:** Design  
-> **Supersedes:** [v1 Design](../history/resource_editor_v1/RESOURCE_EDITOR_DESIGN.md)  
 > **Related:** [Canvas DSL](CANVAS_DSL.md) · [Parser & Command System](PARSER_AND_COMMAND_SYSTEM.md) · [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---
@@ -9,18 +8,6 @@
 ## 1. Overview
 
 The VDE Resource Editor is a 2D pixel art editor built on the VDE Game API with a full ImGui interface. It supports creating, editing, saving, exporting, and procedurally generating 2D image assets.
-
-### Why v2?
-
-The v1 design established the right architectural principles — command-first, multi-canvas, layered DSL — but the implementation grew organically, leading to:
-
-- A monolithic `ResourceEditorScene` acting as a god-class with ~25+ command handlers inline
-- Ad-hoc argument parsing per handler with inconsistent patterns
-- No structured metadata for commands (no auto-help, no validation, no autocomplete)
-- Tightly coupled DSL types mixed with editor logic
-- Object ownership permanently bound to canvases with no transfer/copy capability
-
-**v2 starts from scratch** with a clean separation of concerns, a metadata-driven command system, and a modular file layout where each command is a self-contained unit.
 
 ### Core Design Principles
 

@@ -1,7 +1,6 @@
-# VDE Canvas Drawing DSL v2 — Language Specification
+# VDE Canvas Drawing DSL — Language Specification
 
 > **Status:** Design  
-> **Supersedes:** [v1 Canvas DSL](../history/resource_editor_v1/CANVAS_DSL_DESIGN.md)  
 > **Related:** [Editor Design](EDITOR_DESIGN.md) · [Parser & Command System](PARSER_AND_COMMAND_SYSTEM.md) · [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---

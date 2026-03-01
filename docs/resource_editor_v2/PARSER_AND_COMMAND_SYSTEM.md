@@ -1,21 +1,13 @@
-# VDE Resource Editor v2 — Parser & Command System Design
+# VDE Resource Editor — Parser & Command System Design
 
 > **Status:** Design  
-> **Supersedes:** [v1 Command System Refactor Plan](../history/resource_editor_v1/COMMAND_SYSTEM_REFACTOR_PLAN.md)  
 > **Related:** [Editor Design](EDITOR_DESIGN.md) · [Canvas DSL](CANVAS_DSL.md) · [Implementation Plan](IMPLEMENTATION_PLAN.md)
 
 ---
 
 ## 1. Overview
 
-This document specifies the metadata-driven command system and the Canvas DSL parser that form the backbone of the Resource Editor v2. The v1 system suffered from:
-
-- All handlers as methods on a god-class scene (~25+ methods, 1400+ lines)
-- No structured metadata — freeform help strings, no machine-readable parameter info
-- Ad-hoc `istringstream` parsing per handler with inconsistent patterns
-- No parameter validation before dispatch
-
-The v2 system introduces:
+This document specifies the metadata-driven command system and the Canvas DSL parser that form the backbone of the Resource Editor. The system provides:
 
 1. **One command = one file** — Self-contained class with structured metadata
 2. **Typed parameter metadata** — Powers validation, auto-help, autocomplete, and tooltips
