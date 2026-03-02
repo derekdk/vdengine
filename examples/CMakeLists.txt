@@ -139,3 +139,6 @@ add_vde_example(vde_imgui_demo "imgui_demo/main.cpp")
 # Persistent storage demo - demonstrates StorageManager API with an ImGui panel UI
 add_vde_example(vde_storage_demo "storage_demo/main.cpp")
 
+# Transition demo - demonstrates screen transition effects (fade, wipe, circle reveal)
+add_vde_example(vde_transition_demo "transition_demo/main.cpp")
+

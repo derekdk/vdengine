@@ -1,0 +1,22 @@
+# Smoke test for transition demo
+# Tests launching, triggering transitions, and clean exit
+wait startup
+wait 1000
+
+# Trigger fade transition to GameScene
+press 1
+wait 2s
+
+# Trigger circle reveal to GameScene (already there, tests re-transition)
+press 4
+wait 2s
+
+# Trigger wipe left to CreditsScene
+press 2
+wait 2s
+
+# Trigger wipe right back to MainMenuScene
+press 3
+wait 2s
+
+exit

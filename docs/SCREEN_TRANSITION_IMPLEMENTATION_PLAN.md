@@ -6,7 +6,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 1: Offscreen Render Targets
+## Phase 1: Offscreen Render Targets ✅ COMPLETE
 
 **Goal:** Render a scene to an offscreen texture and sample it in a later pass.
 
@@ -38,7 +38,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 2: Transition Base Class and Built-in Effects
+## Phase 2: Transition Base Class and Built-in Effects ✅ COMPLETE
 
 **Goal:** Define the `Transition` class hierarchy and write the transition shaders.
 
@@ -82,7 +82,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 3: TransitionManager (Engine Internal)
+## Phase 3: TransitionManager (Engine Internal) ✅ COMPLETE
 
 **Goal:** Wire up the offscreen render targets, transition lifecycle, and compositing pipeline.
 
@@ -127,7 +127,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 4: Game Integration
+## Phase 4: Game Integration ✅ COMPLETE
 
 **Goal:** Expose the transition API on `Game` and hook it into the scheduler and render loop.
 
@@ -199,7 +199,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 5: Partial-Screen (Viewport) Transitions
+## Phase 5: Partial-Screen (Viewport) Transitions ✅ COMPLETE
 
 **Goal:** Support transitions scoped to a single viewport in multi-scene layouts.
 
@@ -223,7 +223,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 6: Transition Demo
+## Phase 6: Transition Demo ✅ COMPLETE
 
 **Goal:** Build and validate a runnable demo that exercises every built-in transition and confirms end-to-end functionality.
 
@@ -272,7 +272,7 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 7: Documentation
+## Phase 7: Documentation ✅ COMPLETE
 
 **Goal:** Update all project documentation to reflect the new transition API.
 

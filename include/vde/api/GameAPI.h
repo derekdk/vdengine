@@ -23,6 +23,7 @@
 #include "GameTypes.h"
 #include "Scheduler.h"
 #include "ThreadPool.h"
+#include "Transition.h"
 
 // Scene and entity system
 #include "AudioEvent.h"

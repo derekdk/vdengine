@@ -15,6 +15,7 @@
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
 #include <vde/api/StorageManager.h>
+#include <vde/api/TransitionManager.h>
 
 #include <GLFW/glfw3.h>
 
@@ -84,6 +85,13 @@ bool Game::initialize(const GameSettings& settings) {
         // Create sprite rendering pipeline (Phase 3)
         createSpriteRenderingPipeline();
 
+        // Create transition system
+        m_transitionManager = std::make_unique<TransitionManager>(m_vulkanContext.get());
+        {
+            VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+            m_transitionManager->recreateRenderTargets(extent.width, extent.height);
+        }
+
         // Initialize audio system (Phase 6)
         AudioManager::getInstance().initialize(settings.audio);
 
@@ -94,6 +102,10 @@ bool Game::initialize(const GameSettings& settings) {
         m_window->setResizeCallback([this](uint32_t width, uint32_t height) {
             if (m_vulkanContext) {
                 m_vulkanContext->recreateSwapchain(width, height);
+            }
+            // Resize transition render targets
+            if (m_transitionManager) {
+                m_transitionManager->recreateRenderTargets(width, height);
             }
             // Update camera aspect ratio if there's an active scene
             if (m_activeScene && m_activeScene->getCamera()) {
@@ -161,6 +173,9 @@ void Game::shutdown() {
 
     // Shutdown persistent storage
     StorageManager::getInstance().shutdown();
+
+    // Destroy transition system (before rendering pipelines)
+    m_transitionManager.reset();
 
     // Cleanup rendering pipelines
     destroyLightingResources();
@@ -845,6 +860,138 @@ void Game::popScene() {
     } else {
         m_activeScene = nullptr;
     }
+}
+
+// ============================================================================
+// Transitions
+// ============================================================================
+
+void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
+                             float duration) {
+    // Full-screen transition (default)
+    m_viewportTransition = false;
+    m_transitionViewport = ViewportRect::fullWindow();
+
+    // Validate destination scene exists
+    auto it = m_scenes.find(name);
+    if (it == m_scenes.end()) {
+        return;
+    }
+
+    // If duration <= 0, do an instant switch
+    if (duration <= 0.0f) {
+        setActiveScene(name);
+        return;
+    }
+
+    // If already transitioning, cancel first (exits dest scene)
+    if (m_transitionManager && m_transitionManager->isActive()) {
+        cancelTransition();
+    }
+
+    // Record source scene name (current primary scene)
+    m_transitionSourceScene.clear();
+    if (m_activeScene) {
+        for (const auto& [sceneName, scenePtr] : m_scenes) {
+            if (scenePtr.get() == m_activeScene) {
+                m_transitionSourceScene = sceneName;
+                break;
+            }
+        }
+    }
+    m_transitionDestScene = name;
+
+    // Enter the destination scene (so it starts receiving updates)
+    Scene* destScene = it->second.get();
+    bool alreadyInGroup = false;
+    for (const auto& gn : m_activeSceneGroup.sceneNames) {
+        if (gn == name) {
+            alreadyInGroup = true;
+            break;
+        }
+    }
+    if (!alreadyInGroup) {
+        destScene->onEnter();
+    }
+
+    // Start the transition
+    m_transitionManager->start(std::move(transition), duration, [this]() {
+        // Transition complete callback
+
+        // Exit the source scene
+        if (!m_transitionSourceScene.empty() && m_transitionSourceScene != m_transitionDestScene) {
+            auto srcIt = m_scenes.find(m_transitionSourceScene);
+            if (srcIt != m_scenes.end()) {
+                srcIt->second->onExit();
+            }
+        }
+
+        // Set active scene to the destination
+        auto destIt = m_scenes.find(m_transitionDestScene);
+        if (destIt != m_scenes.end()) {
+            m_activeScene = destIt->second.get();
+        }
+        m_activeSceneGroup = SceneGroup::create(m_transitionDestScene, {m_transitionDestScene});
+        m_sceneStack.clear();
+
+        // Clear transition state
+        m_transitionSourceScene.clear();
+        m_transitionDestScene.clear();
+        m_viewportTransition = false;
+        m_transitionViewport = ViewportRect::fullWindow();
+
+        // Rebuild scheduler without transition tasks
+        rebuildSchedulerGraph();
+    });
+
+    // Rebuild scheduler to include transition update task
+    rebuildSchedulerGraph();
+}
+
+void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
+                             float duration, const ViewportRect& region) {
+    // Store viewport info before delegating to the main overload
+    transitionToScene(name, std::move(transition), duration);
+
+    // Apply viewport-scoped transition settings (after transitionToScene sets up state)
+    if (m_transitionManager && m_transitionManager->isActive()) {
+        m_viewportTransition = true;
+        m_transitionViewport = region;
+    }
+}
+
+bool Game::isTransitioning() const {
+    return m_transitionManager && m_transitionManager->isActive();
+}
+
+void Game::cancelTransition() {
+    if (!m_transitionManager || !m_transitionManager->isActive()) {
+        return;
+    }
+
+    // Exit the destination scene since we're reverting to source
+    if (!m_transitionDestScene.empty() && m_transitionDestScene != m_transitionSourceScene) {
+        auto it = m_scenes.find(m_transitionDestScene);
+        if (it != m_scenes.end()) {
+            it->second->onExit();
+        }
+    }
+
+    m_transitionManager->cancel();
+    m_transitionSourceScene.clear();
+    m_transitionDestScene.clear();
+    m_viewportTransition = false;
+    m_transitionViewport = ViewportRect::fullWindow();
+
+    // Rebuild scheduler without transition tasks
+    rebuildSchedulerGraph();
+}
+
+float Game::getTransitionProgress() const {
+    if (m_transitionManager) {
+        return m_transitionManager->getProgress();
+    }
+    return 0.0f;
 }
 
 void Game::applyDisplaySettings(const DisplaySettings& settings) {
@@ -2188,6 +2335,202 @@ void Game::renderMultiViewport() {
     m_vulkanContext->drawFrameMultiScene(renderInfos);
 }
 
+void Game::renderTransition() {
+    m_vulkanContext->drawFrameCustom([this](VkCommandBuffer cmd, VkFramebuffer swapchainFB,
+                                            VkImage swapchainImage) {
+        VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+
+        // Helper: render a scene into an offscreen framebuffer
+        auto renderSceneOffscreen = [&](const std::string& sceneName, VkFramebuffer framebuffer) {
+            auto it = m_scenes.find(sceneName);
+            if (it == m_scenes.end()) {
+                return;
+            }
+            Scene* scene = it->second.get();
+
+            // Apply camera so UBO is correct
+            if (scene->getCamera()) {
+                scene->getCamera()->applyTo(*m_vulkanContext);
+            }
+
+            // Update UBO via vkCmdUpdateBuffer (outside render pass)
+            UniformBufferObject ubo{};
+            ubo.model = glm::mat4(1.0f);
+            ubo.view = m_vulkanContext->getCamera().getViewMatrix();
+            ubo.proj = m_vulkanContext->getCamera().getProjectionMatrix();
+
+            VkBuffer uboBuffer = m_vulkanContext->getCurrentUniformBuffer();
+            vkCmdUpdateBuffer(cmd, uboBuffer, 0, sizeof(UniformBufferObject), &ubo);
+
+            // Barrier: transfer write → uniform read
+            VkBufferMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.buffer = uboBuffer;
+            barrier.offset = 0;
+            barrier.size = sizeof(UniformBufferObject);
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0,
+                                 nullptr);
+
+            // Begin offscreen render pass
+            VkRenderPassBeginInfo rpInfo{};
+            rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            rpInfo.renderPass = m_vulkanContext->getOffscreenRenderPass();
+            rpInfo.framebuffer = framebuffer;
+            rpInfo.renderArea.offset = {0, 0};
+            rpInfo.renderArea.extent = extent;
+
+            std::array<VkClearValue, 2> clearValues{};
+            const Color& bg = scene->getBackgroundColor();
+            clearValues[0].color = {{bg.r, bg.g, bg.b, bg.a}};
+            clearValues[1].depthStencil = {1.0f, 0};
+            rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            rpInfo.pClearValues = clearValues.data();
+
+            vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            // Full viewport
+            VkViewport viewport{};
+            viewport.x = 0.0f;
+            viewport.y = 0.0f;
+            viewport.width = static_cast<float>(extent.width);
+            viewport.height = static_cast<float>(extent.height);
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+            VkRect2D scissor{};
+            scissor.offset = {0, 0};
+            scissor.extent = extent;
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+            // Update lighting for this scene
+            updateLightingUBO(scene);
+
+            // Render the scene
+            scene->render();
+
+            vkCmdEndRenderPass(cmd);
+        };
+
+        // Pass 1: Render source scene to offscreen target A
+        renderSceneOffscreen(m_transitionSourceScene, m_transitionManager->getSourceFramebuffer());
+
+        // Pass 2: Render dest scene to offscreen target B
+        renderSceneOffscreen(m_transitionDestScene, m_transitionManager->getDestFramebuffer());
+
+        // Pass 3: Composite to swapchain framebuffer
+        VkRenderPassBeginInfo rpInfo{};
+        rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        rpInfo.renderPass = m_vulkanContext->getRenderPass();
+        rpInfo.framebuffer = swapchainFB;
+        rpInfo.renderArea.offset = {0, 0};
+        rpInfo.renderArea.extent = extent;
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        rpInfo.pClearValues = clearValues.data();
+
+        vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        // If viewport-scoped transition, render non-transitioning scenes first
+        if (m_viewportTransition) {
+            for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+                // Skip the source and dest scenes of the transition
+                if (sceneName == m_transitionSourceScene || sceneName == m_transitionDestScene) {
+                    continue;
+                }
+
+                auto sceneIt = m_scenes.find(sceneName);
+                if (sceneIt == m_scenes.end()) {
+                    continue;
+                }
+
+                Scene* scene = sceneIt->second.get();
+
+                // Apply camera
+                if (scene->getCamera()) {
+                    scene->getCamera()->applyTo(*m_vulkanContext);
+                }
+
+                // Update UBO for this scene
+                UniformBufferObject sceneUbo{};
+                sceneUbo.model = glm::mat4(1.0f);
+                sceneUbo.view = m_vulkanContext->getCamera().getViewMatrix();
+                sceneUbo.proj = m_vulkanContext->getCamera().getProjectionMatrix();
+
+                VkBuffer sceneUboBuffer = m_vulkanContext->getCurrentUniformBuffer();
+                vkCmdUpdateBuffer(cmd, sceneUboBuffer, 0, sizeof(UniformBufferObject), &sceneUbo);
+
+                VkBufferMemoryBarrier sceneBarrier{};
+                sceneBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                sceneBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                sceneBarrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+                sceneBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                sceneBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                sceneBarrier.buffer = sceneUboBuffer;
+                sceneBarrier.offset = 0;
+                sceneBarrier.size = sizeof(UniformBufferObject);
+
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1,
+                                     &sceneBarrier, 0, nullptr);
+
+                // Set viewport/scissor for this scene
+                const ViewportRect& vpRect = scene->getViewportRect();
+                VkViewport sceneVp = vpRect.toVkViewport(extent.width, extent.height);
+                VkRect2D sceneSc = vpRect.toVkScissor(extent.width, extent.height);
+                vkCmdSetViewport(cmd, 0, 1, &sceneVp);
+                vkCmdSetScissor(cmd, 0, 1, &sceneSc);
+
+                updateLightingUBO(scene);
+                scene->render();
+            }
+
+            // Set scissor to the transition viewport region for composite
+            VkViewport transVp = m_transitionViewport.toVkViewport(extent.width, extent.height);
+            VkRect2D transSc = m_transitionViewport.toVkScissor(extent.width, extent.height);
+            vkCmdSetViewport(cmd, 0, 1, &transVp);
+            vkCmdSetScissor(cmd, 0, 1, &transSc);
+        }
+
+        // Render the composite (pipeline bind, descriptor set, push constants, draw)
+        m_transitionManager->renderComposite(cmd);
+
+        // Call onRender() hook (ImGui overlays etc.)
+        onRender();
+
+        vkCmdEndRenderPass(cmd);
+
+        // Transition swapchain image layout to PRESENT_SRC_KHR
+        VkImageMemoryBarrier presentBarrier{};
+        presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        presentBarrier.dstAccessMask = 0;
+        presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentBarrier.image = swapchainImage;
+        presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        presentBarrier.subresourceRange.baseMipLevel = 0;
+        presentBarrier.subresourceRange.levelCount = 1;
+        presentBarrier.subresourceRange.baseArrayLayer = 0;
+        presentBarrier.subresourceRange.layerCount = 1;
+
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                             &presentBarrier);
+    });
+}
+
 void Game::rebuildSchedulerGraph() {
     m_scheduler.clear();
 
@@ -2227,6 +2570,24 @@ void Game::rebuildSchedulerGraph() {
         }
         if (!inGroup) {
             updateScenes.push_back({scenePtr.get(), name, scenePtr->getUpdatePriority()});
+        }
+    }
+
+    // During transitions, ensure the destination scene is also updated
+    if (m_transitionManager && m_transitionManager->isActive() && !m_transitionDestScene.empty()) {
+        bool destAlreadyListed = false;
+        for (const auto& entry : updateScenes) {
+            if (entry.name == m_transitionDestScene) {
+                destAlreadyListed = true;
+                break;
+            }
+        }
+        if (!destAlreadyListed) {
+            auto it = m_scenes.find(m_transitionDestScene);
+            if (it != m_scenes.end()) {
+                updateScenes.push_back(
+                    {it->second.get(), m_transitionDestScene, it->second->getUpdatePriority()});
+            }
         }
     }
 
@@ -2375,14 +2736,34 @@ void Game::rebuildSchedulerGraph() {
          {audioTask}});
 
     // ---------------------------------------------------------------
-    // Task 4: Render — draw frame.  If any scene has a non-fullWindow
-    //         viewport, use multi-pass rendering.  Otherwise, use the
-    //         original single-pass path for backwards compatibility.
+    // Task 3b: Transition update — advance transition progress.
+    //          Only present when a transition is active.
+    // ---------------------------------------------------------------
+    TaskId renderDep = preRenderTask;
+    if (m_transitionManager && m_transitionManager->isActive()) {
+        TaskId transitionUpdateTask =
+            m_scheduler.addTask({"transition.update",
+                                 TaskPhase::PreRender,
+                                 [this]() { m_transitionManager->update(m_deltaTime); },
+                                 {preRenderTask}});
+        renderDep = transitionUpdateTask;
+    }
+
+    // ---------------------------------------------------------------
+    // Task 4: Render — draw frame.  When transitioning, render both
+    //         scenes to offscreen targets and composite.  Otherwise,
+    //         use the normal single/multi-viewport path.
     // ---------------------------------------------------------------
     m_scheduler.addTask({"scene.render",
                          TaskPhase::Render,
                          [this]() {
                              if (!m_vulkanContext) {
+                                 return;
+                             }
+
+                             // Transition rendering path
+                             if (m_transitionManager && m_transitionManager->isActive()) {
+                                 renderTransition();
                                  return;
                              }
 
@@ -2407,7 +2788,7 @@ void Game::rebuildSchedulerGraph() {
                                  renderSingleViewport();
                              }
                          },
-                         {preRenderTask}});
+                         {renderDep}});
 }
 
 }  // namespace vde

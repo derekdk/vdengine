@@ -25,6 +25,8 @@
 #include "Scene.h"
 #include "SceneGroup.h"
 #include "Scheduler.h"
+#include "Transition.h"
+#include "TransitionManager.h"
 #include "ViewportRect.h"
 
 namespace vde {
@@ -226,6 +228,56 @@ class Game {
      * @brief Pop the current scene and return to the previous one.
      */
     void popScene();
+
+    // =========================================================================
+    // Transitions
+    // =========================================================================
+
+    /**
+     * @brief Transition to a scene with a visual effect.
+     *
+     * Both the source and destination scenes update during the transition.
+     * If duration <= 0, performs an instant scene switch (equivalent to setActiveScene).
+     *
+     * @param name       Name of the scene to transition to
+     * @param transition The visual transition effect (Game takes ownership)
+     * @param duration   Duration in seconds
+     */
+    void transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
+                           float duration);
+
+    /**
+     * @brief Transition a specific viewport region with a visual effect.
+     *
+     * Only the specified viewport region participates in the transition.
+     * Other viewports in the active scene group continue rendering normally.
+     *
+     * @param name       Name of the scene to transition to
+     * @param transition The visual transition effect (Game takes ownership)
+     * @param duration   Duration in seconds
+     * @param region     Normalized viewport region for the transition
+     */
+    void transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
+                           float duration, const ViewportRect& region);
+
+    /**
+     * @brief Returns true while a scene transition is in progress.
+     */
+    bool isTransitioning() const;
+
+    /**
+     * @brief Cancel the current transition immediately.
+     *
+     * Snaps back to the source scene; the destination scene receives onExit().
+     * The completion callback does NOT fire.
+     */
+    void cancelTransition();
+
+    /**
+     * @brief Get the progress [0, 1] of the current transition.
+     * @return 0 if no transition is active.
+     */
+    float getTransitionProgress() const;
 
     // Input handling
 
@@ -533,6 +585,13 @@ class Game {
     std::vector<VkDeviceMemory> m_lightingUBOMemory;        // One per frame-in-flight
     std::vector<void*> m_lightingUBOMapped;                 // Persistently mapped pointers
 
+    // Transition system
+    std::unique_ptr<TransitionManager> m_transitionManager;
+    std::string m_transitionDestScene;    ///< Destination scene name during transition
+    std::string m_transitionSourceScene;  ///< Source scene name during transition
+    ViewportRect m_transitionViewport = ViewportRect::fullWindow();  ///< Viewport for transition
+    bool m_viewportTransition = false;  ///< True when transition is viewport-scoped
+
     // Scheduler
     Scheduler m_scheduler;
 
@@ -576,6 +635,7 @@ class Game {
     void rebuildSchedulerGraph();
     void renderSingleViewport();
     void renderMultiViewport();
+    void renderTransition();
 };
 
 }  // namespace vde

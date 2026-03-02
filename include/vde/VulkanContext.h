@@ -207,6 +207,23 @@ class VulkanContext {
     };
     void drawFrameMultiScene(const std::vector<SceneRenderInfo>& sceneRenderInfos);
 
+    /**
+     * @brief Draw a frame with fully custom command buffer recording.
+     *
+     * Handles fence synchronization, image acquisition, command buffer
+     * management, submission and presentation.  The caller-supplied recorder
+     * function is responsible for recording all render passes into the
+     * command buffer.
+     *
+     * @param recorder Callback that records Vulkan commands.
+     *                 Receives the command buffer, the swapchain framebuffer
+     *                 for the current image, and the swapchain image handle
+     *                 (needed for layout transitions before present).
+     */
+    using CustomFrameRecorder =
+        std::function<void(VkCommandBuffer cmd, VkFramebuffer swapchainFB, VkImage swapchainImage)>;
+    void drawFrameCustom(CustomFrameRecorder recorder);
+
     // =========================================================================
     // Viewport Override
     // =========================================================================
