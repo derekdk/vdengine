@@ -20,7 +20,7 @@
 | 2 | [Sprite Animation System](#2-sprite-animation-system) | High | Sidescroller | Not Started |
 | 3 | [TileMap / Tiled Background](#3-tilemap--tiled-background) | High | Sidescroller | Not Started |
 | 4 | [Sprite Flipping / Mirroring](#4-sprite-flipping--mirroring) | High | Sidescroller | Not Started |
-| 5 | [Scene Transition Effects](#5-scene-transition-effects) | Medium | Multi-Scene | Not Started |
+| 5 | [Scene Transition Effects](#5-scene-transition-effects) | Medium | Multi-Scene | In Progress |
 | 6 | [Scene Re-entry Optimization](#6-scene-re-entry-optimization) | Medium | Multi-Scene | Not Started |
 | 7 | [Per-Scene Input Blocking](#7-per-scene-input-blocking) | Medium | Multi-Scene | Partial |
 | 8 | [2D Circle Collider & Spatial Partitioning](#8-2d-circle-collider--spatial-partitioning) | Medium | Sidescroller | Partial |

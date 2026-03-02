@@ -220,6 +220,9 @@ void Game::run() {
         // Process any pending scene changes
         processPendingSceneChange();
 
+        // Update active screen transition (may trigger a scene switch at midpoint)
+        updateTransition();
+
         // Process input
         processInput();
 
@@ -731,6 +734,25 @@ void Game::setActiveScene(const std::string& name) {
     m_sceneSwitchPending = true;
 }
 
+void Game::setActiveScene(const std::string& name, TransitionType transition, float duration) {
+    if (transition == TransitionType::NONE) {
+        setActiveScene(name);
+        return;
+    }
+
+    // Validate that the target scene exists
+    if (m_scenes.find(name) == m_scenes.end()) {
+        return;
+    }
+
+    // Don't start a new transition if one is already active
+    if (m_transition.isActive()) {
+        return;
+    }
+
+    m_transition.start(transition, name, duration);
+}
+
 void Game::setActiveSceneGroup(const SceneGroup& group) {
     // Validate that all scenes exist
     for (const auto& sceneName : group.sceneNames) {
@@ -1008,6 +1030,21 @@ void Game::processPendingSceneChange() {
 
     // Rebuild the scheduler graph for the new scene
     rebuildSchedulerGraph();
+}
+
+void Game::updateTransition() {
+    if (!m_transition.isActive()) {
+        return;
+    }
+
+    bool midpointReached = m_transition.update(m_deltaTime);
+
+    if (midpointReached) {
+        // Perform the actual scene switch at the transition midpoint
+        m_pendingScene = m_transition.targetScene;
+        m_sceneSwitchPending = true;
+        processPendingSceneChange();
+    }
 }
 
 void Game::setupInputCallbacks() {

@@ -53,6 +53,8 @@ set(VDE_TEST_SOURCES
     Joystick_test.cpp
     # Input script tests
     InputScript_test.cpp
+    # Screen transition tests
+    ScreenTransition_test.cpp
     # Storage tests
     StorageManager_test.cpp
 )

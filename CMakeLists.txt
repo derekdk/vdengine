@@ -153,6 +153,8 @@ set(VDE_SOURCES
     src/api/AudioSource.cpp
     # Input script
     src/api/InputScript.cpp
+    # Screen transition
+    src/api/ScreenTransition.cpp
     # Storage
     src/api/StorageManager.cpp
 )
@@ -207,6 +209,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/AudioSource.h
     # Input script
     include/vde/api/InputScript.h
+    # Screen transition
+    include/vde/api/ScreenTransition.h
     # Storage
     include/vde/api/StorageManager.h
 )

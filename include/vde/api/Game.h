@@ -25,6 +25,7 @@
 #include "Scene.h"
 #include "SceneGroup.h"
 #include "Scheduler.h"
+#include "ScreenTransition.h"
 #include "ViewportRect.h"
 
 namespace vde {
@@ -162,6 +163,21 @@ class Game {
     void setActiveScene(const std::string& name);
 
     /**
+     * @brief Set the active scene with a transition effect.
+     * @param name Name of the scene to activate
+     * @param transition The transition effect to use
+     * @param duration Total duration of the transition in seconds
+     *
+     * When transition is NONE, behaves identically to setActiveScene(name).
+     * Otherwise, initiates an animated transition: the old scene fades out,
+     * the scene switch occurs at the midpoint, then the new scene fades in.
+     *
+     * @note Only FADE_BLACK is currently implemented. Other transition types
+     *       fall back to FADE_BLACK.
+     */
+    void setActiveScene(const std::string& name, TransitionType transition, float duration = 0.5f);
+
+    /**
      * @brief Set a group of scenes to be active simultaneously.
      *
      * The first scene in the group is the primary scene (its camera
@@ -226,6 +242,31 @@ class Game {
      * @brief Pop the current scene and return to the previous one.
      */
     void popScene();
+
+    // Screen transitions
+
+    /**
+     * @brief Check if a screen transition is currently active.
+     * @return true if a transition is in progress
+     */
+    bool isTransitioning() const { return m_transition.isActive(); }
+
+    /**
+     * @brief Get the current transition overlay alpha.
+     *
+     * Returns a value between 0.0 (fully transparent) and 1.0 (fully opaque)
+     * representing the current state of the transition overlay. Games can
+     * use this to draw custom transition overlays.
+     *
+     * @return Overlay alpha value (0.0–1.0), or 0.0 if no transition is active
+     */
+    float getTransitionOverlayAlpha() const { return m_transition.overlayAlpha; }
+
+    /**
+     * @brief Get the current transition state (read-only).
+     * @return Reference to the current transition state
+     */
+    const TransitionState& getTransitionState() const { return m_transition; }
 
     // Input handling
 
@@ -522,6 +563,9 @@ class Game {
     bool m_sceneSwitchPending = false;
     SceneGroup m_activeSceneGroup;
 
+    // Screen transition state
+    TransitionState m_transition;
+
     // Input focus for split-screen
     std::string m_focusedSceneName;
 
@@ -566,6 +610,7 @@ class Game {
     void pollGamepads();
     void updateTiming();
     void processPendingSceneChange();
+    void updateTransition();
     void setupInputCallbacks();
     void createMeshRenderingPipeline();
     void destroyMeshRenderingPipeline();
