@@ -357,3 +357,140 @@ TEST_F(CommandSystemTest, SaveLogRangeInvalidStartReturnsFalse) {
     // Log is empty, so start index 5 is out of range.
     EXPECT_FALSE(cmdSys.saveLogRange(5, 10, "should_not_exist.txt"));
 }
+
+// ============================================================================
+// Command sequences — multi-step pipeline log verification
+// ============================================================================
+
+/**
+ * @brief Table-driven test: executes a 6-step drawing pipeline and verifies
+ *        every log entry's commandLine, success flag, and result substring.
+ *
+ * Commands covered: fill, draw rect, draw line, set, flip, resize.
+ */
+TEST_F(CommandSystemTest, Sequence_DrawPipelineLogsAllSteps) {
+    struct Step {
+        const char* cmd;
+        const char* resultSubstring;
+    };
+    static const Step steps[] = {
+        {"fill #000000FF", "#000000FF"},
+        {"draw rect (0,0) to (7,7) with #FF0000FF filled", "filled"},
+        {"draw line (0,0) to (7,7) with #00FF00FF", "(0,0)"},
+        {"set (4,4) #0000FFFF", "(4,4)"},
+        {"flip horizontal", "horizontal"},
+        {"resize 16 16", "16x16"},
+    };
+    constexpr size_t stepCount = std::size(steps);
+
+    for (const auto& step : steps) {
+        EXPECT_TRUE(cmdSys.execute(step.cmd)) << "Command failed: " << step.cmd;
+    }
+
+    const auto& log = cmdSys.getLog();
+    ASSERT_EQ(log.size(), stepCount);
+
+    for (size_t i = 0; i < stepCount; ++i) {
+        SCOPED_TRACE("Step " + std::to_string(i) + ": " + steps[i].cmd);
+        EXPECT_TRUE(log[i].success);
+        EXPECT_EQ(log[i].commandLine, steps[i].cmd);
+        EXPECT_NE(log[i].result.find(steps[i].resultSubstring), std::string::npos)
+            << "result was: " << log[i].result;
+    }
+}
+
+/**
+ * @brief Verifies that a fill + set + flip horizontal sequence lands pixels at
+ *        the correct positions, and that the entire 4-entry log is successful.
+ */
+TEST_F(CommandSystemTest, Sequence_DrawPipelinePixelVerification) {
+    // Build a known pattern: black background, red at (0,0), green at (7,7).
+    EXPECT_TRUE(cmdSys.execute("fill #000000FF"));
+    EXPECT_TRUE(cmdSys.execute("set (0,0) #FF0000FF"));
+    EXPECT_TRUE(cmdSys.execute("set (7,7) #00FF00FF"));
+
+    // Confirm pre-flip state.
+    {
+        RGBAColor topLeft = testCanvas->document->getPixel(0, 0);
+        EXPECT_EQ(topLeft.r, 255) << "Expected red at (0,0) before flip";
+        EXPECT_EQ(topLeft.g, 0);
+
+        RGBAColor bottomRight = testCanvas->document->getPixel(7, 7);
+        EXPECT_EQ(bottomRight.g, 255) << "Expected green at (7,7) before flip";
+        EXPECT_EQ(bottomRight.r, 0);
+    }
+
+    EXPECT_TRUE(cmdSys.execute("flip horizontal"));
+
+    // After flip horizontal on an 8x8 canvas, pixel at (x,y) moves to (7-x, y).
+    //   (0,0) red  → now at (7,0)
+    //   (7,7) green → now at (0,7)
+    {
+        RGBAColor movedRed = testCanvas->document->getPixel(7, 0);
+        EXPECT_EQ(movedRed.r, 255) << "Red pixel should be at (7,0) after horizontal flip";
+        EXPECT_EQ(movedRed.g, 0);
+        EXPECT_EQ(movedRed.b, 0);
+
+        RGBAColor movedGreen = testCanvas->document->getPixel(0, 7);
+        EXPECT_EQ(movedGreen.g, 255) << "Green pixel should be at (0,7) after horizontal flip";
+        EXPECT_EQ(movedGreen.r, 0);
+        EXPECT_EQ(movedGreen.b, 0);
+
+        // Origin itself should now be black (was black before at (7,0)).
+        RGBAColor origin = testCanvas->document->getPixel(0, 0);
+        EXPECT_EQ(origin.r, 0);
+        EXPECT_EQ(origin.g, 0);
+        EXPECT_EQ(origin.b, 0);
+    }
+
+    // The 4-entry log should all be successful.
+    const auto& log = cmdSys.getLog();
+    ASSERT_EQ(log.size(), 4u);
+    for (size_t i = 0; i < log.size(); ++i) {
+        EXPECT_TRUE(log[i].success)
+            << "Log entry " << i << " (" << log[i].commandLine << ") unexpectedly failed";
+    }
+}
+
+/**
+ * @brief Creates two canvases, runs fill on each, and confirms that log entries
+ *        record the correct canvas name for every step.
+ *
+ * Execution order and expected canvasName in each log entry:
+ *   log[0] create canvas icons 4 4 → canvasName = "hero"  (active before create)
+ *   log[1] fill #FF0000FF          → canvasName = "icons" (active after create)
+ *   log[2] select hero             → canvasName = "icons" (active before select)
+ *   log[3] fill #0000FFFF          → canvasName = "hero"  (active after select)
+ */
+TEST_F(CommandSystemTest, Sequence_MultiCanvasLogsTrackCanvasName) {
+    EXPECT_TRUE(cmdSys.execute("create canvas icons 4 4"));
+    EXPECT_TRUE(cmdSys.execute("fill #FF0000FF"));
+    EXPECT_TRUE(cmdSys.execute("select hero"));
+    EXPECT_TRUE(cmdSys.execute("fill #0000FFFF"));
+
+    const auto& log = cmdSys.getLog();
+    ASSERT_EQ(log.size(), 4u);
+
+    // All commands should have succeeded.
+    for (size_t i = 0; i < log.size(); ++i) {
+        EXPECT_TRUE(log[i].success) << "Entry " << i << " failed: " << log[i].result;
+    }
+
+    // The fill after create targeted "icons".
+    EXPECT_EQ(log[1].canvasName, "icons");
+
+    // The fill after select hero targeted "hero".
+    EXPECT_EQ(log[3].canvasName, "hero");
+
+    // Pixel data confirms each canvas was filled independently.
+    Canvas* icons = registry.getByName("icons");
+    ASSERT_NE(icons, nullptr);
+
+    RGBAColor iconsPx = icons->document->getPixel(0, 0);
+    EXPECT_EQ(iconsPx.r, 255) << "icons canvas should be red";
+    EXPECT_EQ(iconsPx.b, 0);
+
+    RGBAColor heroPx = testCanvas->document->getPixel(0, 0);
+    EXPECT_EQ(heroPx.r, 0);
+    EXPECT_EQ(heroPx.b, 255) << "hero canvas should be blue";
+}
