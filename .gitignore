@@ -85,3 +85,6 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+
+# CodeQL artifacts
+_codeql_detected_source_root
