@@ -279,6 +279,41 @@ class Game {
      */
     float getTransitionProgress() const;
 
+    /**
+     * @brief Pause or unpause the active transition.
+     *
+     * While paused, the transition freezes at its current progress
+     * but continues to render. Use stepTransitionOneFrame() to
+     * advance frame-by-frame while paused.
+     */
+    void setTransitionPaused(bool paused);
+
+    /**
+     * @brief Returns true if the transition is currently paused.
+     */
+    bool isTransitionPaused() const;
+
+    /**
+     * @brief Advance a paused transition by exactly one frame.
+     *
+     * Has no effect if the transition is not paused or not active.
+     */
+    void stepTransitionOneFrame();
+
+    /**
+     * @brief Set the playback speed multiplier for transitions.
+     *
+     * 1.0 = normal speed, 0.25 = quarter speed, etc. Must be > 0.
+     *
+     * @param speed Speed multiplier (default 1.0)
+     */
+    void setTransitionSpeed(float speed);
+
+    /**
+     * @brief Get the current transition playback speed multiplier.
+     */
+    float getTransitionSpeed() const;
+
     // Input handling
 
     // Scheduler

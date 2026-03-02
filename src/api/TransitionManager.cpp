@@ -71,6 +71,7 @@ void TransitionManager::start(std::unique_ptr<Transition> transition, float dura
     m_uniforms = TransitionUniforms{};
 
     m_activeTransition->onStart();
+    m_paused = false;  // Reset pause state for new transitions
 }
 
 void TransitionManager::update(float deltaTime) {
@@ -78,7 +79,12 @@ void TransitionManager::update(float deltaTime) {
         return;
     }
 
-    m_elapsed += deltaTime;
+    // If paused, don't advance time
+    if (m_paused) {
+        return;
+    }
+
+    m_elapsed += deltaTime * m_speed;
     m_progress = std::clamp(m_elapsed / m_duration, 0.0f, 1.0f);
 
     // Build the update context
@@ -130,11 +136,44 @@ void TransitionManager::cancel() {
     m_elapsed = 0.0f;
     m_progress = 0.0f;
     m_duration = 0.0f;
+    m_paused = false;
     m_uniforms = TransitionUniforms{};
 }
 
 float TransitionManager::getProgress() const {
     return m_progress;
+}
+
+void TransitionManager::setPaused(bool paused) {
+    m_paused = paused;
+}
+
+bool TransitionManager::isPaused() const {
+    return m_paused;
+}
+
+void TransitionManager::stepOneFrame(float deltaTime) {
+    if (!m_paused || !m_activeTransition) {
+        return;
+    }
+
+    // Temporarily unpause, advance, re-pause
+    m_paused = false;
+    update(deltaTime);
+    // Only re-pause if the transition is still active (didn't complete)
+    if (m_activeTransition) {
+        m_paused = true;
+    }
+}
+
+void TransitionManager::setSpeed(float speed) {
+    if (speed > 0.0f) {
+        m_speed = speed;
+    }
+}
+
+float TransitionManager::getSpeed() const {
+    return m_speed;
 }
 
 // =========================================================================

@@ -8,6 +8,8 @@
  * - Circle reveal transition (expanding circle from center)
  * - Adjustable transition duration
  * - Transition cancellation
+ * - Pause & frame-step for debugging transitions
+ * - Adjustable playback speed
  * - onEnter/onExit lifecycle logging
  *
  * Controls:
@@ -19,6 +21,9 @@
  * - +/=: Increase transition duration (+0.25s)
  * - -: Decrease transition duration (-0.25s, min 0.25s)
  * - C: Cancel in-flight transition
+ * - SPACE: Pause / unpause transition
+ * - . (Period): Step forward one frame (while paused)
+ * - S: Cycle playback speed (1x -> 0.5x -> 0.25x -> 0.1x -> 1x)
  * - ESC: Exit
  * - F: Report failure
  */
@@ -59,6 +64,12 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
             m_decreaseDuration = true;
         if (key == KEY_C)
             m_cancelTransition = true;
+        if (key == KEY_SPACE)
+            m_togglePause = true;
+        if (key == KEY_PERIOD)
+            m_stepFrame = true;
+        if (key == KEY_S)
+            m_cycleSpeed = true;
     }
 
     bool consumeFade() {
@@ -101,6 +112,21 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
         m_cancelTransition = false;
         return v;
     }
+    bool consumeTogglePause() {
+        bool v = m_togglePause;
+        m_togglePause = false;
+        return v;
+    }
+    bool consumeStepFrame() {
+        bool v = m_stepFrame;
+        m_stepFrame = false;
+        return v;
+    }
+    bool consumeCycleSpeed() {
+        bool v = m_cycleSpeed;
+        m_cycleSpeed = false;
+        return v;
+    }
 
   private:
     bool m_triggerFade = false;
@@ -111,6 +137,9 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
     bool m_increaseDuration = false;
     bool m_decreaseDuration = false;
     bool m_cancelTransition = false;
+    bool m_togglePause = false;
+    bool m_stepFrame = false;
+    bool m_cycleSpeed = false;
 };
 
 // ============================================================================
@@ -191,10 +220,11 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
     }
 
     std::vector<std::string> getControls() const override {
-        return {"1 - Fade to GameScene",      "2 - Wipe Left to CreditsScene",
-                "3 - Wipe Right to MainMenu", "4 - Circle Reveal to GameScene",
-                "5 - Block Fall to Showcase", "+/- - Adjust duration",
-                "C - Cancel transition"};
+        return {"1 - Fade to GameScene",       "2 - Wipe Left to CreditsScene",
+                "3 - Wipe Right to MainMenu",  "4 - Circle Reveal to GameScene",
+                "5 - Block Fall to Showcase",  "+/- - Adjust duration",
+                "C - Cancel transition",       "SPACE - Pause/unpause transition",
+                ". (Period) - Step one frame", "S - Cycle speed (1x/0.5x/0.25x/0.1x)"};
     }
 };
 
@@ -457,6 +487,43 @@ class TransitionDemoGame
                 std::cout << "[TransitionDemo] Cancelling transition" << std::endl;
                 cancelTransition();
             }
+        }
+
+        // Pause / unpause
+        if (input->consumeTogglePause()) {
+            if (isTransitioning()) {
+                bool nowPaused = !isTransitionPaused();
+                setTransitionPaused(nowPaused);
+                std::cout << "[TransitionDemo] " << (nowPaused ? "PAUSED" : "RESUMED")
+                          << " (progress: " << std::fixed << std::setprecision(3)
+                          << getTransitionProgress() << ")" << std::endl;
+            }
+        }
+
+        // Step one frame
+        if (input->consumeStepFrame()) {
+            if (isTransitioning() && isTransitionPaused()) {
+                stepTransitionOneFrame();
+                std::cout << "[TransitionDemo] STEP -> progress: " << std::fixed
+                          << std::setprecision(3) << getTransitionProgress() << std::endl;
+            }
+        }
+
+        // Cycle playback speed
+        if (input->consumeCycleSpeed()) {
+            constexpr float speeds[] = {1.0f, 0.5f, 0.25f, 0.1f};
+            constexpr int numSpeeds = 4;
+            float current = getTransitionSpeed();
+            int idx = 0;
+            for (int i = 0; i < numSpeeds; ++i) {
+                if (std::abs(current - speeds[i]) < 0.01f) {
+                    idx = (i + 1) % numSpeeds;
+                    break;
+                }
+            }
+            setTransitionSpeed(speeds[idx]);
+            std::cout << "[TransitionDemo] Speed: " << std::fixed << std::setprecision(2)
+                      << speeds[idx] << "x" << std::endl;
         }
 
         // Transition triggers

@@ -994,6 +994,38 @@ float Game::getTransitionProgress() const {
     return 0.0f;
 }
 
+void Game::setTransitionPaused(bool paused) {
+    if (m_transitionManager) {
+        m_transitionManager->setPaused(paused);
+    }
+}
+
+bool Game::isTransitionPaused() const {
+    if (m_transitionManager) {
+        return m_transitionManager->isPaused();
+    }
+    return false;
+}
+
+void Game::stepTransitionOneFrame() {
+    if (m_transitionManager) {
+        m_transitionManager->stepOneFrame(m_deltaTime);
+    }
+}
+
+void Game::setTransitionSpeed(float speed) {
+    if (m_transitionManager) {
+        m_transitionManager->setSpeed(speed);
+    }
+}
+
+float Game::getTransitionSpeed() const {
+    if (m_transitionManager) {
+        return m_transitionManager->getSpeed();
+    }
+    return 1.0f;
+}
+
 void Game::applyDisplaySettings(const DisplaySettings& settings) {
     if (!m_window)
         return;

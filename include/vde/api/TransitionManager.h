@@ -98,6 +98,47 @@ class TransitionManager {
     float getProgress() const;
 
     /**
+     * @brief Pause or unpause the active transition.
+     *
+     * While paused, update() does not advance elapsed time.
+     * The transition remains active and continues to render at its
+     * current progress.
+     */
+    void setPaused(bool paused);
+
+    /**
+     * @brief Returns true if the transition is currently paused.
+     */
+    bool isPaused() const;
+
+    /**
+     * @brief Advance a paused transition by exactly one frame's worth of time.
+     *
+     * Has no effect if the transition is not paused or not active.
+     * The deltaTime used is the same value that would have been passed
+     * to update() by the engine.
+     *
+     * @param deltaTime The frame delta to advance by (in seconds)
+     */
+    void stepOneFrame(float deltaTime);
+
+    /**
+     * @brief Set the playback speed multiplier for transitions.
+     *
+     * 1.0 = normal speed, 0.25 = quarter speed, 2.0 = double speed, etc.
+     * The multiplier scales the deltaTime passed to update().
+     * Must be > 0.
+     *
+     * @param speed Speed multiplier (default 1.0)
+     */
+    void setSpeed(float speed);
+
+    /**
+     * @brief Get the current playback speed multiplier.
+     */
+    float getSpeed() const;
+
+    /**
      * @brief Get the current transition uniforms (for the GPU push constants).
      */
     const TransitionUniforms& getUniforms() const { return m_uniforms; }
@@ -165,6 +206,8 @@ class TransitionManager {
     float m_progress = 0.0f;
     std::function<void()> m_onComplete;
     TransitionUniforms m_uniforms{};
+    bool m_paused = false;
+    float m_speed = 1.0f;
 
     // Vulkan resources for the fullscreen composite pipeline
     VkPipeline m_pipeline = VK_NULL_HANDLE;
