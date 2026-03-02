@@ -149,6 +149,9 @@ set(VDE_SOURCES
     src/api/ThreadPool.cpp
     # Transitions
     src/api/Transition.cpp
+    src/api/FadeTransition.cpp
+    src/api/WipeTransition.cpp
+    src/api/CircleRevealTransition.cpp
     src/api/TransitionManager.cpp
     # Audio
     src/miniaudio_impl.cpp
@@ -207,6 +210,9 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/ThreadPool.h
     # Transition headers
     include/vde/api/Transition.h
+    include/vde/api/FadeTransition.h
+    include/vde/api/WipeTransition.h
+    include/vde/api/CircleRevealTransition.h
     include/vde/api/TransitionManager.h
     # Audio headers
     include/vde/api/AudioClip.h

@@ -2,17 +2,20 @@
 
 /**
  * @file Transition.h
- * @brief Base class and built-in transitions for screen transition effects.
+ * @brief Base transition interface and shared transition data types.
  *
- * Provides the `Transition` base class that custom transitions extend,
- * along with built-in effects (Fade, Wipe, CircleReveal). Transitions
- * are primarily shader-driven: a fullscreen-triangle fragment shader
- * samples source and destination textures with a `progress` uniform.
+ * Provides the `Transition` base class that custom transitions extend.
+ * Built-in effects are declared in dedicated headers for easy discovery:
+ * - vde/api/FadeTransition.h
+ * - vde/api/WipeTransition.h
+ * - vde/api/CircleRevealTransition.h
+ *
+ * Transitions are primarily shader-driven: a fullscreen-triangle fragment
+ * shader samples source and destination textures with a `progress` uniform.
  */
 
 #include <vulkan/vulkan.h>
 
-#include <cmath>
 #include <cstdint>
 #include <string>
 
@@ -137,55 +140,9 @@ class Transition {
     TransitionDirection m_direction = TransitionDirection::Center;
 };
 
-// =========================================================================
-// Built-in transitions
-// =========================================================================
-
-/**
- * @brief Cross-fade (alpha blend) between source and destination.
- */
-class FadeTransition : public Transition {
-  public:
-    const char* getName() const override { return "Fade"; }
-    std::string getFragmentShaderPath() const override;
-};
-
-/**
- * @brief Linear wipe in the configured direction.
- */
-class WipeTransition : public Transition {
-  public:
-    /**
-     * @brief Construct a wipe transition with the given direction.
-     * @param dir Wipe direction (default: Left)
-     */
-    explicit WipeTransition(TransitionDirection dir = TransitionDirection::Left) {
-        m_direction = dir;
-    }
-
-    const char* getName() const override { return "Wipe"; }
-    std::string getFragmentShaderPath() const override;
-
-    /**
-     * @brief Encodes direction into uniforms so the shader can branch.
-     */
-    void update(const TransitionUpdateContext& ctx, TransitionUniforms& outUniforms) override;
-};
-
-/**
- * @brief Expanding circle from the center revealing the destination.
- */
-class CircleRevealTransition : public Transition {
-  public:
-    CircleRevealTransition() { m_direction = TransitionDirection::Center; }
-
-    const char* getName() const override { return "CircleReveal"; }
-    std::string getFragmentShaderPath() const override;
-
-    /**
-     * @brief Maps linear progress to a radius and encodes it in uniforms.
-     */
-    void update(const TransitionUpdateContext& ctx, TransitionUniforms& outUniforms) override;
-};
-
 }  // namespace vde
+
+// Built-in transitions (kept included here for backward compatibility).
+#include <vde/api/CircleRevealTransition.h>
+#include <vde/api/FadeTransition.h>
+#include <vde/api/WipeTransition.h>
