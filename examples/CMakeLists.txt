@@ -113,13 +113,30 @@ add_vde_example(vde_resource_demo "resource_demo/main.cpp")
 # Audio demo example demonstrating audio system
 add_vde_example(vde_audio_demo "audio_demo/main.cpp")
 
-# Copy audio assets directory
-add_custom_command(TARGET vde_audio_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets
-    $<TARGET_FILE_DIR:vde_audio_demo>/assets
-    COMMENT "Copying audio assets next to executable..."
+# Keep audio assets synced even when only asset files change
+file(GLOB_RECURSE VDE_AUDIO_DEMO_ASSET_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets/*
 )
+
+set(VDE_AUDIO_DEMO_ASSET_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_audio_demo_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_AUDIO_DEMO_ASSET_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_audio_demo>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets
+        $<TARGET_FILE_DIR:vde_audio_demo>/assets
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_AUDIO_DEMO_ASSET_STAMP}
+    DEPENDS ${VDE_AUDIO_DEMO_ASSET_FILES}
+    COMMENT "Syncing audio demo assets..."
+    VERBATIM
+)
+
+add_custom_target(vde_audio_demo_sync_assets ALL
+    DEPENDS ${VDE_AUDIO_DEMO_ASSET_STAMP}
+)
+
+add_dependencies(vde_audio_demo vde_audio_demo_sync_assets)
 
 # 2D Sidescroller example demonstrating platformer game mechanics
 add_vde_example(vde_sidescroller "sidescroller/main.cpp")
