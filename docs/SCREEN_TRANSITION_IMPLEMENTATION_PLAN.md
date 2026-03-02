@@ -223,44 +223,81 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 
 ---
 
-## Phase 6: Example & Documentation
+## Phase 6: Transition Demo
 
-**Goal:** Ship a working example and update project documentation.
+**Goal:** Build and validate a runnable demo that exercises every built-in transition and confirms end-to-end functionality.
 
 ### Tasks
 
 1. **Create `transition_demo` example**
    - File: `examples/transition_demo/main.cpp`
-   - Two simple scenes (different background colors and entities)
+   - Three scenes with distinct visual content:
+     - `MainMenuScene` — title text + solid background color
+     - `GameScene` — several moving entities
+     - `CreditsScene` — static text layout
+   - On-screen HUD (ImGui or simple text rendering) showing:
+     - Currently active transition name and current progress value
+     - Keybinding cheat sheet
    - Keyboard controls to trigger each built-in transition:
-     - `1` → Fade, `2` → Wipe Left, `3` → Wipe Right, `4` → Circle Reveal
-   - Duration configurable via key (e.g., `+` / `-`)
+     - `1` → Fade to GameScene
+     - `2` → Wipe Left to CreditsScene
+     - `3` → Wipe Right back to MainMenuScene
+     - `4` → Circle Reveal to GameScene
+     - `+` / `-` — increase / decrease transition duration (0.25 s steps, min 0.25 s)
+     - `C` — cancel in-flight transition (instant cut)
+   - Confirm `onEnter()` / `onExit()` fire correctly by logging to console
    - Add to `examples/CMakeLists.txt`
 
 2. **Add smoke test script**
-   - `scripts/input/transition_demo_smoke.vdescript`
-   - Launch, wait, trigger a transition, wait for completion, exit
+   - File: `scripts/input/transition_demo_smoke.vdescript`
+   - Launch app, wait 1 s, press `1` to trigger fade, wait for completion, press `4` for circle reveal, wait, exit
+   - Ensures the demo launches and completes transitions without crashing
 
-3. **Update API-DOC.md**
-   - Add Transitions section with usage examples
-   - Document `Transition` base class, built-in transitions, `Game` methods
+3. **Manual test checklist** (record results in a PR comment)
+   - [ ] Fade renders a smooth blend with no tearing
+   - [ ] Wipe Left and Wipe Right travel in opposite directions
+   - [ ] Circle Reveal expands from center outward
+   - [ ] Duration changes via `+` / `-` take effect on the next transition
+   - [ ] Cancelling mid-transition with `C` snaps to the source scene cleanly
+   - [ ] Window resize during transition does not crash or corrupt render targets
+   - [ ] Instant switch (duration = 0) works when duration is wound down to zero
 
-4. **Update docs/API.md**
-   - Add `Transition`, `TransitionManager`, easing functions to the reference
-
-5. **Update using-api skill**
-   - Add transition workflow to `.github/skills/using-api/SKILL.md`
-
-6. **Build, test, smoke-test**
+4. **Build and smoke-test**
 
 ### Acceptance Criteria
-- `transition_demo` runs and demonstrates all three built-in transitions
-- Smoke test passes
-- Documentation is complete
+- `transition_demo` compiles and launches without Vulkan validation errors
+- All four transitions are visually correct
+- Smoke test passes in CI
+- Manual checklist completed and all items pass
 
 ---
 
-## Phase 7: Polish & Extensions (Optional / Future)
+## Phase 7: Documentation
+
+**Goal:** Update all project documentation to reflect the new transition API.
+
+### Tasks
+
+1. **Update `API-DOC.md`**
+   - Add Transitions section with usage examples
+   - Document `Transition` base class, all built-in transitions, and `Game` methods
+
+2. **Update `docs/API.md`**
+   - Add `Transition`, `TransitionManager`, and easing functions to the reference
+
+3. **Update using-api skill**
+   - Add transition workflow to `.github/skills/using-api/SKILL.md`
+
+4. **Update `writing-examples` skill**
+   - Note that new examples should test transitions where scene switching is relevant
+
+### Acceptance Criteria
+- All public API symbols introduced in Phases 1–6 are documented
+- Code examples in docs compile against the current headers
+
+---
+
+## Phase 8: Polish & Extensions (Optional / Future)
 
 **Goal:** Quality-of-life improvements and advanced features.
 
@@ -307,9 +344,9 @@ Reference: [SCREEN_TRANSITION_API_DESIGN.md](SCREEN_TRANSITION_API_DESIGN.md)
 | `examples/transition_demo/main.cpp` | 6 | Example |
 | `examples/CMakeLists.txt` | 6 | Modified |
 | `scripts/input/transition_demo_smoke.vdescript` | 6 | Smoke test |
-| `API-DOC.md` | 6 | Modified |
-| `docs/API.md` | 6 | Modified |
-| `include/vde/api/Easing.h` | 7 | Public header (optional) |
+| `API-DOC.md` | 7 | Modified |
+| `docs/API.md` | 7 | Modified |
+| `include/vde/api/Easing.h` | 8 | Public header (optional) |
 
 ---
 
@@ -329,10 +366,12 @@ Phase 4 (Game Integration)      ← Core feature complete
    │
    ├──▶ Phase 5 (Viewport Transitions)
    │
-   └──▶ Phase 6 (Example + Docs)
+   ├──▶ Phase 6 (Transition Demo)
+   │
+   └──▶ Phase 7 (Documentation)
             │
             ▼
-        Phase 7 (Polish / Future)
+        Phase 8 (Polish / Future)
 ```
 
 ---
@@ -358,5 +397,6 @@ Phase 4 (Game Integration)      ← Core feature complete
 | Phase 3 — TransitionManager | 2–3 days |
 | Phase 4 — Game Integration | 2–3 days |
 | Phase 5 — Viewport Transitions | 1 day |
-| Phase 6 — Example + Documentation | 1 day |
-| **Total (Phases 1–6)** | **8–11 days** |
+| Phase 6 — Transition Demo | 1–2 days |
+| Phase 7 — Documentation | 0.5 day |
+| **Total (Phases 1–7)** | **8.5–12.5 days** |
