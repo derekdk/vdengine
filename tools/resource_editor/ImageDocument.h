@@ -235,9 +235,16 @@ class ImageDocument {
     bool m_dirty = false;           ///< True if modified since last save/clear.
     uint64_t m_generation = 0;      ///< Mutation counter.
 
-    std::vector<std::vector<uint8_t>> m_undoStack;  ///< Undo history.
-    std::vector<std::vector<uint8_t>> m_redoStack;  ///< Redo future.
-    static constexpr size_t kMaxUndoLevels = 50;    ///< Maximum undo depth.
+    /** @brief Full document state captured for undo/redo. */
+    struct Snapshot {
+        std::vector<uint8_t> pixels;
+        uint32_t width = 0;
+        uint32_t height = 0;
+    };
+
+    std::vector<Snapshot> m_undoStack;            ///< Undo history.
+    std::vector<Snapshot> m_redoStack;            ///< Redo future.
+    static constexpr size_t kMaxUndoLevels = 50;  ///< Maximum undo depth.
 };
 
 }  // namespace vde::tools

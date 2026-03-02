@@ -493,7 +493,7 @@ void ImageDocument::clear() {
 // =============================================================================
 
 void ImageDocument::snapshotForUndo() {
-    m_undoStack.push_back(m_pixels);
+    m_undoStack.push_back({m_pixels, m_width, m_height});
     if (m_undoStack.size() > kMaxUndoLevels) {
         m_undoStack.erase(m_undoStack.begin());
     }
@@ -504,8 +504,11 @@ bool ImageDocument::undo() {
     if (m_undoStack.empty()) {
         return false;
     }
-    m_redoStack.push_back(m_pixels);
-    m_pixels = m_undoStack.back();
+    m_redoStack.push_back({m_pixels, m_width, m_height});
+    auto& snap = m_undoStack.back();
+    m_pixels = std::move(snap.pixels);
+    m_width = snap.width;
+    m_height = snap.height;
     m_undoStack.pop_back();
     ++m_generation;
     m_dirty = true;
@@ -516,8 +519,11 @@ bool ImageDocument::redo() {
     if (m_redoStack.empty()) {
         return false;
     }
-    m_undoStack.push_back(m_pixels);
-    m_pixels = m_redoStack.back();
+    m_undoStack.push_back({m_pixels, m_width, m_height});
+    auto& snap = m_redoStack.back();
+    m_pixels = std::move(snap.pixels);
+    m_width = snap.width;
+    m_height = snap.height;
     m_redoStack.pop_back();
     ++m_generation;
     m_dirty = true;
