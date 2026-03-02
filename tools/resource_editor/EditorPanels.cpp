@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "CommandSystem.h"
 
@@ -72,9 +73,67 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
         ImGui::Text(">");
         ImGui::SameLine();
 
+        // Detect multi-line paste (Ctrl+V) while the console input is focused.
+        // ImGui's single-line InputText strips newlines from pasted text, so we
+        // intercept the clipboard ourselves, execute each non-blank/non-comment
+        // line, and schedule a buffer clear via the InputText callback.
+        const bool isCtrlV =
+            ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, /*repeat=*/false);
+        if (m_consoleInputFocused && isCtrlV) {
+            const char* clip = ImGui::GetClipboardText();
+            if (clip && std::strchr(clip, '\n')) {
+                // Split clipboard into lines
+                std::istringstream stream(clip);
+                std::string line;
+                std::vector<std::string> cmds;
+                while (std::getline(stream, line)) {
+                    // Trim whitespace
+                    auto s = line.find_first_not_of(" \t\r\n");
+                    if (s == std::string::npos)
+                        continue;
+                    line = line.substr(s);
+                    auto e = line.find_last_not_of(" \t\r\n");
+                    if (e != std::string::npos)
+                        line = line.substr(0, e + 1);
+                    // Skip blank lines and comments
+                    if (line.empty() || line[0] == '#')
+                        continue;
+                    if (line.size() >= 2 && line[0] == '/' && line[1] == '/')
+                        continue;
+                    cmds.push_back(line);
+                }
+                if (!cmds.empty()) {
+                    for (const auto& c : cmds) {
+                        cmd.logRawInput(c);
+                        cmd.execute(c);
+                    }
+                    m_scrollConsoleToBottom = true;
+                }
+                // Ask the InputText callback to wipe whatever single-line
+                // fragment ImGui may have already inserted into the buffer.
+                m_pendingClear = true;
+            }
+        }
+
+        // Callback used to clear the buffer after a multi-line paste.
+        struct ClearCallbackData {
+            bool* pendingClear;
+        };
+        ClearCallbackData cbData{&m_pendingClear};
+        auto clearCallback = [](ImGuiInputTextCallbackData* data) -> int {
+            auto* cbd = static_cast<ClearCallbackData*>(data->UserData);
+            if (*cbd->pendingClear) {
+                data->DeleteChars(0, data->BufTextLen);
+                *cbd->pendingClear = false;
+            }
+            return 0;
+        };
+
         bool reclaim = false;
         if (ImGui::InputText("##consoleinput", m_consoleInputBuffer, sizeof(m_consoleInputBuffer),
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+                             ImGuiInputTextFlags_EnterReturnsTrue |
+                                 ImGuiInputTextFlags_CallbackAlways,
+                             clearCallback, &cbData)) {
             std::string input(m_consoleInputBuffer);
             if (!input.empty()) {
                 cmd.logRawInput(input);  // Echo verbatim before any parsing
@@ -84,6 +143,7 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
             }
             reclaim = true;
         }
+        m_consoleInputFocused = ImGui::IsItemFocused();
 
         if (reclaim) {
             ImGui::SetKeyboardFocusHere(-1);

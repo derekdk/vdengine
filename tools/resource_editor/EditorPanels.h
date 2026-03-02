@@ -93,10 +93,12 @@ class EditorPanels {
   private:
     char m_consoleInputBuffer[512] = {};   ///< Text input buffer for the console.
     bool m_scrollConsoleToBottom = false;  ///< Flag to auto-scroll console on next frame.
-    bool m_showNewCanvasPopup = false;     ///< Trigger flag for the "New Canvas" modal.
-    char m_newCanvasName[128] = {};        ///< Name buffer for the new-canvas dialog.
-    int m_newCanvasWidth = 32;             ///< Width default for the new-canvas dialog.
-    int m_newCanvasHeight = 32;            ///< Height default for the new-canvas dialog.
+    bool m_consoleInputFocused = false;    ///< Whether the console input was focused last frame.
+    bool m_pendingClear = false;  ///< Clear the input buffer via callback (after multi-line paste).
+    bool m_showNewCanvasPopup = false;  ///< Trigger flag for the "New Canvas" modal.
+    char m_newCanvasName[128] = {};     ///< Name buffer for the new-canvas dialog.
+    int m_newCanvasWidth = 32;          ///< Width default for the new-canvas dialog.
+    int m_newCanvasHeight = 32;         ///< Height default for the new-canvas dialog.
 };
 
 }  // namespace vde::tools
