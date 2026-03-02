@@ -10,6 +10,7 @@
  */
 
 #include <string>
+#include <vector>
 
 #include "CanvasRegistry.h"
 #include "ToolPalette.h"
@@ -91,10 +92,26 @@ class EditorPanels {
     void drawMenuBar(CommandSystem& cmd, CanvasRegistry& canvases);
 
   private:
+    // --- Console input ---
     char m_consoleInputBuffer[512] = {};   ///< Text input buffer for the console.
     bool m_scrollConsoleToBottom = false;  ///< Flag to auto-scroll console on next frame.
     bool m_consoleInputFocused = false;    ///< Whether the console input was focused last frame.
     bool m_pendingClear = false;  ///< Clear the input buffer via callback (after multi-line paste).
+
+    // --- Autocomplete state ---
+    std::vector<std::string> m_completions;  ///< Current autocomplete suggestions.
+    int m_selectedCompletion = -1;           ///< Highlighted completion index (-1 = none).
+    bool m_showCompletions = false;          ///< Whether to display the completion popup.
+    std::string m_paramHint;                 ///< Ghost text for current parameter hint.
+    int m_completionReplaceStart = 0;        ///< Buffer offset where Tab replaces text.
+
+    /** @brief Recompute completions and parameter hint from the current input. */
+    void updateCompletions(const std::string& input, const CommandSystem& cmd);
+
+    /** @brief Return a ghost-text hint showing remaining parameters. */
+    std::string getParameterHint(const std::string& input) const;
+
+    // --- New-canvas dialog ---
     bool m_showNewCanvasPopup = false;  ///< Trigger flag for the "New Canvas" modal.
     char m_newCanvasName[128] = {};     ///< Name buffer for the new-canvas dialog.
     int m_newCanvasWidth = 32;          ///< Width default for the new-canvas dialog.

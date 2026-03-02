@@ -127,6 +127,27 @@ class CanvasRegistry {
      */
     ResourceRef resolveResource(const std::string& ref, uint32_t activeCanvasId);
 
+    /**
+     * @brief Transfer a named resource from one canvas to another (move semantics).
+     * @param resourceName Name of the resource in the source canvas.
+     * @param srcCanvasId Source canvas ID.
+     * @param dstCanvasId Destination canvas ID.
+     * @return true on success.
+     */
+    bool transferResource(const std::string& resourceName, uint32_t srcCanvasId,
+                          uint32_t dstCanvasId);
+
+    /**
+     * @brief Copy a named resource from one canvas to another.
+     * @param resourceName Name of the resource in the source canvas.
+     * @param srcCanvasId Source canvas ID.
+     * @param dstCanvasId Destination canvas ID.
+     * @param newName Name for the copy in the destination (empty = same name).
+     * @return true on success.
+     */
+    bool copyResource(const std::string& resourceName, uint32_t srcCanvasId,
+                      uint32_t dstCanvasId, const std::string& newName = "");
+
   private:
     std::map<uint32_t, std::unique_ptr<Canvas>> m_canvases;  ///< ID -> Canvas.
     std::map<std::string, uint32_t> m_nameIndex;             ///< Name -> ID.

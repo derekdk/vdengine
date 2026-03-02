@@ -173,5 +173,56 @@ CanvasRegistry::ResourceRef CanvasRegistry::resolveResource(const std::string& r
     return result;
 }
 
+// =============================================================================
+// Cross-canvas resource operations
+// =============================================================================
+
+bool CanvasRegistry::transferResource(const std::string& resourceName, uint32_t srcCanvasId,
+                                      uint32_t dstCanvasId) {
+    Canvas* src = getById(srcCanvasId);
+    Canvas* dst = getById(dstCanvasId);
+    if (!src || !dst) {
+        return false;
+    }
+
+    auto it = src->resources.find(resourceName);
+    if (it == src->resources.end()) {
+        return false;
+    }
+
+    dst->resources[resourceName] = std::move(it->second);
+    src->resources.erase(it);
+    return true;
+}
+
+bool CanvasRegistry::copyResource(const std::string& resourceName, uint32_t srcCanvasId,
+                                  uint32_t dstCanvasId, const std::string& newName) {
+    Canvas* src = getById(srcCanvasId);
+    Canvas* dst = getById(dstCanvasId);
+    if (!src || !dst) {
+        return false;
+    }
+
+    auto it = src->resources.find(resourceName);
+    if (it == src->resources.end()) {
+        return false;
+    }
+
+    const ImageDocument* original = it->second.get();
+    uint32_t w = original->getWidth();
+    uint32_t h = original->getHeight();
+    auto copy = ImageDocument::createNew(w, h);
+
+    for (uint32_t y = 0; y < h; ++y) {
+        for (uint32_t x = 0; x < w; ++x) {
+            copy->setPixel(x, y, original->getPixel(x, y));
+        }
+    }
+
+    const std::string& destName = newName.empty() ? resourceName : newName;
+    dst->resources[destName] = std::move(copy);
+    return true;
+}
+
 }  // namespace tools
 }  // namespace vde

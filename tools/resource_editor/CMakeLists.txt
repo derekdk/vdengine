@@ -55,8 +55,11 @@ add_executable(vde_resource_editor
     commands/global/ExitCommand.h
     commands/global/SetColorCommand.h
     commands/global/SetToolCommand.h
-    commands/global/SetSizeCommand.h
-
+    commands/global/SetSizeCommand.h    commands/global/DefineColorCommand.h
+    commands/global/ListColorsCommand.h
+    commands/global/UndefineColorCommand.h
+    commands/global/CopyHostCommand.h
+    commands/global/RehostCommand.h
     # Canvas commands
     commands/canvas/FillCommand.h
     commands/canvas/SetCommand.h
@@ -72,6 +75,9 @@ add_executable(vde_resource_editor
     commands/canvas/FlipCommand.h
     commands/canvas/RotateCommand.h
     commands/canvas/ClearCommand.h
+    commands/canvas/DrawArcCommand.h
+    commands/canvas/DrawBezierCommand.h
+    commands/canvas/DrawImageCommand.h
 )
 
 target_include_directories(vde_resource_editor PRIVATE

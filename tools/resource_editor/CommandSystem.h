@@ -93,6 +93,9 @@ class CommandSystem {
      */
     void logRawInput(const std::string& input);
 
+    /** @brief Read-only access to the editor context (for named colors, etc.). */
+    const EditorContext* getContext() const { return m_ctx; }
+
     /** @brief Clear the log and reset active canvas. */
     void clear();
 

@@ -1,6 +1,6 @@
 # VDE Resource Editor — Implementation Plan
 
-> **Status:** Phase 1 Complete  
+> **Status:** Phase 2 Complete  
 > **Related:** [Editor Design](EDITOR_DESIGN.md) · [Canvas DSL](CANVAS_DSL.md) · [Parser & Command System](PARSER_AND_COMMAND_SYSTEM.md)
 
 ---
@@ -270,7 +270,11 @@ smoketests/
 
 **Goal:** Add features that leverage the clean command architecture — named colors, autocomplete, cross-canvas operations, and advanced drawing.
 
+> **Status:** ✅ Complete
+
 ### Step 6 — Named Colors & Color Palette
+
+> **Status:** ✅ Complete
 
 **Files to create:**
 ```
@@ -293,12 +297,15 @@ tools/resource_editor/EditorPanels.cpp
 - `fill skin` resolves to `#FFCC99FF`
 - Color names appear in REPL autocomplete suggestions
 - Colors persist across sessions via StorageManager
+  - **Deferred to Phase 4 (Step 14)** — colors are in-memory only for now
 
 **Dependencies:** Phase 1 complete
 
 ---
 
 ### Step 7 — REPL Autocomplete & Parameter Hints
+
+> **Status:** ✅ Complete
 
 Enhance the ImGui command input with metadata-driven features.
 
@@ -322,7 +329,9 @@ tools/resource_editor/EditorPanels.cpp
 
 ### Step 8 — Cross-Canvas Operations
 
-Implement resource transfer and compositing between canvases.
+> **Status:** ✅ Complete
+>
+> Implement resource transfer and compositing between canvases.
 
 **Files to create:**
 ```
@@ -352,6 +361,8 @@ tools/resource_editor/CMakeLists.txt
 
 ### Step 9 — Arc, Bézier & Advanced Drawing
 
+> **Status:** ✅ Complete
+
 **Files to create:**
 ```
 tools/resource_editor/commands/canvas/
@@ -372,6 +383,29 @@ tools/resource_editor/CMakeLists.txt
 - Both work with undo/redo
 
 **Dependencies:** Step 6
+
+### Phase 2 Implementation Notes
+
+**Test coverage:** 21 new tests in `tests/Phase2Commands_test.cpp` plus updated smoke test
+(`tools/resource_editor/scripts/smoke_test.txt`) with 61 commands total. All 79 resource editor
+unit tests pass.
+
+**Known deviations to track for future phases:**
+
+| Priority | Item | Target Phase |
+|----------|------|-------------|
+| High | `DrawImageCommand` registered as `"draw image"` — should add `"draw"` alias for DSL fallback | Phase 3 |
+| Medium | Quadratic Bézier (3-point) not supported — only cubic (4-point) | Phase 3 |
+| Low | Tuple bracket matching in REPL not implemented | Polish |
+| Low | Arc angles are `Int` — could be `Float` for sub-degree precision | Polish |
+| Low | `[layer]` parameter for `draw image` deferred until layer system exists | Phase 3 |
+| Low | `rehost`/`copyhost` `type` enum only supports `"image"` — `"color"`, `"area"` deferred | Future |
+| Low | Named color persistence deferred from Step 6 to Phase 4 (Step 14) | Polish |
+| Low | Autocomplete logic is ImGui-coupled — consider extracting for unit testability | Testing |
+
+**Intentional naming decision:** `define color` (not `create color`) was chosen for the command
+name to avoid collision with `create canvas` and because `define` better conveys establishing an
+alias rather than creating a resource.
 
 ---
 

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "commands/CommandTypes.h"
@@ -120,6 +121,28 @@ class ImageDocument {
      * @param filled If true, fill the interior.
      */
     void drawEllipse(int cx, int cy, int rx, int ry, RGBAColor color, bool filled);
+
+    /**
+     * @brief Draw a circular arc.
+     * @param cx Center X.
+     * @param cy Center Y.
+     * @param r  Radius.
+     * @param startAngle Start angle in degrees (0 = right, counter-clockwise).
+     * @param endAngle End angle in degrees.
+     * @param color Arc color.
+     * @param thickness Line thickness (1 = single pixel).
+     */
+    void drawArc(int cx, int cy, int r, float startAngle, float endAngle, RGBAColor color,
+                 int thickness = 1);
+
+    /**
+     * @brief Draw a cubic Bézier curve through four control points.
+     * @param points Four control points as (x, y) pairs.
+     * @param color Curve color.
+     * @param thickness Line thickness.
+     */
+    void drawBezier(const std::vector<std::pair<int, int>>& points, RGBAColor color,
+                    int thickness = 1);
 
     /**
      * @brief Stack-based flood fill starting at (x, y).

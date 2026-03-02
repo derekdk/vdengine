@@ -87,6 +87,8 @@ set(VDE_RESOURCE_EDITOR_SRC ${CMAKE_SOURCE_DIR}/tools/resource_editor)
 add_executable(vde_resource_editor_tests
     CommandSystem_test.cpp
     ToolPalette_test.cpp
+    Phase2Commands_test.cpp
+    Phase2Commands_test.cpp
 
     # Domain sources (main.cpp and EditorPanels excluded — no GPU/window needed)
     ${VDE_RESOURCE_EDITOR_SRC}/CommandSystem.cpp

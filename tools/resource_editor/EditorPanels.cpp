@@ -6,15 +6,258 @@
 #include "EditorPanels.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "CommandSystem.h"
+#include "commands/CommandRegistry.h"
+#include "commands/EditorContext.h"
 
 namespace vde {
 namespace tools {
+
+// =============================================================================
+// Autocomplete helpers
+// =============================================================================
+
+void EditorPanels::updateCompletions(const std::string& input, const CommandSystem& cmd) {
+    m_completions.clear();
+    m_paramHint.clear();
+    m_showCompletions = false;
+
+    auto textStart = input.find_first_not_of(" \t");
+    if (textStart == std::string::npos) {
+        m_selectedCompletion = -1;
+        return;
+    }
+
+    std::string text = input.substr(textStart);
+    size_t cmdOffset = textStart;
+
+    // Skip @canvas prefix if present.
+    if (!text.empty() && text[0] == '@') {
+        auto sp = text.find(' ');
+        if (sp == std::string::npos)
+            return;
+        cmdOffset += sp + 1;
+        text = text.substr(sp + 1);
+        auto ns = text.find_first_not_of(" \t");
+        if (ns == std::string::npos)
+            return;
+        cmdOffset += ns;
+        text = text.substr(ns);
+    }
+
+    if (text.empty())
+        return;
+
+    std::string textLower = text;
+    std::transform(textLower.begin(), textLower.end(), textLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    auto& registry = CommandRegistry::instance();
+    auto allMeta = registry.getAllMetadata();
+
+    // Find the longest-matching command name at the start of the text.
+    const CommandMetadata* matchedCmd = nullptr;
+    size_t matchLen = 0;
+
+    for (const auto* meta : allMeta) {
+        auto tryMatch = [&](const std::string& name) {
+            std::string lower = name;
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (textLower.size() >= lower.size() + 1 && textLower[lower.size()] == ' ' &&
+                textLower.substr(0, lower.size()) == lower && lower.size() > matchLen) {
+                matchedCmd = meta;
+                matchLen = lower.size();
+            }
+        };
+        tryMatch(meta->name);
+        for (const auto& alias : meta->aliases)
+            tryMatch(alias);
+    }
+
+    if (matchedCmd) {
+        // ---- Parameter mode ----
+        m_paramHint = getParameterHint(input);
+
+        std::string argsText = text.substr(matchLen + 1);
+        std::vector<std::string> tokens;
+        {
+            std::istringstream iss(argsText);
+            std::string tok;
+            while (iss >> tok)
+                tokens.push_back(tok);
+        }
+
+        bool endsWithSpace = !argsText.empty() && argsText.back() == ' ';
+        size_t paramIdx =
+            endsWithSpace ? tokens.size() : (tokens.empty() ? 0 : tokens.size() - 1);
+        std::string currentToken = (!endsWithSpace && !tokens.empty()) ? tokens.back() : "";
+
+        if (paramIdx < matchedCmd->params.size()) {
+            const auto& param = matchedCmd->params[paramIdx];
+            std::string currentLower = currentToken;
+            std::transform(currentLower.begin(), currentLower.end(), currentLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            m_completionReplaceStart = currentToken.empty()
+                                           ? static_cast<int>(input.size())
+                                           : static_cast<int>(input.size() - currentToken.size());
+
+            if (param.type == ParamType::Enum) {
+                for (const auto& ev : param.enumValues) {
+                    std::string evLower = ev;
+                    std::transform(evLower.begin(), evLower.end(), evLower.begin(),
+                                   [](unsigned char c) {
+                                       return static_cast<char>(std::tolower(c));
+                                   });
+                    if (currentToken.empty() ||
+                        (evLower.find(currentLower) == 0 && evLower != currentLower)) {
+                        m_completions.push_back(ev);
+                    }
+                }
+            } else if (param.type == ParamType::Color) {
+                const auto* ctx = cmd.getContext();
+                if (ctx) {
+                    for (const auto& [name, color] : ctx->namedColors) {
+                        std::string nameLower = name;
+                        std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(),
+                                       [](unsigned char c) {
+                                           return static_cast<char>(std::tolower(c));
+                                       });
+                        if (currentToken.empty() ||
+                            (nameLower.find(currentLower) == 0 && nameLower != currentLower)) {
+                            m_completions.push_back(name);
+                        }
+                    }
+                }
+            }
+        }
+
+        m_showCompletions = !m_completions.empty();
+        if (!m_completions.empty()) {
+            m_selectedCompletion =
+                std::clamp(m_selectedCompletion, 0, static_cast<int>(m_completions.size()) - 1);
+        } else {
+            m_selectedCompletion = -1;
+        }
+        return;
+    }
+
+    // ---- Command-name mode ----
+    m_completionReplaceStart = static_cast<int>(cmdOffset);
+
+    for (const auto* meta : allMeta) {
+        auto tryPrefix = [&](const std::string& name) {
+            std::string lower = name;
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (lower.find(textLower) == 0 && lower != textLower) {
+                m_completions.push_back(name);
+            }
+        };
+        tryPrefix(meta->name);
+        for (const auto& alias : meta->aliases)
+            tryPrefix(alias);
+    }
+
+    std::sort(m_completions.begin(), m_completions.end());
+    m_completions.erase(std::unique(m_completions.begin(), m_completions.end()),
+                        m_completions.end());
+
+    m_showCompletions = !m_completions.empty();
+    if (!m_completions.empty()) {
+        m_selectedCompletion =
+            std::clamp(m_selectedCompletion, 0, static_cast<int>(m_completions.size()) - 1);
+    } else {
+        m_selectedCompletion = -1;
+    }
+}
+
+std::string EditorPanels::getParameterHint(const std::string& input) const {
+    std::string text = input;
+    auto start = text.find_first_not_of(" \t");
+    if (start == std::string::npos)
+        return {};
+    text = text.substr(start);
+
+    // Skip @canvas prefix.
+    if (!text.empty() && text[0] == '@') {
+        auto sp = text.find(' ');
+        if (sp == std::string::npos)
+            return {};
+        text = text.substr(sp + 1);
+        auto ns = text.find_first_not_of(" \t");
+        if (ns == std::string::npos)
+            return {};
+        text = text.substr(ns);
+    }
+
+    if (text.empty())
+        return {};
+
+    std::string textLower = text;
+    std::transform(textLower.begin(), textLower.end(), textLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    auto& registry = CommandRegistry::instance();
+    auto allMeta = registry.getAllMetadata();
+
+    const CommandMetadata* matched = nullptr;
+    size_t matchLen = 0;
+
+    for (const auto* meta : allMeta) {
+        auto tryMatch = [&](const std::string& name) {
+            std::string lower = name;
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (textLower.size() >= lower.size() + 1 && textLower[lower.size()] == ' ' &&
+                textLower.substr(0, lower.size()) == lower && lower.size() > matchLen) {
+                matched = meta;
+                matchLen = lower.size();
+            }
+        };
+        tryMatch(meta->name);
+        for (const auto& alias : meta->aliases)
+            tryMatch(alias);
+    }
+
+    if (!matched || matched->params.empty())
+        return {};
+
+    // Count how many tokens have been fully typed after the command name.
+    std::string argsText = text.substr(matchLen + 1);
+    std::vector<std::string> tokens;
+    {
+        std::istringstream iss(argsText);
+        std::string tok;
+        while (iss >> tok)
+            tokens.push_back(tok);
+    }
+
+    bool endsWithSpace = !argsText.empty() && argsText.back() == ' ';
+    size_t completedParams =
+        endsWithSpace ? tokens.size() : (tokens.empty() ? 0 : tokens.size() - 1);
+
+    if (completedParams >= matched->params.size())
+        return {};
+
+    std::ostringstream os;
+    for (size_t i = completedParams; i < matched->params.size(); ++i) {
+        const auto& p = matched->params[i];
+        if (p.required) {
+            os << " <" << p.name << ">";
+        } else {
+            os << " [" << p.name << "]";
+        }
+    }
+    return os.str();
+}
 
 // =============================================================================
 // Command Console
@@ -115,25 +358,62 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
             }
         }
 
-        // Callback used to clear the buffer after a multi-line paste.
-        struct ClearCallbackData {
+        // Callback used for buffer clear (multi-line paste), Tab completion,
+        // and Up/Down navigation through autocomplete suggestions.
+        struct ConsoleCallbackData {
             bool* pendingClear;
+            EditorPanels* panels;
         };
-        ClearCallbackData cbData{&m_pendingClear};
-        auto clearCallback = [](ImGuiInputTextCallbackData* data) -> int {
-            auto* cbd = static_cast<ClearCallbackData*>(data->UserData);
-            if (*cbd->pendingClear) {
-                data->DeleteChars(0, data->BufTextLen);
-                *cbd->pendingClear = false;
+        ConsoleCallbackData cbData{&m_pendingClear, this};
+        auto consoleCallback = [](ImGuiInputTextCallbackData* data) -> int {
+            auto* cbd = static_cast<ConsoleCallbackData*>(data->UserData);
+            auto& panels = *cbd->panels;
+
+            if (data->EventFlag == ImGuiInputTextFlags_CallbackAlways) {
+                if (*cbd->pendingClear) {
+                    data->DeleteChars(0, data->BufTextLen);
+                    *cbd->pendingClear = false;
+                }
             }
+
+            if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+                // Tab — accept the currently selected completion.
+                if (panels.m_showCompletions && panels.m_selectedCompletion >= 0 &&
+                    panels.m_selectedCompletion <
+                        static_cast<int>(panels.m_completions.size())) {
+                    const std::string& completion =
+                        panels.m_completions[panels.m_selectedCompletion];
+                    int start = panels.m_completionReplaceStart;
+                    data->DeleteChars(start, data->BufTextLen - start);
+                    data->InsertChars(start, (completion + " ").c_str());
+                    panels.m_showCompletions = false;
+                    panels.m_selectedCompletion = -1;
+                }
+            }
+
+            if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
+                if (panels.m_showCompletions && !panels.m_completions.empty()) {
+                    if (data->EventKey == ImGuiKey_UpArrow) {
+                        panels.m_selectedCompletion =
+                            std::max(0, panels.m_selectedCompletion - 1);
+                    } else if (data->EventKey == ImGuiKey_DownArrow) {
+                        panels.m_selectedCompletion = std::min(
+                            static_cast<int>(panels.m_completions.size()) - 1,
+                            panels.m_selectedCompletion + 1);
+                    }
+                }
+            }
+
             return 0;
         };
 
         bool reclaim = false;
         if (ImGui::InputText("##consoleinput", m_consoleInputBuffer, sizeof(m_consoleInputBuffer),
                              ImGuiInputTextFlags_EnterReturnsTrue |
-                                 ImGuiInputTextFlags_CallbackAlways,
-                             clearCallback, &cbData)) {
+                                 ImGuiInputTextFlags_CallbackAlways |
+                                 ImGuiInputTextFlags_CallbackCompletion |
+                                 ImGuiInputTextFlags_CallbackHistory,
+                             consoleCallback, &cbData)) {
             std::string input(m_consoleInputBuffer);
             if (!input.empty()) {
                 cmd.logRawInput(input);  // Echo verbatim before any parsing
@@ -142,8 +422,71 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
                 m_scrollConsoleToBottom = true;
             }
             reclaim = true;
+            // Clear completions on command execution.
+            m_showCompletions = false;
+            m_completions.clear();
+            m_paramHint.clear();
+            m_selectedCompletion = -1;
         }
+
+        // Capture InputText rect before other widgets change "last item" state.
+        ImVec2 inputRectMin = ImGui::GetItemRectMin();
+        ImVec2 inputRectMax = ImGui::GetItemRectMax();
         m_consoleInputFocused = ImGui::IsItemFocused();
+
+        // Update autocomplete state.
+        if (m_consoleInputFocused) {
+            updateCompletions(std::string(m_consoleInputBuffer), cmd);
+        } else {
+            m_showCompletions = false;
+            m_completions.clear();
+            m_paramHint.clear();
+        }
+
+        // Draw parameter hint as ghost text overlaid inside the input area.
+        if (!m_paramHint.empty() && m_consoleInputFocused) {
+            float textWidth = ImGui::CalcTextSize(m_consoleInputBuffer).x;
+            ImVec2 hintPos =
+                ImVec2(inputRectMin.x + textWidth + ImGui::GetStyle().FramePadding.x,
+                       inputRectMin.y + ImGui::GetStyle().FramePadding.y);
+            ImGui::GetWindowDrawList()->AddText(hintPos, IM_COL32(128, 128, 128, 160),
+                                                m_paramHint.c_str());
+        }
+
+        // Draw autocomplete popup below the input text.
+        if (m_showCompletions && !m_completions.empty() && m_consoleInputFocused) {
+            float popupWidth = inputRectMax.x - inputRectMin.x;
+            ImGui::SetNextWindowPos(ImVec2(inputRectMin.x, inputRectMax.y));
+            ImGui::SetNextWindowSize(ImVec2(popupWidth, 0));
+            ImGui::SetNextWindowBgAlpha(0.95f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 4));
+            if (ImGui::Begin("##autocomplete", nullptr,
+                             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                 ImGuiWindowFlags_NoMove |
+                                 ImGuiWindowFlags_NoFocusOnAppearing |
+                                 ImGuiWindowFlags_NoNav |
+                                 ImGuiWindowFlags_AlwaysAutoResize |
+                                 ImGuiWindowFlags_NoSavedSettings)) {
+                int maxVisible = std::min(static_cast<int>(m_completions.size()), 8);
+                for (int i = 0; i < maxVisible; ++i) {
+                    bool isSelected = (i == m_selectedCompletion);
+                    if (isSelected) {
+                        ImGui::PushStyleColor(ImGuiCol_Text,
+                                              ImVec4(1.0f, 1.0f, 0.4f, 1.0f));
+                    }
+                    ImGui::TextUnformatted(m_completions[i].c_str());
+                    if (isSelected) {
+                        ImGui::PopStyleColor();
+                    }
+                }
+                if (static_cast<int>(m_completions.size()) > maxVisible) {
+                    ImGui::TextDisabled("... and %d more",
+                                        static_cast<int>(m_completions.size()) - maxVisible);
+                }
+            }
+            ImGui::End();
+            ImGui::PopStyleVar();
+        }
 
         if (reclaim) {
             ImGui::SetKeyboardFocusHere(-1);

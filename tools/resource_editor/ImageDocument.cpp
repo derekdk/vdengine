@@ -344,6 +344,130 @@ void ImageDocument::drawEllipse(int cx, int cy, int rx, int ry, RGBAColor color,
     m_dirty = true;
 }
 
+void ImageDocument::drawArc(int cx, int cy, int r, float startAngle, float endAngle,
+                            RGBAColor color, int thickness) {
+    if (r <= 0) {
+        return;
+    }
+
+    auto plotPixel = [&](int px, int py) {
+        if (thickness <= 1) {
+            if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
+                static_cast<uint32_t>(py) < m_height) {
+                setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
+            }
+        } else {
+            int hr = thickness / 2;
+            for (int dy = -hr; dy <= hr; ++dy) {
+                for (int dx = -hr; dx <= hr; ++dx) {
+                    if (dx * dx + dy * dy <= hr * hr) {
+                        int fx = px + dx;
+                        int fy = py + dy;
+                        if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
+                            static_cast<uint32_t>(fy) < m_height) {
+                            setPixelUnchecked(static_cast<uint32_t>(fx),
+                                              static_cast<uint32_t>(fy), color);
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    // Convert degrees to radians
+    constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+    float startRad = startAngle * kDegToRad;
+    float endRad = endAngle * kDegToRad;
+
+    // Normalize so we always sweep forward
+    while (endRad < startRad) {
+        endRad += 2.0f * 3.14159265358979323846f;
+    }
+
+    // Step in ~0.5-degree increments
+    float step = 0.5f * kDegToRad;
+    for (float a = startRad; a <= endRad; a += step) {
+        int px = cx + static_cast<int>(std::round(r * std::cos(a)));
+        int py = cy + static_cast<int>(std::round(r * std::sin(a)));
+        plotPixel(px, py);
+    }
+
+    // Always plot the endpoint
+    {
+        int px = cx + static_cast<int>(std::round(r * std::cos(endRad)));
+        int py = cy + static_cast<int>(std::round(r * std::sin(endRad)));
+        plotPixel(px, py);
+    }
+
+    ++m_generation;
+    m_dirty = true;
+}
+
+void ImageDocument::drawBezier(const std::vector<std::pair<int, int>>& points, RGBAColor color,
+                               int thickness) {
+    if (points.size() != 4) {
+        return;
+    }
+
+    auto plotPixel = [&](int px, int py) {
+        if (thickness <= 1) {
+            if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
+                static_cast<uint32_t>(py) < m_height) {
+                setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
+            }
+        } else {
+            int hr = thickness / 2;
+            for (int dy = -hr; dy <= hr; ++dy) {
+                for (int dx = -hr; dx <= hr; ++dx) {
+                    if (dx * dx + dy * dy <= hr * hr) {
+                        int fx = px + dx;
+                        int fy = py + dy;
+                        if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
+                            static_cast<uint32_t>(fy) < m_height) {
+                            setPixelUnchecked(static_cast<uint32_t>(fx),
+                                              static_cast<uint32_t>(fy), color);
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    float p0x = static_cast<float>(points[0].first);
+    float p0y = static_cast<float>(points[0].second);
+    float p1x = static_cast<float>(points[1].first);
+    float p1y = static_cast<float>(points[1].second);
+    float p2x = static_cast<float>(points[2].first);
+    float p2y = static_cast<float>(points[2].second);
+    float p3x = static_cast<float>(points[3].first);
+    float p3y = static_cast<float>(points[3].second);
+
+    // Adaptive step count based on rough arc length estimate
+    float chordLen = std::sqrt((p3x - p0x) * (p3x - p0x) + (p3y - p0y) * (p3y - p0y));
+    float controlLen = std::sqrt((p1x - p0x) * (p1x - p0x) + (p1y - p0y) * (p1y - p0y)) +
+                       std::sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y)) +
+                       std::sqrt((p3x - p2x) * (p3x - p2x) + (p3y - p2y) * (p3y - p2y));
+    int steps = std::max(100, static_cast<int>(controlLen + chordLen) * 2);
+
+    float dt = 1.0f / static_cast<float>(steps);
+    for (int i = 0; i <= steps; ++i) {
+        float t = static_cast<float>(i) * dt;
+        float u = 1.0f - t;
+        float u2 = u * u;
+        float u3 = u2 * u;
+        float t2 = t * t;
+        float t3 = t2 * t;
+
+        float bx = u3 * p0x + 3.0f * u2 * t * p1x + 3.0f * u * t2 * p2x + t3 * p3x;
+        float by = u3 * p0y + 3.0f * u2 * t * p1y + 3.0f * u * t2 * p2y + t3 * p3y;
+
+        plotPixel(static_cast<int>(std::round(bx)), static_cast<int>(std::round(by)));
+    }
+
+    ++m_generation;
+    m_dirty = true;
+}
+
 void ImageDocument::floodFill(int x, int y, RGBAColor color) {
     if (x < 0 || y < 0 || static_cast<uint32_t>(x) >= m_width ||
         static_cast<uint32_t>(y) >= m_height) {

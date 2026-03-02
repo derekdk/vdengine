@@ -1,5 +1,7 @@
 # VDE Resource Editor - Smoke Test Script
-# Exercises all 30 commands in sequence for scripted validation.
+# Exercises all commands in sequence for scripted validation.
+# Phase 1: 30 commands, Phase 2: +8 commands (named colors, arc/bezier,
+# cross-canvas operations, REPL autocomplete).
 #
 # Run as: vde_resource_editor.exe <path_to_this_file>
 # Expected result: exit code 0, no command failures.
@@ -10,6 +12,26 @@
 help
 help create canvas
 help fill
+
+# =============================================================================
+# Named colors (Phase 2, Step 6)
+# =============================================================================
+
+# define color - create named color aliases
+define color cherry #FF0044FF
+define color sky #4488FFFF
+define color grass #22CC22FF
+
+# list colors - display all defined colors
+list colors
+
+# Use named colors in drawing (tested after canvas creation below)
+
+# undefine color - remove a named color
+undefine color grass
+
+# Verify remaining colors survive
+list colors
 
 # =============================================================================
 # Canvas management (global commands)
@@ -66,6 +88,32 @@ draw ellipse (8, 16) (3, 5) with #8800FFFF filled
 
 # flood - flood fill from a corner
 flood (0, 31) with #888888FF
+
+# =============================================================================
+# Arc and Bezier drawing (Phase 2, Step 9)
+# =============================================================================
+
+# draw arc - circular arc, outline
+draw arc (16, 16) radius 10 from 0 to 180 with #FF0000FF
+
+# draw arc - with thickness
+draw arc (16, 16) radius 6 from 45 to 270 with #00FF00FF width 2
+
+# draw bezier - cubic Bezier curve
+draw bezier (0, 0) (10, 0) (20, 31) (31, 31) with #0000FFFF
+
+# draw bezier - with thickness
+draw bezier (0, 31) (10, 31) (20, 0) (31, 0) with cherry width 2
+
+# =============================================================================
+# Named colors in drawing (Phase 2, Step 6 cont.)
+# =============================================================================
+
+# Use a named color for fill
+fill sky
+
+# Use a named color in draw line
+draw line (0, 0) to (31, 31) with cherry
 
 # =============================================================================
 # Undo / redo
@@ -132,6 +180,15 @@ rename renamed_overlay overlay
 
 # Delete the overlay canvas
 delete overlay
+
+# =============================================================================
+# Cross-canvas operations (Phase 2, Step 8) — NOT smoke-testable yet
+# =============================================================================
+# draw image, rehost, and copyhost require sub-resources in a canvas's
+# resource map.  There is no command yet to create sub-resources, so these
+# commands are tested only via unit tests (Phase2Commands_test.cpp).
+# TODO: add smoke coverage once a "create resource" or "import resource"
+#       command is available.
 
 # =============================================================================
 # Exit
