@@ -25,6 +25,18 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
+bool isBlockBorder(vec2 uv, vec2 blockUV) {
+    vec2 safeBlockUV = max(blockUV, vec2(1e-6));
+    vec2 local = fract(uv / safeBlockUV);
+
+    // 2-pixel border in screen space, converted to block-local UV.
+    vec2 pixelUV = vec2(abs(dFdx(fragUV.x)), abs(dFdy(fragUV.y)));
+    vec2 border = (2.0 * pixelUV) / safeBlockUV;
+
+    return (local.x <= border.x) || (local.x >= 1.0 - border.x) ||
+           (local.y <= border.y) || (local.y >= 1.0 - border.y);
+}
+
 void main() {
     vec4 dst = texture(destTexture, fragUV);
 
@@ -36,6 +48,10 @@ void main() {
     float startTime = randomValue * 0.75;
 
     if (transition.progress <= startTime) {
+        if (isBlockBorder(fragUV, blockUV)) {
+            outColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+        }
         outColor = texture(sourceTexture, fragUV);
         return;
     }
@@ -44,10 +60,22 @@ void main() {
 
     // Move each block downward until it passes beyond the screen.
     float fallDistance = 1.0 + blockUV.y * 2.0;
-    vec2 sourceUV = fragUV + vec2(0.0, localProgress * fallDistance);
+
+    // Add subtle horizontal momentum per block for visual interest.
+    float driftSign = (hash12(blockIndex + vec2(19.37, 47.11) + transition.direction) < 0.5) ? -1.0 : 1.0;
+    float driftStrength = mix(0.35, 1.0, hash12(blockIndex + vec2(73.21, 11.49) + transition.direction * 0.5));
+    float maxDrift = blockUV.x * 0.45 * driftStrength;
+    float driftX = driftSign * maxDrift * (localProgress * localProgress);
+
+    vec2 sourceUV = fragUV + vec2(driftX, localProgress * fallDistance);
 
     if (sourceUV.x < 0.0 || sourceUV.x > 1.0 || sourceUV.y < 0.0 || sourceUV.y > 1.0) {
         outColor = dst;
+        return;
+    }
+
+    if (isBlockBorder(sourceUV, blockUV)) {
+        outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
