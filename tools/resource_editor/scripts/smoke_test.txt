@@ -1,0 +1,142 @@
+# VDE Resource Editor - Smoke Test Script
+# Exercises all 30 commands in sequence for scripted validation.
+#
+# Run as: vde_resource_editor.exe <path_to_this_file>
+# Expected result: exit code 0, no command failures.
+
+# =============================================================================
+# Help system
+# =============================================================================
+help
+help create canvas
+help fill
+
+# =============================================================================
+# Canvas management (global commands)
+# =============================================================================
+
+# create canvas - create two canvases
+create canvas sprite 32 32
+create canvas overlay 64 64
+
+# list - show all open canvases
+list
+
+# =============================================================================
+# Tool configuration (global commands)
+# =============================================================================
+
+setcolor #FF0000FF
+settool brush
+setsize 2
+
+# =============================================================================
+# View options (global commands)
+# =============================================================================
+
+zoom 2
+grid on
+grid off
+zoom 1
+
+# =============================================================================
+# Drawing commands (active canvas: sprite, 32x32)
+# =============================================================================
+
+# fill - flood fill entire canvas
+fill #FFFFFFFF
+
+# set - set a single pixel
+set (5, 5) #FF0000FF
+
+# draw line - Bresenham diagonal
+draw line (0, 0) to (31, 31) with #0000FFFF
+
+# draw rect - outline and filled variants
+draw rect (2, 2) to (10, 10) with #00FF00FF outline
+draw rect (14, 14) to (20, 20) with #FFFF00FF filled
+
+# draw circle - outline and filled variants
+draw circle (16, 16) radius 8 with #FF00FFFF outline
+draw circle (10, 10) radius 3 with #00FFFFFF filled
+
+# draw ellipse - outline and filled variants
+draw ellipse (16, 8) (6, 3) with #FF8800FF outline
+draw ellipse (8, 16) (3, 5) with #8800FFFF filled
+
+# flood - flood fill from a corner
+flood (0, 31) with #888888FF
+
+# =============================================================================
+# Undo / redo
+# =============================================================================
+
+undo
+undo
+redo
+redo
+
+# =============================================================================
+# Transform operations
+# =============================================================================
+
+clear
+fill #FFFFFFFF
+flip horizontal
+flip vertical
+rotate 90
+rotate 270
+rotate 180
+
+# =============================================================================
+# Resize and crop
+# =============================================================================
+
+resize 48 48
+crop (0, 0) (32, 32)
+
+# =============================================================================
+# History
+# =============================================================================
+
+history 10
+
+# =============================================================================
+# File operations
+# =============================================================================
+
+# Save, then export, then load the saved file as a new canvas
+save "smoke_output.png"
+export "smoke_output_export.png"
+load "smoke_output.png"
+
+# Select the loaded canvas, then delete it
+select smoke_output
+delete smoke_output
+
+# =============================================================================
+# Multi-canvas operations
+# =============================================================================
+
+# Switch to overlay and draw on it
+select overlay
+fill #0000FFFF
+draw rect (0, 0) to (63, 63) with #FFFFFFFF outline
+
+# Return to sprite
+select sprite
+
+# Rename overlay back and forth to verify rename command
+rename overlay renamed_overlay
+rename renamed_overlay overlay
+
+# Delete the overlay canvas
+delete overlay
+
+# =============================================================================
+# Exit
+# =============================================================================
+
+# NOTE: do NOT add 'exit' here.  In script mode the engine calls quit()
+# automatically after the script finishes.  Calling exit within the script
+# also calls game->quit(), which causes a double-quit and an access violation.

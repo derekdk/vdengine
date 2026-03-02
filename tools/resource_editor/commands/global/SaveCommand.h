@@ -35,7 +35,7 @@ class SaveCommand final : public GlobalCommand {
             .params =
                 {
                     {.name = "filepath",
-                     .type = ParamType::String,
+                     .type = ParamType::QuotedString,
                      .required = false,
                      .description = "Output file path"},
                 },

@@ -76,6 +76,20 @@ CommandBase* CommandRegistry::find(const std::string& name) const {
 }
 
 // =============================================================================
+// findExact — no fallback shortening
+// =============================================================================
+
+CommandBase* CommandRegistry::findExact(const std::string& name) const {
+    auto it = m_nameIndex.find(name);
+    if (it != m_nameIndex.end())
+        return it->second;
+    auto ait = m_aliasIndex.find(name);
+    if (ait != m_aliasIndex.end())
+        return ait->second;
+    return nullptr;
+}
+
+// =============================================================================
 // Metadata queries
 // =============================================================================
 

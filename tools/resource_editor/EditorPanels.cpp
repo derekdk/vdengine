@@ -29,27 +29,35 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
         if (ImGui::BeginChild("ConsoleOutput", consoleSize, ImGuiChildFlags_Borders)) {
             const auto& log = cmd.getLog();
             for (const auto& entry : log) {
-                // Color-code by success/failure
-                if (entry.success) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+                if (entry.isRawInput) {
+                    // Verbatim echo: bright cyan so it's visually distinct from results
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.9f, 1.0f, 1.0f));
+                    ImGui::TextWrapped("[%s] (raw) > %s", entry.timestamp.c_str(),
+                                       entry.commandLine.c_str());
+                    ImGui::PopStyleColor();
                 } else {
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                    // Color-code by success/failure
+                    if (entry.success) {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.8f, 0.8f, 1.0f));
+                    } else {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+                    }
+
+                    // Show canvas prefix if present
+                    std::string prefix;
+                    if (!entry.canvasName.empty()) {
+                        prefix = "[" + entry.canvasName + "] ";
+                    }
+
+                    ImGui::TextWrapped("[%s] %s%s", entry.timestamp.c_str(), prefix.c_str(),
+                                       entry.commandLine.c_str());
+
+                    if (!entry.result.empty()) {
+                        ImGui::TextWrapped("  => %s", entry.result.c_str());
+                    }
+
+                    ImGui::PopStyleColor();
                 }
-
-                // Show canvas prefix if present
-                std::string prefix;
-                if (!entry.canvasName.empty()) {
-                    prefix = "[" + entry.canvasName + "] ";
-                }
-
-                ImGui::TextWrapped("[%s] %s%s", entry.timestamp.c_str(), prefix.c_str(),
-                                   entry.commandLine.c_str());
-
-                if (!entry.result.empty()) {
-                    ImGui::TextWrapped("  => %s", entry.result.c_str());
-                }
-
-                ImGui::PopStyleColor();
             }
 
             if (m_scrollConsoleToBottom) {
@@ -69,6 +77,7 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
             std::string input(m_consoleInputBuffer);
             if (!input.empty()) {
+                cmd.logRawInput(input);  // Echo verbatim before any parsing
                 cmd.execute(input);
                 m_consoleInputBuffer[0] = '\0';
                 m_scrollConsoleToBottom = true;
@@ -188,8 +197,15 @@ void EditorPanels::drawCanvasTabs(CanvasRegistry& canvases, CommandSystem& cmd, 
                     ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.3f, 0.5f, 0.7f, 1.0f));
                 }
 
-                if (ImGui::BeginTabItem(label.c_str())) {
-                    if (!isActive) {
+                // Pass SetSelected so ImGui's tab state tracks the engine's active canvas.
+                // Without this, ImGui picks its own "open" tab independently and BeginTabItem
+                // returns true for the wrong tab, firing spurious select commands.
+                ImGuiTabItemFlags flags =
+                    isActive ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+                if (ImGui::BeginTabItem(label.c_str(), nullptr, flags)) {
+                    // IsItemActivated() is true only on the frame the user actually clicked
+                    // the tab — not when it was programmatically set via SetSelected.
+                    if (ImGui::IsItemActivated() && !isActive) {
                         cmd.execute("select canvas " + canvas->name);
                     }
                     ImGui::EndTabItem();

@@ -39,6 +39,13 @@ class CommandRegistry {
      */
     CommandBase* find(const std::string& name) const;
 
+    /**
+     * @brief Exact-match lookup — only checks the name/alias index directly,
+     *        never falls back to a shorter prefix.  Used by the command resolver
+     *        when testing whether a two-token prefix is a genuine compound name.
+     */
+    CommandBase* findExact(const std::string& name) const;
+
     /** @brief Return metadata pointers for every registered command. */
     std::vector<const CommandMetadata*> getAllMetadata() const;
 

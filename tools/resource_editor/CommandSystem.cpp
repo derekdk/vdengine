@@ -140,7 +140,10 @@ CommandSystem::ResolvedCommand CommandSystem::resolveCommand(const std::string& 
 
     if (tokens.size() >= 2) {
         std::string twoWord = tokens[0] + " " + tokens[1];
-        CommandBase* cmd = registry.find(twoWord);
+        // Use findExact so we only match genuine two-word command names/aliases.
+        // registry.find() falls back via prefix shortening and would match single-word
+        // commands when the second token is actually an argument (e.g. a coordinate).
+        CommandBase* cmd = registry.findExact(twoWord);
         if (cmd) {
             resolved.command = cmd;
             resolved.commandName = twoWord;
@@ -244,6 +247,16 @@ bool CommandSystem::saveFullLog(const std::string& filePath) {
 
 const std::vector<CommandLogEntry>& CommandSystem::getLog() const {
     return m_log;
+}
+
+void CommandSystem::logRawInput(const std::string& input) {
+    CommandLogEntry entry;
+    entry.timestamp = getCurrentTimestamp();
+    entry.commandLine = input;
+    entry.result.clear();
+    entry.success = true;
+    entry.isRawInput = true;
+    m_log.push_back(std::move(entry));
 }
 
 void CommandSystem::addLogEntry(const std::string& line, const std::string& result, bool success,

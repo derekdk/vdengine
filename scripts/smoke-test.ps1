@@ -100,6 +100,7 @@ $smokeScriptMap = @{
     # Tools
     'vde_vlauncher.exe'                = 'smoke_vlauncher.vdescript'
     'vde_geometry_repl.exe'            = 'smoke_geometry_repl.vdescript'
+    'vde_resource_editor.exe'          = 'smoke_resource_editor.vdescript'
 }
 
 $defaultSmoke = 'smoke_quick.vdescript'

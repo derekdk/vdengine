@@ -28,6 +28,7 @@ struct CommandLogEntry {
     std::string canvasName;
     std::string result;
     bool success = true;
+    bool isRawInput = false;  ///< True for verbatim "typed" echo entries — before any parsing.
 };
 
 /**
@@ -85,6 +86,12 @@ class CommandSystem {
      */
     void addLogEntry(const std::string& line, const std::string& result, bool success,
                      const std::string& canvasName = "");
+
+    /**
+     * @brief Record the verbatim text the user typed before any parsing occurs.
+     * Used to verify that input reaches execute() unmodified.
+     */
+    void logRawInput(const std::string& input);
 
     /** @brief Clear the log and reset active canvas. */
     void clear();

@@ -1,6 +1,6 @@
 # VDE Resource Editor — Implementation Plan
 
-> **Status:** Phase 1 Steps 1–4 Complete  
+> **Status:** Phase 1 Complete  
 > **Related:** [Editor Design](EDITOR_DESIGN.md) · [Canvas DSL](CANVAS_DSL.md) · [Parser & Command System](PARSER_AND_COMMAND_SYSTEM.md)
 
 ---
@@ -233,22 +233,34 @@ tools/resource_editor/CMakeLists.txt     # Add each new file
 
 ### Step 5 — Smoke Test & Scripted Validation
 
-> **Status:** Not started
+> **Status:** ✅ Complete (verified: all 30 commands pass, exit code 0)
 
 Create a command script that exercises every command and verify it runs cleanly.
 
-**Files to create:**
+**Files created:**
 ```
 tools/resource_editor/scripts/
-    smoke_test.txt             # Exercises all commands in sequence
+    smoke_test.txt                    # Exercises all 30 commands in sequence
 smoketests/
-    resource_editor_smoke.ps1  # Launches editor with --input-script, verifies exit code
+    resource_editor_smoke.ps1         # Launches editor in script mode, verifies exit code 0
+    scripts/
+        smoke_resource_editor.vdescript  # GUI smoke script for scripts/smoke-test.ps1
 ```
 
+**Bugs found and fixed during testing:**
+- `onEnter()` was never called in script mode (game loop deferred via `setActiveScene`);
+  added explicit `scene->onEnter()` call in `ResourceEditorGame::onStart()` before script execution
+- `CommandRegistry::findExact()` added to prevent two-word lookup fallback from stripping
+  args (e.g. `help create canvas` routing to `help` and treating `canvas` as unknown command)
+- `SaveCommand` filepath param changed from `ParamType::String` to `ParamType::QuotedString`
+  so quoted filenames are stripped correctly (e.g. `save "output.png"`)
+- `cleanupImGuiTextures()` now releases `canvas->gpuTexture` shared_ptr before Vulkan teardown
+- `smoke_test.txt` corrected: `flood` requires `with` keyword; `resize` takes bare ints not a tuple
+
 **Verification:**
-- `vde_resource_editor.exe < smoke_test.txt` runs all commands without errors
-- Exit code 0
-- Can be added to CI smoke test suite
+- `.\smoketests\resource_editor_smoke.ps1` → PASSED (exit code 0), all 30 commands succeed
+- `scripts/smoke-test.ps1` maps `vde_resource_editor.exe` → GUI smoke via vdescript
+- 784/784 unit tests continue to pass
 
 **Dependencies:** Step 4
 

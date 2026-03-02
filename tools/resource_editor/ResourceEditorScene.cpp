@@ -147,9 +147,15 @@ void ResourceEditorScene::onBeforeImGuiShutdown() {
 void ResourceEditorScene::cleanupImGuiTextures() {
     for (uint32_t id : m_canvasRegistry.getIds()) {
         Canvas* canvas = m_canvasRegistry.getById(id);
-        if (canvas && canvas->imguiTextureId != VK_NULL_HANDLE) {
-            ImGui_ImplVulkan_RemoveTexture(canvas->imguiTextureId);
-            canvas->imguiTextureId = VK_NULL_HANDLE;
+        if (canvas) {
+            if (canvas->imguiTextureId != VK_NULL_HANDLE) {
+                ImGui_ImplVulkan_RemoveTexture(canvas->imguiTextureId);
+                canvas->imguiTextureId = VK_NULL_HANDLE;
+            }
+            // Release the GPU texture now, while the Vulkan device is still valid.
+            // If we leave this to the CanvasRegistry destructor, it may run after
+            // the Vulkan device has been destroyed, causing an access violation.
+            canvas->gpuTexture = nullptr;
         }
     }
 }

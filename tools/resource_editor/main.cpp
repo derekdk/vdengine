@@ -31,6 +31,13 @@ class ResourceEditorGame : public BaseToolGame<BaseToolInputHandler, ResourceEdi
         if (m_toolMode == ToolMode::SCRIPT && !m_scriptFile.empty()) {
             auto* scene = getToolScene();
             if (scene) {
+                // In script mode the game loop never runs (quit() is called before it
+                // starts), so processPendingSceneChange() is never called and the scene's
+                // onEnter() is never invoked by the framework.  Call it explicitly so that
+                // the EditorContext (canvases, palette, commands, game) is wired up before
+                // any commands execute.
+                scene->onEnter();
+
                 if (!scene->getCommandSystem().executeScript(m_scriptFile)) {
                     std::cerr << "Failed to process script file: " << m_scriptFile << "\n";
                     m_exitCode = 1;
