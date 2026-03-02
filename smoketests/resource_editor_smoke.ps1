@@ -68,7 +68,7 @@ try {
     Push-Location $exeDir
 
     if ($Verbose) {
-        & $exePath $smokeScript
+        & $exePath $smokeScript --log-console
     } else {
         & $exePath $smokeScript 2>&1 | Out-Null
     }
