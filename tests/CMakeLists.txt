@@ -55,6 +55,11 @@ set(VDE_TEST_SOURCES
     InputScript_test.cpp
     # Storage tests
     StorageManager_test.cpp
+    # Offscreen render target tests
+    OffscreenRenderTarget_test.cpp
+    # Transition tests
+    Transition_test.cpp
+    TransitionManager_test.cpp
 )
 
 # Create test executable

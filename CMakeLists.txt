@@ -128,6 +128,7 @@ set(VDE_SOURCES
     src/UniformBuffer.cpp
     src/DescriptorManager.cpp
     src/ImageLoader.cpp
+    src/OffscreenRenderTarget.cpp
     src/stb_impl.cpp
     src/HexGeometry.cpp
     src/HexPrismMesh.cpp
@@ -146,6 +147,9 @@ set(VDE_SOURCES
     src/api/PhysicsScene.cpp
     src/api/PhysicsEntity.cpp
     src/api/ThreadPool.cpp
+    # Transitions
+    src/api/Transition.cpp
+    src/api/TransitionManager.cpp
     # Audio
     src/miniaudio_impl.cpp
     src/api/AudioClip.cpp
@@ -171,6 +175,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/UniformBuffer.h
     include/vde/DescriptorManager.h
     include/vde/ImageLoader.h
+    include/vde/OffscreenRenderTarget.h
     include/vde/Types.h
     include/vde/HexGeometry.h
     include/vde/HexPrismMesh.h
@@ -200,6 +205,9 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/PhysicsScene.h
     include/vde/api/PhysicsEntity.h
     include/vde/api/ThreadPool.h
+    # Transition headers
+    include/vde/api/Transition.h
+    include/vde/api/TransitionManager.h
     # Audio headers
     include/vde/api/AudioClip.h
     include/vde/api/AudioEvent.h

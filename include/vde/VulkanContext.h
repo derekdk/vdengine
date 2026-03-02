@@ -116,8 +116,11 @@ class VulkanContext {
     VkQueue getPresentQueue() const { return m_presentQueue; }
     uint32_t getGraphicsQueueFamily() const { return m_graphicsQueueFamilyIndex; }
     VkRenderPass getRenderPass() const { return m_renderPass; }
+    VkRenderPass getOffscreenRenderPass() const { return m_offscreenRenderPass; }
     VkCommandPool getCommandPool() const { return m_commandPool; }
     VkExtent2D getSwapChainExtent() const { return m_swapChainExtent; }
+    VkFormat getSwapChainImageFormat() const { return m_swapChainImageFormat; }
+    VkFormat getDepthFormat() const { return m_depthFormat; }
     uint32_t getCurrentFrame() const { return m_currentFrame; }
 
     const std::vector<VkCommandBuffer>& getCommandBuffers() const { return m_commandBuffers; }
@@ -326,7 +329,8 @@ class VulkanContext {
 
     // Render pass and framebuffers
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
-    VkRenderPass m_renderPassLoad = VK_NULL_HANDLE;  // LOAD variant for multi-scene
+    VkRenderPass m_renderPassLoad = VK_NULL_HANDLE;       // LOAD variant for multi-scene
+    VkRenderPass m_offscreenRenderPass = VK_NULL_HANDLE;  // Offscreen: color → SHADER_READ_OPTIMAL
     std::vector<VkFramebuffer> m_swapChainFramebuffers;
 
     // Depth resources

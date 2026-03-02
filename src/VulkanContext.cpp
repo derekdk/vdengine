@@ -150,6 +150,10 @@ void VulkanContext::cleanupSwapChain() {
         vkDestroyRenderPass(m_device, m_renderPassLoad, nullptr);
         m_renderPassLoad = VK_NULL_HANDLE;
     }
+    if (m_offscreenRenderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
+        m_offscreenRenderPass = VK_NULL_HANDLE;
+    }
 
     if (m_depthImageView != VK_NULL_HANDLE) {
         vkDestroyImageView(m_device, m_depthImageView, nullptr);
@@ -707,6 +711,82 @@ void VulkanContext::createRenderPass() {
 
     if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPassLoad) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create load render pass!");
+    }
+
+    // Create offscreen render pass (color → SHADER_READ_OPTIMAL for sampling)
+    {
+        VkAttachmentDescription offscreenColor{};
+        offscreenColor.format = m_swapChainImageFormat;
+        offscreenColor.samples = VK_SAMPLE_COUNT_1_BIT;
+        offscreenColor.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        offscreenColor.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        offscreenColor.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        offscreenColor.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        offscreenColor.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        offscreenColor.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentReference offscreenColorRef{};
+        offscreenColorRef.attachment = 0;
+        offscreenColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription offscreenDepth{};
+        offscreenDepth.format = findDepthFormat();
+        offscreenDepth.samples = VK_SAMPLE_COUNT_1_BIT;
+        offscreenDepth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        offscreenDepth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        offscreenDepth.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        offscreenDepth.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        offscreenDepth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        offscreenDepth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference offscreenDepthRef{};
+        offscreenDepthRef.attachment = 1;
+        offscreenDepthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription offscreenSubpass{};
+        offscreenSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        offscreenSubpass.colorAttachmentCount = 1;
+        offscreenSubpass.pColorAttachments = &offscreenColorRef;
+        offscreenSubpass.pDepthStencilAttachment = &offscreenDepthRef;
+
+        // Dependency: fragment shader reads happen after color output
+        std::array<VkSubpassDependency, 2> offscreenDeps{};
+        // External → subpass 0: wait for nothing, produce color+depth
+        offscreenDeps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        offscreenDeps[0].dstSubpass = 0;
+        offscreenDeps[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        offscreenDeps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        offscreenDeps[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        offscreenDeps[0].dstAccessMask =
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        offscreenDeps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        // Subpass 0 → external: color writes complete before fragment shader reads
+        offscreenDeps[1].srcSubpass = 0;
+        offscreenDeps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        offscreenDeps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        offscreenDeps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        offscreenDeps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        offscreenDeps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        offscreenDeps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        std::array<VkAttachmentDescription, 2> offscreenAttachments = {offscreenColor,
+                                                                       offscreenDepth};
+
+        VkRenderPassCreateInfo offscreenRPInfo{};
+        offscreenRPInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        offscreenRPInfo.attachmentCount = static_cast<uint32_t>(offscreenAttachments.size());
+        offscreenRPInfo.pAttachments = offscreenAttachments.data();
+        offscreenRPInfo.subpassCount = 1;
+        offscreenRPInfo.pSubpasses = &offscreenSubpass;
+        offscreenRPInfo.dependencyCount = static_cast<uint32_t>(offscreenDeps.size());
+        offscreenRPInfo.pDependencies = offscreenDeps.data();
+
+        if (vkCreateRenderPass(m_device, &offscreenRPInfo, nullptr, &m_offscreenRenderPass) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("Failed to create offscreen render pass!");
+        }
     }
 }
 
