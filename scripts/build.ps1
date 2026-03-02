@@ -96,7 +96,7 @@ try {
         Write-Info "Configuring CMake with $Generator generator..."
         
         if ($Generator -eq "Ninja") {
-            cmake -S $vdeRoot -B $buildDir -G Ninja -DCMAKE_BUILD_TYPE=$Config
+            cmake -S $vdeRoot -B $buildDir -G Ninja "-DCMAKE_BUILD_TYPE=$Config"
         } else {
             cmake -S $vdeRoot -B $buildDir
         }

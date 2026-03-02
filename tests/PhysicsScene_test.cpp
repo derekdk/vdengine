@@ -1025,4 +1025,74 @@ TEST_F(PhysicsSceneTest, GetEntityByPhysicsBodyReturnsNullForUnknownId) {
     EXPECT_EQ(found, nullptr);
 }
 
+// ============================================================================
+// PhysicsBodyDef Factory Method Tests
+// ============================================================================
+
+TEST(PhysicsBodyDefFactoryTest, DynamicBoxDefaults) {
+    auto def = PhysicsBodyDef::dynamicBox({1.0f, 2.0f}, {0.5f, 0.3f});
+
+    EXPECT_EQ(def.type, PhysicsBodyType::Dynamic);
+    EXPECT_EQ(def.shape, PhysicsShape::Box);
+    EXPECT_FLOAT_EQ(def.position.x, 1.0f);
+    EXPECT_FLOAT_EQ(def.position.y, 2.0f);
+    EXPECT_FLOAT_EQ(def.extents.x, 0.5f);
+    EXPECT_FLOAT_EQ(def.extents.y, 0.3f);
+    EXPECT_FLOAT_EQ(def.mass, 1.0f);
+    EXPECT_FLOAT_EQ(def.restitution, 0.2f);
+    EXPECT_FLOAT_EQ(def.friction, 0.3f);
+}
+
+TEST(PhysicsBodyDefFactoryTest, DynamicBoxCustom) {
+    auto def = PhysicsBodyDef::dynamicBox({0.0f, 0.0f}, {1.0f, 1.0f}, 5.0f, 0.8f, 0.1f);
+
+    EXPECT_FLOAT_EQ(def.mass, 5.0f);
+    EXPECT_FLOAT_EQ(def.restitution, 0.8f);
+    EXPECT_FLOAT_EQ(def.friction, 0.1f);
+}
+
+TEST(PhysicsBodyDefFactoryTest, DynamicCircleDefaults) {
+    auto def = PhysicsBodyDef::dynamicCircle({3.0f, 4.0f}, 0.75f);
+
+    EXPECT_EQ(def.type, PhysicsBodyType::Dynamic);
+    EXPECT_EQ(def.shape, PhysicsShape::Circle);
+    EXPECT_FLOAT_EQ(def.position.x, 3.0f);
+    EXPECT_FLOAT_EQ(def.position.y, 4.0f);
+    EXPECT_FLOAT_EQ(def.extents.x, 0.75f);  // radius stored in extents.x
+    EXPECT_FLOAT_EQ(def.mass, 1.0f);
+    EXPECT_FLOAT_EQ(def.restitution, 0.2f);
+    EXPECT_FLOAT_EQ(def.friction, 0.1f);
+}
+
+TEST(PhysicsBodyDefFactoryTest, DynamicCircleCustom) {
+    auto def = PhysicsBodyDef::dynamicCircle({0.0f, 0.0f}, 1.0f, 2.5f, 0.9f, 0.0f);
+
+    EXPECT_FLOAT_EQ(def.mass, 2.5f);
+    EXPECT_FLOAT_EQ(def.restitution, 0.9f);
+    EXPECT_FLOAT_EQ(def.friction, 0.0f);
+}
+
+TEST(PhysicsBodyDefFactoryTest, StaticBox) {
+    auto def = PhysicsBodyDef::staticBox({-5.0f, 0.0f}, {3.0f, 0.5f});
+
+    EXPECT_EQ(def.type, PhysicsBodyType::Static);
+    EXPECT_EQ(def.shape, PhysicsShape::Box);
+    EXPECT_FLOAT_EQ(def.position.x, -5.0f);
+    EXPECT_FLOAT_EQ(def.extents.x, 3.0f);
+    EXPECT_FLOAT_EQ(def.extents.y, 0.5f);
+    EXPECT_FLOAT_EQ(def.mass, 0.0f);
+}
+
+TEST(PhysicsBodyDefFactoryTest, KinematicBox) {
+    auto def = PhysicsBodyDef::kinematicBox({2.0f, 1.0f}, {1.0f, 0.25f});
+
+    EXPECT_EQ(def.type, PhysicsBodyType::Kinematic);
+    EXPECT_EQ(def.shape, PhysicsShape::Box);
+    EXPECT_FLOAT_EQ(def.position.x, 2.0f);
+    EXPECT_FLOAT_EQ(def.position.y, 1.0f);
+    EXPECT_FLOAT_EQ(def.extents.x, 1.0f);
+    EXPECT_FLOAT_EQ(def.extents.y, 0.25f);
+    EXPECT_FLOAT_EQ(def.mass, 0.0f);
+}
+
 }  // namespace vde::test

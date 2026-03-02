@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(VulkanDisplayEngine VERSION 0.1.0 LANGUAGES CXX)
+project(VulkanDisplayEngine VERSION 0.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Options
 option(VDE_BUILD_EXAMPLES "Build example applications" ON)
 option(VDE_BUILD_TESTS "Build unit tests" ON)
+option(VDE_BUILD_TOOLS "Build asset creation tools" ON)
 option(VDE_SHARED_LIBS "Build as shared library" OFF)
 
 # Compiler options
@@ -94,6 +95,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(miniaudio)
 
+# SQLite3 for persistent key-value storage
+FetchContent_Declare(
+    sqlite3
+    URL https://www.sqlite.org/2025/sqlite-amalgamation-3490100.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_GetProperties(sqlite3)
+if(NOT sqlite3_POPULATED)
+    # Policy CMP0169: allow direct FetchContent_Populate for content with no CMakeLists
+    cmake_policy(SET CMP0169 OLD)
+    FetchContent_Populate(sqlite3)
+    add_library(sqlite3 STATIC ${sqlite3_SOURCE_DIR}/sqlite3.c)
+    target_include_directories(sqlite3 PUBLIC ${sqlite3_SOURCE_DIR})
+    if(MSVC)
+        target_compile_options(sqlite3 PRIVATE /W0)
+    else()
+        target_compile_options(sqlite3 PRIVATE -w)
+    endif()
+endif()
+
 # Library sources
 set(VDE_SOURCES
     src/Window.cpp
@@ -130,6 +151,10 @@ set(VDE_SOURCES
     src/api/AudioClip.cpp
     src/api/AudioManager.cpp
     src/api/AudioSource.cpp
+    # Input script
+    src/api/InputScript.cpp
+    # Storage
+    src/api/StorageManager.cpp
 )
 
 # Public headers
@@ -180,6 +205,10 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/AudioEvent.h
     include/vde/api/AudioManager.h
     include/vde/api/AudioSource.h
+    # Input script
+    include/vde/api/InputScript.h
+    # Storage
+    include/vde/api/StorageManager.h
 )
 
 # Create library
@@ -218,6 +247,7 @@ target_link_libraries(vde PRIVATE
     glslang::glslang
     glslang::glslang-default-resource-limits
     glslang::SPIRV
+    sqlite3
 )
 
 # Shader directory configuration
@@ -248,6 +278,11 @@ if(VDE_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+# Tools
+if(VDE_BUILD_TOOLS)
+    add_subdirectory(tools)
+endif()
+
 # Tests
 if(VDE_BUILD_TESTS)
     enable_testing()
@@ -261,5 +296,6 @@ message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Shared library: ${VDE_SHARED_LIBS}")
 message(STATUS "  Build examples: ${VDE_BUILD_EXAMPLES}")
+message(STATUS "  Build tools: ${VDE_BUILD_TOOLS}")
 message(STATUS "  Build tests: ${VDE_BUILD_TESTS}")
 message(STATUS "===========================================")

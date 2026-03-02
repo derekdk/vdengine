@@ -20,6 +20,7 @@
 
 #include "GameSettings.h"
 #include "InputHandler.h"
+#include "InputScript.h"
 #include "ResourceManager.h"
 #include "Scene.h"
 #include "SceneGroup.h"
@@ -105,6 +106,23 @@ class Game {
      * @brief Request the game to exit.
      */
     void quit();
+
+    // Input script
+
+    /**
+     * @brief Set the input script file path.
+     *
+     * This has the highest priority for input script discovery.
+     * Priority order: API call > CLI arg > environment variable.
+     *
+     * @param scriptPath Path to the .vdescript file
+     */
+    void setInputScriptFile(const std::string& scriptPath);
+
+    /**
+     * @brief Get the configured input script file path.
+     */
+    const std::string& getInputScriptFile() const;
 
     /**
      * @brief Check if the game is running.
@@ -264,6 +282,15 @@ class Game {
     Window* getWindow() { return m_window.get(); }
     const Window* getWindow() const { return m_window.get(); }
 
+    /**
+     * @brief Get DPI scale factor for the window.
+     * @return DPI scale (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)
+     *
+     * Returns the content scale factor for the window's monitor,
+     * which is useful for scaling UI elements on high-DPI displays.
+     */
+    float getDPIScale() const;
+
     // Settings
 
     /**
@@ -323,6 +350,20 @@ class Game {
      * @brief Get the mesh pipeline layout.
      */
     VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
+
+    /**
+     * @brief Allocate a mesh texture descriptor set (set 2).
+     */
+    VkDescriptorSet allocateMeshTextureDescriptorSet();
+
+    /**
+     * @brief Update a mesh texture descriptor set with texture binding.
+     * @param descriptorSet Descriptor set to update
+     * @param imageView Texture image view
+     * @param sampler Texture sampler
+     */
+    void updateMeshTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView,
+                                     VkSampler sampler);
 
     /**
      * @brief Get the sprite rendering pipeline.
@@ -389,6 +430,41 @@ class Game {
      */
     void updateLightingUBO(const Scene* scene);
 
+    // =========================================================================
+    // Exit Code Management (B6 minimal — needed by Track A assertions)
+    // =========================================================================
+
+    /**
+     * @brief Set the process exit code.
+     *
+     * Used by assertion commands to signal test failure.
+     * Once set to non-zero, subsequent calls with 0 are ignored.
+     *
+     * @param code Exit code (0 = success, 1 = failure)
+     */
+    void setExitCode(int code);
+
+    /**
+     * @brief Get the current exit code.
+     * @return 0 for success, 1 for failure
+     */
+    int getExitCode() const { return m_exitCode; }
+
+    // =========================================================================
+    // Screenshot Capture (A2)
+    // =========================================================================
+
+    /**
+     * @brief Capture the current framebuffer to a PNG file.
+     *
+     * Reads back the most recently rendered frame from the GPU and writes
+     * it to the specified path as an RGBA PNG image.
+     *
+     * @param outputPath Path for the output PNG file
+     * @return true if capture and write succeeded
+     */
+    bool captureScreenshot(const std::string& outputPath);
+
   protected:
     // Virtual methods for subclassing
 
@@ -427,6 +503,8 @@ class Game {
     VkPipelineLayout m_meshPipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_meshPipeline = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_meshTextureDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_meshTextureDescriptorPool = VK_NULL_HANDLE;
 
     // Sprite rendering infrastructure (Phase 3)
     VkPipelineLayout m_spritePipelineLayout = VK_NULL_HANDLE;
@@ -470,12 +548,21 @@ class Game {
     double m_fpsAccumulator = 0.0;
     int m_fpsFrameCount = 0;
 
+    // Input script
+    std::string m_inputScriptFile;
+    std::unique_ptr<InputScriptState> m_inputScriptState;
+
+    // Exit code (B6 minimal)
+    int m_exitCode = 0;
+
     // Callbacks
     std::function<void(uint32_t, uint32_t)> m_resizeCallback;
     std::function<void(bool)> m_focusCallback;
 
     // Internal methods
     void processInput();
+    void processInputScript();
+    void loadInputScript();
     void pollGamepads();
     void updateTiming();
     void processPendingSceneChange();

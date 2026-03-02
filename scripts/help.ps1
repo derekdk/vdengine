@@ -20,12 +20,14 @@ Write-Cmd '.\scripts\build.ps1' 'Build the project (default Ninja Debug)'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean and rebuild'
 Write-Cmd '.\scripts\clean.ps1' 'Clean build artifacts'
 Write-Cmd '.\scripts\test.ps1' 'Run unit tests'
+Write-Cmd '.\scripts\run-vlauncher.ps1' 'Run VLauncher (builds target if missing)'
 
 Write-Title "QUICK START"
 Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default)'
 Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
 Write-Cmd '.\scripts\test.ps1' 'Run all tests'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'
+Write-Cmd '.\scripts\run-vlauncher.ps1' 'Launch VLauncher from root'
 
 Write-Title "COMMON TASKS"
 Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
@@ -47,6 +49,7 @@ Write-Title "EXAMPLES"
 Write-Cmd '.\scripts\build.ps1 -Config Release' 'Release build'
 Write-Cmd '.\scripts\test.ps1 -Generator Ninja -Build' 'Build with Ninja and test'
 Write-Cmd '.\scripts\clean.ps1 -Full; .\scripts\build.ps1' 'Full clean rebuild'
+Write-Cmd '.\run-vlauncher.ps1' 'Root shortcut to launch VLauncher'
 
 Write-Title "HELP & DOCS"
 Write-Cmd '.\scripts\help.ps1' 'Show this help'

@@ -1,0 +1,25 @@
+# Smoke test for asteroids demo
+# Tests ship rotation and thrust
+wait startup
+wait 500
+
+# Rotate ship
+keydown LEFT
+wait 500
+keyup LEFT
+
+keydown RIGHT
+wait 500
+keyup RIGHT
+
+# Apply thrust
+keydown UP
+wait 1000
+keyup UP
+
+# Fire a shot
+press SPACE
+wait 500
+
+wait 2s
+exit

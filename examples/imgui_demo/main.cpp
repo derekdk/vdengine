@@ -40,30 +40,6 @@
 #include <imgui_impl_vulkan.h>
 
 // =============================================================================
-// ImGui Vulkan helpers
-// =============================================================================
-
-/// Creates a dedicated descriptor pool for ImGui's internal use.
-static VkDescriptorPool createImGuiDescriptorPool(VkDevice device) {
-    VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100},
-    };
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    poolInfo.maxSets = 100;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(std::size(poolSizes));
-    poolInfo.pPoolSizes = poolSizes;
-
-    VkDescriptorPool pool = VK_NULL_HANDLE;
-    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create ImGui descriptor pool!");
-    }
-    return pool;
-}
-
-// =============================================================================
 // Input Handler
 // =============================================================================
 
@@ -88,6 +64,12 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
 
     void onEnter() override {
         printExampleHeader();
+
+        // Store DPI scale for UI scaling
+        auto* game = getGame();
+        if (game) {
+            m_dpiScale = game->getDPIScale();
+        }
 
         // --- Camera ---
         setCamera(new vde::OrbitCamera(vde::Position(0, 0, 0), 8.0f, 30.0f, 25.0f));
@@ -166,25 +148,29 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         }
     }
 
-    /// Called by the Game subclass during ImGui rendering phase.
-    void drawImGui() {
+    /// Called by BaseExampleGame during ImGui rendering phase.
+    void drawDebugUI() override {
+        // Apply DPI scale to all window positions and sizes
+        float scale = m_dpiScale;
+
         // --- Stats overlay ---
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260, 120), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(10 * scale, 10 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(260 * scale, 140 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Engine Stats")) {
             auto* game = getGame();
             ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
             ImGui::Text("Frame: %llu", game ? game->getFrameCount() : 0ULL);
             ImGui::Text("Delta: %.3f ms", game ? game->getDeltaTime() * 1000.0f : 0.0f);
             ImGui::Text("Entities: %zu", getEntities().size());
+            ImGui::Text("DPI Scale: %.2f", game ? game->getDPIScale() : 1.0f);
             ImGui::Separator();
             ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "ImGui integrated as overlay");
         }
         ImGui::End();
 
         // --- Cube Inspector ---
-        ImGui::SetNextWindowPos(ImVec2(10, 140), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(280, 300), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(10 * scale, 140 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(280 * scale, 300 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Cube Inspector")) {
             ImGui::DragFloat3("Position##cube", m_cubePos, 0.1f, -10.0f, 10.0f);
             ImGui::SliderFloat("Scale", &m_cubeScale, 0.1f, 5.0f);
@@ -199,8 +185,8 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         ImGui::End();
 
         // --- Sphere Inspector ---
-        ImGui::SetNextWindowPos(ImVec2(10, 450), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(280, 140), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(10 * scale, 450 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(280 * scale, 140 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Sphere Inspector")) {
             ImGui::DragFloat3("Position##sphere", m_spherePos, 0.1f, -10.0f, 10.0f);
             ImGui::ColorEdit3("Color##sphere", m_sphereColor);
@@ -208,8 +194,8 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         ImGui::End();
 
         // --- Lighting ---
-        ImGui::SetNextWindowPos(ImVec2(300, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260, 140), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(300 * scale, 10 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(260 * scale, 140 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Lighting")) {
             if (ImGui::ColorEdit3("Ambient", m_ambientColor)) {
                 m_lightingDirty = true;
@@ -221,8 +207,8 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         ImGui::End();
 
         // --- ImGui demo window (toggle with checkbox) ---
-        ImGui::SetNextWindowPos(ImVec2(300, 160), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260, 50), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(300 * scale, 160 * scale), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(260 * scale, 50 * scale), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Options")) {
             ImGui::Checkbox("Show ImGui Demo Window", &m_showDemoWindow);
         }
@@ -275,143 +261,34 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
 
     bool m_showDemoWindow = false;
     float m_totalTime = 0.0f;
+    float m_dpiScale = 1.0f;
 };
 
 // =============================================================================
-// Game – manages ImGui lifecycle alongside the VDE engine
+// Game – uses BaseExampleGame with built-in ImGui support
 // =============================================================================
 
 class ImGuiDemoGame : public vde::examples::BaseExampleGame<ImGuiDemoInputHandler, ImGuiDemoScene> {
   public:
     ImGuiDemoGame() = default;
-    ~ImGuiDemoGame() override { cleanupImGui(); }
+    ~ImGuiDemoGame() override = default;
 
-    void onStart() override {
-        BaseExampleGame::onStart();
-        initImGui();
-    }
-
-    void onRender() override {
-        // This is called inside the active render pass, after
-        // scene entities have been drawn – perfect for ImGui overlay.
-        renderImGui();
-    }
-
-    void onShutdown() override {
-        // Ensure GPU is idle before tearing down ImGui resources
-        if (getVulkanContext()) {
-            vkDeviceWaitIdle(getVulkanContext()->getDevice());
-        }
-        cleanupImGui();
-        BaseExampleGame::onShutdown();
-    }
-
-  private:
-    VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
-    bool m_imguiInitialized = false;
-
-    // -----------------------------------------------------------------
-    // ImGui init / shutdown
-    // -----------------------------------------------------------------
-
-    void initImGui() {
-        auto* ctx = getVulkanContext();
-        auto* win = getWindow();
-        if (!ctx || !win)
-            return;
-
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        ImGui::StyleColorsDark();
-
-        // Platform backend – GLFW.
-        // install_callbacks=true lets ImGui capture input alongside VDE.
-        ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
-
-        // Create a descriptor pool dedicated to ImGui.
-        m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
-
-        // Renderer backend – Vulkan.
-        ImGui_ImplVulkan_InitInfo initInfo{};
-        initInfo.Instance = ctx->getInstance();
-        initInfo.PhysicalDevice = ctx->getPhysicalDevice();
-        initInfo.Device = ctx->getDevice();
-        initInfo.QueueFamily = ctx->getGraphicsQueueFamily();
-        initInfo.Queue = ctx->getGraphicsQueue();
-        initInfo.DescriptorPool = m_imguiPool;
-        initInfo.MinImageCount = 2;
-        initInfo.ImageCount = 2;  // double-buffered
-        initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-        initInfo.RenderPass = ctx->getRenderPass();
-        initInfo.Subpass = 0;
-
-        ImGui_ImplVulkan_Init(&initInfo);
-
-        // Upload font atlas textures.
-        ImGui_ImplVulkan_CreateFontsTexture();
-
-        m_imguiInitialized = true;
-    }
-
-    void cleanupImGui() {
-        if (!m_imguiInitialized)
-            return;
-
-        ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-
-        if (m_imguiPool != VK_NULL_HANDLE) {
-            auto* ctx = getVulkanContext();
-            if (ctx && ctx->getDevice()) {
-                vkDestroyDescriptorPool(ctx->getDevice(), m_imguiPool, nullptr);
-            }
-            m_imguiPool = VK_NULL_HANDLE;
-        }
-
-        m_imguiInitialized = false;
-    }
-
-    // -----------------------------------------------------------------
-    // Per-frame ImGui rendering
-    // -----------------------------------------------------------------
-
-    void renderImGui() {
-        if (!m_imguiInitialized)
-            return;
-
-        // Start the ImGui frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        // Let the scene build its ImGui windows
-        auto* scene = getExampleScene();
-        if (scene) {
-            scene->drawImGui();
-        }
-
-        // Finalize and record draw data into the active command buffer
-        ImGui::Render();
-        ImDrawData* drawData = ImGui::GetDrawData();
-
-        auto* ctx = getVulkanContext();
-        if (ctx) {
-            VkCommandBuffer cmd = ctx->getCurrentCommandBuffer();
-            if (cmd != VK_NULL_HANDLE) {
-                ImGui_ImplVulkan_RenderDrawData(drawData, cmd);
-            }
-        }
-    }
+    // BaseExampleGame handles all ImGui initialization and rendering!
 };
 
 // =============================================================================
 // Main
 // =============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     ImGuiDemoGame demo;
-    return vde::examples::runExample(demo, "VDE ImGui Demo", 1280, 720);
+
+    // Adjust default resolution based on DPI
+    float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
+
+    // Scale the resolution for high DPI displays
+    uint32_t width = static_cast<uint32_t>(1280 * dpiScale);
+    uint32_t height = static_cast<uint32_t>(720 * dpiScale);
+
+    return vde::examples::runExample(demo, "VDE ImGui Demo", width, height, argc, argv);
 }

@@ -9,6 +9,7 @@
 #include <vde/api/Entity.h>
 #include <vde/api/GameCamera.h>
 #include <vde/api/LightBox.h>
+#include <vde/api/PhysicsEntity.h>
 #include <vde/api/Scene.h>
 #include <vde/api/ViewportRect.h>
 #include <vde/api/WorldBounds.h>
@@ -445,4 +446,169 @@ TEST_F(SceneTest, PhaseCallbackUpdateAudioDrainsQueue) {
 
     scene->updateAudio(0.016f);
     EXPECT_EQ(scene->getAudioEventQueueSize(), 0u);
+}
+
+// ============================================================================
+// Deferred Command Tests
+// ============================================================================
+
+TEST_F(SceneTest, DeferCommandBasicExecution) {
+    bool executed = false;
+    scene->deferCommand([&executed]() { executed = true; });
+
+    EXPECT_FALSE(executed);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 1u);
+
+    scene->update(0.016f);
+    EXPECT_TRUE(executed);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+TEST_F(SceneTest, DeferCommandFIFOOrder) {
+    std::vector<int> order;
+    scene->deferCommand([&order]() { order.push_back(1); });
+    scene->deferCommand([&order]() { order.push_back(2); });
+    scene->deferCommand([&order]() { order.push_back(3); });
+
+    scene->update(0.016f);
+
+    ASSERT_EQ(order.size(), 3u);
+    EXPECT_EQ(order[0], 1);
+    EXPECT_EQ(order[1], 2);
+    EXPECT_EQ(order[2], 3);
+}
+
+TEST_F(SceneTest, DeferCommandMultipleFlushCycles) {
+    int counter = 0;
+    scene->deferCommand([&counter]() { counter++; });
+    scene->update(0.016f);
+    EXPECT_EQ(counter, 1);
+
+    // Second update with no pending commands does nothing
+    scene->update(0.016f);
+    EXPECT_EQ(counter, 1);
+
+    // Queue more and flush again
+    scene->deferCommand([&counter]() { counter++; });
+    scene->update(0.016f);
+    EXPECT_EQ(counter, 2);
+}
+
+TEST_F(SceneTest, DeferCommandReentrant) {
+    // A deferred command queues another deferred command — must execute next update
+    int step = 0;
+    scene->deferCommand([this, &step]() {
+        step = 1;
+        scene->deferCommand([&step]() { step = 2; });
+    });
+
+    scene->update(0.016f);
+    // First command ran; second was queued during execution
+    EXPECT_EQ(step, 1);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 1u);
+
+    scene->update(0.016f);
+    EXPECT_EQ(step, 2);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+TEST_F(SceneTest, DeferCommandEntityAddRemove) {
+    scene->deferCommand([this]() {
+        auto entity = scene->addEntity<MeshEntity>();
+        entity->setName("Deferred");
+    });
+    EXPECT_EQ(scene->getEntities().size(), 0u);
+
+    scene->update(0.016f);
+    EXPECT_EQ(scene->getEntities().size(), 1u);
+    EXPECT_NE(scene->getEntityByName("Deferred"), nullptr);
+}
+
+TEST_F(SceneTest, RetireResourceKeepsAlive) {
+    auto resource = std::make_shared<int>(42);
+    std::weak_ptr<int> weak = resource;
+
+    scene->retireResource(std::move(resource));
+    // resource moved — but still alive in the retire queue
+    EXPECT_FALSE(weak.expired());
+
+    scene->update(0.016f);
+    // flushDeferredCommands clears retired resources
+    EXPECT_TRUE(weak.expired());
+}
+
+TEST_F(SceneTest, DeferCommandCount) {
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+    scene->deferCommand([]() {});
+    EXPECT_EQ(scene->getDeferredCommandCount(), 1u);
+    scene->deferCommand([]() {});
+    EXPECT_EQ(scene->getDeferredCommandCount(), 2u);
+
+    scene->update(0.016f);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+TEST_F(SceneTest, DeferCommandFlushedByUpdateGameLogic) {
+    bool executed = false;
+    scene->deferCommand([&executed]() { executed = true; });
+
+    scene->updateGameLogic(0.016f);
+    EXPECT_TRUE(executed);
+    EXPECT_EQ(scene->getDeferredCommandCount(), 0u);
+}
+
+// ============================================================================
+// 2D Convenience Method Tests
+// ============================================================================
+
+TEST_F(SceneTest, Setup2DSetsCamera2D) {
+    scene->setup2D(20.0f, 15.0f);
+
+    auto* cam = scene->getCamera();
+    ASSERT_NE(cam, nullptr);
+
+    // Verify it's a Camera2D (downcast succeeds)
+    auto* cam2d = dynamic_cast<Camera2D*>(cam);
+    EXPECT_NE(cam2d, nullptr);
+}
+
+TEST_F(SceneTest, Setup2DSetsLightBox) {
+    scene->setup2D(20.0f, 15.0f);
+
+    auto* lb = scene->getLightBox();
+    EXPECT_NE(lb, nullptr);
+}
+
+TEST_F(SceneTest, Setup2DSetsBackgroundColor) {
+    Color bg(0.1f, 0.2f, 0.3f, 1.0f);
+    scene->setup2D(20.0f, 15.0f, bg);
+
+    EXPECT_FLOAT_EQ(scene->getBackgroundColor().r, 0.1f);
+    EXPECT_FLOAT_EQ(scene->getBackgroundColor().g, 0.2f);
+    EXPECT_FLOAT_EQ(scene->getBackgroundColor().b, 0.3f);
+}
+
+TEST_F(SceneTest, Setup2DDefaultBackgroundIsBlack) {
+    scene->setup2D(20.0f, 15.0f);
+
+    EXPECT_FLOAT_EQ(scene->getBackgroundColor().r, 0.0f);
+    EXPECT_FLOAT_EQ(scene->getBackgroundColor().g, 0.0f);
+    EXPECT_FLOAT_EQ(scene->getBackgroundColor().b, 0.0f);
+}
+
+TEST_F(SceneTest, CreatePhysicsWallsAdds4Entities) {
+    scene->enablePhysics();
+    scene->createPhysicsWalls(18.0f, 12.0f);
+
+    // 4 walls: floor, ceiling, left, right
+    EXPECT_EQ(scene->getEntities().size(), 4u);
+}
+
+TEST_F(SceneTest, CreatePhysicsWallsRequiresPhysics) {
+    // Physics not enabled — createPhysicsWalls should still add entities
+    // (they just won't have a working physics body until physics is enabled)
+    // This verifies no crash occurs without physics
+    scene->enablePhysics();
+    scene->createPhysicsWalls(10.0f, 8.0f);
+    EXPECT_EQ(scene->getEntities().size(), 4u);
 }

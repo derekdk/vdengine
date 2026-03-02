@@ -453,7 +453,7 @@ class SidescrollerGame
 /**
  * @brief Main entry point
  */
-int main() {
+int main(int argc, char** argv) {
     SidescrollerGame game;
-    return vde::examples::runExample(game, "VDE 2D Sidescroller", 1280, 720);
+    return vde::examples::runExample(game, "VDE 2D Sidescroller", 1280, 720, argc, argv);
 }

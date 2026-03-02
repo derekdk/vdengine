@@ -10,6 +10,7 @@
 #include <glm/gtc/constants.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <limits>
@@ -109,6 +110,59 @@ bool Mesh::loadFromFile(const std::string& path) {
                 indices.push_back(faceIndices[0]);
                 indices.push_back(faceIndices[i]);
                 indices.push_back(faceIndices[i + 1]);
+            }
+        }
+    }
+
+    // Fallback UV generation when OBJ has no usable texture coordinates.
+    // Without this, all vertices default to (0,0) and the mesh samples a single texel.
+    if (!vertices.empty()) {
+        glm::vec2 uvMin(std::numeric_limits<float>::max());
+        glm::vec2 uvMax(std::numeric_limits<float>::lowest());
+        for (const auto& vertex : vertices) {
+            uvMin = glm::min(uvMin, vertex.texCoord);
+            uvMax = glm::max(uvMax, vertex.texCoord);
+        }
+
+        constexpr float epsilon = 1e-5f;
+        bool hasUsableUVs =
+            (std::abs(uvMax.x - uvMin.x) > epsilon) || (std::abs(uvMax.y - uvMin.y) > epsilon);
+
+        if (!hasUsableUVs) {
+            glm::vec3 boundsMin(std::numeric_limits<float>::max());
+            glm::vec3 boundsMax(std::numeric_limits<float>::lowest());
+            for (const auto& vertex : vertices) {
+                boundsMin = glm::min(boundsMin, vertex.position);
+                boundsMax = glm::max(boundsMax, vertex.position);
+            }
+
+            glm::vec3 extents = boundsMax - boundsMin;
+            std::array<int, 3> axes = {0, 1, 2};
+            std::sort(axes.begin(), axes.end(),
+                      [&extents](int a, int b) { return extents[a] > extents[b]; });
+
+            int uAxis = axes[0];
+            int vAxis = axes[1];
+
+            auto axisValue = [](const glm::vec3& value, int axis) -> float {
+                if (axis == 0)
+                    return value.x;
+                if (axis == 1)
+                    return value.y;
+                return value.z;
+            };
+
+            float minU = axisValue(boundsMin, uAxis);
+            float maxU = axisValue(boundsMax, uAxis);
+            float minV = axisValue(boundsMin, vAxis);
+            float maxV = axisValue(boundsMax, vAxis);
+            float rangeU = std::max(maxU - minU, epsilon);
+            float rangeV = std::max(maxV - minV, epsilon);
+
+            for (auto& vertex : vertices) {
+                float u = (axisValue(vertex.position, uAxis) - minU) / rangeU;
+                float v = (axisValue(vertex.position, vAxis) - minV) / rangeV;
+                vertex.texCoord = glm::vec2(u, v);
             }
         }
     }

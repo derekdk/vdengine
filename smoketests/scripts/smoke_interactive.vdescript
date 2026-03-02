@@ -1,0 +1,27 @@
+# Interactive smoke test demonstrating modifiers, mouse, and loops
+# Use this to verify advanced input script features
+wait startup
+wait 500
+
+# Click in the viewport
+click 640 360
+wait 200
+
+# Drag sequence
+mousedown 100 100
+wait 100
+mousemove 300 300
+wait 100
+mouseup 300 300
+wait 200
+
+# Repeat a key sequence 3 times
+label key_loop
+press A
+wait 200
+press B
+wait 200
+loop key_loop 3
+
+wait 1000
+exit

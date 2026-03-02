@@ -281,6 +281,22 @@ class VulkanContext {
      */
     VkShaderModule createShaderModule(const std::vector<char>& code);
 
+    // =========================================================================
+    // Framebuffer Capture (A2)
+    // =========================================================================
+
+    /**
+     * @brief Capture the most recently presented framebuffer as RGBA pixel data.
+     *
+     * Waits for the GPU to finish, then copies the swapchain image to a
+     * staging buffer and returns the pixel data as RGBA uint8 values.
+     *
+     * @param[out] outWidth  Width of the captured image in pixels
+     * @param[out] outHeight Height of the captured image in pixels
+     * @return RGBA pixel data (4 bytes per pixel), or empty on failure
+     */
+    std::vector<uint8_t> captureFramebuffer(uint32_t& outWidth, uint32_t& outHeight);
+
   protected:
     // Protected for testing subclasses
     struct MockTag {};  ///< Tag for test constructor
@@ -312,6 +328,12 @@ class VulkanContext {
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     VkRenderPass m_renderPassLoad = VK_NULL_HANDLE;  // LOAD variant for multi-scene
     std::vector<VkFramebuffer> m_swapChainFramebuffers;
+
+    // Depth resources
+    VkImage m_depthImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_depthImageMemory = VK_NULL_HANDLE;
+    VkImageView m_depthImageView = VK_NULL_HANDLE;
+    VkFormat m_depthFormat = VK_FORMAT_UNDEFINED;
 
     // Descriptor management
     DescriptorManager m_descriptorManager;
@@ -415,7 +437,14 @@ class VulkanContext {
     void createImageViews();
 
     void createRenderPass();
+    void createDepthResources();
     void createFramebuffers();
+
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+                                 VkFormatFeatureFlags features);
+    VkFormat findDepthFormat();
+    bool hasStencilComponent(VkFormat format) const;
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     void createDescriptorSetLayouts();
     void createUniformBuffers();

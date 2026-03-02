@@ -82,6 +82,16 @@ class Window {
     uint32_t getHeight() const { return m_height; }
 
     /**
+     * @brief Get DPI scale factor for the window
+     * @return DPI scale (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)
+     *
+     * Returns the content scale factor for the window's monitor,
+     * which is useful for scaling UI elements on high-DPI displays.
+     * On Windows with 150% scaling, this returns 1.5.
+     */
+    float getDPIScale() const;
+
+    /**
      * @brief Set window resolution
      * @param width New width in pixels
      * @param height New height in pixels
@@ -124,6 +134,15 @@ class Window {
      * @return Pointer to resolution array
      */
     static const Resolution* getResolutions();
+
+    /**
+     * @brief Get DPI scale of primary monitor without creating a window
+     * @return DPI scale (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)
+     *
+     * This is useful for determining appropriate window size before
+     * creating the window. Temporarily initializes GLFW if needed.
+     */
+    static float getPrimaryMonitorDPIScale();
 
   protected:
     // Protected constructor for testing (allows mocks to avoid GLFW initialization)

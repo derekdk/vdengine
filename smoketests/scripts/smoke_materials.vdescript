@@ -1,0 +1,21 @@
+# Smoke test for materials and lighting demo
+# Tests material switching and lighting interactions
+wait startup
+wait 500
+
+# Cycle through materials
+press 1
+wait 500
+press 2
+wait 500
+press 3
+wait 500
+
+# Test lighting controls
+press L
+wait 500
+
+# Let scene render with different settings
+wait 2s
+
+exit

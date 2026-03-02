@@ -1,0 +1,13 @@
+# Smoke test for VLauncher tool
+# Tests that VLauncher launches with ImGui UI and exits cleanly
+wait startup
+wait 1s
+
+# Toggle UI visibility
+press F1
+wait 500
+press F1
+wait 500
+
+wait 1s
+exit

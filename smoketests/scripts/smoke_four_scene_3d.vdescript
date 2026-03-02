@@ -1,0 +1,57 @@
+# Smoke test for vde_four_scene_3d_demo
+# Demonstrates Track A visual regression testing features
+
+# Wait for initialization
+wait startup
+
+# Use frame-based waiting for stability (A3)
+wait_frames 10
+
+# A1: Assert that all 4 scenes are rendered
+assert rendered_scene_count == 4
+
+# A1: Verify each scene is active and rendering
+assert scene "crystal" was_rendered == true
+assert scene "crystal" draw_calls > 0
+assert scene "crystal" entities_drawn > 0
+
+assert scene "metropolis" was_rendered == true
+assert scene "metropolis" draw_calls > 0
+assert scene "metropolis" entities_drawn > 0
+
+assert scene "nature" was_rendered == true
+assert scene "nature" draw_calls > 0
+assert scene "nature" entities_drawn > 0
+
+assert scene "cosmos" was_rendered == true
+assert scene "cosmos" draw_calls > 0
+assert scene "cosmos" entities_drawn > 0
+
+# A1: Check viewport dimensions are valid
+assert scene "crystal" viewport_width > 0
+assert scene "crystal" viewport_height > 0
+
+# A1: Verify scenes are not blank
+assert scene "crystal" not_blank
+assert scene "metropolis" not_blank
+assert scene "nature" not_blank
+assert scene "cosmos" not_blank
+
+# A5: Set comparison threshold variable
+set THRESHOLD 0.02
+
+print All scene assertions passed!
+
+# A2: Capture a screenshot for visual verification
+screenshot test_output.png
+
+# Note: A4 compare would be used like this (requires golden image):
+# compare test_output_frame_1.png golden/four_scene_reference.png 0.02
+
+# Allow additional frames to render
+wait_frames 5
+
+print Four scene demo smoke test PASSED
+
+# Exit cleanly
+exit

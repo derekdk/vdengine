@@ -37,7 +37,11 @@
 
 // Input handling
 #include "InputHandler.h"
+#include "InputScript.h"
 #include "KeyCodes.h"
+
+// Storage
+#include "StorageManager.h"
 
 // Graphics
 #include "GameCamera.h"

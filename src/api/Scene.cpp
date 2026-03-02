@@ -5,8 +5,11 @@
 
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
+#include <vde/api/GameCamera.h>
+#include <vde/api/LightBox.h>
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
+#include <vde/api/PhysicsTypes.h>
 #include <vde/api/Scene.h>
 
 #include <algorithm>
@@ -31,6 +34,9 @@ Scene::~Scene() {
 }
 
 void Scene::update(float deltaTime) {
+    // Flush any commands queued during the previous render phase
+    flushDeferredCommands();
+
     // Update all entities
     for (auto& entity : m_entities) {
         if (entity) {
@@ -53,6 +59,11 @@ void Scene::render() {
 // ============================================================================
 
 void Scene::updateGameLogic([[maybe_unused]] float deltaTime) {
+    // Flush any commands queued during the previous render phase.
+    // (Legacy-mode scenes get this from update(); phase-callback scenes
+    //  get it here since update() is not called for them.)
+    flushDeferredCommands();
+
     // Default: no-op.  Derived scenes override this when using phase callbacks.
 }
 
@@ -266,6 +277,42 @@ void Scene::disablePhysics() {
     m_physicsScene.reset();
 }
 
+// ============================================================================
+// 2D Convenience Methods
+// ============================================================================
+
+void Scene::setup2D(float viewWidth, float viewHeight, const Color& bgColor) {
+    // Orthographic camera centered at origin
+    auto camera = std::make_unique<Camera2D>(viewWidth, viewHeight);
+    setCamera(std::move(camera));
+
+    // Flat white ambient lighting — correct for 2D sprites
+    setLightBox(std::make_unique<SimpleColorLightBox>(Color::white()));
+
+    setBackgroundColor(bgColor);
+}
+
+void Scene::createPhysicsWalls(float width, float height, float thickness, const Color& color) {
+    const float halfW = width * 0.5f;
+    const float halfH = height * 0.5f;
+
+    auto makeWall = [&](glm::vec2 pos, glm::vec2 extents) {
+        auto wall = addEntity<PhysicsSpriteEntity>();
+        wall->setColor(color);
+        wall->setScale(Scale(extents.x * 2.0f, extents.y * 2.0f, 1.0f));
+        wall->createPhysicsBody(PhysicsBodyDef::staticBox(pos, extents));
+    };
+
+    // Floor
+    makeWall({0.0f, -halfH - thickness}, {halfW + thickness, thickness});
+    // Ceiling
+    makeWall({0.0f, halfH + thickness}, {halfW + thickness, thickness});
+    // Left
+    makeWall({-halfW - thickness, 0.0f}, {thickness, halfH});
+    // Right
+    makeWall({halfW + thickness, 0.0f}, {thickness, halfH});
+}
+
 InputHandler* Scene::getInputHandler() {
     // Return scene's input handler if set, otherwise fall back to game's
     if (m_inputHandler) {
@@ -286,6 +333,40 @@ const InputHandler* Scene::getInputHandler() const {
         return m_game->getInputHandler();
     }
     return nullptr;
+}
+
+// ============================================================================
+// Deferred Command Queue
+// ============================================================================
+
+void Scene::deferCommand(std::function<void()> command) {
+    if (command) {
+        m_deferredCommands.push_back(std::move(command));
+    }
+}
+
+void Scene::retireResource(std::shared_ptr<void> resource) {
+    if (resource) {
+        m_retiredResources.push_back(std::move(resource));
+    }
+}
+
+void Scene::flushDeferredCommands() {
+    // Release resources that were kept alive for GPU lifetime safety.
+    // By the time the update phase runs, the previous frame's command
+    // buffer has completed (drawFrame waits on in-flight fences).
+    m_retiredResources.clear();
+
+    // Execute queued commands (entity add/remove, mesh swaps, etc.)
+    // Swap the queue to a local so that commands can safely queue more
+    // deferred work without invalidating the iterator.
+    if (!m_deferredCommands.empty()) {
+        std::vector<std::function<void()>> commands;
+        commands.swap(m_deferredCommands);
+        for (auto& cmd : commands) {
+            cmd();
+        }
+    }
 }
 
 }  // namespace vde

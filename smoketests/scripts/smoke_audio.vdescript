@@ -1,0 +1,15 @@
+# Smoke test for audio demo
+# Tests audio playback controls
+wait startup
+wait 1000
+
+# Trigger a few sounds if keybindings exist
+press SPACE
+wait 500
+press 1
+wait 500
+press 2
+wait 500
+
+wait 2s
+exit

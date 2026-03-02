@@ -1,0 +1,24 @@
+# Smoke test for textured cube demo
+# Tests texture atlas mapping with different textures on each face
+wait startup
+wait 500
+
+# Let the cube rotate for a bit to show all faces
+wait 2s
+
+# Toggle rotation off
+press Space
+wait 500
+
+# Toggle rotation back on
+press Space
+wait 1s
+
+# Reset rotation
+press R
+wait 500
+
+# Let it rotate a bit more
+wait 1s
+
+exit

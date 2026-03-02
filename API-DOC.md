@@ -21,6 +21,7 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Physics System](#physics-system)
 - [Audio System](#audio-system)
 - [Multi-Scene & Split-Screen](#multi-scene--split-screen)
+- [Deferred Commands & Thread Safety](#deferred-commands--thread-safety)
 - [Common Types](#common-types)
 - [World Coordinates & Bounds](#world-coordinates--bounds)
 - [Examples](#examples)
@@ -376,6 +377,74 @@ auto meshEntities = scene->getEntitiesOfType<vde::MeshEntity>();
 scene->removeEntity(entityId);
 scene->clearEntities();
 ```
+
+#### Deferred Commands (Safe Entity Mutation)
+
+The game loop executes `update()` and `render()` in separate scheduler phases.
+Entity mutations (`addEntity`, `removeEntity`, `setMesh`) are **only safe during
+the update phase** (`onEnter()`, `update()`, `updateGameLogic()`).
+
+Code that runs during the **render phase** — such as ImGui callbacks in
+`onRender()` or `drawDebugUI()` — must **never** call these methods directly,
+because the Vulkan command buffer may still reference the GPU buffers being freed.
+
+Use `deferCommand()` to schedule entity mutations for the next update:
+
+```cpp
+// Safe: runs in the next update() / updateGameLogic() call
+deferCommand([this]() {
+    auto entity = addEntity<vde::MeshEntity>();
+    entity->setMesh(myMesh);
+    entity->setName("spawned");
+});
+```
+
+When removing or replacing entities/meshes, use `retireResource()` to keep the
+GPU buffers alive until the in-flight command buffer has finished:
+
+```cpp
+// Inside a deferred command — remove entity safely
+deferCommand([this, entityId]() {
+    removeEntity(entityId);
+});
+// Keep the entity's shared_ptr alive for one more frame
+retireResource(std::move(entitySharedPtr));
+```
+
+Replacing a mesh on a visible entity:
+
+```cpp
+deferCommand([this, entityId, newMesh]() {
+    auto* entity = getEntity<vde::MeshEntity>(entityId);
+    if (entity) {
+        auto oldMesh = entity->getMesh();
+        if (oldMesh) {
+            retireResource(std::move(oldMesh));
+        }
+        entity->setMesh(newMesh);
+    }
+});
+```
+
+**Key rules:**
+
+| Method | Description |
+|--------|-------------|
+| `deferCommand(fn)` | Queue a `void()` callable for execution at the start of the next `update()` or `updateGameLogic()` |
+| `retireResource(ptr)` | Extend a `shared_ptr` lifetime until the deferred flush (prevents GPU use-after-free) |
+| `getDeferredCommandCount()` | Number of pending commands (useful for diagnostics) |
+
+**When to use:**
+- Adding/removing entities from ImGui UI callbacks (`onRender()`, `drawDebugUI()`)
+- Swapping meshes or textures in response to render-phase user interaction
+- Any entity mutation triggered outside of `update()` / `updateGameLogic()` / `onEnter()`
+
+**When it's NOT needed:**
+- Entity operations in `onEnter()`, `update()`, `updateGameLogic()` — these run in the safe GameLogic phase
+- Reading entity state or calling `getEntity()` (read-only access is always safe)
+
+> Commands are flushed in FIFO order. A deferred command may call `deferCommand()`
+> again; the re-entrant command will execute on the *next* update cycle.
 
 ---
 
@@ -1448,6 +1517,87 @@ class Player2Scene : public vde::Scene {
     }
 };
 ```
+
+---
+
+## Deferred Commands & Thread Safety
+
+The VDE game loop uses a **scheduler** that executes work in ordered phases:
+
+```
+Input → GameLogic → Audio → Physics → PostPhysics → PreRender → Render
+```
+
+**Entity mutations** (`addEntity`, `removeEntity`, `setMesh`, `clearEntities`) modify
+GPU-visible resources and are **only safe during the GameLogic phase** — that is, inside
+`onEnter()`, `update()`, or `updateGameLogic()`.
+
+The **Render phase** records a Vulkan command buffer that references entity meshes and
+buffers. Mutating entities during this phase (e.g., from an `onRender()` or
+`drawDebugUI()` callback) can free GPU memory while the command buffer still uses it,
+causing crashes or validation errors.
+
+### deferCommand()
+
+Queue a callable that will execute at the very start of the next `update()` or
+`updateGameLogic()`:
+
+```cpp
+void deferCommand(std::function<void()> command);
+```
+
+```cpp
+// Example: spawn entity from an ImGui button (render-phase code)
+if (ImGui::Button("Add Cube")) {
+    deferCommand([this]() {
+        auto cube = addEntity<vde::MeshEntity>();
+        cube->setMesh(vde::Mesh::createCube(1.0f));
+    });
+}
+```
+
+Commands execute in FIFO order. A command may call `deferCommand()` again; the
+re-entrant command runs on the *next* update cycle.
+
+### retireResource()
+
+Extend a `shared_ptr` lifetime until the deferred flush so that GPU buffers
+remain valid through the current frame's command buffer submission:
+
+```cpp
+void retireResource(std::shared_ptr<void> resource);
+```
+
+```cpp
+// Remove an entity from render-phase code
+deferCommand([this, eid]() { removeEntity(eid); });
+retireResource(std::move(entityPtr));  // GPU buffers stay alive one more frame
+
+// Replace a mesh
+deferCommand([this, entity, newMesh]() {
+    auto old = entity->getMesh();
+    if (old) retireResource(std::move(old));
+    entity->setMesh(newMesh);
+});
+```
+
+### getDeferredCommandCount()
+
+```cpp
+size_t getDeferredCommandCount() const;
+```
+
+Returns the number of pending commands. Useful for diagnostics or tests.
+
+### Summary Table
+
+| Context | Safe to mutate entities? | What to use |
+|---------|:------------------------:|-------------|
+| `onEnter()` | Yes | Direct calls |
+| `update()` / `updateGameLogic()` | Yes | Direct calls |
+| `onRender()` / `drawDebugUI()` | **No** | `deferCommand()` + `retireResource()` |
+| Input callbacks | Yes (dispatched during GameLogic) | Direct calls |
+| Physics callbacks | Yes (dispatched during Physics) | Direct calls |
 
 ---
 

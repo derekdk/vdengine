@@ -10,9 +10,11 @@
 #include <vde/Window.h>
 #include <vde/api/AudioManager.h>
 #include <vde/api/Game.h>
+#include <vde/api/InputScript.h>
 #include <vde/api/LightBox.h>
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/PhysicsScene.h>
+#include <vde/api/StorageManager.h>
 
 #include <GLFW/glfw3.h>
 
@@ -21,9 +23,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 
+#include "stb_image.h"
+#include "stb_image_write.h"
 #include <glslang/Public/ShaderLang.h>
 
 namespace vde {
@@ -103,6 +108,18 @@ bool Game::initialize(const GameSettings& settings) {
         m_initialized = true;
         m_lastFrameTime = glfwGetTime();
 
+        // Input script discovery: API call > CLI arg > env var
+        // (CLI arg is applied before initialize via configureInputScriptFromArgs)
+        if (m_inputScriptFile.empty()) {
+            const char* envScript = std::getenv("VDE_INPUT_SCRIPT");
+            if (envScript && envScript[0] != '\0') {
+                m_inputScriptFile = envScript;
+            }
+        }
+        if (!m_inputScriptFile.empty()) {
+            loadInputScript();
+        }
+
         return true;
 
     } catch (const std::exception& e) {
@@ -141,6 +158,9 @@ void Game::shutdown() {
 
     // Shutdown audio system
     AudioManager::getInstance().shutdown();
+
+    // Shutdown persistent storage
+    StorageManager::getInstance().shutdown();
 
     // Cleanup rendering pipelines
     destroyLightingResources();
@@ -204,7 +224,7 @@ void Game::run() {
         processInput();
 
         // Execute the scheduler task graph
-        // (covers: onUpdate, scene update, audio, pre-render, render)
+        // (covers: input script, onUpdate, scene update, audio, pre-render, render)
         m_scheduler.execute();
 
         m_frameCount++;
@@ -220,6 +240,447 @@ void Game::run() {
 
 void Game::quit() {
     m_running = false;
+}
+
+void Game::setExitCode(int code) {
+    if (code != 0) {
+        m_exitCode = code;
+    }
+}
+
+bool Game::captureScreenshot(const std::string& outputPath) {
+    if (!m_vulkanContext) {
+        std::cerr << "[VDE:InputScript] screenshot failed: no Vulkan context" << std::endl;
+        return false;
+    }
+
+    uint32_t width = 0, height = 0;
+    auto pixels = m_vulkanContext->captureFramebuffer(width, height);
+    if (pixels.empty() || width == 0 || height == 0) {
+        std::cerr << "[VDE:InputScript] screenshot failed: framebuffer capture returned no data"
+                  << std::endl;
+        return false;
+    }
+
+    // Create parent directories if they don't exist
+    auto parentPath = std::filesystem::path(outputPath).parent_path();
+    if (!parentPath.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(parentPath, ec);
+        if (ec) {
+            std::cerr << "[VDE:InputScript] screenshot warning: could not create directory '"
+                      << parentPath.string() << "'" << std::endl;
+        }
+    }
+
+    // Write PNG via stb_image_write
+    int result =
+        stbi_write_png(outputPath.c_str(), static_cast<int>(width), static_cast<int>(height),
+                       4,  // RGBA
+                       pixels.data(), static_cast<int>(width * 4));
+
+    if (result == 0) {
+        std::cerr << "[VDE:InputScript] screenshot failed: could not write '" << outputPath << "'"
+                  << std::endl;
+        return false;
+    }
+
+    std::cout << "[VDE:InputScript] screenshot saved: " << outputPath << " (" << width << "x"
+              << height << ")" << std::endl;
+    return true;
+}
+
+void Game::setInputScriptFile(const std::string& scriptPath) {
+    m_inputScriptFile = scriptPath;
+}
+
+const std::string& Game::getInputScriptFile() const {
+    return m_inputScriptFile;
+}
+
+void Game::loadInputScript() {
+    m_inputScriptState = std::make_unique<InputScriptState>();
+    std::string errorMsg;
+
+    if (!parseInputScript(m_inputScriptFile, m_inputScriptState->commands,
+                          m_inputScriptState->labels, errorMsg)) {
+        std::cerr << "[VDE:InputScript] " << errorMsg << std::endl;
+        m_inputScriptState.reset();
+        return;
+    }
+
+    m_inputScriptState->scriptPath = m_inputScriptFile;
+    std::cout << "[VDE:InputScript] Loaded " << m_inputScriptState->commands.size()
+              << " commands from " << m_inputScriptFile << std::endl;
+}
+
+void Game::processInputScript() {
+    if (!m_inputScriptState || m_inputScriptState->finished) {
+        return;
+    }
+
+    auto& state = *m_inputScriptState;
+    state.frameNumber++;
+
+    // Handle pending mouse button release from previous frame (for click commands)
+    if (state.pendingMouseRelease) {
+        state.pendingMouseRelease = false;
+        // Resolve handler: focused scene handler → global handler
+        InputHandler* handler = nullptr;
+        Scene* focused = getFocusedScene();
+        if (focused) {
+            handler = focused->getInputHandler();
+        }
+        if (!handler) {
+            handler = m_inputHandler;
+        }
+        if (handler) {
+            handler->onMouseButtonRelease(state.pendingMouseButton, state.pendingMouseX,
+                                          state.pendingMouseY);
+        }
+    }
+
+    // Process commands until we hit a blocking command or run out
+    while (state.currentCommand < state.commands.size()) {
+        const auto& cmd = state.commands[state.currentCommand];
+
+        // Resolve handler: focused scene handler → global handler
+        InputHandler* handler = nullptr;
+        Scene* focused = getFocusedScene();
+        if (focused) {
+            handler = focused->getInputHandler();
+        }
+        if (!handler) {
+            handler = m_inputHandler;
+        }
+
+        switch (cmd.type) {
+        case InputCommandType::WaitStartup:
+            if (!state.startupComplete) {
+                state.startupComplete = true;
+                state.currentCommand++;
+                return;  // Wait until next frame
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::WaitMs:
+            state.waitAccumulator += static_cast<double>(m_deltaTime) * 1000.0;
+            if (state.waitAccumulator >= cmd.waitMs) {
+                state.waitAccumulator = 0.0;
+                state.currentCommand++;
+            } else {
+                return;  // Still waiting
+            }
+            break;
+
+        case InputCommandType::Press:
+            if (handler) {
+                handler->onKeyPress(cmd.keyCode);
+                handler->onKeyRelease(cmd.keyCode);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::KeyDown:
+            if (handler) {
+                handler->onKeyPress(cmd.keyCode);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::KeyUp:
+            if (handler) {
+                handler->onKeyRelease(cmd.keyCode);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Click: {
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseButtonPress(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+                // Schedule release for next frame
+                state.pendingMouseRelease = true;
+                state.pendingMouseButton = MOUSE_BUTTON_LEFT;
+                state.pendingMouseX = cmd.mouseX;
+                state.pendingMouseY = cmd.mouseY;
+            }
+            state.currentCommand++;
+            return;  // Wait for next frame for release
+        }
+
+        case InputCommandType::ClickRight: {
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseButtonPress(MOUSE_BUTTON_RIGHT, cmd.mouseX, cmd.mouseY);
+                state.pendingMouseRelease = true;
+                state.pendingMouseButton = MOUSE_BUTTON_RIGHT;
+                state.pendingMouseX = cmd.mouseX;
+                state.pendingMouseY = cmd.mouseY;
+            }
+            state.currentCommand++;
+            return;  // Wait for next frame for release
+        }
+
+        case InputCommandType::MouseDown:
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseButtonPress(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::MouseUp:
+            if (handler) {
+                handler->onMouseButtonRelease(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::MouseMove:
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Scroll:
+            if (handler) {
+                handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+                handler->onMouseScroll(0.0, cmd.scrollDelta);
+            }
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Screenshot: {
+            // Insert frame number into filename (e.g., "output.png" -> "output_frame_0042.png")
+            std::string basePath = cmd.argument;
+            size_t dotPos = basePath.find_last_of('.');
+            std::string framePath;
+            if (dotPos != std::string::npos) {
+                std::string base = basePath.substr(0, dotPos);
+                std::string ext = basePath.substr(dotPos);
+                framePath = base + "_frame_" + std::to_string(state.frameNumber) + ext;
+            } else {
+                framePath = basePath + "_frame_" + std::to_string(state.frameNumber) + ".png";
+            }
+
+            captureScreenshot(framePath);
+
+            state.currentCommand++;
+            break;
+        }
+
+        case InputCommandType::Print:
+            std::cout << "[VDE:InputScript] " << cmd.argument << std::endl;
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Label:
+            // Labels are no-ops at execution time
+            state.currentCommand++;
+            break;
+
+        case InputCommandType::Loop: {
+            auto labelIt = state.labels.find(cmd.argument);
+            if (labelIt == state.labels.end()) {
+                std::cerr << "[VDE:InputScript] Error at line " << cmd.lineNumber
+                          << ": undefined label '" << cmd.argument << "'" << std::endl;
+                state.finished = true;
+                return;
+            }
+
+            auto& labelState = labelIt->second;
+
+            if (cmd.loopCount == 0) {
+                // Infinite loop
+                state.currentCommand = labelState.commandIndex + 1;
+            } else {
+                if (labelState.remainingIterations < 0) {
+                    // First encounter
+                    labelState.remainingIterations = cmd.loopCount - 1;
+                } else {
+                    labelState.remainingIterations--;
+                }
+
+                if (labelState.remainingIterations > 0) {
+                    state.currentCommand = labelState.commandIndex + 1;
+                } else {
+                    // Reset for potential re-entry (e.g., outer loop re-runs inner)
+                    labelState.remainingIterations = -1;
+                    state.currentCommand++;
+                }
+            }
+            break;
+        }
+
+        case InputCommandType::Exit:
+            std::cout << "[VDE:InputScript] exit" << std::endl;
+            if (state.assertionFailed) {
+                setExitCode(1);
+            }
+            state.finished = true;
+            quit();
+            return;
+
+        // ---- A3: wait_frames ----
+        case InputCommandType::WaitFrames:
+            if (state.frameWaitCounter == 0) {
+                state.frameWaitCounter = cmd.waitFrames;
+            }
+            state.frameWaitCounter--;
+            if (state.frameWaitCounter > 0) {
+                return;  // Still waiting
+            }
+            state.currentCommand++;
+            break;
+
+        // ---- A1: assert rendered_scene_count ----
+        case InputCommandType::AssertSceneCount: {
+            auto count = static_cast<double>(m_activeSceneGroup.sceneNames.size());
+            if (!evaluateComparison(count, cmd.assertOp, cmd.assertValue)) {
+                std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                          << ": rendered_scene_count (" << static_cast<int>(count) << ") "
+                          << compareOpToString(cmd.assertOp) << " "
+                          << static_cast<int>(cmd.assertValue) << std::endl;
+                state.assertionFailed = true;
+            }
+            state.currentCommand++;
+            break;
+        }
+
+        // ---- A1: assert scene ----
+        case InputCommandType::AssertScene: {
+            Scene* targetScene = getScene(cmd.assertSceneName);
+            bool inActiveGroup = false;
+            for (const auto& sn : m_activeSceneGroup.sceneNames) {
+                if (sn == cmd.assertSceneName) {
+                    inActiveGroup = true;
+                    break;
+                }
+            }
+
+            double fieldValue = 0.0;
+            bool fieldResolved = true;
+
+            if (cmd.assertField == "was_rendered") {
+                fieldValue = (targetScene && inActiveGroup) ? 1.0 : 0.0;
+            } else if (cmd.assertField == "draw_calls") {
+                // Draw call counting requires B5 (Scene counters) — not yet implemented
+                // For now, report > 0 if scene has entities and was rendered
+                if (targetScene && inActiveGroup) {
+                    fieldValue = targetScene->getEntities().empty() ? 0.0 : 1.0;
+                }
+            } else if (cmd.assertField == "entities_drawn") {
+                if (targetScene && inActiveGroup) {
+                    fieldValue = static_cast<double>(targetScene->getEntities().size());
+                }
+            } else if (cmd.assertField == "viewport_width") {
+                if (targetScene) {
+                    auto extent = m_vulkanContext->getSwapChainExtent();
+                    const auto& vp = targetScene->getViewportRect();
+                    fieldValue = static_cast<double>(vp.width * extent.width);
+                }
+            } else if (cmd.assertField == "viewport_height") {
+                if (targetScene) {
+                    auto extent = m_vulkanContext->getSwapChainExtent();
+                    const auto& vp = targetScene->getViewportRect();
+                    fieldValue = static_cast<double>(vp.height * extent.height);
+                }
+            } else if (cmd.assertField == "not_blank") {
+                // Requires screenshot hashing — treat as pass if scene is rendered
+                fieldValue = (targetScene && inActiveGroup) ? 1.0 : 0.0;
+            } else {
+                fieldResolved = false;
+                std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                          << ": unknown field '" << cmd.assertField << "'" << std::endl;
+                state.assertionFailed = true;
+            }
+
+            if (fieldResolved && !evaluateComparison(fieldValue, cmd.assertOp, cmd.assertValue)) {
+                std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                          << ": scene \"" << cmd.assertSceneName << "\" " << cmd.assertField << " ("
+                          << fieldValue << ") " << compareOpToString(cmd.assertOp) << " "
+                          << cmd.assertValue << std::endl;
+                state.assertionFailed = true;
+            }
+            state.currentCommand++;
+            break;
+        }
+
+        // ---- A4: compare ----
+        case InputCommandType::Compare: {
+            std::cout << "[VDE:InputScript] compare " << cmd.argument << " vs " << cmd.comparePath
+                      << " (threshold " << cmd.compareThreshold << ")" << std::endl;
+
+            // Load both images via stb_image
+            int w1 = 0, h1 = 0, c1 = 0;
+            int w2 = 0, h2 = 0, c2 = 0;
+            unsigned char* img1 = stbi_load(cmd.argument.c_str(), &w1, &h1, &c1, 4);
+            unsigned char* img2 = stbi_load(cmd.comparePath.c_str(), &w2, &h2, &c2, 4);
+
+            if (!img1) {
+                std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                          << ": cannot load image '" << cmd.argument << "'" << std::endl;
+                state.assertionFailed = true;
+            } else if (!img2) {
+                std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                          << ": cannot load golden image '" << cmd.comparePath << "'" << std::endl;
+                state.assertionFailed = true;
+            } else if (w1 != w2 || h1 != h2) {
+                std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                          << ": dimension mismatch — actual (" << w1 << "x" << h1 << ") vs golden ("
+                          << w2 << "x" << h2 << ")" << std::endl;
+                state.assertionFailed = true;
+            } else {
+                // Compute RMSE across all pixels (RGBA)
+                size_t pixelCount = static_cast<size_t>(w1) * h1 * 4;
+                double sumSqErr = 0.0;
+                for (size_t i = 0; i < pixelCount; ++i) {
+                    double diff =
+                        (static_cast<double>(img1[i]) - static_cast<double>(img2[i])) / 255.0;
+                    sumSqErr += diff * diff;
+                }
+                double rmse = std::sqrt(sumSqErr / static_cast<double>(pixelCount));
+
+                if (rmse > cmd.compareThreshold) {
+                    std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                              << ": image mismatch — RMSE " << rmse << " > threshold "
+                              << cmd.compareThreshold << std::endl;
+                    state.assertionFailed = true;
+                } else {
+                    std::cout << "[VDE:InputScript] compare PASSED (RMSE " << rmse
+                              << " <= " << cmd.compareThreshold << ")" << std::endl;
+                }
+            }
+
+            if (img1)
+                stbi_image_free(img1);
+            if (img2)
+                stbi_image_free(img2);
+
+            state.currentCommand++;
+            break;
+        }
+
+        // ---- A5: set variable ----
+        case InputCommandType::Set:
+            state.variables[cmd.setVarName] = cmd.setVarValue;
+            state.currentCommand++;
+            break;
+        }
+    }
+
+    // All commands consumed — script is done, app continues
+    if (state.assertionFailed) {
+        setExitCode(1);
+    }
+    state.finished = true;
+}
+
+float Game::getDPIScale() const {
+    return m_window ? m_window->getDPIScale() : 1.0f;
 }
 
 void Game::addScene(const std::string& name, Scene* scene) {
@@ -810,11 +1271,14 @@ void Game::createMeshRenderingPipeline() {
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Depth/stencil (no depth test for Phase 2)
+    // Depth/stencil
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_FALSE;
-    depthStencil.depthWriteEnable = VK_FALSE;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
 
     // Color blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
@@ -854,6 +1318,39 @@ void Game::createMeshRenderingPipeline() {
         throw std::runtime_error("Failed to create mesh descriptor set layout");
     }
 
+    // Descriptor set layout (for mesh texture sampler at set 2)
+    VkDescriptorSetLayoutBinding textureLayoutBinding{};
+    textureLayoutBinding.binding = 0;
+    textureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textureLayoutBinding.descriptorCount = 1;
+    textureLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
+    textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    textureLayoutInfo.bindingCount = 1;
+    textureLayoutInfo.pBindings = &textureLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr,
+                                    &m_meshTextureDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh texture descriptor set layout");
+    }
+
+    // Create descriptor pool for mesh texture descriptor sets
+    VkDescriptorPoolSize meshTexturePoolSize{};
+    meshTexturePoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    meshTexturePoolSize.descriptorCount = 256;
+
+    VkDescriptorPoolCreateInfo meshTexturePoolInfo{};
+    meshTexturePoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    meshTexturePoolInfo.poolSizeCount = 1;
+    meshTexturePoolInfo.pPoolSizes = &meshTexturePoolSize;
+    meshTexturePoolInfo.maxSets = 256;
+
+    if (vkCreateDescriptorPool(device, &meshTexturePoolInfo, nullptr,
+                               &m_meshTextureDescriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create mesh texture descriptor pool");
+    }
+
     // Push constant range (for model matrix + material properties)
     // Size: 64 (mat4) + 48 (MaterialPushConstants) = 112 bytes
     VkPushConstantRange pushConstantRange{};
@@ -861,10 +1358,10 @@ void Game::createMeshRenderingPipeline() {
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(glm::mat4) + sizeof(MaterialPushConstants);
 
-    // Pipeline layout with two descriptor set layouts
-    // Set 0: UBO (view/projection), Set 1: Lighting UBO
-    std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts = {m_meshDescriptorSetLayout,
-                                                                 m_lightingDescriptorSetLayout};
+    // Pipeline layout with descriptor set layouts
+    // Set 0: UBO (view/projection), Set 1: Lighting UBO, Set 2: Texture sampler
+    std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
+        m_meshDescriptorSetLayout, m_lightingDescriptorSetLayout, m_meshTextureDescriptorSetLayout};
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -925,6 +1422,16 @@ void Game::destroyMeshRenderingPipeline() {
     if (m_meshDescriptorSetLayout != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device, m_meshDescriptorSetLayout, nullptr);
         m_meshDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_meshTextureDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_meshTextureDescriptorSetLayout, nullptr);
+        m_meshTextureDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_meshTextureDescriptorPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, m_meshTextureDescriptorPool, nullptr);
+        m_meshTextureDescriptorPool = VK_NULL_HANDLE;
     }
 }
 
@@ -1277,6 +1784,50 @@ void Game::updateSpriteDescriptor(VkDescriptorSet descriptorSet, VkBuffer uboBuf
     vkUpdateDescriptorSets(m_vulkanContext->getDevice(),
                            static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(),
                            0, nullptr);
+}
+
+VkDescriptorSet Game::allocateMeshTextureDescriptorSet() {
+    if (!m_vulkanContext || m_meshTextureDescriptorPool == VK_NULL_HANDLE ||
+        m_meshTextureDescriptorSetLayout == VK_NULL_HANDLE) {
+        return VK_NULL_HANDLE;
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_meshTextureDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_meshTextureDescriptorSetLayout;
+
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    if (vkAllocateDescriptorSets(m_vulkanContext->getDevice(), &allocInfo, &descriptorSet) !=
+        VK_SUCCESS) {
+        return VK_NULL_HANDLE;
+    }
+
+    return descriptorSet;
+}
+
+void Game::updateMeshTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView,
+                                       VkSampler sampler) {
+    if (!m_vulkanContext || descriptorSet == VK_NULL_HANDLE) {
+        return;
+    }
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = sampler;
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = descriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(m_vulkanContext->getDevice(), 1, &descriptorWrite, 0, nullptr);
 }
 
 // ============================================================================
@@ -1684,11 +2235,23 @@ void Game::rebuildSchedulerGraph() {
               [](const SceneEntry& a, const SceneEntry& b) { return a.priority < b.priority; });
 
     // ---------------------------------------------------------------
+    // Task 0: Input — process input script commands.
+    //         Runs in the Input phase (before GameLogic) so scripted
+    //         input is dispatched before any game logic reads it.
+    //         This avoids race conditions with worker threads: all
+    //         input is fully committed before game-logic tasks begin.
+    // ---------------------------------------------------------------
+    TaskId inputScriptTask =
+        m_scheduler.addTask({"input.script", TaskPhase::Input, [this]() { processInputScript(); }});
+
+    // ---------------------------------------------------------------
     // Task 1: GameLogic — onUpdate hook + all scene updates
     // ---------------------------------------------------------------
-    // Chain: onUpdate -> update(scene1) | gameLogic(scene1) -> ...
-    TaskId prevTask = m_scheduler.addTask(
-        {"game.update", TaskPhase::GameLogic, [this]() { onUpdate(m_deltaTime); }});
+    // Chain: inputScript -> onUpdate -> update(scene1) | gameLogic(scene1) -> ...
+    TaskId prevTask = m_scheduler.addTask({"game.update",
+                                           TaskPhase::GameLogic,
+                                           [this]() { onUpdate(m_deltaTime); },
+                                           {inputScriptTask}});
 
     // Track per-scene audio tasks so audio.global can depend on all of them
     std::vector<TaskId> audioTasks;

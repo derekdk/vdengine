@@ -96,6 +96,82 @@ struct PhysicsBodyDef {
     float restitution = 0.2f;          ///< Bounciness (0 = no bounce, 1 = perfect)
     float linearDamping = 0.01f;       ///< Linear velocity damping
     bool isSensor = false;             ///< If true, triggers callbacks but no response
+
+    // -----------------------------------------------------------------
+    // Factory methods — named constructors for common body configurations
+    // -----------------------------------------------------------------
+
+    /**
+     * @brief Create a dynamic box body definition.
+     * @param pos       Initial position
+     * @param halfExt   Half-extents {halfWidth, halfHeight}
+     * @param mass      Mass in kg (default 1.0)
+     * @param restitution Bounciness 0–1 (default 0.2)
+     * @param friction  Surface friction (default 0.3)
+     */
+    static PhysicsBodyDef dynamicBox(glm::vec2 pos, glm::vec2 halfExt, float mass = 1.0f,
+                                     float restitution = 0.2f, float friction = 0.3f) {
+        PhysicsBodyDef d;
+        d.type = PhysicsBodyType::Dynamic;
+        d.shape = PhysicsShape::Box;
+        d.position = pos;
+        d.extents = halfExt;
+        d.mass = mass;
+        d.restitution = restitution;
+        d.friction = friction;
+        return d;
+    }
+
+    /**
+     * @brief Create a dynamic circle body definition.
+     * @param pos       Initial position
+     * @param radius    Circle radius
+     * @param mass      Mass in kg (default 1.0)
+     * @param restitution Bounciness 0–1 (default 0.2)
+     * @param friction  Surface friction (default 0.1)
+     */
+    static PhysicsBodyDef dynamicCircle(glm::vec2 pos, float radius, float mass = 1.0f,
+                                        float restitution = 0.2f, float friction = 0.1f) {
+        PhysicsBodyDef d;
+        d.type = PhysicsBodyType::Dynamic;
+        d.shape = PhysicsShape::Circle;
+        d.position = pos;
+        d.extents = {radius, 0.0f};
+        d.mass = mass;
+        d.restitution = restitution;
+        d.friction = friction;
+        return d;
+    }
+
+    /**
+     * @brief Create a static box body definition (walls, platforms).
+     * @param pos       Position
+     * @param halfExt   Half-extents {halfWidth, halfHeight}
+     */
+    static PhysicsBodyDef staticBox(glm::vec2 pos, glm::vec2 halfExt) {
+        PhysicsBodyDef d;
+        d.type = PhysicsBodyType::Static;
+        d.shape = PhysicsShape::Box;
+        d.position = pos;
+        d.extents = halfExt;
+        d.mass = 0.0f;
+        return d;
+    }
+
+    /**
+     * @brief Create a kinematic box body definition (moving platforms).
+     * @param pos       Initial position
+     * @param halfExt   Half-extents {halfWidth, halfHeight}
+     */
+    static PhysicsBodyDef kinematicBox(glm::vec2 pos, glm::vec2 halfExt) {
+        PhysicsBodyDef d;
+        d.type = PhysicsBodyType::Kinematic;
+        d.shape = PhysicsShape::Box;
+        d.position = pos;
+        d.extents = halfExt;
+        d.mass = 0.0f;
+        return d;
+    }
 };
 
 // ============================================================================

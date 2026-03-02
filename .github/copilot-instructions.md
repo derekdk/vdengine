@@ -46,7 +46,27 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Creating demo or example applications that showcase engine features.  
 **Location:** `.github/skills/writing-examples/SKILL.md`
 
+### writing-tools
+**Purpose:** Guide for creating asset creation tools in VDE.  
+**Use when:** Creating tools that support both interactive GUI mode and scriptable batch mode.  
+**Location:** `.github/skills/writing-tools/SKILL.md`
+
 ### imgui-integration
 **Purpose:** Guide for integrating Dear ImGui with VDE applications.  
 **Use when:** Adding debug UI, tools, or overlay interfaces to VDE games and examples.  
 **Location:** `.github/skills/imgui-integration/SKILL.md`
+
+### scripted-input
+**Purpose:** Guide for using scripted input automation in VDE games, examples, and tools.  
+**Use when:** Adding test automation, smoke tests, automated demos, or CI/CD integration.  
+**Location:** `.github/skills/scripted-input/SKILL.md`
+
+### smoke-testing
+**Purpose:** Guide for running smoke tests and interpreting the results.  
+**Use when:** Running, debugging, or extending automated smoke tests for examples and tools.  
+**Location:** `.github/skills/smoke-testing/SKILL.md`
+
+### 2d-games
+**Purpose:** Guide for creating 2D games, demos, and examples with the VDE API.  
+**Use when:** Building 2D physics, sprite-based, or side-view applications. Setting up Camera2D, physics arenas, or choosing between manual and engine-powered collision detection.  
+**Location:** `.github/skills/2d-games/SKILL.md`

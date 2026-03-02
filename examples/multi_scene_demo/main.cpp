@@ -1020,7 +1020,7 @@ class MultiSceneDemo : public vde::Game {
 // Main
 // ============================================================================
 
-int main() {
+int main(int argc, char** argv) {
     MultiSceneDemo demo;
-    return vde::examples::runExample(demo, "VDE Multi-Scene Demo", 1280, 720);
+    return vde::examples::runExample(demo, "VDE Multi-Scene Demo", 1280, 720, argc, argv);
 }

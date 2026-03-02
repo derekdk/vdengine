@@ -1,0 +1,5 @@
+# Universal smoke test
+# Verifies example launches, renders, and exits cleanly
+wait startup
+wait 3000
+exit

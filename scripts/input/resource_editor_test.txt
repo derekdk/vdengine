@@ -1,0 +1,97 @@
+# =============================================================
+# Resource Editor — Functional Test Script (DSL Syntax)
+# =============================================================
+# Run this with:
+#   build_ninja\tools\resource_editor\vde_resource_editor.exe scripts\input\resource_editor_test.txt
+#
+# This exercises all Phase 1 commands using the unified DSL
+# syntax. The editor runs in script mode — no window
+# interaction required. Watch the console output for
+# OK / ERROR on each command.
+# =============================================================
+
+# --- Help ---
+help
+help create
+help set
+
+# --- Create canvases (DSL §2) ---
+create canvas hero 32 32
+create canvas enemy 16 16
+create canvas background 64 64
+list
+
+# --- Named colors (DSL §3.1) ---
+create color red #FF0000FF
+create color green #00FF00FF
+create color blue #0000FFFF
+create color skin #FFCC99
+create color outline #333333FF
+
+# --- Select active canvas (DSL pattern) ---
+select canvas hero
+
+# --- Drawing color / tool / brush size (REPL utilities) ---
+setcolor #FF0000FF
+settool brush
+setsize 3
+
+# --- Set pixels (DSL §8.1 — on active canvas "hero") ---
+set 5 5 #FF0000FF
+set 10 10 red
+set 0 0 blue
+
+# --- Fill entire canvas (DSL §8.2) ---
+fill #222222FF
+
+# --- Flood fill (DSL §8.7) ---
+floodfill 0 0 with #AAAAAAFF
+
+# --- Draw shapes (DSL §8.3–8.5) ---
+draw line 0 0 to 31 31 with #FFFF00FF
+draw line 0 31 to 31 0 with outline width 2
+draw rect 2 2 to 12 10 with #FF00FFFF filled
+draw rect 14 14 to 20 20 with #00FFFFFF outline
+draw circle 16 16 radius 5 with #FF8800FF filled
+draw circle 24 24 radius 3 with #8800FFFF outline
+
+# --- Undo / Redo ---
+undo
+undo
+redo
+
+# --- Color picker ---
+pick 5 5
+
+# --- Transforms (DSL §12.4) ---
+flip horizontal
+flip vertical
+resize 64 64
+crop 0 0 to 31 31
+
+# --- Zoom / Pan (REPL utilities) ---
+zoom 4
+pan 10 10
+
+# --- Target other canvas by name with @prefix ---
+@enemy fill #880000FF
+@enemy set 8 8 #FFFFFFFF
+@enemy draw line 0 0 to 15 15 with green
+
+# --- Target by numeric ID (canvas 3 = background) ---
+@3 fill #335577FF
+@background draw rect 10 10 to 30 30 with #FFFFFFAA filled
+
+# --- Export (DSL §17) ---
+@hero export png hero_test_output.png
+@enemy export png enemy_test_output.png
+
+# --- Close a canvas ---
+@enemy close
+list
+
+# --- Log management ---
+log save test_command_log.txt
+
+# --- Exit ---
+exit
