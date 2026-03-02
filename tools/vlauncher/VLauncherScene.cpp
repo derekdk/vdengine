@@ -133,7 +133,13 @@ void VLauncherScene::drawDebugUI() {
             }
 
             ImGui::TableSetColumnIndex(6);
-            ImGui::TextUnformatted(entry.executablePath.string().c_str());
+            std::error_code relError;
+            std::filesystem::path displayPath = std::filesystem::relative(
+                entry.executablePath, m_snapshot.repositoryRoot, relError);
+            if (relError || displayPath.empty()) {
+                displayPath = entry.executablePath;
+            }
+            ImGui::TextUnformatted(displayPath.generic_string().c_str());
 
             ImGui::TableSetColumnIndex(7);
             std::string buttonLabel = "Launch##" + entry.executablePath.string();
