@@ -74,3 +74,47 @@ target_include_directories(vde_tests PRIVATE
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(vde_tests)
+
+# =============================================================================
+# Resource Editor Tests
+#
+# Separate target that compiles the resource editor domain code (no GPU/ImGui)
+# and links AllCommands.cpp to fire every REGISTER_COMMAND static initializer.
+# =============================================================================
+
+set(VDE_RESOURCE_EDITOR_SRC ${CMAKE_SOURCE_DIR}/tools/resource_editor)
+
+add_executable(vde_resource_editor_tests
+    CommandSystem_test.cpp
+    ToolPalette_test.cpp
+
+    # Domain sources (main.cpp and EditorPanels excluded — no GPU/window needed)
+    ${VDE_RESOURCE_EDITOR_SRC}/CommandSystem.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/CanvasRegistry.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/ImageDocument.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/ToolPalette.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/FileOperations.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/commands/CommandBase.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/commands/CommandArgParser.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/commands/CommandRegistry.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/commands/EditorContext.cpp
+    ${VDE_RESOURCE_EDITOR_SRC}/commands/AllCommands.cpp
+)
+
+target_include_directories(vde_resource_editor_tests PRIVATE
+    ${VDE_RESOURCE_EDITOR_SRC}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/third_party/stb
+)
+
+target_link_libraries(vde_resource_editor_tests PRIVATE
+    vde
+    GTest::gtest
+    GTest::gtest_main
+)
+
+if(WIN32)
+    target_link_libraries(vde_resource_editor_tests PRIVATE ole32 uuid)
+endif()
+
+gtest_discover_tests(vde_resource_editor_tests)

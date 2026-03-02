@@ -74,6 +74,18 @@ class ToolPalette {
      */
     void setTool(EditorTool tool);
 
+    /** @brief Set the current drawing color. */
+    void setColor(RGBAColor color) { m_state.color = color; }
+
+    /** @brief Set the brush diameter in pixels. */
+    void setBrushSize(int size) { m_state.brushSize = size; }
+
+    /** @brief Set whether shapes are drawn filled or outline-only. */
+    void setFillShape(bool fill) { m_state.fillShape = fill; }
+
+    /** @brief Return true while a shape drag is in progress. */
+    bool isDrawingShape() const { return m_state.drawingShape; }
+
     /** @brief Read-only access to the current tool state. */
     const ToolState& getState() const { return m_state; }
 
