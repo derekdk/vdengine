@@ -5,14 +5,14 @@
  * @brief Command to save the active canvas to disk.
  */
 
-#include "../CommandBase.h"
-#include "../CommandRegistry.h"
-#include "../EditorContext.h"
+#include <string>
+
 #include "../../CanvasRegistry.h"
 #include "../../FileOperations.h"
 #include "../../ImageDocument.h"
-
-#include <string>
+#include "../CommandBase.h"
+#include "../CommandRegistry.h"
+#include "../EditorContext.h"
 
 namespace vde::tools {
 
@@ -22,7 +22,7 @@ namespace vde::tools {
  * Syntax: save [filepath]
  */
 class SaveCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "save",
@@ -44,7 +44,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         Canvas* canvas = ctx.getActiveCanvas();
         if (!canvas) {

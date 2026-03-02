@@ -1,13 +1,12 @@
 #include "ResourceEditorScene.h"
 
-#include "FileOperations.h"
-
 #include <vde/Texture.h>
 #include <vde/VulkanContext.h>
 
-#include <imgui_impl_vulkan.h>
-
 #include <iostream>
+
+#include "FileOperations.h"
+#include <imgui_impl_vulkan.h>
 
 namespace vde::tools {
 
@@ -55,7 +54,9 @@ void ResourceEditorScene::executeCommand(const std::string& cmdLine) {
 // Tool identity
 // =============================================================================
 
-std::string ResourceEditorScene::getToolName() const { return "VDE Resource Editor"; }
+std::string ResourceEditorScene::getToolName() const {
+    return "VDE Resource Editor";
+}
 
 std::string ResourceEditorScene::getToolDescription() const {
     return "2D pixel art editor with command console";
@@ -139,7 +140,9 @@ void ResourceEditorScene::syncGpuTextures() {
 // ImGui cleanup
 // =============================================================================
 
-void ResourceEditorScene::onBeforeImGuiShutdown() { cleanupImGuiTextures(); }
+void ResourceEditorScene::onBeforeImGuiShutdown() {
+    cleanupImGuiTextures();
+}
 
 void ResourceEditorScene::cleanupImGuiTextures() {
     for (uint32_t id : m_canvasRegistry.getIds()) {

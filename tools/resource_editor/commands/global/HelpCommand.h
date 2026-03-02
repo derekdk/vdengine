@@ -5,17 +5,17 @@
  * @brief Command to display help for all commands or a specific command.
  */
 
-#include "../CommandBase.h"
-#include "../CommandRegistry.h"
-#include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
 #include <algorithm>
 #include <map>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
+#include "../CommandBase.h"
+#include "../CommandRegistry.h"
+#include "../EditorContext.h"
 
 namespace vde::tools {
 
@@ -25,7 +25,7 @@ namespace vde::tools {
  * Syntax: help [command]
  */
 class HelpCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "help",
@@ -43,13 +43,15 @@ public:
 
     bool usesCustomParsing() const override { return true; }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& /*ctx*/) override {
         std::string remainder = args.remainder();
 
         // Trim whitespace
-        while (!remainder.empty() && remainder.front() == ' ') remainder.erase(remainder.begin());
-        while (!remainder.empty() && remainder.back() == ' ') remainder.pop_back();
+        while (!remainder.empty() && remainder.front() == ' ')
+            remainder.erase(remainder.begin());
+        while (!remainder.empty() && remainder.back() == ' ')
+            remainder.pop_back();
 
         if (!remainder.empty()) {
             // Show help for a specific command

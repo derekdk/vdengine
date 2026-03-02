@@ -5,13 +5,13 @@
  * @brief Command to toggle the grid overlay on the active canvas.
  */
 
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <string>
 
 namespace vde::tools {
 
@@ -21,7 +21,7 @@ namespace vde::tools {
  * Syntax: grid on|off
  */
 class GridCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "grid",
@@ -43,7 +43,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& /*ctx*/) override {
         const std::string& state = args.getString("state");
         bool enabled = (state == "on");

@@ -5,10 +5,10 @@
  * @brief Command to flip a canvas horizontally or vertically.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: flip horizontal|vertical
  */
 class FlipCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "flip",
@@ -40,7 +40,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         const std::string& direction = args.getString("direction");

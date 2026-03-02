@@ -5,12 +5,12 @@
 
 #include "EditorPanels.h"
 
-#include "CommandSystem.h"
-
 #include <algorithm>
 #include <cstdio>
 #include <sstream>
 #include <string>
+
+#include "CommandSystem.h"
 
 namespace vde {
 namespace tools {
@@ -417,8 +417,7 @@ void EditorPanels::drawMenuBar(CommandSystem& cmd, CanvasRegistry& canvases) {
             if (name.empty()) {
                 name = canvases.generateUniqueName();
             }
-            cmd.execute("create canvas " + name + " " +
-                        std::to_string(m_newCanvasWidth) + " " +
+            cmd.execute("create canvas " + name + " " + std::to_string(m_newCanvasWidth) + " " +
                         std::to_string(m_newCanvasHeight));
             ImGui::CloseCurrentPopup();
         }

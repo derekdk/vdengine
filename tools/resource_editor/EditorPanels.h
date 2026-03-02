@@ -9,12 +9,11 @@
  * creates its own ImGui window.
  */
 
+#include <string>
+
 #include "CanvasRegistry.h"
 #include "ToolPalette.h"
-
 #include <imgui.h>
-
-#include <string>
 
 namespace vde::tools {
 
@@ -24,7 +23,7 @@ class CommandSystem;
  * @brief Draws all ImGui panels that make up the Resource Editor UI.
  */
 class EditorPanels {
-public:
+  public:
     /**
      * @brief Draw the interactive command console (log + text input).
      * @param cmd Command system to execute typed commands against.
@@ -64,8 +63,8 @@ public:
      * @param isActive Whether this canvas is the currently active one.
      * @param dpiScale DPI scaling factor for layout.
      */
-    void drawCanvasViewport(Canvas& canvas, ToolPalette& palette, CommandSystem& cmd,
-                            bool isActive, float dpiScale);
+    void drawCanvasViewport(Canvas& canvas, ToolPalette& palette, CommandSystem& cmd, bool isActive,
+                            float dpiScale);
 
     /**
      * @brief Draw viewports for all registered canvases.
@@ -74,8 +73,8 @@ public:
      * @param cmd Command system for executing drawing commands.
      * @param dpiScale DPI scaling factor for layout.
      */
-    void drawAllCanvasViewports(CanvasRegistry& canvases, ToolPalette& palette,
-                                CommandSystem& cmd, float dpiScale);
+    void drawAllCanvasViewports(CanvasRegistry& canvases, ToolPalette& palette, CommandSystem& cmd,
+                                float dpiScale);
 
     /**
      * @brief Draw the properties panel for the active canvas.
@@ -91,13 +90,13 @@ public:
      */
     void drawMenuBar(CommandSystem& cmd, CanvasRegistry& canvases);
 
-private:
-    char m_consoleInputBuffer[512] = {};  ///< Text input buffer for the console.
+  private:
+    char m_consoleInputBuffer[512] = {};   ///< Text input buffer for the console.
     bool m_scrollConsoleToBottom = false;  ///< Flag to auto-scroll console on next frame.
-    bool m_showNewCanvasPopup = false;    ///< Trigger flag for the "New Canvas" modal.
-    char m_newCanvasName[128] = {};       ///< Name buffer for the new-canvas dialog.
-    int m_newCanvasWidth = 32;            ///< Width default for the new-canvas dialog.
-    int m_newCanvasHeight = 32;           ///< Height default for the new-canvas dialog.
+    bool m_showNewCanvasPopup = false;     ///< Trigger flag for the "New Canvas" modal.
+    char m_newCanvasName[128] = {};        ///< Name buffer for the new-canvas dialog.
+    int m_newCanvasWidth = 32;             ///< Width default for the new-canvas dialog.
+    int m_newCanvasHeight = 32;            ///< Height default for the new-canvas dialog.
 };
 
 }  // namespace vde::tools

@@ -5,14 +5,14 @@
  * @brief Command to display the command execution history.
  */
 
+#include <sstream>
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <sstream>
-#include <string>
 
 namespace vde::tools {
 
@@ -22,7 +22,7 @@ namespace vde::tools {
  * Syntax: history [n]
  */
 class HistoryCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "history",
@@ -44,10 +44,11 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         int n = args.has("n") ? args.getInt("n") : 20;
-        if (n <= 0) n = 20;
+        if (n <= 0)
+            n = 20;
 
         const auto& log = ctx.commands->getLog();
         if (log.empty()) {

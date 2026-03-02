@@ -5,10 +5,10 @@
  * @brief Command to redo a previously undone edit operation on a canvas.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: redo
  */
 class RedoCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "redo",
@@ -33,7 +33,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& /*args*/,
                                 EditorContext& /*ctx*/) override {
         if (canvas.document->getRedoCount() == 0) {
@@ -41,8 +41,7 @@ protected:
         }
 
         canvas.document->redo();
-        return {true, "Redone (" + std::to_string(canvas.document->getRedoCount()) +
-                           " remaining)"};
+        return {true, "Redone (" + std::to_string(canvas.document->getRedoCount()) + " remaining)"};
     }
 };
 

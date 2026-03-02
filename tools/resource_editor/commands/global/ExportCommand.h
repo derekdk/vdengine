@@ -5,14 +5,14 @@
  * @brief Command to export the active canvas to a file.
  */
 
-#include "../CommandBase.h"
-#include "../CommandRegistry.h"
-#include "../EditorContext.h"
+#include <string>
+
 #include "../../CanvasRegistry.h"
 #include "../../FileOperations.h"
 #include "../../ImageDocument.h"
-
-#include <string>
+#include "../CommandBase.h"
+#include "../CommandRegistry.h"
+#include "../EditorContext.h"
 
 namespace vde::tools {
 
@@ -22,7 +22,7 @@ namespace vde::tools {
  * Syntax: export [filepath]
  */
 class ExportCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "export",
@@ -41,7 +41,7 @@ public:
 
     bool usesCustomParsing() const override { return true; }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         Canvas* canvas = ctx.getActiveCanvas();
         if (!canvas) {
@@ -67,12 +67,14 @@ protected:
         return {true, "Exported '" + canvas->name + "' to " + path};
     }
 
-private:
+  private:
     static std::string stripQuotes(const std::string& s) {
         std::string trimmed = s;
         // Trim leading/trailing whitespace
-        while (!trimmed.empty() && trimmed.front() == ' ') trimmed.erase(trimmed.begin());
-        while (!trimmed.empty() && trimmed.back() == ' ') trimmed.pop_back();
+        while (!trimmed.empty() && trimmed.front() == ' ')
+            trimmed.erase(trimmed.begin());
+        while (!trimmed.empty() && trimmed.back() == ' ')
+            trimmed.pop_back();
         // Strip quotes
         if (trimmed.size() >= 2 && trimmed.front() == '"' && trimmed.back() == '"') {
             return trimmed.substr(1, trimmed.size() - 2);

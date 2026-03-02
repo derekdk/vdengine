@@ -5,10 +5,10 @@
  * @brief Command to draw a circle on the canvas.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: draw circle (cx,cy) radius <r> with <color> [filled|outline]
  */
 class DrawCircleCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "draw circle",
@@ -62,7 +62,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         auto center = args.getPoint("center");
@@ -74,8 +74,8 @@ protected:
         canvas.document->drawCircle(center.x, center.y, r, color, isFilled);
 
         return {true, "Drew " + std::string(isFilled ? "filled" : "outline") + " circle at (" +
-                           std::to_string(center.x) + "," + std::to_string(center.y) +
-                           ") r=" + std::to_string(r) + " with " + color.toHex()};
+                          std::to_string(center.x) + "," + std::to_string(center.y) +
+                          ") r=" + std::to_string(r) + " with " + color.toHex()};
     }
 };
 

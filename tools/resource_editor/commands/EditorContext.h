@@ -9,10 +9,10 @@
  * tight coupling.
  */
 
-#include "CommandTypes.h"
-
 #include <map>
 #include <string>
+
+#include "CommandTypes.h"
 
 namespace vde {
 class Game;

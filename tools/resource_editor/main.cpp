@@ -20,9 +20,8 @@ using namespace vde::tools;
 // Tool Game class
 // =============================================================================
 
-class ResourceEditorGame
-    : public BaseToolGame<BaseToolInputHandler, ResourceEditorScene> {
-public:
+class ResourceEditorGame : public BaseToolGame<BaseToolInputHandler, ResourceEditorScene> {
+  public:
     ResourceEditorGame(ToolMode mode, const std::string& scriptFile = "")
         : BaseToolGame(mode), m_scriptFile(scriptFile) {}
 
@@ -42,7 +41,7 @@ public:
         }
     }
 
-private:
+  private:
     std::string m_scriptFile;
 };
 

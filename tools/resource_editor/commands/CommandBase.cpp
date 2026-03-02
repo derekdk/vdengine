@@ -5,9 +5,9 @@
 
 #include "CommandBase.h"
 
-#include "EditorContext.h"
 #include "../CanvasRegistry.h"
 #include "../CommandSystem.h"
+#include "EditorContext.h"
 
 namespace vde::tools {
 

@@ -116,7 +116,19 @@ struct IntRect {
 // =============================================================================
 
 /** @brief Types that a command parameter can take. */
-enum class ParamType { Int, Float, String, QuotedString, Color, Bool, Keyword, Enum, Point, Size, Rect };
+enum class ParamType {
+    Int,
+    Float,
+    String,
+    QuotedString,
+    Color,
+    Bool,
+    Keyword,
+    Enum,
+    Point,
+    Size,
+    Rect
+};
 
 /**
  * @brief Describes a single parameter that a command accepts.
@@ -200,17 +212,39 @@ struct CommandMetadata {
             for (const auto& p : params) {
                 os << "    " << p.name << " (";
                 switch (p.type) {
-                case ParamType::Int:         os << "int";          break;
-                case ParamType::Float:       os << "float";        break;
-                case ParamType::String:      os << "string";       break;
-                case ParamType::QuotedString:os << "quoted string"; break;
-                case ParamType::Color:       os << "color";        break;
-                case ParamType::Bool:        os << "bool";         break;
-                case ParamType::Keyword:     os << "keyword";      break;
-                case ParamType::Enum:        os << "enum";         break;
-                case ParamType::Point:       os << "point";        break;
-                case ParamType::Size:        os << "size";         break;
-                case ParamType::Rect:        os << "rect";         break;
+                case ParamType::Int:
+                    os << "int";
+                    break;
+                case ParamType::Float:
+                    os << "float";
+                    break;
+                case ParamType::String:
+                    os << "string";
+                    break;
+                case ParamType::QuotedString:
+                    os << "quoted string";
+                    break;
+                case ParamType::Color:
+                    os << "color";
+                    break;
+                case ParamType::Bool:
+                    os << "bool";
+                    break;
+                case ParamType::Keyword:
+                    os << "keyword";
+                    break;
+                case ParamType::Enum:
+                    os << "enum";
+                    break;
+                case ParamType::Point:
+                    os << "point";
+                    break;
+                case ParamType::Size:
+                    os << "size";
+                    break;
+                case ParamType::Rect:
+                    os << "rect";
+                    break;
                 }
                 os << ")";
                 if (!p.required) {
@@ -226,7 +260,8 @@ struct CommandMetadata {
                 if (!p.enumValues.empty()) {
                     os << " {";
                     for (size_t i = 0; i < p.enumValues.size(); ++i) {
-                        if (i > 0) os << ", ";
+                        if (i > 0)
+                            os << ", ";
                         os << p.enumValues[i];
                     }
                     os << "}";

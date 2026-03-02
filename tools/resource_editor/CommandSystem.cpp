@@ -1,8 +1,5 @@
 #include "CommandSystem.h"
 
-#include "CanvasRegistry.h"
-#include "FileOperations.h"
-
 #include <algorithm>
 #include <chrono>
 #include <ctime>
@@ -11,13 +8,18 @@
 #include <iostream>
 #include <sstream>
 
+#include "CanvasRegistry.h"
+#include "FileOperations.h"
+
 namespace vde::tools {
 
 // =============================================================================
 // Initialization
 // =============================================================================
 
-void CommandSystem::initialize(EditorContext& ctx) { m_ctx = &ctx; }
+void CommandSystem::initialize(EditorContext& ctx) {
+    m_ctx = &ctx;
+}
 
 // =============================================================================
 // Execute a single command line
@@ -50,12 +52,11 @@ bool CommandSystem::execute(const std::string& commandLine) {
         // Custom-parsing commands receive the raw argument string as remainder
         // Set the remainder directly via the friend relationship through CommandArgParser
         // We do a trivial parse that puts everything in remainder
-        auto parseResult =
-            CommandArgParser::parse(resolved.rawArgs, {}, *m_ctx);
+        auto parseResult = CommandArgParser::parse(resolved.rawArgs, {}, *m_ctx);
         args = std::move(parseResult.args);
     } else {
-        auto parseResult = CommandArgParser::parse(resolved.rawArgs,
-                                                   resolved.command->metadata().params, *m_ctx);
+        auto parseResult =
+            CommandArgParser::parse(resolved.rawArgs, resolved.command->metadata().params, *m_ctx);
         if (!parseResult.success) {
             std::string errorMsg = "Parse error: " + parseResult.error;
             addLogEntry(line, errorMsg, false);
@@ -184,9 +185,8 @@ bool CommandSystem::executeScript(const std::string& filePath) {
         return false;
     }
 
-    addLogEntry("executeScript " + filePath, "Running script (" + std::to_string(lines.size()) +
-                                                  " commands)",
-                true);
+    addLogEntry("executeScript " + filePath,
+                "Running script (" + std::to_string(lines.size()) + " commands)", true);
 
     bool allOk = true;
     for (const auto& line : lines) {
@@ -242,7 +242,9 @@ bool CommandSystem::saveFullLog(const std::string& filePath) {
 // Log accessors
 // =============================================================================
 
-const std::vector<CommandLogEntry>& CommandSystem::getLog() const { return m_log; }
+const std::vector<CommandLogEntry>& CommandSystem::getLog() const {
+    return m_log;
+}
 
 void CommandSystem::addLogEntry(const std::string& line, const std::string& result, bool success,
                                 const std::string& canvasName) {
@@ -265,9 +267,13 @@ void CommandSystem::clear() {
     m_activeCanvasId = 0;
 }
 
-void CommandSystem::setActiveCanvasId(uint32_t id) { m_activeCanvasId = id; }
+void CommandSystem::setActiveCanvasId(uint32_t id) {
+    m_activeCanvasId = id;
+}
 
-uint32_t CommandSystem::getActiveCanvasId() const { return m_activeCanvasId; }
+uint32_t CommandSystem::getActiveCanvasId() const {
+    return m_activeCanvasId;
+}
 
 // =============================================================================
 // Timestamp helper

@@ -5,12 +5,12 @@
  * @brief Command to draw a rectangle on the canvas.
  */
 
+#include <algorithm>
+
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-
-#include <algorithm>
 
 namespace vde::tools {
 
@@ -20,7 +20,7 @@ namespace vde::tools {
  * Syntax: draw rect (x1,y1) to (x2,y2) with <color> [filled|outline]
  */
 class DrawRectCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "draw rect",
@@ -64,7 +64,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         auto start = args.getPoint("start");
@@ -81,9 +81,8 @@ protected:
         canvas.document->drawRect(x, y, w, h, color, isFilled);
 
         return {true, "Drew " + std::string(isFilled ? "filled" : "outline") + " rect at (" +
-                           std::to_string(x) + "," + std::to_string(y) + ") " +
-                           std::to_string(w) + "x" + std::to_string(h) + " with " +
-                           color.toHex()};
+                          std::to_string(x) + "," + std::to_string(y) + ") " + std::to_string(w) +
+                          "x" + std::to_string(h) + " with " + color.toHex()};
     }
 };
 

@@ -5,15 +5,15 @@
  * @brief Command to load an image from disk into a new or existing canvas.
  */
 
-#include "../CommandBase.h"
-#include "../CommandRegistry.h"
-#include "../EditorContext.h"
+#include <string>
+#include <vector>
+
 #include "../../CanvasRegistry.h"
 #include "../../FileOperations.h"
 #include "../../ImageDocument.h"
-
-#include <string>
-#include <vector>
+#include "../CommandBase.h"
+#include "../CommandRegistry.h"
+#include "../EditorContext.h"
 
 namespace vde::tools {
 
@@ -27,7 +27,7 @@ namespace vde::tools {
  * If just a filepath is given, creates a new canvas from the image.
  */
 class LoadCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "load",
@@ -45,7 +45,7 @@ public:
 
     bool usesCustomParsing() const override { return true; }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         std::string remainder = args.remainder();
 
@@ -99,11 +99,11 @@ protected:
         canvas->document->setFilePath(filepath);
         ctx.commands->setActiveCanvasId(canvas->id);
         return {true, "Loaded '" + canvasName + "' (" +
-                           std::to_string(canvas->document->getWidth()) + "x" +
-                           std::to_string(canvas->document->getHeight()) + ")"};
+                          std::to_string(canvas->document->getWidth()) + "x" +
+                          std::to_string(canvas->document->getHeight()) + ")"};
     }
 
-private:
+  private:
     /**
      * @brief Split a load argument string into tokens, respecting quoted strings.
      */
@@ -112,20 +112,25 @@ private:
         size_t i = 0;
         while (i < input.size()) {
             // Skip whitespace
-            while (i < input.size() && input[i] == ' ') ++i;
-            if (i >= input.size()) break;
+            while (i < input.size() && input[i] == ' ')
+                ++i;
+            if (i >= input.size())
+                break;
 
             if (input[i] == '"') {
                 // Quoted token — find closing quote
                 size_t start = i;
                 ++i;
-                while (i < input.size() && input[i] != '"') ++i;
-                if (i < input.size()) ++i;  // skip closing quote
+                while (i < input.size() && input[i] != '"')
+                    ++i;
+                if (i < input.size())
+                    ++i;  // skip closing quote
                 tokens.push_back(input.substr(start, i - start));
             } else {
                 // Unquoted token
                 size_t start = i;
-                while (i < input.size() && input[i] != ' ') ++i;
+                while (i < input.size() && input[i] != ' ')
+                    ++i;
                 tokens.push_back(input.substr(start, i - start));
             }
         }

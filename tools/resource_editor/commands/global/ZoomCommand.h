@@ -5,14 +5,14 @@
  * @brief Command to adjust the viewport zoom level of the active canvas.
  */
 
+#include <algorithm>
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <algorithm>
-#include <string>
 
 namespace vde::tools {
 
@@ -22,7 +22,7 @@ namespace vde::tools {
  * Syntax: zoom <level|in|out>
  */
 class ZoomCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "zoom",
@@ -40,7 +40,7 @@ public:
 
     bool usesCustomParsing() const override { return true; }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         Canvas* canvas = ctx.getActiveCanvas();
         if (!canvas) {
@@ -49,8 +49,10 @@ protected:
 
         std::string remainder = args.remainder();
         // Trim whitespace
-        while (!remainder.empty() && remainder.front() == ' ') remainder.erase(remainder.begin());
-        while (!remainder.empty() && remainder.back() == ' ') remainder.pop_back();
+        while (!remainder.empty() && remainder.front() == ' ')
+            remainder.erase(remainder.begin());
+        while (!remainder.empty() && remainder.back() == ' ')
+            remainder.pop_back();
 
         if (remainder.empty()) {
             return {true,

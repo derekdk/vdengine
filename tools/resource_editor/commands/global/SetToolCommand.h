@@ -5,12 +5,12 @@
  * @brief Command to switch the active drawing tool on the palette.
  */
 
-#include "../CommandBase.h"
-#include "../CommandRegistry.h"
-#include "../EditorContext.h"
 #include "../../CanvasRegistry.h"
 #include "../../ImageDocument.h"
 #include "../../ToolPalette.h"
+#include "../CommandBase.h"
+#include "../CommandRegistry.h"
+#include "../EditorContext.h"
 
 namespace vde::tools {
 
@@ -20,7 +20,7 @@ namespace vde::tools {
  * Syntax: settool <toolname>
  */
 class SetToolCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "settool",
@@ -42,7 +42,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         const std::string& toolName = args.getString("toolname");
 

@@ -5,10 +5,10 @@
  * @brief Command to clear a canvas to transparent black.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: clear
  */
 class ClearCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "clear",
@@ -33,7 +33,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& /*args*/,
                                 EditorContext& /*ctx*/) override {
         canvas.document->snapshotForUndo();

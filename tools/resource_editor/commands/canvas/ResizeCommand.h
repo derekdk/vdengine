@@ -5,10 +5,10 @@
  * @brief Command to resize a canvas using nearest-neighbor sampling.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: resize <width> <height>
  */
 class ResizeCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "resize",
@@ -44,7 +44,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         int w = args.getInt("width");

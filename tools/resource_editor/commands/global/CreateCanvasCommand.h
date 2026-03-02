@@ -5,13 +5,13 @@
  * @brief Command to create a new canvas with given dimensions.
  */
 
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <string>
 
 namespace vde::tools {
 
@@ -21,7 +21,7 @@ namespace vde::tools {
  * Syntax: create canvas <name> <width> <height>
  */
 class CreateCanvasCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "create canvas",
@@ -51,7 +51,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         const std::string& name = args.getString("name");
         int w = args.getInt("width");
@@ -73,7 +73,7 @@ protected:
 
         ctx.commands->setActiveCanvasId(canvas->id);
         return {true, "Created canvas '" + canvas->name + "' (" + std::to_string(w) + "x" +
-                           std::to_string(h) + ")"};
+                          std::to_string(h) + ")"};
     }
 };
 

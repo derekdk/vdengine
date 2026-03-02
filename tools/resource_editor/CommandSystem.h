@@ -8,14 +8,14 @@
  * delegates argument parsing, and maintains an execution log.
  */
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "commands/CommandArgParser.h"
 #include "commands/CommandBase.h"
 #include "commands/CommandRegistry.h"
 #include "commands/EditorContext.h"
-
-#include <cstdint>
-#include <string>
-#include <vector>
 
 namespace vde::tools {
 
@@ -38,7 +38,7 @@ struct CommandLogEntry {
  * a bounded execution log.
  */
 class CommandSystem {
-public:
+  public:
     /**
      * @brief Wire the system to the shared editor context.
      * @param ctx Editor context whose lifetime must exceed this object's.
@@ -92,7 +92,7 @@ public:
     void setActiveCanvasId(uint32_t id);
     uint32_t getActiveCanvasId() const;
 
-private:
+  private:
     /** @brief Intermediate result of resolving a command line. */
     struct ResolvedCommand {
         CommandBase* command = nullptr;

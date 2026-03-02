@@ -5,12 +5,12 @@
 
 #include "CommandArgParser.h"
 
-#include "EditorContext.h"
-
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <stdexcept>
+
+#include "EditorContext.h"
 
 namespace vde::tools {
 
@@ -105,7 +105,8 @@ bool CommandArgParser::validateEnum(const std::string& value,
                     break;
                 }
             }
-            if (match) return true;
+            if (match)
+                return true;
         }
     }
     return false;
@@ -139,7 +140,8 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
             // Parse "a,b" and "c,d"
             auto comma1 = first.find(',');
             auto comma2 = second.find(',');
-            if (comma1 == std::string::npos || comma2 == std::string::npos) return false;
+            if (comma1 == std::string::npos || comma2 == std::string::npos)
+                return false;
             try {
                 out.m_rect.x = std::stoi(first.substr(0, comma1));
                 out.m_rect.y = std::stoi(first.substr(comma1 + 1));
@@ -161,7 +163,8 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
         // Trim whitespace
         auto start = part.find_first_not_of(" \t");
         auto end = part.find_last_not_of(" \t");
-        if (start == std::string::npos) return false;
+        if (start == std::string::npos)
+            return false;
         part = part.substr(start, end - start + 1);
         try {
             values.push_back(std::stoi(part));
@@ -311,8 +314,7 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
             ParsedArg arg;
             if (tokens[tokenIdx].front() == '(') {
                 if (!parseTuple(tokens[tokenIdx], arg, param.type)) {
-                    result.error =
-                        "Invalid " + param.name + " tuple: '" + tokens[tokenIdx] + "'";
+                    result.error = "Invalid " + param.name + " tuple: '" + tokens[tokenIdx] + "'";
                     return result;
                 }
                 arg.type = param.type;
@@ -354,8 +356,7 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
             ParsedArg arg;
             if (tokens[tokenIdx].front() == '(') {
                 if (!parseTuple(tokens[tokenIdx], arg, ParamType::Rect)) {
-                    result.error =
-                        "Invalid " + param.name + " rect: '" + tokens[tokenIdx] + "'";
+                    result.error = "Invalid " + param.name + " rect: '" + tokens[tokenIdx] + "'";
                     return result;
                 }
                 arg.type = ParamType::Rect;
@@ -434,7 +435,8 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
     if (tokenIdx < tokens.size()) {
         std::ostringstream rem;
         for (size_t i = tokenIdx; i < tokens.size(); ++i) {
-            if (i > tokenIdx) rem << " ";
+            if (i > tokenIdx)
+                rem << " ";
             rem << tokens[i];
         }
         result.args.m_remainder = rem.str();

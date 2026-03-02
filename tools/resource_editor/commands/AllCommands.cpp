@@ -9,8 +9,8 @@
  */
 
 // Full definitions needed by inline command implementations
-#include "../CommandSystem.h"
 #include "../CanvasRegistry.h"
+#include "../CommandSystem.h"
 #include "../FileOperations.h"
 
 // Global commands

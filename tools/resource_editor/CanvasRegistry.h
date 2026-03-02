@@ -8,9 +8,6 @@
  * GPU texture and ImGui descriptor set for viewport rendering.
  */
 
-#include "ImageDocument.h"
-#include "commands/CommandTypes.h"
-
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
@@ -18,6 +15,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "ImageDocument.h"
+#include "commands/CommandTypes.h"
 
 namespace vde {
 class Texture;
@@ -29,24 +29,24 @@ namespace vde::tools {
  * @brief A single canvas: pixel document + GPU texture + view state.
  */
 struct Canvas {
-    uint32_t id = 0;                                    ///< Unique canvas ID.
-    std::string name;                                   ///< Human-readable name.
-    std::unique_ptr<ImageDocument> document;             ///< Owned pixel data.
+    uint32_t id = 0;                                                  ///< Unique canvas ID.
+    std::string name;                                                 ///< Human-readable name.
+    std::unique_ptr<ImageDocument> document;                          ///< Owned pixel data.
     std::map<std::string, std::unique_ptr<ImageDocument>> resources;  ///< Named sub-resources.
-    std::vector<std::string> operationHistory;           ///< Log of commands applied.
-    std::shared_ptr<vde::Texture> gpuTexture;            ///< GPU-side texture (may be null).
-    VkDescriptorSet imguiTextureId = VK_NULL_HANDLE;     ///< ImGui descriptor for viewport.
-    uint64_t lastUploadedGeneration = 0;                 ///< Generation at last GPU upload.
-    float zoomLevel = 8.0f;                              ///< Viewport zoom (pixel-art default).
-    float panX = 0.0f;                                   ///< Viewport horizontal pan.
-    float panY = 0.0f;                                   ///< Viewport vertical pan.
+    std::vector<std::string> operationHistory;                        ///< Log of commands applied.
+    std::shared_ptr<vde::Texture> gpuTexture;         ///< GPU-side texture (may be null).
+    VkDescriptorSet imguiTextureId = VK_NULL_HANDLE;  ///< ImGui descriptor for viewport.
+    uint64_t lastUploadedGeneration = 0;              ///< Generation at last GPU upload.
+    float zoomLevel = 8.0f;                           ///< Viewport zoom (pixel-art default).
+    float panX = 0.0f;                                ///< Viewport horizontal pan.
+    float panY = 0.0f;                                ///< Viewport vertical pan.
 };
 
 /**
  * @brief Owns all Canvas instances and provides lookup by ID or name.
  */
 class CanvasRegistry {
-public:
+  public:
     /**
      * @brief Create a new canvas with the given name and document.
      * @param name Unique human-readable name.
@@ -114,8 +114,9 @@ public:
      * @brief Reference to a canvas and one of its sub-resource images.
      */
     struct ResourceRef {
-        Canvas* canvas = nullptr;       ///< Owning canvas.
-        ImageDocument* image = nullptr;  ///< Resolved image (may be the main doc or a sub-resource).
+        Canvas* canvas = nullptr;  ///< Owning canvas.
+        ImageDocument* image =
+            nullptr;  ///< Resolved image (may be the main doc or a sub-resource).
     };
 
     /**
@@ -126,11 +127,11 @@ public:
      */
     ResourceRef resolveResource(const std::string& ref, uint32_t activeCanvasId);
 
-private:
+  private:
     std::map<uint32_t, std::unique_ptr<Canvas>> m_canvases;  ///< ID -> Canvas.
     std::map<std::string, uint32_t> m_nameIndex;             ///< Name -> ID.
-    uint32_t m_nextId = 1;                                    ///< Next auto-assigned ID.
-    int m_nextUntitledIndex = 1;                              ///< Counter for unique name generation.
+    uint32_t m_nextId = 1;                                   ///< Next auto-assigned ID.
+    int m_nextUntitledIndex = 1;  ///< Counter for unique name generation.
 };
 
 }  // namespace vde::tools

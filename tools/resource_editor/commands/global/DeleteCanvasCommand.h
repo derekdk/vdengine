@@ -5,13 +5,13 @@
  * @brief Command to delete (close) a canvas by name or ID.
  */
 
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <string>
 
 namespace vde::tools {
 
@@ -24,7 +24,7 @@ namespace vde::tools {
  * reassigned to the next available canvas (or cleared if none remain).
  */
 class DeleteCanvasCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "delete",
@@ -46,7 +46,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         const std::string& nameOrId = args.getString("name");
 

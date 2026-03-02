@@ -9,12 +9,12 @@
  * for compound command names.
  */
 
-#include "CommandBase.h"
-
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "CommandBase.h"
 
 namespace vde::tools {
 
@@ -22,7 +22,7 @@ namespace vde::tools {
  * @brief Singleton that owns all registered CommandBase instances.
  */
 class CommandRegistry {
-public:
+  public:
     /** @brief Access the global registry singleton. */
     static CommandRegistry& instance();
 
@@ -45,7 +45,7 @@ public:
     /** @brief Return metadata pointers filtered by category. */
     std::vector<const CommandMetadata*> getByCategory(const std::string& category) const;
 
-private:
+  private:
     CommandRegistry() = default;
 
     std::vector<std::unique_ptr<CommandBase>> m_commands;
@@ -61,12 +61,11 @@ private:
  *   REGISTER_COMMAND(DrawLineCommand);
  * @endcode
  */
-#define REGISTER_COMMAND(CommandClass)                                  \
-    static struct CommandClass##_Registrar {                            \
-        CommandClass##_Registrar() {                                    \
-            CommandRegistry::instance().registerCommand(                \
-                std::make_unique<CommandClass>());                      \
-        }                                                              \
+#define REGISTER_COMMAND(CommandClass)                                                             \
+    static struct CommandClass##_Registrar {                                                       \
+        CommandClass##_Registrar() {                                                               \
+            CommandRegistry::instance().registerCommand(std::make_unique<CommandClass>());         \
+        }                                                                                          \
     } s_##CommandClass##_registrar;
 
 }  // namespace vde::tools

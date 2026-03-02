@@ -5,13 +5,13 @@
  * @brief Command to rename an existing canvas.
  */
 
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <string>
 
 namespace vde::tools {
 
@@ -21,7 +21,7 @@ namespace vde::tools {
  * Syntax: rename <oldname> <newname>
  */
 class RenameCanvasCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "rename",
@@ -47,7 +47,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         const std::string& oldName = args.getString("oldname");
         const std::string& newName = args.getString("newname");

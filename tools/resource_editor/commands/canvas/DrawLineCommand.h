@@ -5,10 +5,10 @@
  * @brief Command to draw a line between two points on the canvas.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: draw line (x1,y1) to (x2,y2) with <color> [width <n>]
  */
 class DrawLineCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "draw line",
@@ -65,7 +65,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         auto start = args.getPoint("start");
@@ -76,9 +76,9 @@ protected:
         canvas.document->snapshotForUndo();
         canvas.document->drawLine(start.x, start.y, end.x, end.y, color, thickness);
 
-        return {true, "Drew line (" + std::to_string(start.x) + "," +
-                           std::to_string(start.y) + ") to (" + std::to_string(end.x) + "," +
-                           std::to_string(end.y) + ") with " + color.toHex()};
+        return {true, "Drew line (" + std::to_string(start.x) + "," + std::to_string(start.y) +
+                          ") to (" + std::to_string(end.x) + "," + std::to_string(end.y) +
+                          ") with " + color.toHex()};
     }
 };
 

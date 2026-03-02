@@ -5,13 +5,13 @@
  * @brief Command to quit the resource editor application.
  */
 
+#include <vde/api/Game.h>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <vde/api/Game.h>
 
 namespace vde::tools {
 
@@ -21,7 +21,7 @@ namespace vde::tools {
  * Syntax: exit
  */
 class ExitCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "exit",
@@ -36,7 +36,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& /*args*/, EditorContext& ctx) override {
         if (ctx.game) {
             ctx.game->quit();

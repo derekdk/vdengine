@@ -5,10 +5,10 @@
  * @brief Command to draw an ellipse on the canvas.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: draw ellipse (cx,cy) (rx,ry) with <color> [filled|outline]
  */
 class DrawEllipseCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "draw ellipse",
@@ -58,7 +58,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         auto center = args.getPoint("center");
@@ -70,9 +70,9 @@ protected:
         canvas.document->drawEllipse(center.x, center.y, radii.x, radii.y, color, isFilled);
 
         return {true, "Drew " + std::string(isFilled ? "filled" : "outline") + " ellipse at (" +
-                           std::to_string(center.x) + "," + std::to_string(center.y) + ") rx=" +
-                           std::to_string(radii.x) + " ry=" + std::to_string(radii.y) + " with " +
-                           color.toHex()};
+                          std::to_string(center.x) + "," + std::to_string(center.y) +
+                          ") rx=" + std::to_string(radii.x) + " ry=" + std::to_string(radii.y) +
+                          " with " + color.toHex()};
     }
 };
 

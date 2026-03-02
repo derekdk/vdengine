@@ -5,13 +5,13 @@
 
 #include "ImageDocument.h"
 
-#include "stb_image.h"
-#include "stb_image_write.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <stack>
+
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 namespace vde {
 namespace tools {
@@ -119,8 +119,8 @@ void ImageDocument::drawLine(int x1, int y1, int x2, int y2, RGBAColor color, in
                         int fy = py + dy;
                         if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
                             static_cast<uint32_t>(fy) < m_height) {
-                            setPixelUnchecked(static_cast<uint32_t>(fx),
-                                              static_cast<uint32_t>(fy), color);
+                            setPixelUnchecked(static_cast<uint32_t>(fx), static_cast<uint32_t>(fy),
+                                              color);
                         }
                     }
                 }
@@ -167,11 +167,11 @@ void ImageDocument::drawRect(int x, int y, int w, int h, RGBAColor color, bool f
         }
     } else {
         // Four edges
-        drawLine(x, y, x + w - 1, y, color);                 // Top
-        drawLine(x, y + h - 1, x + w - 1, y + h - 1, color); // Bottom
-        drawLine(x, y, x, y + h - 1, color);                 // Left
-        drawLine(x + w - 1, y, x + w - 1, y + h - 1, color); // Right
-        return;  // drawLine already bumps generation
+        drawLine(x, y, x + w - 1, y, color);                  // Top
+        drawLine(x, y + h - 1, x + w - 1, y + h - 1, color);  // Bottom
+        drawLine(x, y, x, y + h - 1, color);                  // Left
+        drawLine(x + w - 1, y, x + w - 1, y + h - 1, color);  // Right
+        return;                                               // drawLine already bumps generation
     }
     ++m_generation;
     m_dirty = true;
@@ -306,10 +306,11 @@ void ImageDocument::drawEllipse(int cx, int cy, int rx, int ry, RGBAColor color,
     }
 
     // Region 2: slope magnitude >= 1
-    long long p2 =
-        rySq * (static_cast<long long>(x) * x + x) + rxSq * (static_cast<long long>(y - 1) * (y - 1)) - rxSq * rySq;
+    long long p2 = rySq * (static_cast<long long>(x) * x + x) +
+                   rxSq * (static_cast<long long>(y - 1) * (y - 1)) - rxSq * rySq;
     // Adjust: use standard formulation
-    p2 = rySq * (2 * x + 1) * (2 * x + 1) / 4 + rxSq * (static_cast<long long>(y) - 1) * (y - 1) - rxSq * rySq;
+    p2 = rySq * (2 * x + 1) * (2 * x + 1) / 4 + rxSq * (static_cast<long long>(y) - 1) * (y - 1) -
+         rxSq * rySq;
     // Simpler: recompute
     {
         long long tx = x;
@@ -352,8 +353,7 @@ void ImageDocument::floodFill(int x, int y, RGBAColor color) {
     RGBAColor target = getPixel(static_cast<uint32_t>(x), static_cast<uint32_t>(y));
 
     // Don't fill if target color is the same as fill color
-    if (target.r == color.r && target.g == color.g && target.b == color.b &&
-        target.a == color.a) {
+    if (target.r == color.r && target.g == color.g && target.b == color.b && target.a == color.a) {
         return;
     }
 
@@ -369,8 +369,7 @@ void ImageDocument::floodFill(int x, int y, RGBAColor color) {
             continue;
         }
 
-        RGBAColor current =
-            getPixel(static_cast<uint32_t>(px), static_cast<uint32_t>(py));
+        RGBAColor current = getPixel(static_cast<uint32_t>(px), static_cast<uint32_t>(py));
         if (current.r != target.r || current.g != target.g || current.b != target.b ||
             current.a != target.a) {
             continue;
@@ -426,10 +425,8 @@ void ImageDocument::resize(uint32_t newW, uint32_t newH) {
     // Nearest-neighbor sampling
     for (uint32_t ny = 0; ny < newH; ++ny) {
         for (uint32_t nx = 0; nx < newW; ++nx) {
-            uint32_t srcX = static_cast<uint32_t>(
-                static_cast<float>(nx) * m_width / newW);
-            uint32_t srcY = static_cast<uint32_t>(
-                static_cast<float>(ny) * m_height / newH);
+            uint32_t srcX = static_cast<uint32_t>(static_cast<float>(nx) * m_width / newW);
+            uint32_t srcY = static_cast<uint32_t>(static_cast<float>(ny) * m_height / newH);
             srcX = std::min(srcX, m_width - 1);
             srcY = std::min(srcY, m_height - 1);
 

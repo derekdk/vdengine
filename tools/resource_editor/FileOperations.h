@@ -17,7 +17,7 @@ namespace vde::tools {
  * @brief Static utility class for file I/O and native dialogs.
  */
 class FileOperations {
-public:
+  public:
     /**
      * @brief Open a native file dialog for selecting an image to open.
      * @return Selected file path, or empty string if cancelled.

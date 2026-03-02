@@ -46,25 +46,30 @@ CommandBase* CommandRegistry::find(const std::string& name) const {
     // Try the full string first
     {
         auto it = m_nameIndex.find(name);
-        if (it != m_nameIndex.end()) return it->second;
+        if (it != m_nameIndex.end())
+            return it->second;
     }
     {
         auto it = m_aliasIndex.find(name);
-        if (it != m_aliasIndex.end()) return it->second;
+        if (it != m_aliasIndex.end())
+            return it->second;
     }
 
     // Progressively try shorter prefixes by splitting on the last space
     std::string candidate = name;
     while (true) {
         auto pos = candidate.rfind(' ');
-        if (pos == std::string::npos) break;
+        if (pos == std::string::npos)
+            break;
         candidate = candidate.substr(0, pos);
 
         auto it = m_nameIndex.find(candidate);
-        if (it != m_nameIndex.end()) return it->second;
+        if (it != m_nameIndex.end())
+            return it->second;
 
         auto ait = m_aliasIndex.find(candidate);
-        if (ait != m_aliasIndex.end()) return ait->second;
+        if (ait != m_aliasIndex.end())
+            return ait->second;
     }
 
     return nullptr;
@@ -83,8 +88,8 @@ std::vector<const CommandMetadata*> CommandRegistry::getAllMetadata() const {
     return result;
 }
 
-std::vector<const CommandMetadata*> CommandRegistry::getByCategory(
-    const std::string& category) const {
+std::vector<const CommandMetadata*>
+CommandRegistry::getByCategory(const std::string& category) const {
     std::vector<const CommandMetadata*> result;
     for (const auto& cmd : m_commands) {
         if (cmd->metadata().category == category) {

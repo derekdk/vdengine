@@ -9,13 +9,12 @@
  * resource editor subsystems.
  */
 
+#include "../ToolBase.h"
 #include "CanvasRegistry.h"
 #include "CommandSystem.h"
 #include "EditorPanels.h"
 #include "ToolPalette.h"
 #include "commands/EditorContext.h"
-
-#include "../ToolBase.h"
 
 namespace vde::tools {
 
@@ -23,7 +22,7 @@ namespace vde::tools {
  * @brief Scene that drives the 2D pixel-art resource editor.
  */
 class ResourceEditorScene : public BaseToolScene {
-public:
+  public:
     explicit ResourceEditorScene(ToolMode mode = ToolMode::INTERACTIVE);
     ~ResourceEditorScene() override = default;
 
@@ -42,7 +41,7 @@ public:
     /** @brief Access the canvas registry. */
     CanvasRegistry& getCanvasRegistry() { return m_canvasRegistry; }
 
-private:
+  private:
     void syncGpuTextures();
     void cleanupImGuiTextures();
 

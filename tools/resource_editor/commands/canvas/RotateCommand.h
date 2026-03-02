@@ -5,11 +5,11 @@
  * @brief Command to rotate a canvas by 90, 180, or 270 degrees clockwise.
  */
 
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
 
 namespace vde::tools {
 
@@ -19,7 +19,7 @@ namespace vde::tools {
  * Syntax: rotate 90|180|270
  */
 class RotateCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "rotate",
@@ -42,7 +42,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         const std::string& angle = args.getString("angle");

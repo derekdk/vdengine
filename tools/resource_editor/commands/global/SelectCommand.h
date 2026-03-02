@@ -5,14 +5,14 @@
  * @brief Command to select (activate) a canvas by name or ID.
  */
 
+#include <sstream>
+#include <string>
+
+#include "../../CanvasRegistry.h"
+#include "../../ImageDocument.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
-#include "../../ImageDocument.h"
-
-#include <sstream>
-#include <string>
 
 namespace vde::tools {
 
@@ -25,7 +25,7 @@ namespace vde::tools {
  * `select mysprite` are accepted.
  */
 class SelectCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "select",
@@ -49,7 +49,7 @@ public:
 
     bool usesCustomParsing() const override { return true; }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         std::string remainder = args.remainder();
         std::istringstream iss(remainder);

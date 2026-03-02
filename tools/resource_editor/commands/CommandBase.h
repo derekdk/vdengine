@@ -8,11 +8,11 @@
  * GlobalCommand / CanvasCommand hierarchy.
  */
 
-#include "CommandTypes.h"
-
 #include <map>
 #include <stdexcept>
 #include <string>
+
+#include "CommandTypes.h"
 
 namespace vde::tools {
 
@@ -61,7 +61,7 @@ struct ParsedArg {
     IntPair asSize() const { return m_pair; }
     IntRect asRect() const { return m_rect; }
 
-private:
+  private:
     friend class CommandArgParser;
     IntPair m_pair;
     IntRect m_rect;
@@ -76,7 +76,7 @@ private:
  * @brief Collection of named, parsed arguments ready for consumption by a command.
  */
 class CommandArgs {
-public:
+  public:
     bool has(const std::string& name) const { return m_args.count(name) > 0; }
 
     const ParsedArg& get(const std::string& name) const {
@@ -97,7 +97,7 @@ public:
     IntRect getRect(const std::string& name) const { return get(name).asRect(); }
     const std::string& remainder() const { return m_remainder; }
 
-private:
+  private:
     friend class CommandArgParser;
     std::map<std::string, ParsedArg> m_args;
     std::string m_remainder;
@@ -111,7 +111,7 @@ private:
  * @brief Abstract base for all resource editor commands.
  */
 class CommandBase {
-public:
+  public:
     virtual ~CommandBase() = default;
 
     /** @brief Return the command's metadata (name, params, etc.). */
@@ -136,12 +136,11 @@ public:
  * Subclasses implement executeGlobal(); the canvasId is ignored.
  */
 class GlobalCommand : public CommandBase {
-public:
+  public:
     /// Delegates to executeGlobal().  Defined in CommandBase.cpp.
-    CommandResult execute(uint32_t canvasId, const CommandArgs& args,
-                          EditorContext& ctx) override;
+    CommandResult execute(uint32_t canvasId, const CommandArgs& args, EditorContext& ctx) override;
 
-protected:
+  protected:
     virtual CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) = 0;
 };
 
@@ -152,13 +151,12 @@ protected:
  * Implementation in CommandBase.cpp.
  */
 class CanvasCommand : public CommandBase {
-public:
+  public:
     /// Looks up the canvas from EditorContext and delegates to executeCanvas().
     /// Defined in CommandBase.cpp.
-    CommandResult execute(uint32_t canvasId, const CommandArgs& args,
-                          EditorContext& ctx) override;
+    CommandResult execute(uint32_t canvasId, const CommandArgs& args, EditorContext& ctx) override;
 
-protected:
+  protected:
     virtual CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                         EditorContext& ctx) = 0;
 };

@@ -8,10 +8,10 @@
  * the parameter descriptors declared in CommandMetadata.
  */
 
-#include "CommandBase.h"
-
 #include <string>
 #include <vector>
+
+#include "CommandBase.h"
 
 namespace vde::tools {
 
@@ -22,7 +22,7 @@ struct EditorContext;  // forward — needed for named-color resolution
  *        a CommandArgs bag from a set of ParamDescriptors.
  */
 class CommandArgParser {
-public:
+  public:
     /** @brief Result of a parse attempt. */
     struct ParseResult {
         bool success = false;
@@ -38,8 +38,7 @@ public:
      * @return ParseResult with success flag, args, or error message.
      */
     static ParseResult parse(const std::string& argsString,
-                             const std::vector<ParamDescriptor>& params,
-                             const EditorContext& ctx);
+                             const std::vector<ParamDescriptor>& params, const EditorContext& ctx);
 
     /**
      * @brief Tokenize an input string, respecting parentheses and quoted strings.
@@ -48,7 +47,7 @@ public:
      */
     static std::vector<std::string> tokenize(const std::string& input);
 
-private:
+  private:
     static bool parseToken(const std::string& token, ParamType type, ParsedArg& out,
                            const EditorContext& ctx);
     static bool parseTuple(const std::string& token, ParsedArg& out, ParamType expected);

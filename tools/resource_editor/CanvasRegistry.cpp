@@ -123,7 +123,7 @@ std::string CanvasRegistry::generateUniqueName(const std::string& base) {
     }
 
     // Then try base_2, base_3, ...
-    for (int i = m_nextUntitledIndex + 1; ; ++i) {
+    for (int i = m_nextUntitledIndex + 1;; ++i) {
         std::string candidate = base + "_" + std::to_string(i);
         if (!hasName(candidate)) {
             m_nextUntitledIndex = i;

@@ -5,10 +5,10 @@
  * @brief Command to flood-fill a region of the canvas from a seed point.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: floodfill (x,y) with <color>
  */
 class FloodFillCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "floodfill",
@@ -48,7 +48,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         auto point = args.getPoint("point");
@@ -58,7 +58,7 @@ protected:
         canvas.document->floodFill(point.x, point.y, color);
 
         return {true, "Flood-filled from (" + std::to_string(point.x) + "," +
-                           std::to_string(point.y) + ") with " + color.toHex()};
+                          std::to_string(point.y) + ") with " + color.toHex()};
     }
 };
 

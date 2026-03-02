@@ -5,12 +5,12 @@
  * @brief Command to set the brush size on the tool palette.
  */
 
-#include "../CommandBase.h"
-#include "../CommandRegistry.h"
-#include "../EditorContext.h"
 #include "../../CanvasRegistry.h"
 #include "../../ImageDocument.h"
 #include "../../ToolPalette.h"
+#include "../CommandBase.h"
+#include "../CommandRegistry.h"
+#include "../EditorContext.h"
 
 namespace vde::tools {
 
@@ -20,7 +20,7 @@ namespace vde::tools {
  * Syntax: setsize <n>
  */
 class SetSizeCommand final : public GlobalCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "setsize",
@@ -41,7 +41,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeGlobal(const CommandArgs& args, EditorContext& ctx) override {
         int size = args.getInt("size");
 

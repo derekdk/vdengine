@@ -9,12 +9,12 @@
  * canvases, commands, GPU textures, or any UI layer.
  */
 
-#include "commands/CommandTypes.h"
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "commands/CommandTypes.h"
 
 namespace vde::tools {
 
@@ -26,7 +26,7 @@ namespace vde::tools {
  * entire snapshot afterwards.
  */
 class ImageDocument {
-public:
+  public:
     /**
      * @brief Create a blank image filled with transparent black.
      * @param w Width in pixels.
@@ -222,7 +222,7 @@ public:
     /** @brief Associate a file path with this document. */
     void setFilePath(const std::string& path);
 
-private:
+  private:
     ImageDocument() = default;
 
     /** @brief Set pixel without bounds checking (internal drawing ops). */

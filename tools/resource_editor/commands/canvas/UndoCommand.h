@@ -5,10 +5,10 @@
  * @brief Command to undo the last edit operation on a canvas.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: undo
  */
 class UndoCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "undo",
@@ -33,7 +33,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& /*args*/,
                                 EditorContext& /*ctx*/) override {
         if (canvas.document->getUndoCount() == 0) {
@@ -41,8 +41,7 @@ protected:
         }
 
         canvas.document->undo();
-        return {true, "Undone (" + std::to_string(canvas.document->getUndoCount()) +
-                           " remaining)"};
+        return {true, "Undone (" + std::to_string(canvas.document->getUndoCount()) + " remaining)"};
     }
 };
 

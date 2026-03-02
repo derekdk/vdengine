@@ -9,10 +9,10 @@
  * drawing color, brush size, and in-progress shape state.
  */
 
-#include "commands/CommandTypes.h"
-
 #include <cstdint>
 #include <string>
+
+#include "commands/CommandTypes.h"
 
 namespace vde::tools {
 
@@ -27,11 +27,11 @@ enum class EditorTool { Brush, Eraser, ColorPicker, Fill, Line, Rect, Circle };
 struct ToolState {
     EditorTool activeTool = EditorTool::Brush;  ///< Currently active tool.
     RGBAColor color = {0, 0, 0, 255};           ///< Current drawing color (default: black).
-    int brushSize = 1;                           ///< Brush diameter in pixels.
-    bool fillShape = true;                       ///< Whether shapes are filled or outline-only.
-    bool drawingShape = false;                   ///< True while a shape drag is in progress.
-    int shapeStartX = 0;                         ///< X coordinate where the shape drag started.
-    int shapeStartY = 0;                         ///< Y coordinate where the shape drag started.
+    int brushSize = 1;                          ///< Brush diameter in pixels.
+    bool fillShape = true;                      ///< Whether shapes are filled or outline-only.
+    bool drawingShape = false;                  ///< True while a shape drag is in progress.
+    int shapeStartX = 0;                        ///< X coordinate where the shape drag started.
+    int shapeStartY = 0;                        ///< Y coordinate where the shape drag started.
 };
 
 /**
@@ -40,7 +40,7 @@ struct ToolState {
  * The returned strings are meant to be fed directly into CommandSystem::execute().
  */
 class ToolPalette {
-public:
+  public:
     /**
      * @brief Handle a mouse-down event on a canvas.
      * @param canvasId ID of the canvas that received the event.
@@ -110,7 +110,7 @@ public:
      */
     static bool stringToTool(const std::string& name, EditorTool& outTool);
 
-private:
+  private:
     ToolState m_state;  ///< Current tool state.
 };
 

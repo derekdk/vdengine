@@ -50,8 +50,8 @@ static std::string wideToUtf8(const std::wstring& wstr) {
     if (wstr.empty()) {
         return {};
     }
-    int size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), static_cast<int>(wstr.size()),
-                                   nullptr, 0, nullptr, nullptr);
+    int size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), static_cast<int>(wstr.size()), nullptr,
+                                   0, nullptr, nullptr);
     std::string result(static_cast<size_t>(size), '\0');
     WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), static_cast<int>(wstr.size()), result.data(),
                         size, nullptr, nullptr);
@@ -70,10 +70,8 @@ static bool ensureCom() {
 
 // Image file filter specs (shared by all dialogs)
 static const COMDLG_FILTERSPEC kImageFilters[] = {
-    {L"PNG Images", L"*.png"},
-    {L"BMP Images", L"*.bmp"},
-    {L"TGA Images", L"*.tga"},
-    {L"All Image Files", L"*.png;*.bmp;*.tga"},
+    {L"PNG Images", L"*.png"}, {L"BMP Images", L"*.bmp"},
+    {L"TGA Images", L"*.tga"}, {L"All Image Files", L"*.png;*.bmp;*.tga"},
     {L"All Files", L"*.*"},
 };
 static constexpr UINT kImageFilterCount =
@@ -84,8 +82,8 @@ std::string FileOperations::openImageDialog() {
     bool weInitCom = ensureCom();
 
     IFileOpenDialog* pDialog = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
-                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&pDialog));
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_IFileOpenDialog,
+                                  reinterpret_cast<void**>(&pDialog));
     if (SUCCEEDED(hr)) {
         pDialog->SetTitle(L"Open Image");
         pDialog->SetFileTypes(kImageFilterCount, kImageFilters);
@@ -122,8 +120,8 @@ static std::string showSaveDialog(const wchar_t* title, const std::string& defau
     bool weInitCom = ensureCom();
 
     IFileSaveDialog* pDialog = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_ALL,
-                                  IID_IFileSaveDialog, reinterpret_cast<void**>(&pDialog));
+    HRESULT hr = CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_ALL, IID_IFileSaveDialog,
+                                  reinterpret_cast<void**>(&pDialog));
     if (SUCCEEDED(hr)) {
         pDialog->SetTitle(title);
         pDialog->SetFileTypes(kImageFilterCount, kImageFilters);

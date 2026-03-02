@@ -5,10 +5,10 @@
  * @brief Command to crop a canvas to a sub-region.
  */
 
+#include "../../CanvasRegistry.h"
 #include "../CommandBase.h"
 #include "../CommandRegistry.h"
 #include "../EditorContext.h"
-#include "../../CanvasRegistry.h"
 
 namespace vde::tools {
 
@@ -18,7 +18,7 @@ namespace vde::tools {
  * Syntax: crop (x, y) (w, h)
  */
 class CropCommand final : public CanvasCommand {
-public:
+  public:
     const CommandMetadata& metadata() const override {
         static const CommandMetadata meta{
             .name = "crop",
@@ -44,7 +44,7 @@ public:
         return meta;
     }
 
-protected:
+  protected:
     CommandResult executeCanvas(Canvas& canvas, const CommandArgs& args,
                                 EditorContext& /*ctx*/) override {
         auto origin = args.getPoint("origin");
@@ -57,8 +57,7 @@ protected:
         uint32_t docW = canvas.document->getWidth();
         uint32_t docH = canvas.document->getHeight();
 
-        if (origin.x < 0 || origin.y < 0 ||
-            static_cast<uint32_t>(origin.x + size.x) > docW ||
+        if (origin.x < 0 || origin.y < 0 || static_cast<uint32_t>(origin.x + size.x) > docW ||
             static_cast<uint32_t>(origin.y + size.y) > docH) {
             return {false, "Crop region exceeds canvas bounds (" + std::to_string(docW) + "x" +
                                std::to_string(docH) + ")"};
@@ -68,9 +67,8 @@ protected:
         canvas.document->crop(origin.x, origin.y, static_cast<uint32_t>(size.x),
                               static_cast<uint32_t>(size.y));
 
-        return {true, "Cropped to (" + std::to_string(origin.x) + "," +
-                           std::to_string(origin.y) + ") " + std::to_string(size.x) + "x" +
-                           std::to_string(size.y)};
+        return {true, "Cropped to (" + std::to_string(origin.x) + "," + std::to_string(origin.y) +
+                          ") " + std::to_string(size.x) + "x" + std::to_string(size.y)};
     }
 };
 
