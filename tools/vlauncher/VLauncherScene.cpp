@@ -181,8 +181,25 @@ std::vector<ExecutableEntry> VLauncherScene::getSortedEntries() const {
         filtered.push_back(entry);
     }
 
+    const auto now = std::chrono::system_clock::now();
+
+    auto gitRecency = [now](const ExecutableEntry& entry) {
+        if (entry.sourceDirty) {
+            return now;
+        }
+        if (entry.hasLastSourceCommitTime) {
+            return entry.lastSourceCommitTime;
+        }
+        return std::chrono::system_clock::time_point{};
+    };
+
     std::sort(filtered.begin(), filtered.end(),
-              [](const ExecutableEntry& a, const ExecutableEntry& b) {
+              [gitRecency](const ExecutableEntry& a, const ExecutableEntry& b) {
+                  auto aRecency = gitRecency(a);
+                  auto bRecency = gitRecency(b);
+                  if (aRecency != bRecency) {
+                      return aRecency > bRecency;
+                  }
                   if (a.outOfDate != b.outOfDate) {
                       return a.outOfDate > b.outOfDate;
                   }
