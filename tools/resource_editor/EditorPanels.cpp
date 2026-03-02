@@ -5,6 +5,8 @@
 
 #include "EditorPanels.h"
 
+#include "CommandSystem.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <sstream>

@@ -1,6 +1,6 @@
 # VDE Resource Editor — Implementation Plan
 
-> **Status:** Plan  
+> **Status:** Phase 1 Steps 1–4 Complete  
 > **Related:** [Editor Design](EDITOR_DESIGN.md) · [Canvas DSL](CANVAS_DSL.md) · [Parser & Command System](PARSER_AND_COMMAND_SYSTEM.md)
 
 ---
@@ -35,6 +35,8 @@ Build the editor from the ground up in four phases:
 
 ### Step 1 — Command Infrastructure Types
 
+> **Status:** ✅ Complete
+
 Create the foundational types that the entire command system depends on.
 
 **Files to create:**
@@ -44,11 +46,14 @@ tools/resource_editor/commands/
                            # RGBAColor helpers, IntPair, IntRect
     CommandBase.h          # CommandBase, GlobalCommand, CanvasCommand base classes,
                            # CommandResult, CommandArgs, ParsedArg
+    CommandBase.cpp        # GlobalCommand::execute(), CanvasCommand::execute() with canvas resolution
     CommandArgParser.h     # CommandArgParser declaration
     CommandArgParser.cpp   # Parenthesis-aware tokenizer, tuple parsing, type validation
     CommandRegistry.h      # CommandRegistry singleton, REGISTER_COMMAND macro
     CommandRegistry.cpp    # Registry impl with compound-name longest-match lookup
     EditorContext.h        # EditorContext façade struct
+    EditorContext.cpp      # getActiveCanvas() implementation (wires to CanvasRegistry + CommandSystem)
+    AllCommands.cpp        # Includes all command headers to trigger REGISTER_COMMAND static initializers
 ```
 
 **Files to create/modify:**
@@ -78,6 +83,8 @@ tools/resource_editor/CMakeLists.txt   # Add new sources
 ---
 
 ### Step 2 — Editor Subsystems
+
+> **Status:** ✅ Complete
 
 Build the core editor modules that commands will operate on.
 
@@ -112,6 +119,8 @@ tools/resource_editor/
 ---
 
 ### Step 3 — Scene, Panels & Command System
+
+> **Status:** ✅ Complete
 
 Wire the subsystems into a functioning editor with ImGui UI and command dispatch.
 
@@ -151,6 +160,8 @@ tools/resource_editor/
 ---
 
 ### Step 4 — Core Commands
+
+> **Status:** ✅ Complete (30 commands — 16 global, 14 canvas)
 
 Implement all commands needed for a fully functional pixel editor. Built in four batches, each tested before moving on.
 
@@ -199,6 +210,9 @@ tools/resource_editor/commands/global/
     ZoomCommand.h              # "zoom <level>"
     GridCommand.h              # "grid on|off"
     ExitCommand.h              # "exit"
+    SetColorCommand.h          # "setcolor <color>" — set active drawing color
+    SetToolCommand.h           # "settool <tool>" — set active tool
+    SetSizeCommand.h           # "setsize <n>" — set brush size
 ```
 
 **Files to modify per batch:**
@@ -218,6 +232,8 @@ tools/resource_editor/CMakeLists.txt     # Add each new file
 ---
 
 ### Step 5 — Smoke Test & Scripted Validation
+
+> **Status:** Not started
 
 Create a command script that exercises every command and verify it runs cleanly.
 
