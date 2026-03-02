@@ -23,11 +23,4 @@ if(WIN32)
     target_link_libraries(vde_vlauncher PRIVATE ole32 uuid)
 endif()
 
-add_dependencies(vde_vlauncher copy_tool_shaders)
-
-add_custom_command(TARGET vde_vlauncher POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/shaders
-        $<TARGET_FILE_DIR:vde_vlauncher>/shaders
-    COMMENT "Copying shaders to vlauncher executable directory..."
-)
+vde_add_shader_sync(vde_vlauncher)

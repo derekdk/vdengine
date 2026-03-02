@@ -32,8 +32,16 @@ target_link_libraries(imgui_backend PUBLIC
     glfw
 )
 
-# Create a custom target to copy shaders once (avoids parallel copy conflicts with MSBuild)
-add_custom_target(copy_example_shaders ALL
+# Track shader source files so updates trigger copy without requiring executable relink
+file(GLOB_RECURSE VDE_SHADER_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/shaders/*
+)
+
+set(VDE_EXAMPLE_SHADER_STAMP ${CMAKE_CURRENT_BINARY_DIR}/copy_example_shaders.stamp)
+
+# Create a dependency-driven shader copy target for examples
+add_custom_command(
+    OUTPUT ${VDE_EXAMPLE_SHADER_STAMP}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Debug/shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
@@ -46,7 +54,14 @@ add_custom_target(copy_example_shaders ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/shaders
         ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
-    COMMENT "Copying shader files to examples directory..."
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_EXAMPLE_SHADER_STAMP}
+    DEPENDS ${VDE_SHADER_FILES}
+    COMMENT "Syncing shader files for examples..."
+    VERBATIM
+)
+
+add_custom_target(copy_example_shaders ALL
+    DEPENDS ${VDE_EXAMPLE_SHADER_STAMP}
 )
 
 # Helper function to add examples with ImGui support enabled
