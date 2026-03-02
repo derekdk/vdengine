@@ -8,6 +8,8 @@
  * GlobalCommand / CanvasCommand hierarchy.
  */
 
+#include <algorithm>
+#include <cctype>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -52,7 +54,11 @@ struct ParsedArg {
     float asFloat() const { return std::stof(raw); }
 
     bool asBool() const {
-        return raw == "true" || raw == "1" || raw == "filled" || raw == "show" || raw == "yes";
+        std::string lower = raw;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        return lower == "true" || lower == "1" || lower == "filled" || lower == "show" ||
+               lower == "yes";
     }
 
     const std::string& asString() const { return raw; }

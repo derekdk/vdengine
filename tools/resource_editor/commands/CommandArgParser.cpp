@@ -15,6 +15,34 @@
 namespace vde::tools {
 
 // =============================================================================
+// Strict numeric conversions — reject partial matches like "12abc"
+// =============================================================================
+
+static bool strictStoi(const std::string& s, int& out) {
+    if (s.empty())
+        return false;
+    try {
+        size_t pos = 0;
+        out = std::stoi(s, &pos);
+        return pos == s.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+static bool strictStof(const std::string& s, float& out) {
+    if (s.empty())
+        return false;
+    try {
+        size_t pos = 0;
+        out = std::stof(s, &pos);
+        return pos == s.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+// =============================================================================
 // tokenize — parenthesis- and quote-aware splitting
 // =============================================================================
 
@@ -93,7 +121,7 @@ std::vector<std::string> CommandArgParser::tokenize(const std::string& input) {
 // =============================================================================
 
 bool CommandArgParser::validateEnum(const std::string& value,
-                                    const std::vector<std::string>& allowed) {
+                                    const std::vector<std::string>& allowed, std::string& matched) {
     for (const auto& s : allowed) {
         // Case-insensitive comparison
         if (s.size() == value.size()) {
@@ -105,8 +133,10 @@ bool CommandArgParser::validateEnum(const std::string& value,
                     break;
                 }
             }
-            if (match)
+            if (match) {
+                matched = s;
                 return true;
+            }
         }
     }
     return false;
@@ -127,6 +157,16 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
 
     // Check for nested-pair rect: "(a,b),(c,d)"
     if (expected == ParamType::Rect && inner.find("(") != std::string::npos) {
+        // Strip whitespace for uniform separator matching
+        std::string compact;
+        compact.reserve(inner.size());
+        for (char c : inner) {
+            if (!std::isspace(static_cast<unsigned char>(c))) {
+                compact += c;
+            }
+        }
+        inner = compact;
+
         // Parse "((a,b),(c,d))" → already stripped one layer: "(a,b),(c,d)"
         // Strip another layer if present
         if (inner.size() >= 2 && inner.front() == '(' && inner.back() == ')') {
@@ -142,12 +182,10 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
             auto comma2 = second.find(',');
             if (comma1 == std::string::npos || comma2 == std::string::npos)
                 return false;
-            try {
-                out.m_rect.x = std::stoi(first.substr(0, comma1));
-                out.m_rect.y = std::stoi(first.substr(comma1 + 1));
-                out.m_rect.w = std::stoi(second.substr(0, comma2));
-                out.m_rect.h = std::stoi(second.substr(comma2 + 1));
-            } catch (...) {
+            if (!strictStoi(first.substr(0, comma1), out.m_rect.x) ||
+                !strictStoi(first.substr(comma1 + 1), out.m_rect.y) ||
+                !strictStoi(second.substr(0, comma2), out.m_rect.w) ||
+                !strictStoi(second.substr(comma2 + 1), out.m_rect.h)) {
                 return false;
             }
             out.raw = token;
@@ -166,11 +204,10 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
         if (start == std::string::npos)
             return false;
         part = part.substr(start, end - start + 1);
-        try {
-            values.push_back(std::stoi(part));
-        } catch (...) {
+        int val = 0;
+        if (!strictStoi(part, val))
             return false;
-        }
+        values.push_back(val);
     }
 
     if ((expected == ParamType::Point || expected == ParamType::Size) && values.size() == 2) {
@@ -200,21 +237,15 @@ bool CommandArgParser::parseToken(const std::string& token, ParamType type, Pars
     out.type = type;
 
     switch (type) {
-    case ParamType::Int:
-        try {
-            (void)std::stoi(token);
-        } catch (...) {
-            return false;
-        }
-        return true;
+    case ParamType::Int: {
+        int dummy = 0;
+        return strictStoi(token, dummy);
+    }
 
-    case ParamType::Float:
-        try {
-            (void)std::stof(token);
-        } catch (...) {
-            return false;
-        }
-        return true;
+    case ParamType::Float: {
+        float dummy = 0.0f;
+        return strictStof(token, dummy);
+    }
 
     case ParamType::String:
     case ParamType::Keyword:
@@ -233,6 +264,7 @@ bool CommandArgParser::parseToken(const std::string& token, ParamType type, Pars
         if (lower == "true" || lower == "false" || lower == "1" || lower == "0" ||
             lower == "filled" || lower == "outline" || lower == "show" || lower == "hide" ||
             lower == "yes" || lower == "no") {
+            out.raw = lower;
             return true;
         }
         return false;
@@ -329,10 +361,8 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
                     }
                     continue;
                 }
-                try {
-                    arg.m_pair.x = std::stoi(tokens[tokenIdx]);
-                    arg.m_pair.y = std::stoi(tokens[tokenIdx + 1]);
-                } catch (...) {
+                if (!strictStoi(tokens[tokenIdx], arg.m_pair.x) ||
+                    !strictStoi(tokens[tokenIdx + 1], arg.m_pair.y)) {
                     result.error = "Invalid integers for parameter '" + param.name + "'";
                     return result;
                 }
@@ -371,12 +401,10 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
                     }
                     continue;
                 }
-                try {
-                    arg.m_rect.x = std::stoi(tokens[tokenIdx]);
-                    arg.m_rect.y = std::stoi(tokens[tokenIdx + 1]);
-                    arg.m_rect.w = std::stoi(tokens[tokenIdx + 2]);
-                    arg.m_rect.h = std::stoi(tokens[tokenIdx + 3]);
-                } catch (...) {
+                if (!strictStoi(tokens[tokenIdx], arg.m_rect.x) ||
+                    !strictStoi(tokens[tokenIdx + 1], arg.m_rect.y) ||
+                    !strictStoi(tokens[tokenIdx + 2], arg.m_rect.w) ||
+                    !strictStoi(tokens[tokenIdx + 3], arg.m_rect.h)) {
                     result.error = "Invalid integers for rect parameter '" + param.name + "'";
                     return result;
                 }
@@ -419,12 +447,14 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
             return result;
         }
 
-        // Enum validation
+        // Enum validation — normalize to canonical casing from enumValues
         if (param.type == ParamType::Enum && !param.enumValues.empty()) {
-            if (!validateEnum(arg.raw, param.enumValues)) {
+            std::string matched;
+            if (!validateEnum(arg.raw, param.enumValues, matched)) {
                 result.error = "Invalid enum value for '" + param.name + "': '" + arg.raw + "'";
                 return result;
             }
+            arg.raw = matched;
         }
 
         result.args.m_args[param.name] = arg;
@@ -438,6 +468,11 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
             if (i > tokenIdx)
                 rem << " ";
             rem << tokens[i];
+        }
+        // Normal commands (non-empty param list) should not have leftover tokens
+        if (!params.empty()) {
+            result.error = "Unexpected extra arguments: '" + rem.str() + "'";
+            return result;
         }
         result.args.m_remainder = rem.str();
     }

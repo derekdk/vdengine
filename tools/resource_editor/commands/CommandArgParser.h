@@ -51,7 +51,8 @@ class CommandArgParser {
     static bool parseToken(const std::string& token, ParamType type, ParsedArg& out,
                            const EditorContext& ctx);
     static bool parseTuple(const std::string& token, ParsedArg& out, ParamType expected);
-    static bool validateEnum(const std::string& value, const std::vector<std::string>& allowed);
+    static bool validateEnum(const std::string& value, const std::vector<std::string>& allowed,
+                             std::string& matched);
 };
 
 }  // namespace vde::tools
