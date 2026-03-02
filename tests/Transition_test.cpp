@@ -238,6 +238,45 @@ TEST_F(CircleRevealTransitionTest, SquareFrameHasAspectOne) {
 }
 
 // =========================================================================
+// BlockFallTransition
+// =========================================================================
+
+class BlockFallTransitionTest : public ::testing::Test {
+  protected:
+    BlockFallTransition blockFall;
+};
+
+TEST_F(BlockFallTransitionTest, NameIsBlockFall) {
+    EXPECT_STREQ(blockFall.getName(), "BlockFall");
+}
+
+TEST_F(BlockFallTransitionTest, FragmentShaderPath) {
+    EXPECT_EQ(blockFall.getFragmentShaderPath(), "transition_block_fall.frag");
+}
+
+TEST_F(BlockFallTransitionTest, DefaultConstructorUses32PixelBlocksAndZeroSeed) {
+    EXPECT_FLOAT_EQ(blockFall.getBlockSizePixels(), 32.0f);
+    EXPECT_FLOAT_EQ(blockFall.getRandomSeed(), 0.0f);
+}
+
+TEST(BlockFallTransitionStandaloneTest, UpdateEncodesNormalizedBlockDimensions) {
+    BlockFallTransition transition{32.0f, 0.25f};
+
+    TransitionUpdateContext ctx{};
+    ctx.progress = 0.5f;
+    ctx.frameWidth = 640;
+    ctx.frameHeight = 480;
+
+    TransitionUniforms uniforms{};
+    transition.update(ctx, uniforms);
+
+    EXPECT_FLOAT_EQ(uniforms.progress, 0.5f);
+    EXPECT_FLOAT_EQ(uniforms.direction, 0.25f);
+    EXPECT_NEAR(uniforms.param0, 32.0f / 640.0f, 0.00001f);
+    EXPECT_NEAR(uniforms.param1, 32.0f / 480.0f, 0.00001f);
+}
+
+// =========================================================================
 // TransitionDirection enum coverage
 // =========================================================================
 

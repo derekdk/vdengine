@@ -15,6 +15,7 @@
  * - 2: Wipe Left to CreditsScene
  * - 3: Wipe Right to MainMenuScene
  * - 4: Circle Reveal to GameScene
+ * - 5: Random Block Fall to ShowcaseScene
  * - +/=: Increase transition duration (+0.25s)
  * - -: Decrease transition duration (-0.25s, min 0.25s)
  * - C: Cancel in-flight transition
@@ -50,6 +51,8 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
             m_triggerWipeRight = true;
         if (key == KEY_4)
             m_triggerCircleReveal = true;
+        if (key == KEY_5)
+            m_triggerBlockFall = true;
         if (key == KEY_EQUAL || key == KEY_KP_ADD)
             m_increaseDuration = true;
         if (key == KEY_MINUS || key == KEY_KP_SUBTRACT)
@@ -78,6 +81,11 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
         m_triggerCircleReveal = false;
         return v;
     }
+    bool consumeBlockFall() {
+        bool v = m_triggerBlockFall;
+        m_triggerBlockFall = false;
+        return v;
+    }
     bool consumeIncreaseDuration() {
         bool v = m_increaseDuration;
         m_increaseDuration = false;
@@ -99,6 +107,7 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
     bool m_triggerWipeLeft = false;
     bool m_triggerWipeRight = false;
     bool m_triggerCircleReveal = false;
+    bool m_triggerBlockFall = false;
     bool m_increaseDuration = false;
     bool m_decreaseDuration = false;
     bool m_cancelTransition = false;
@@ -169,21 +178,23 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
 
     std::vector<std::string> getFeatures() const override {
         return {"Fade transition (cross-fade)", "Wipe transition (left/right)",
-                "Circle reveal transition", "Adjustable duration (+/-)",
-                "Cancel mid-transition (C)"};
+                "Circle reveal transition",     "Random block-fall transition (32x32)",
+                "Adjustable duration (+/-)",    "Cancel mid-transition (C)"};
     }
 
     std::vector<std::string> getExpectedVisuals() const override {
         return {"Blue scene (MainMenu) with yellow/purple boxes",
                 "Green scene (Game) with moving orange entities",
                 "Dark red scene (Credits) with white/gray boxes",
+                "Dark blue showcase scene with dense animated meshes",
                 "Smooth transitions between scenes"};
     }
 
     std::vector<std::string> getControls() const override {
         return {"1 - Fade to GameScene",      "2 - Wipe Left to CreditsScene",
                 "3 - Wipe Right to MainMenu", "4 - Circle Reveal to GameScene",
-                "+/- - Adjust duration",      "C - Cancel transition"};
+                "5 - Block Fall to Showcase", "+/- - Adjust duration",
+                "C - Cancel transition"};
     }
 };
 
@@ -298,6 +309,107 @@ class CreditsScene : public Scene {
 };
 
 // ============================================================================
+// Showcase Scene — dense animated geometry for transition visibility
+// ============================================================================
+
+class ShowcaseScene : public Scene {
+  public:
+    void onEnter() override {
+        std::cout << "[ShowcaseScene] onEnter()" << std::endl;
+
+        setBackgroundColor({0.05f, 0.08f, 0.16f, 1.0f});
+
+        auto camera = std::make_unique<Camera2D>(24.0f, 18.0f);
+        setCamera(std::move(camera));
+
+        auto cubeMesh = Mesh::createCube(1.0f);
+        auto sphereMesh = Mesh::createSphere(0.65f, 20, 20);
+        auto pyramidMesh = Mesh::createPyramid(1.0f, 1.2f);
+
+        auto center = std::make_unique<MeshEntity>();
+        center->setMesh(cubeMesh);
+        center->setPosition(0.0f, 0.0f, 0.0f);
+        center->setScale(2.1f, 2.1f, 0.7f);
+        center->setColor(Color{0.95f, 0.75f, 0.2f, 1.0f});
+        addEntity(std::move(center));
+
+        for (int i = 0; i < 18; ++i) {
+            auto entity = std::make_unique<MeshEntity>();
+            if (i % 3 == 0) {
+                entity->setMesh(cubeMesh);
+            } else if (i % 3 == 1) {
+                entity->setMesh(sphereMesh);
+            } else {
+                entity->setMesh(pyramidMesh);
+            }
+
+            const float angle = static_cast<float>(i) * (6.2831853f / 18.0f);
+            const float radius = 4.5f + static_cast<float>(i % 4) * 0.85f;
+            entity->setPosition(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
+            entity->setScale(0.5f + static_cast<float>(i % 5) * 0.08f);
+            entity->setColor(Color{0.2f + 0.04f * static_cast<float>(i),
+                                   0.9f - 0.03f * static_cast<float>(i),
+                                   0.45f + 0.02f * static_cast<float>(i), 1.0f});
+            addEntity(std::move(entity));
+        }
+
+        for (int i = 0; i < 10; ++i) {
+            auto topNode = std::make_unique<MeshEntity>();
+            topNode->setMesh(cubeMesh);
+            topNode->setPosition(-9.0f + static_cast<float>(i) * 2.0f, 6.3f, 0.0f);
+            topNode->setScale(0.8f, 0.35f, 0.3f);
+            topNode->setColor(Color{0.3f, 0.8f, 1.0f, 1.0f});
+            addEntity(std::move(topNode));
+
+            auto bottomNode = std::make_unique<MeshEntity>();
+            bottomNode->setMesh(cubeMesh);
+            bottomNode->setPosition(9.0f - static_cast<float>(i) * 2.0f, -6.3f, 0.0f);
+            bottomNode->setScale(0.8f, 0.35f, 0.3f);
+            bottomNode->setColor(Color{1.0f, 0.5f, 0.4f, 1.0f});
+            addEntity(std::move(bottomNode));
+        }
+    }
+
+    void onExit() override { std::cout << "[ShowcaseScene] onExit()" << std::endl; }
+
+    void update(float deltaTime) override {
+        (void)deltaTime;
+        const float t = static_cast<float>(getGame()->getTotalTime());
+
+        auto& entities = getEntities();
+        if (entities.empty()) {
+            return;
+        }
+
+        const float pulse = 1.8f + std::sin(t * 2.4f) * 0.35f;
+        entities[0]->setScale(pulse, pulse, 0.7f);
+        entities[0]->setRotation(0.0f, 0.0f, t * 90.0f);
+
+        for (size_t i = 1; i <= 18; ++i) {
+            const float phase = static_cast<float>(i) * 0.45f;
+            const float radius = 4.2f + std::sin(t * 0.8f + phase) * 1.5f;
+            const float angle = t * (0.7f + (static_cast<float>(i % 5) * 0.12f)) + phase;
+            const float x = std::cos(angle) * radius;
+            const float y = std::sin(angle) * radius;
+            entities[i]->setPosition(x, y, 0.0f);
+            entities[i]->setRotation(0.0f, 0.0f, (t * 50.0f) + phase * 35.0f);
+        }
+
+        const size_t topStart = 19;
+        const size_t bottomStart = 29;
+        for (size_t i = 0; i < 10; ++i) {
+            const float f = static_cast<float>(i);
+            const float xTop = -9.5f + std::fmod((t * 4.0f) + f * 1.7f, 20.0f);
+            const float xBottom = 9.5f - std::fmod((t * 4.0f) + f * 1.7f, 20.0f);
+            const float yOffset = std::sin(t * 3.0f + f) * 0.25f;
+
+            entities[topStart + i]->setPosition(xTop, 6.3f + yOffset, 0.0f);
+            entities[bottomStart + i]->setPosition(xBottom, -6.3f - yOffset, 0.0f);
+        }
+    }
+};
+
+// ============================================================================
 // Transition Demo Game
 // ============================================================================
 
@@ -312,6 +424,7 @@ class TransitionDemoGame
         // Add additional scenes
         addScene("game", new GameScene());
         addScene("credits", new CreditsScene());
+        addScene("showcase", new ShowcaseScene());
 
         std::cout << "\n[TransitionDemo] Duration: " << std::fixed << std::setprecision(2)
                   << m_transitionDuration << "s\n"
@@ -369,6 +482,12 @@ class TransitionDemoGame
             std::cout << "[TransitionDemo] Circle Reveal -> GameScene (" << std::fixed
                       << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
             transitionToScene("game", std::make_unique<CircleRevealTransition>(),
+                              m_transitionDuration);
+        }
+        if (input->consumeBlockFall()) {
+            std::cout << "[TransitionDemo] Block Fall -> ShowcaseScene (" << std::fixed
+                      << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
+            transitionToScene("showcase", std::make_unique<BlockFallTransition>(),
                               m_transitionDuration);
         }
     }

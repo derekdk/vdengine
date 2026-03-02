@@ -18,6 +18,7 @@
  */
 
 // Core game classes
+#include "BlockFallTransition.h"
 #include "CircleRevealTransition.h"
 #include "FadeTransition.h"
 #include "Game.h"

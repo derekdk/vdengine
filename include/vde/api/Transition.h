@@ -9,6 +9,7 @@
  * - vde/api/FadeTransition.h
  * - vde/api/WipeTransition.h
  * - vde/api/CircleRevealTransition.h
+ * - vde/api/BlockFallTransition.h
  *
  * Transitions are primarily shader-driven: a fullscreen-triangle fragment
  * shader samples source and destination textures with a `progress` uniform.
@@ -143,6 +144,7 @@ class Transition {
 }  // namespace vde
 
 // Built-in transitions (kept included here for backward compatibility).
+#include <vde/api/BlockFallTransition.h>
 #include <vde/api/CircleRevealTransition.h>
 #include <vde/api/FadeTransition.h>
 #include <vde/api/WipeTransition.h>
