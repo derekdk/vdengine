@@ -32,6 +32,7 @@ class BlockFallTransition : public Transition {
 
     const char* getName() const override { return "BlockFall"; }
     std::string getFragmentShaderPath() const override;
+    bool freezesSourceScene() const override { return true; }
 
     /**
      * @brief Encodes normalized block size and seed into uniforms.

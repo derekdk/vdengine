@@ -2579,8 +2579,17 @@ void Game::rebuildSchedulerGraph() {
 
     std::vector<SceneEntry> updateScenes;
 
+    // Check whether the active transition wants the source scene frozen.
+    bool freezeSource = m_transitionManager && m_transitionManager->isActive() &&
+                        m_transitionManager->getActiveTransition() &&
+                        m_transitionManager->getActiveTransition()->freezesSourceScene();
+
     // Active group scenes
     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        // Skip updating the source scene when the transition freezes it.
+        if (freezeSource && sceneName == m_transitionSourceScene) {
+            continue;
+        }
         auto it = m_scenes.find(sceneName);
         if (it != m_scenes.end()) {
             updateScenes.push_back({it->second.get(), sceneName, it->second->getUpdatePriority()});

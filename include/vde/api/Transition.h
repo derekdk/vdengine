@@ -103,6 +103,20 @@ class Transition {
      */
     virtual void update(const TransitionUpdateContext& ctx, TransitionUniforms& outUniforms);
 
+    // ---- Source scene behaviour ----
+
+    /**
+     * @brief Return true if the source scene should be frozen (not updated)
+     * during this transition.
+     *
+     * Transitions that break the source image into discrete pieces (e.g. block
+     * fall) need a static snapshot so that each piece carries consistent
+     * content throughout the animation.  The default is false, which lets the
+     * source scene continue animating (appropriate for cross-fades, wipes,
+     * etc.).
+     */
+    virtual bool freezesSourceScene() const { return false; }
+
     // ---- Lifecycle hooks ----
 
     /** @brief Called once when the transition begins. */
