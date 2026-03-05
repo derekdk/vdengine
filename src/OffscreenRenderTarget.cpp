@@ -95,9 +95,6 @@ void OffscreenRenderTarget::destroy() {
         return;
     }
 
-    // Wait for any pending GPU work before destroying resources
-    vkDeviceWaitIdle(device);
-
     if (m_framebuffer != VK_NULL_HANDLE) {
         vkDestroyFramebuffer(device, m_framebuffer, nullptr);
         m_framebuffer = VK_NULL_HANDLE;
