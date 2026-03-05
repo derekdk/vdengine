@@ -113,12 +113,14 @@ int main(int argc, char** argv) {
             logToConsole = true;
         } else if (arg == "--log-file" && i + 1 < argc) {
             logFile = argv[++i];
-        } else if (arg != "--input-script" && arg.rfind("--", 0) != 0 && scriptFile.empty()) {
+        } else if (arg == "--input-script") {
+            // Skip the value; it is consumed by configureInputScriptFromArgs below
+            ++i;
+        } else if (arg.rfind("--", 0) != 0 && scriptFile.empty()) {
             // First non-flag argument is the script file
             scriptFile = arg;
             mode = ToolMode::SCRIPT;
         }
-        // --input-script <path> is consumed by configureInputScriptFromArgs below
     }
 
     if (mode == ToolMode::SCRIPT) {

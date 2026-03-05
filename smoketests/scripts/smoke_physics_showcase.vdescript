@@ -2,37 +2,37 @@
 # Cycles through all 7 physics tests, verifying each one launches and runs.
 
 wait startup
-wait 1s
+wait 500
 
 # Test 1: Gravity Rain (default)
-wait 1500
+wait 700
 
 # Cycle to Test 2: Bouncy Chamber
 press right
-wait 1500
+wait 700
 
 # Cycle to Test 3: Domino Chain - tip the first domino
 press right
-wait 500
+wait 300
 press space
-wait 1s
+wait 500
 
 # Cycle to Test 4: Wrecking Ball
 press right
-wait 1500
+wait 700
 
 # Cycle to Test 5: Zero Gravity
 press right
-wait 1500
+wait 700
 
 # Cycle to Test 6: Gravity Flip
 press right
-wait 2s
+wait 1000
 
 # Cycle to Test 7: Explosion Burst - trigger it
 press right
-wait 500
+wait 300
 press space
-wait 1s
+wait 500
 
 exit
