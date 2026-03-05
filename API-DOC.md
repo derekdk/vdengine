@@ -1613,7 +1613,7 @@ class MyTransition : public vde::Transition {
 };
 ```
 
-The fragment shader receives two textures (`texSource`, `texDest`) and `TransitionUniforms` as push constants with `progress` (0→1), `direction`, and `aspectRatio`.
+The fragment shader receives two textures (`sourceTexture`, `destTexture`) and `TransitionUniforms` as push constants with `progress` (0→1), `direction`, and `param0` (used for the aspect ratio).
 
 ---
 
