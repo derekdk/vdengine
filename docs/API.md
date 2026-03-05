@@ -1445,7 +1445,7 @@ RAII wrapper for a Vulkan offscreen render target (color + depth).
 
 | Method | Description |
 |--------|-------------|
-| `void create(VulkanContext*, uint32_t w, uint32_t h)` | Create render target |
+| `void create(VulkanContext*, VkRenderPass renderPass, uint32_t w, uint32_t h)` | Create render target |
 | `void recreate(uint32_t w, uint32_t h)` | Resize to new dimensions |
 | `void destroy()` | Release Vulkan resources |
 | `VkFramebuffer getFramebuffer() const` | Framebuffer handle |
