@@ -36,6 +36,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Asked to create unit tests.  
 **Location:** `.github/skills/create-tests/SKILL.md`
 
+### fixing-bugs
+**Purpose:** Guide for fixing bugs in the VDE project, including required build/test verification and mandatory subagent code review after every fix.  
+**Use when:** Diagnosing or resolving any defect, regression, crash, or incorrect behavior in engine code, examples, or tools.  
+**Location:** `.github/skills/fixing-bugs/SKILL.md`
+
 ### vulkan-patterns
 **Purpose:** Vulkan patterns and common tasks for the VDE engine.  
 **Use when:** Working with Vulkan resources, buffers, textures, or descriptors.  

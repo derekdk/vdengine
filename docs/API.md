@@ -1395,6 +1395,7 @@ Base class for screen transition effects. Subclass to create custom transitions.
 | `FadeTransition` | Cross-fade between source and destination |
 | `WipeTransition(TransitionDirection)` | Directional edge wipe |
 | `CircleRevealTransition` | Expanding circle from center |
+| `BlockFallTransition` | Freezes source scene; destination revealed as falling blocks |
 
 ### TransitionDirection
 

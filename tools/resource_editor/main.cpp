@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
             logToConsole = true;
         } else if (arg == "--log-file" && i + 1 < argc) {
             logFile = argv[++i];
-        } else if (arg == "--input-script") {
+        } else if (arg == "--input-script" && i + 1 < argc) {
             // Skip the value; it is consumed by configureInputScriptFromArgs below
             ++i;
         } else if (arg.rfind("--", 0) != 0 && scriptFile.empty()) {
