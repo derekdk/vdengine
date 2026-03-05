@@ -94,12 +94,4 @@ if(WIN32)
     target_link_libraries(vde_resource_editor PRIVATE ole32 uuid)
 endif()
 
-add_dependencies(vde_resource_editor copy_tool_shaders)
-
-# Copy shaders to the resource_editor output directory
-add_custom_command(TARGET vde_resource_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/shaders
-        $<TARGET_FILE_DIR:vde_resource_editor>/shaders
-    COMMENT "Copying shaders to resource_editor executable directory..."
-)
+vde_add_shader_sync(vde_resource_editor)

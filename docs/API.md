@@ -1368,3 +1368,87 @@ struct RaycastHit {
     float distance;
 };
 ```
+
+---
+
+## vde::Transition
+
+**Header**: `<vde/api/Transition.h>`
+
+Base class for screen transition effects. Subclass to create custom transitions.
+
+### Methods (Virtual)
+
+| Method | Description |
+|--------|-------------|
+| `string getName() const` | Human-readable name (pure virtual) |
+| `string getFragmentShaderPath() const` | Path to fragment shader (pure virtual) |
+| `string getVertexShaderPath() const` | Path to vertex shader (default: fullscreen triangle) |
+| `void update(const TransitionUpdateContext&)` | Per-frame logic hook |
+| `void onStart()` | Called when transition begins |
+| `void onComplete()` | Called when transition finishes |
+
+### Built-in Transitions
+
+| Class | Description |
+|-------|-------------|
+| `FadeTransition` | Cross-fade between source and destination |
+| `WipeTransition(TransitionDirection)` | Directional edge wipe |
+| `CircleRevealTransition` | Expanding circle from center |
+
+### TransitionDirection
+
+```cpp
+enum class TransitionDirection { Left, Right, Up, Down, Center };
+```
+
+### TransitionUniforms
+
+```cpp
+struct TransitionUniforms {
+    float progress;    // 0.0 → 1.0
+    float direction;   // Encoded TransitionDirection (float cast)
+    float param0;      // Effect-specific parameter
+    float param1;      // Effect-specific parameter
+};
+```
+
+---
+
+## vde::TransitionManager
+
+**Header**: `<vde/api/TransitionManager.h>` (engine-internal)
+
+Manages transition lifecycle, offscreen render targets, and compositing. Owned by `Game`; users interact via `Game::transitionToScene()`.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void start(unique_ptr<Transition>, float duration, function<void()> onComplete)` | Begin a transition |
+| `void update(float deltaTime)` | Advance transition progress |
+| `bool isActive() const` | True while transitioning |
+| `void cancel()` | Cancel immediately (callback not fired) |
+| `float getProgress() const` | Current progress [0, 1] |
+| `void recreateRenderTargets(uint32_t w, uint32_t h)` | Resize offscreen targets |
+| `void renderComposite(VkCommandBuffer cmd)` | Draw composite to current render pass |
+
+---
+
+## vde::OffscreenRenderTarget
+
+**Header**: `<vde/OffscreenRenderTarget.h>`
+
+RAII wrapper for a Vulkan offscreen render target (color + depth).
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void create(VulkanContext*, VkRenderPass renderPass, uint32_t w, uint32_t h)` | Create render target |
+| `void recreate(uint32_t w, uint32_t h)` | Resize to new dimensions |
+| `void destroy()` | Release Vulkan resources |
+| `VkFramebuffer getFramebuffer() const` | Framebuffer handle |
+| `VkImageView getColorImageView() const` | Color attachment view (for sampling) |
+| `VkSampler getSampler() const` | Texture sampler |
+| `bool isValid() const` | True if created successfully |

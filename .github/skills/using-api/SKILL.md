@@ -231,6 +231,32 @@ This enables proper scaling and conversion between screen pixels and game world 
 
 See [API-DOC.md#world-coordinates--bounds](../../../API-DOC.md#world-coordinates--bounds) for complete guide.
 
+### Screen Transitions
+
+Use `transitionToScene()` instead of `setActiveScene()` for animated scene changes:
+
+```cpp
+// In your Game subclass's onUpdate():
+transitionToScene("menu", std::make_unique<vde::FadeTransition>(), 1.0f);
+
+// Wipe with direction
+transitionToScene("credits",
+                  std::make_unique<vde::WipeTransition>(vde::TransitionDirection::Left),
+                  0.75f);
+
+// Circle reveal
+transitionToScene("game", std::make_unique<vde::CircleRevealTransition>(), 1.5f);
+```
+
+**Key points:**
+- Both source and destination scenes update during the transition
+- `onEnter()` fires on the destination scene at transition start; `onExit()` fires on the source scene at completion
+- Duration ≤ 0 performs an instant switch (equivalent to `setActiveScene`)
+- Call `cancelTransition()` to snap back to the source scene
+- Use the viewport overload for split-screen transitions: `transitionToScene(name, transition, duration, viewportRect)`
+
+See [API-DOC.md#screen-transitions](../../../API-DOC.md#screen-transitions) for complete reference.
+
 ## Best Practices
 
 ### 1. Always Call Base Class Methods

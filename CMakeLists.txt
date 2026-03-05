@@ -9,6 +9,7 @@ option(VDE_BUILD_EXAMPLES "Build example applications" ON)
 option(VDE_BUILD_TESTS "Build unit tests" ON)
 option(VDE_BUILD_TOOLS "Build asset creation tools" ON)
 option(VDE_SHARED_LIBS "Build as shared library" OFF)
+option(VDE_TIMING "Enable per-TU compiler timing flags (MSVC: /Bt, GCC/Clang: -ftime-report)" OFF)
 
 # Compiler options
 if(MSVC)
@@ -18,8 +19,17 @@ if(MSVC)
         NOMINMAX
         WIN32_LEAN_AND_MEAN
     )
+    if(VDE_TIMING)
+        # /Bt  - print per-TU "time(file)=Xs (Ys front end, Zs back end)" to stderr
+        add_compile_options(/Bt)
+        message(STATUS "VDE: compiler timing enabled (/Bt)")
+    endif()
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+    if(VDE_TIMING)
+        add_compile_options(-ftime-report)
+        message(STATUS "VDE: compiler timing enabled (-ftime-report)")
+    endif()
 endif()
 
 # Enable testing support
@@ -128,6 +138,7 @@ set(VDE_SOURCES
     src/UniformBuffer.cpp
     src/DescriptorManager.cpp
     src/ImageLoader.cpp
+    src/OffscreenRenderTarget.cpp
     src/stb_impl.cpp
     src/HexGeometry.cpp
     src/HexPrismMesh.cpp
@@ -146,6 +157,13 @@ set(VDE_SOURCES
     src/api/PhysicsScene.cpp
     src/api/PhysicsEntity.cpp
     src/api/ThreadPool.cpp
+    # Transitions
+    src/api/Transition.cpp
+    src/api/FadeTransition.cpp
+    src/api/WipeTransition.cpp
+    src/api/CircleRevealTransition.cpp
+    src/api/BlockFallTransition.cpp
+    src/api/TransitionManager.cpp
     # Audio
     src/miniaudio_impl.cpp
     src/api/AudioClip.cpp
@@ -171,6 +189,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/UniformBuffer.h
     include/vde/DescriptorManager.h
     include/vde/ImageLoader.h
+    include/vde/OffscreenRenderTarget.h
     include/vde/Types.h
     include/vde/HexGeometry.h
     include/vde/HexPrismMesh.h
@@ -200,6 +219,13 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/PhysicsScene.h
     include/vde/api/PhysicsEntity.h
     include/vde/api/ThreadPool.h
+    # Transition headers
+    include/vde/api/Transition.h
+    include/vde/api/FadeTransition.h
+    include/vde/api/WipeTransition.h
+    include/vde/api/CircleRevealTransition.h
+    include/vde/api/BlockFallTransition.h
+    include/vde/api/TransitionManager.h
     # Audio headers
     include/vde/api/AudioClip.h
     include/vde/api/AudioEvent.h
@@ -298,4 +324,5 @@ message(STATUS "  Shared library: ${VDE_SHARED_LIBS}")
 message(STATUS "  Build examples: ${VDE_BUILD_EXAMPLES}")
 message(STATUS "  Build tools: ${VDE_BUILD_TOOLS}")
 message(STATUS "  Build tests: ${VDE_BUILD_TESTS}")
+message(STATUS "  Compiler timing: ${VDE_TIMING}")
 message(STATUS "===========================================")

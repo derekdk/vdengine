@@ -21,6 +21,7 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Physics System](#physics-system)
 - [Audio System](#audio-system)
 - [Multi-Scene & Split-Screen](#multi-scene--split-screen)
+- [Screen Transitions](#screen-transitions)
 - [Deferred Commands & Thread Safety](#deferred-commands--thread-safety)
 - [Common Types](#common-types)
 - [World Coordinates & Bounds](#world-coordinates--bounds)
@@ -1517,6 +1518,102 @@ class Player2Scene : public vde::Scene {
     }
 };
 ```
+
+---
+
+## Screen Transitions
+
+VDE provides a built-in screen transition system for smooth animated transitions between scenes. Transitions render both the source and destination scenes to offscreen render targets and composite them using a shader effect.
+
+### Built-in Transitions
+
+| Transition | Description |
+|---|---|
+| `FadeTransition` | Cross-fade between scenes |
+| `WipeTransition` | Directional edge wipe |
+| `CircleRevealTransition` | Expanding circle from center |
+
+### Basic Usage
+
+```cpp
+#include <vde/api/GameAPI.h>
+
+// In your Game subclass:
+void onUpdate(float deltaTime) override {
+    // Fade to a scene over 1 second
+    transitionToScene("menu", std::make_unique<vde::FadeTransition>(), 1.0f);
+    
+    // Wipe left to credits scene
+    transitionToScene("credits",
+                      std::make_unique<vde::WipeTransition>(vde::TransitionDirection::Left),
+                      0.75f);
+    
+    // Circle reveal
+    transitionToScene("game", std::make_unique<vde::CircleRevealTransition>(), 1.5f);
+}
+```
+
+### Transition Controls
+
+```cpp
+// Check if a transition is in progress
+if (isTransitioning()) {
+    float progress = getTransitionProgress();  // 0.0 to 1.0
+}
+
+// Cancel a transition (snaps back to source scene)
+cancelTransition();
+
+// Instant switch (duration <= 0 bypasses transition rendering)
+transitionToScene("menu", std::make_unique<vde::FadeTransition>(), 0.0f);
+```
+
+### Viewport-Scoped Transitions
+
+Transitions can be limited to a specific viewport region, useful for split-screen scenarios:
+
+```cpp
+// Transition only the left half of the screen
+transitionToScene("game",
+                  std::make_unique<vde::FadeTransition>(),
+                  1.0f,
+                  vde::ViewportRect::leftHalf());
+```
+
+Other viewports in the active scene group continue rendering normally during the transition.
+
+### Lifecycle
+
+During a transition:
+- Both source and destination scenes receive `update()` calls
+- `onEnter()` is called on the destination scene when the transition starts
+- `onExit()` is called on the source scene when the transition completes
+- If cancelled, `onExit()` is called on the destination scene instead
+
+### WipeTransition Directions
+
+```cpp
+vde::TransitionDirection::Left    // Wipes from right to left
+vde::TransitionDirection::Right   // Wipes from left to right
+vde::TransitionDirection::Up      // Wipes from bottom to top
+vde::TransitionDirection::Down    // Wipes from top to bottom
+```
+
+### Custom Transitions
+
+Extend `vde::Transition` to create custom effects:
+
+```cpp
+class MyTransition : public vde::Transition {
+  public:
+    std::string getName() const override { return "MyTransition"; }
+    std::string getFragmentShaderPath() const override {
+        return "shaders/my_transition.frag";
+    }
+};
+```
+
+The fragment shader receives two textures (`sourceTexture`, `destTexture`) and `TransitionUniforms` as push constants with `progress` (0→1), `direction`, and `param0` (used for the aspect ratio).
 
 ---
 

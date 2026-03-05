@@ -32,8 +32,16 @@ target_link_libraries(imgui_backend PUBLIC
     glfw
 )
 
-# Create a custom target to copy shaders once (avoids parallel copy conflicts with MSBuild)
-add_custom_target(copy_example_shaders ALL
+# Track shader source files so updates trigger copy without requiring executable relink
+file(GLOB_RECURSE VDE_SHADER_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/shaders/*
+)
+
+set(VDE_EXAMPLE_SHADER_STAMP ${CMAKE_CURRENT_BINARY_DIR}/copy_example_shaders.stamp)
+
+# Create a dependency-driven shader copy target for examples
+add_custom_command(
+    OUTPUT ${VDE_EXAMPLE_SHADER_STAMP}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Debug/shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
@@ -46,7 +54,14 @@ add_custom_target(copy_example_shaders ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/shaders
         ${CMAKE_CURRENT_BINARY_DIR}/Release/shaders
-    COMMENT "Copying shader files to examples directory..."
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_EXAMPLE_SHADER_STAMP}
+    DEPENDS ${VDE_SHADER_FILES}
+    COMMENT "Syncing shader files for examples..."
+    VERBATIM
+)
+
+add_custom_target(copy_example_shaders ALL
+    DEPENDS ${VDE_EXAMPLE_SHADER_STAMP}
 )
 
 # Helper function to add examples with ImGui support enabled
@@ -98,13 +113,30 @@ add_vde_example(vde_resource_demo "resource_demo/main.cpp")
 # Audio demo example demonstrating audio system
 add_vde_example(vde_audio_demo "audio_demo/main.cpp")
 
-# Copy audio assets directory
-add_custom_command(TARGET vde_audio_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets
-    $<TARGET_FILE_DIR:vde_audio_demo>/assets
-    COMMENT "Copying audio assets next to executable..."
+# Keep audio assets synced even when only asset files change
+file(GLOB_RECURSE VDE_AUDIO_DEMO_ASSET_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets/*
 )
+
+set(VDE_AUDIO_DEMO_ASSET_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_audio_demo_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_AUDIO_DEMO_ASSET_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_audio_demo>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/examples/audio_demo/assets
+        $<TARGET_FILE_DIR:vde_audio_demo>/assets
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_AUDIO_DEMO_ASSET_STAMP}
+    DEPENDS ${VDE_AUDIO_DEMO_ASSET_FILES}
+    COMMENT "Syncing audio demo assets..."
+    VERBATIM
+)
+
+add_custom_target(vde_audio_demo_sync_assets ALL
+    DEPENDS ${VDE_AUDIO_DEMO_ASSET_STAMP}
+)
+
+add_dependencies(vde_audio_demo vde_audio_demo_sync_assets)
 
 # 2D Sidescroller example demonstrating platformer game mechanics
 add_vde_example(vde_sidescroller "sidescroller/main.cpp")
@@ -138,4 +170,7 @@ add_vde_example(vde_imgui_demo "imgui_demo/main.cpp")
 
 # Persistent storage demo - demonstrates StorageManager API with an ImGui panel UI
 add_vde_example(vde_storage_demo "storage_demo/main.cpp")
+
+# Transition demo - demonstrates screen transition effects (fade, wipe, circle reveal)
+add_vde_example(vde_transition_demo "transition_demo/main.cpp")
 

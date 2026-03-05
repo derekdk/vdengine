@@ -18,11 +18,16 @@
  */
 
 // Core game classes
+#include "BlockFallTransition.h"
+#include "CircleRevealTransition.h"
+#include "FadeTransition.h"
 #include "Game.h"
 #include "GameSettings.h"
 #include "GameTypes.h"
 #include "Scheduler.h"
 #include "ThreadPool.h"
+#include "Transition.h"
+#include "WipeTransition.h"
 
 // Scene and entity system
 #include "AudioEvent.h"
