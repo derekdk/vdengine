@@ -21,6 +21,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Creating new classes, systems, or modules in the engine.  
 **Location:** `.github/skills/add-component/SKILL.md`
 
+### adding-skills
+**Purpose:** Guide for creating new skills in the VDE project.  
+**Use when:** Recognizing a repeatable process with expensive-to-acquire knowledge, or when the user identifies a deficiency in how the AI completed work — create a skill immediately to close the loop.  
+**Location:** `.github/skills/adding-skills/SKILL.md`
+
 ### build-tool-workflows
 **Purpose:** Build and test workflows for the VDE project.  
 **Use when:** Building the project or running tests.  
@@ -70,3 +75,8 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Purpose:** Guide for creating 2D games, demos, and examples with the VDE API.  
 **Use when:** Building 2D physics, sprite-based, or side-view applications. Setting up Camera2D, physics arenas, or choosing between manual and engine-powered collision detection.  
 **Location:** `.github/skills/2d-games/SKILL.md`
+
+### completing-work
+**Purpose:** Checklist and rules for verifying that scripts, tools, and workflows actually work before announcing a task is complete.  
+**Use when:** Finishing any task that involves writing or modifying scripts, build tools, automation, or any executable artifact — before telling the user the work is done.  
+**Location:** `.github/skills/completing-work/SKILL.md`
