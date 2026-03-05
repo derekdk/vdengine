@@ -278,6 +278,96 @@ Format C++ source files using clang-format according to the project's style guid
 .\scripts\format.ps1 -Check
 ```
 
+### Capture a Compile Benchmark (e.g. to measure a modules migration)
+```powershell
+# 1. Record a baseline before any changes
+.\scripts\benchmark-compile.ps1 -Label "baseline-headers"
+
+# 2. Make your code changes (e.g. convert a module)
+
+# 3. Record the candidate run
+.\scripts\benchmark-compile.ps1 -Label "phase1-modules"
+
+# 4. Compare the two
+.\scripts\compare-benchmarks.ps1 -Baseline "baseline-headers" -Candidate "phase1-modules"
+
+# 5. Add -Markdown to also write a shareable .md report
+.\scripts\compare-benchmarks.ps1 -Baseline "baseline-headers" -Candidate "phase1-modules" -Markdown
+```
+
+Each benchmark run produces a JSON file in `benchmarks/` named
+`<timestamp>-<label>.json`. Labels are matched as substring lookups so you
+don't need to type the full filename in `compare-benchmarks.ps1`.
+
+## Benchmark Scripts
+
+### benchmark-compile.ps1
+
+Triggers a full clean rebuild, collects per-TU wall-clock times from the
+Ninja log (`.ninja_log`), and optionally captures MSVC front-end / back-end
+timing via the `/Bt` compiler flag.  Results are written to `benchmarks/`.
+
+**Syntax:**
+```powershell
+.\scripts\benchmark-compile.ps1 -Label <string> [-Config Debug|Release]
+                                 [-CaptureDetail] [-OutputDir <path>]
+                                 [-SkipConfigure]
+```
+
+**Parameters:**
+- `-Label`          Required. Short tag for the run (e.g. `"baseline-headers"`)
+- `-Config`         `Debug` (default) or `Release`
+- `-CaptureDetail`  Adds a second serial verbose pass to capture MSVC `/Bt`
+                    front-end / back-end CPU split.  Slower, but shows what
+                    fraction of each TU is header-parsing vs code-generation.
+- `-OutputDir`      Where to write JSON reports (default: `<root>/benchmarks/`)
+- `-SkipConfigure`  Skip cmake reconfigure (use when the cache already has
+                    `VDE_TIMING=ON` from a prior run)
+
+**The JSON report contains:**
+- `build_wall_sec` — real elapsed seconds for the whole build
+- `summary` — aggregate stats (total/avg/max/p95 wall ms across all TUs)
+- `by_target` — per-target totals (`vde`, `examples`, `tools`, `tests`, `deps`)
+- `files` — per-TU row with `wall_ms`, and (if `-CaptureDetail`) `frontend_cpu_s`,
+  `backend_cpu_s`, `frontend_pct`
+
+**Requirements:**
+- Ninja generator (uses `build_ninja/`)
+- MSVC via VS 2022 (script auto-loads VS dev environment)
+
+### compare-benchmarks.ps1
+
+Loads two benchmark JSON files, matches TUs by path, and prints a colour-coded
+table of improvements and regressions.
+
+**Syntax:**
+```powershell
+.\scripts\compare-benchmarks.ps1 -Baseline <report-or-label>
+                                  -Candidate <report-or-label>
+                                  [-BenchmarksDir <path>]
+                                  [-MinDeltaMs <N>]
+                                  [-Markdown]
+```
+
+**Parameters:**
+- `-Baseline`       Path to a JSON file, filename, or a label substring.
+                    The most-recent matching file in `benchmarks/` is used.
+- `-Candidate`      Same as `-Baseline` but for the newer run.
+- `-MinDeltaMs`     Minimum absolute time change to show in the per-TU table
+                    (default: 100 ms — filters out noise).
+- `-Markdown`       Write an `.md` report to `benchmarks/` as well.
+
+**Output columns:**
+- Baseline wall ms → Candidate wall ms → Δ ms → Δ%
+- Colour-coded: green = faster, yellow = slower, white = within threshold
+- Per-target breakdown plus a final FASTER / SLOWER / no-change verdict
+
+**CMake timing flag (`VDE_TIMING`):**
+Both benchmark scripts configure CMake with `-DVDE_TIMING=ON`, which adds the
+undocumented-but-reliable MSVC `/Bt` flag (wall time per TU, broken down into
+CPU front-end and back-end).  On GCC/Clang the equivalent is `-ftime-report`.
+This option is OFF by default so normal builds are unaffected.
+
 ## Build Directories
 
 The scripts use different build directories based on the generator:

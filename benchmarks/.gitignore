@@ -1,0 +1,9 @@
+# Benchmark reports are machine-specific — do not commit them.
+# The benchmarks/ directory itself is tracked so the folder exists after checkout.
+*.json
+*.md
+*.txt
+
+# But keep this file and the README.
+!.gitignore
+!README.md

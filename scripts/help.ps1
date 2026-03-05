@@ -22,6 +22,12 @@ Write-Cmd '.\scripts\clean.ps1' 'Clean build artifacts'
 Write-Cmd '.\scripts\test.ps1' 'Run unit tests'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Run VLauncher (builds target if missing)'
 
+Write-Title "BENCHMARK SCRIPTS"
+Write-Cmd '.\scripts\benchmark-compile.ps1 -Label "baseline"' 'Capture per-TU compile timing (clean build)'
+Write-Cmd '.\scripts\benchmark-compile.ps1 -Label "modules" -CaptureDetail' 'Capture timing + MSVC FE/BE split'
+Write-Cmd '.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate modules' 'Diff two benchmark reports'
+Write-Cmd '.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate modules -Markdown' 'Diff and write Markdown report'
+
 Write-Title "QUICK START"
 Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default)'
 Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'

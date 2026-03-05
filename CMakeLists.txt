@@ -9,6 +9,7 @@ option(VDE_BUILD_EXAMPLES "Build example applications" ON)
 option(VDE_BUILD_TESTS "Build unit tests" ON)
 option(VDE_BUILD_TOOLS "Build asset creation tools" ON)
 option(VDE_SHARED_LIBS "Build as shared library" OFF)
+option(VDE_TIMING "Enable per-TU compiler timing flags (MSVC: /Bt, GCC/Clang: -ftime-report)" OFF)
 
 # Compiler options
 if(MSVC)
@@ -18,8 +19,17 @@ if(MSVC)
         NOMINMAX
         WIN32_LEAN_AND_MEAN
     )
+    if(VDE_TIMING)
+        # /Bt  - print per-TU "time(file)=Xs (Ys front end, Zs back end)" to stderr
+        add_compile_options(/Bt)
+        message(STATUS "VDE: compiler timing enabled (/Bt)")
+    endif()
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+    if(VDE_TIMING)
+        add_compile_options(-ftime-report)
+        message(STATUS "VDE: compiler timing enabled (-ftime-report)")
+    endif()
 endif()
 
 # Enable testing support
@@ -314,4 +324,5 @@ message(STATUS "  Shared library: ${VDE_SHARED_LIBS}")
 message(STATUS "  Build examples: ${VDE_BUILD_EXAMPLES}")
 message(STATUS "  Build tools: ${VDE_BUILD_TOOLS}")
 message(STATUS "  Build tests: ${VDE_BUILD_TESTS}")
+message(STATUS "  Compiler timing: ${VDE_TIMING}")
 message(STATUS "===========================================")
