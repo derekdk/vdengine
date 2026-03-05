@@ -1399,17 +1399,17 @@ Base class for screen transition effects. Subclass to create custom transitions.
 ### TransitionDirection
 
 ```cpp
-enum class TransitionDirection { Left, Right, Up, Down };
+enum class TransitionDirection { Left, Right, Up, Down, Center };
 ```
 
 ### TransitionUniforms
 
 ```cpp
 struct TransitionUniforms {
-    float progress;     // 0.0 → 1.0
-    float direction;    // Encoded TransitionDirection (0-3)
-    float aspectRatio;  // Width / height
-    float reserved;     // Padding
+    float progress;    // 0.0 → 1.0
+    float direction;   // Encoded TransitionDirection (float cast)
+    float param0;      // Effect-specific parameter
+    float param1;      // Effect-specific parameter
 };
 ```
 
