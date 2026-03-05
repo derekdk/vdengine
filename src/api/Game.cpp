@@ -868,15 +868,15 @@ void Game::popScene() {
 
 void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
                              float duration) {
+    // Validate destination scene exists before mutating any state
+    auto it = m_scenes.find(name);
+    if (it == m_scenes.end()) {
+        throw std::runtime_error("[VDE] transitionToScene: unknown scene '" + name + "'");
+    }
+
     // Full-screen transition (default)
     m_viewportTransition = false;
     m_transitionViewport = ViewportRect::fullWindow();
-
-    // Validate destination scene exists
-    auto it = m_scenes.find(name);
-    if (it == m_scenes.end()) {
-        return;
-    }
 
     // If duration <= 0, do an instant switch
     if (duration <= 0.0f) {
@@ -953,10 +953,14 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
     // Store viewport info before delegating to the main overload
     transitionToScene(name, std::move(transition), duration);
 
-    // Apply viewport-scoped transition settings (after transitionToScene sets up state)
+    // Apply viewport-scoped transition settings (after transitionToScene sets up state).
+    // Must call rebuildSchedulerGraph() again here because the full-screen overload already
+    // built the graph with m_viewportTransition == false; we need a second rebuild now that
+    // the flag is correctly set to true so the scheduler accounts for viewport-scoped rendering.
     if (m_transitionManager && m_transitionManager->isActive()) {
         m_viewportTransition = true;
         m_transitionViewport = region;
+        rebuildSchedulerGraph();
     }
 }
 
@@ -2391,6 +2395,11 @@ void Game::renderTransition() {
             ubo.view = m_vulkanContext->getCamera().getViewMatrix();
             ubo.proj = m_vulkanContext->getCamera().getProjectionMatrix();
 
+            // NOTE: getCurrentUniformBuffer() returns the same shared UBO buffer for both the
+            // source and destination offscreen passes. The second call (dest scene) overwrites the
+            // buffer, but by that point the source render pass has already ended, so correctness is
+            // maintained for this sequential single-command-buffer design. If rendering is ever
+            // parallelised across command buffers, this shared UBO would become a data race.
             VkBuffer uboBuffer = m_vulkanContext->getCurrentUniformBuffer();
             vkCmdUpdateBuffer(cmd, uboBuffer, 0, sizeof(UniformBufferObject), &ubo);
 
