@@ -29,7 +29,9 @@ TransitionManager::~TransitionManager() {
     destroyDescriptorResources();
 
     // Wait once before destroying all offscreen render targets
-    vkDeviceWaitIdle(m_context->getDevice());
+    if (m_context->getDevice() != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(m_context->getDevice());
+    }
 
     // Destroy offscreen render targets (they handle their own RAII)
     m_source.destroy();
@@ -194,7 +196,9 @@ void TransitionManager::recreateRenderTargets(uint32_t width, uint32_t height) {
     }
 
     // Wait once before destroying/recreating render targets
-    vkDeviceWaitIdle(m_context->getDevice());
+    if (m_context->getDevice() != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(m_context->getDevice());
+    }
 
     if (m_source.isValid()) {
         m_source.recreate(width, height);
