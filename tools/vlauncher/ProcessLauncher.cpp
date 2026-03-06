@@ -95,9 +95,9 @@ bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& execu
     attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
     attributes.bInheritHandle = TRUE;
 
-    HANDLE outputFileHandle = CreateFileA(outputPath.string().c_str(), GENERIC_WRITE,
-                                          FILE_SHARE_READ | FILE_SHARE_WRITE, &attributes,
-                                          CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE outputFileHandle =
+        CreateFileA(outputPath.string().c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    &attributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (outputFileHandle == INVALID_HANDLE_VALUE) {
         error = "Failed to create temp output file";
         return false;
@@ -118,11 +118,11 @@ bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& execu
 
     PROCESS_INFORMATION processInfo{};
 
-    BOOL created = CreateProcessA(
-        nullptr, commandLineBuffer.data(), nullptr, nullptr,
-        TRUE,  // inherit stdout/stderr handle
-        CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW, nullptr,
-        workDir.empty() ? nullptr : workDir.c_str(), &startupInfo, &processInfo);
+    BOOL created =
+        CreateProcessA(nullptr, commandLineBuffer.data(), nullptr, nullptr,
+                       TRUE,  // inherit stdout/stderr handle
+                       CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW, nullptr,
+                       workDir.empty() ? nullptr : workDir.c_str(), &startupInfo, &processInfo);
 
     CloseHandle(outputFileHandle);
 
@@ -222,8 +222,8 @@ bool ProcessLauncher::readOutputFile(const std::filesystem::path& outputPath, st
         }
 
         const size_t bytesRead = static_cast<size_t>(readCount);
-        const size_t remaining = (kMaxOutputReadBytes > totalRead) ? (kMaxOutputReadBytes - totalRead)
-                                                                    : 0;
+        const size_t remaining =
+            (kMaxOutputReadBytes > totalRead) ? (kMaxOutputReadBytes - totalRead) : 0;
         const size_t toAppend = (bytesRead < remaining) ? bytesRead : remaining;
 
         if (toAppend > 0) {

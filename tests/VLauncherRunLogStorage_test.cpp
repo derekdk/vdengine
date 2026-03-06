@@ -3,16 +3,15 @@
  * @brief Unit tests for vde::tools::RunLogStorage.
  */
 
-#include <gtest/gtest.h>
-
 #include <vde/api/StorageManager.h>
-
-#include "../tools/vlauncher/RunLogStorage.h"
 
 #include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <vector>
+
+#include "../tools/vlauncher/RunLogStorage.h"
+#include <gtest/gtest.h>
 
 #if defined(_WIN32)
 #include <windows.h>

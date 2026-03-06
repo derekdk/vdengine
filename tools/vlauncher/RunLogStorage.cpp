@@ -1,5 +1,7 @@
 #include "RunLogStorage.h"
 
+#include <vde/api/StorageManager.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -8,8 +10,6 @@
 #include <sstream>
 #include <utility>
 #include <vector>
-
-#include <vde/api/StorageManager.h>
 
 namespace vde::tools {
 
@@ -35,7 +35,8 @@ std::string normalizePathForKey(const std::filesystem::path& repositoryRoot,
     }
     absolutePath = absolutePath.lexically_normal();
 
-    std::filesystem::path relativePath = std::filesystem::relative(absolutePath, repositoryRoot, error);
+    std::filesystem::path relativePath =
+        std::filesystem::relative(absolutePath, repositoryRoot, error);
     std::string keyPath = error ? absolutePath.generic_string() : relativePath.generic_string();
 
     std::transform(keyPath.begin(), keyPath.end(), keyPath.begin(),
@@ -69,8 +70,7 @@ bool readUint32(const std::vector<uint8_t>& bytes, size_t& offset, uint32_t& val
         return false;
     }
 
-    value = static_cast<uint32_t>(bytes[offset]) |
-            (static_cast<uint32_t>(bytes[offset + 1]) << 8) |
+    value = static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8) |
             (static_cast<uint32_t>(bytes[offset + 2]) << 16) |
             (static_cast<uint32_t>(bytes[offset + 3]) << 24);
     offset += 4;
@@ -229,7 +229,8 @@ bool RunLogStorage::saveLatestRun(const std::string& targetId, const StoredRunLo
     return true;
 }
 
-std::array<std::optional<StoredRunLog>, 2> RunLogStorage::loadRecentRuns(const std::string& targetId) {
+std::array<std::optional<StoredRunLog>, 2>
+RunLogStorage::loadRecentRuns(const std::string& targetId) {
     auto& storage = vde::StorageManager::getInstance();
     if (!storage.isInitialized()) {
         return {};
