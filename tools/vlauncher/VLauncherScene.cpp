@@ -97,7 +97,27 @@ void VLauncherScene::drawDebugUI() {
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(entry.targetName.c_str());
+            std::string selId = "##target_" + entry.targetName;
+            ImGui::Selectable(entry.targetName.c_str(), false, ImGuiSelectableFlags_AllowOverlap);
+            if (ImGui::BeginPopupContextItem(selId.c_str())) {
+                if (entry.sourceFound) {
+                    if (ImGui::MenuItem("Open in VS Code")) {
+                        auto sourceFile = findMainSourceFile(entry.sourceDirectory);
+                        std::string err;
+                        if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
+                            addConsoleMessage("Opening in VS Code: " + sourceFile.string());
+                        } else {
+                            addConsoleMessage("Failed to open VS Code: " + err);
+                        }
+                    }
+                } else {
+                    ImGui::BeginDisabled();
+                    ImGui::MenuItem("Open in VS Code");
+                    ImGui::EndDisabled();
+                    ImGui::TextDisabled("(source directory not found)");
+                }
+                ImGui::EndPopup();
+            }
 
             ImGui::TableSetColumnIndex(1);
             ImGui::TextUnformatted(entry.kind.c_str());
@@ -157,6 +177,31 @@ void VLauncherScene::drawDebugUI() {
     }
 
     ImGui::End();
+}
+
+std::filesystem::path
+VLauncherScene::findMainSourceFile(const std::filesystem::path& sourceDirectory) {
+    // Prefer main.cpp as the canonical entry point
+    auto mainCpp = sourceDirectory / "main.cpp";
+    if (std::filesystem::exists(mainCpp)) {
+        return mainCpp;
+    }
+
+    // Fall back to the first .cpp file in the directory (alphabetical)
+    std::error_code ec;
+    std::vector<std::filesystem::path> cppFiles;
+    for (const auto& dirEntry : std::filesystem::directory_iterator(sourceDirectory, ec)) {
+        if (dirEntry.is_regular_file() && dirEntry.path().extension() == ".cpp") {
+            cppFiles.push_back(dirEntry.path());
+        }
+    }
+    if (!cppFiles.empty()) {
+        std::sort(cppFiles.begin(), cppFiles.end());
+        return cppFiles.front();
+    }
+
+    // Last resort: open the source directory itself
+    return sourceDirectory;
 }
 
 void VLauncherScene::executeCommand(const std::string& cmdLine) {

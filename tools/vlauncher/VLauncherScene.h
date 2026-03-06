@@ -37,6 +37,8 @@ class VLauncherScene : public BaseToolScene {
 
     std::vector<ExecutableEntry> getSortedEntries() const;
 
+    static std::filesystem::path findMainSourceFile(const std::filesystem::path& sourceDirectory);
+
     static std::string formatAge(std::chrono::system_clock::time_point from,
                                  std::chrono::system_clock::time_point now);
     static std::string formatTimestamp(std::chrono::system_clock::time_point value);

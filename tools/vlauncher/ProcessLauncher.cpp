@@ -43,4 +43,32 @@ bool ProcessLauncher::launchDetached(const std::filesystem::path& executablePath
 #endif
 }
 
+bool ProcessLauncher::openFileInVSCode(const std::filesystem::path& filePath, std::string& error) {
+#ifdef _WIN32
+    // On Windows, 'code' is a batch script, so we must invoke it through cmd.
+    std::string commandLine = "cmd /c code \"" + filePath.string() + "\"";
+
+    STARTUPINFOA si{};
+    si.cb = sizeof(STARTUPINFOA);
+    PROCESS_INFORMATION pi{};
+
+    BOOL created = CreateProcessA(nullptr, commandLine.data(), nullptr, nullptr, FALSE,
+                                  CREATE_NO_WINDOW | DETACHED_PROCESS, nullptr, nullptr, &si, &pi);
+
+    if (!created) {
+        DWORD code = GetLastError();
+        error = "CreateProcess failed with code " + std::to_string(code);
+        return false;
+    }
+
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return true;
+#else
+    (void)filePath;
+    error = "openFileInVSCode is not yet implemented on this platform";
+    return false;
+#endif
+}
+
 }  // namespace vde::tools
