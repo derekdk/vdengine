@@ -18,7 +18,7 @@ This skill defines the required process for resolving bugs in the VDE codebase. 
 
 ## Required Workflow
 
-Always perform every step in this list.
+All steps are mandatory and must be followed in order.
 
 ### Step 1 — Understand the bug before touching code
 
