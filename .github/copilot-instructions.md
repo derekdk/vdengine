@@ -21,6 +21,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Creating new classes, systems, or modules in the engine.  
 **Location:** `.github/skills/add-component/SKILL.md`
 
+### adding-features
+**Purpose:** Guide for implementing new features in the VDE project, including mandatory build/test/smoke verification and subagent review before completion.  
+**Use when:** Implementing enhancements or new capabilities in engine code, examples, tools, or APIs that change supported behavior.  
+**Location:** `.github/skills/adding-features/SKILL.md`
+
 ### adding-skills
 **Purpose:** Guide for creating new skills in the VDE project.  
 **Use when:** Recognizing a repeatable process with expensive-to-acquire knowledge, or when the user identifies a deficiency in how the AI completed work — create a skill immediately to close the loop.  
