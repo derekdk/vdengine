@@ -7,11 +7,12 @@ Thank you for your interest in contributing to the Vulkan Display Engine!
 1. Install Git LFS: See [Git LFS Setup Guide](GIT_LFS_SETUP.md)
 2. Fork the repository
 3. Clone your fork (LFS files will download automatically)
-4. Create a feature branch: `git checkout -b feature/my-feature`
-4. Make your changes
-5. Run tests: `.\scripts\build-and-test.ps1`
-6. Commit with descriptive messages
-7. Push and create a pull request
+4. Configure local Git hooks: `.\scripts\install-hooks.ps1`
+5. Create a feature branch: `git checkout -b feature/my-feature`
+6. Make your changes
+7. Run tests: `.\scripts\build-and-test.ps1`
+8. Commit with descriptive messages
+9. Push and create a pull request
 
 ## Development Setup
 
