@@ -385,6 +385,10 @@ class Game {
 
     /**
      * @brief Queue a window resize operation to run at a scheduler-safe point.
+      *
+      * If multiple resize requests are queued before the next scheduler tick,
+      * only the latest requested size is applied.
+      *
      * @param width Target window width in pixels
      * @param height Target window height in pixels
      */
@@ -663,8 +667,19 @@ class Game {
     // Scheduler
     Scheduler m_scheduler;
 
-    // Queued window operations (executed in scheduler Input phase on main thread)
-    std::vector<std::function<void(Window&)>> m_pendingWindowOperations;
+    enum class WindowOperationKind {
+      Generic,
+      Resize,
+    };
+
+    struct PendingWindowOperation {
+      WindowOperationKind kind = WindowOperationKind::Generic;
+      std::function<void(Window&)> operation;
+    };
+
+    // Queued window operations (executed in scheduler Input phase on main thread).
+    // Resize requests are de-duplicated so only the latest queued size is applied.
+    std::vector<PendingWindowOperation> m_pendingWindowOperations;
     std::mutex m_pendingWindowOperationsMutex;
 
     // Input

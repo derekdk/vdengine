@@ -1054,11 +1054,24 @@ void Game::scheduleWindowOperation(std::function<void(Window&)> operation) {
     }
 
     std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
-    m_pendingWindowOperations.push_back(std::move(operation));
+    m_pendingWindowOperations.push_back(
+        {WindowOperationKind::Generic, std::move(operation)});
 }
 
 void Game::scheduleWindowResize(uint32_t width, uint32_t height) {
-    scheduleWindowOperation([width, height](Window& window) { window.setResolution(width, height); });
+    if (!m_window) {
+        return;
+    }
+
+    if (!m_running) {
+        m_window->setResolution(width, height);
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
+    m_pendingWindowOperations.push_back(
+        {WindowOperationKind::Resize,
+         [width, height](Window& window) { window.setResolution(width, height); }});
 }
 
 void Game::scheduleWindowFullscreen(bool fullscreen) {
@@ -1231,7 +1244,7 @@ void Game::executePendingWindowOperations() {
         return;
     }
 
-    std::vector<std::function<void(Window&)>> pending;
+    std::vector<PendingWindowOperation> pending;
     {
         std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
         if (m_pendingWindowOperations.empty()) {
@@ -1240,9 +1253,21 @@ void Game::executePendingWindowOperations() {
         pending.swap(m_pendingWindowOperations);
     }
 
-    for (auto& operation : pending) {
-        if (operation) {
-            operation(*m_window);
+    size_t lastResizeIndex = pending.size();
+    for (size_t index = 0; index < pending.size(); ++index) {
+        if (pending[index].kind == WindowOperationKind::Resize) {
+            lastResizeIndex = index;
+        }
+    }
+
+    for (size_t index = 0; index < pending.size(); ++index) {
+        auto& pendingOperation = pending[index];
+        if (pendingOperation.kind == WindowOperationKind::Resize && index != lastResizeIndex) {
+            continue;
+        }
+
+        if (pendingOperation.operation) {
+            pendingOperation.operation(*m_window);
         }
     }
 }
