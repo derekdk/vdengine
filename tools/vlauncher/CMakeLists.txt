@@ -12,6 +12,8 @@ add_executable(vde_vlauncher
     GitUtils.h
     ProcessLauncher.cpp
     ProcessLauncher.h
+    RunLogStorage.cpp
+    RunLogStorage.h
 )
 
 target_link_libraries(vde_vlauncher PRIVATE

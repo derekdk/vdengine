@@ -1,13 +1,17 @@
 #pragma once
 
 #include <chrono>
+#include <array>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "../ToolBase.h"
 #include "ExecutableScanner.h"
+#include "ProcessLauncher.h"
+#include "RunLogStorage.h"
 
 namespace vde::tools {
 
@@ -29,15 +33,37 @@ class VLauncherScene : public BaseToolScene {
     }
 
   private:
+    struct ActiveRun {
+        ExecutableEntry entry;
+        std::string targetId;
+        LaunchedProcess process;
+    };
+
     std::unique_ptr<ExecutableScanner> m_scanner;
     ScanSnapshot m_snapshot;
+    std::vector<ActiveRun> m_activeRuns;
+
+    std::string m_selectedTargetId;
+    std::string m_selectedTargetName;
+    std::array<std::optional<StoredRunLog>, 2> m_selectedTargetRuns;
 
     bool m_showUpToDate = true;
     bool m_showMissingSource = true;
 
+    static constexpr size_t kMaxStoredOutputBytes = 256 * 1024;
+
     std::vector<ExecutableEntry> getSortedEntries() const;
+    std::string buildTargetId(const ExecutableEntry& entry) const;
+
+    void selectTargetForLogView(const ExecutableEntry& entry);
+    void refreshSelectedRunLogs();
+    void drawRunLogViewer();
+
+    void updateActiveRuns();
+    void clearActiveRuns();
 
     static std::filesystem::path findMainSourceFile(const std::filesystem::path& sourceDirectory);
+    static std::string truncateOutput(const std::string& output, size_t maxBytes);
 
     static std::string formatAge(std::chrono::system_clock::time_point from,
                                  std::chrono::system_clock::time_point now);

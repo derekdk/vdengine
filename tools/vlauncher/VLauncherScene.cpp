@@ -4,13 +4,15 @@
 #include <iomanip>
 #include <sstream>
 
-#include "ProcessLauncher.h"
+#include <vde/api/StorageManager.h>
 
 namespace vde::tools {
 
 VLauncherScene::VLauncherScene(ToolMode mode) : BaseToolScene(mode) {}
 
 VLauncherScene::~VLauncherScene() {
+    clearActiveRuns();
+
     if (m_scanner) {
         m_scanner->stop();
     }
@@ -25,6 +27,13 @@ void VLauncherScene::onEnter() {
     m_scanner = std::make_unique<ExecutableScanner>(std::filesystem::current_path());
     m_scanner->start();
 
+    bool storageOk = vde::StorageManager::getInstance().init_storage("vde_vlauncher");
+    if (storageOk) {
+        addConsoleMessage("Run-log storage initialized (app='vde_vlauncher').");
+    } else {
+        addConsoleMessage("WARNING: Failed to initialize run-log storage.");
+    }
+
     addConsoleMessage("VLauncher started. Monitoring examples/tools for executable updates.");
 }
 
@@ -32,6 +41,8 @@ void VLauncherScene::onExit() {
     if (m_scanner) {
         m_scanner->stop();
     }
+
+    clearActiveRuns();
 }
 
 void VLauncherScene::update(float deltaTime) {
@@ -40,6 +51,8 @@ void VLauncherScene::update(float deltaTime) {
     if (m_scanner) {
         m_snapshot = m_scanner->getSnapshot();
     }
+
+    updateActiveRuns();
 
     (void)deltaTime;
 }
@@ -76,11 +89,12 @@ void VLauncherScene::drawDebugUI() {
 
     auto entries = getSortedEntries();
     ImGui::Text("Detected launch targets: %d", static_cast<int>(entries.size()));
+    ImGui::Text("Active launches: %d", static_cast<int>(m_activeRuns.size()));
 
     ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
                             ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
 
-    if (ImGui::BeginTable("launch_table", 8, flags, ImVec2(0.0f, 0.0f))) {
+    if (ImGui::BeginTable("launch_table", 9, flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch, 2.3f);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableSetupColumn("Executable Age", ImGuiTableColumnFlags_WidthFixed, 130.0f);
@@ -88,18 +102,25 @@ void VLauncherScene::drawDebugUI() {
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 220.0f);
         ImGui::TableSetupColumn("Git", ImGuiTableColumnFlags_WidthFixed, 180.0f);
         ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch, 3.6f);
-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Run", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Logs", ImGuiTableColumnFlags_WidthFixed, 90.0f);
         ImGui::TableHeadersRow();
 
         auto now = std::chrono::system_clock::now();
 
         for (const auto& entry : entries) {
+            const std::string targetId = buildTargetId(entry);
+
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(0);
-            std::string selId = "##target_" + entry.targetName;
-            ImGui::Selectable(entry.targetName.c_str(), false, ImGuiSelectableFlags_AllowOverlap);
-            if (ImGui::BeginPopupContextItem(selId.c_str())) {
+            const bool selected = (targetId == m_selectedTargetId);
+            std::string targetLabel = entry.targetName + "##target_" + targetId;
+            if (ImGui::Selectable(targetLabel.c_str(), selected, ImGuiSelectableFlags_AllowOverlap)) {
+                selectTargetForLogView(entry);
+            }
+
+            if (ImGui::BeginPopupContextItem(("target_menu_" + targetId).c_str())) {
                 if (entry.sourceFound) {
                     if (ImGui::MenuItem("Open in VS Code")) {
                         auto sourceFile = findMainSourceFile(entry.sourceDirectory);
@@ -164,17 +185,36 @@ void VLauncherScene::drawDebugUI() {
             ImGui::TableSetColumnIndex(7);
             std::string buttonLabel = "Launch##" + entry.executablePath.string();
             if (ImGui::Button(buttonLabel.c_str())) {
-                std::string error;
-                if (ProcessLauncher::launchDetached(entry.executablePath, error)) {
-                    addConsoleMessage("Launched: " + entry.targetName);
+                std::string launchError;
+                LaunchedProcess launchedProcess;
+                if (ProcessLauncher::launchWithOutputCapture(entry.executablePath, launchedProcess,
+                                                             launchError)) {
+                    ActiveRun activeRun;
+                    activeRun.entry = entry;
+                    activeRun.targetId = targetId;
+                    activeRun.process = std::move(launchedProcess);
+                    m_activeRuns.push_back(std::move(activeRun));
+
+                    addConsoleMessage("Launched: " + entry.targetName +
+                                      " (capturing command line output)");
+                    selectTargetForLogView(entry);
                 } else {
-                    addConsoleMessage("Launch failed for " + entry.targetName + ": " + error);
+                    addConsoleMessage("Launch failed for " + entry.targetName + ": " +
+                                      launchError);
                 }
+            }
+
+            ImGui::TableSetColumnIndex(8);
+            std::string logsButton = "View##logs_" + targetId;
+            if (ImGui::Button(logsButton.c_str())) {
+                selectTargetForLogView(entry);
             }
         }
 
         ImGui::EndTable();
     }
+
+    drawRunLogViewer();
 
     ImGui::End();
 }
@@ -215,6 +255,161 @@ void VLauncherScene::executeCommand(const std::string& cmdLine) {
 
     addConsoleMessage("Unknown command: " + cmdLine);
     addConsoleMessage("Available commands: refresh");
+}
+
+std::string VLauncherScene::buildTargetId(const ExecutableEntry& entry) const {
+    std::error_code error;
+    std::filesystem::path root = m_snapshot.repositoryRoot;
+    if (root.empty()) {
+        root = std::filesystem::current_path(error);
+        if (error || root.empty()) {
+            root = std::filesystem::path(".");
+        }
+    }
+
+    return RunLogStorage::buildTargetId(root, entry.executablePath);
+}
+
+void VLauncherScene::selectTargetForLogView(const ExecutableEntry& entry) {
+    m_selectedTargetId = buildTargetId(entry);
+    m_selectedTargetName = entry.targetName;
+    refreshSelectedRunLogs();
+}
+
+void VLauncherScene::refreshSelectedRunLogs() {
+    if (m_selectedTargetId.empty()) {
+        m_selectedTargetRuns = {};
+        return;
+    }
+
+    m_selectedTargetRuns = RunLogStorage::loadRecentRuns(m_selectedTargetId);
+}
+
+void VLauncherScene::drawRunLogViewer() {
+    ImGui::Separator();
+    ImGui::TextUnformatted("Run Logs");
+
+    if (m_selectedTargetId.empty()) {
+        ImGui::TextDisabled("Select a target row or click View to inspect stored run logs.");
+        return;
+    }
+
+    ImGui::Text("Target: %s", m_selectedTargetName.c_str());
+    if (ImGui::Button("Reload logs")) {
+        refreshSelectedRunLogs();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Clear selection")) {
+        m_selectedTargetId.clear();
+        m_selectedTargetName.clear();
+        m_selectedTargetRuns = {};
+        return;
+    }
+
+    if (!m_selectedTargetRuns[0].has_value() && !m_selectedTargetRuns[1].has_value()) {
+        ImGui::TextDisabled("No captured runs saved for this target yet.");
+        return;
+    }
+
+    for (size_t slot = 0; slot < m_selectedTargetRuns.size(); ++slot) {
+        const char* slotName = (slot == 0) ? "Latest run" : "Previous run";
+        if (!m_selectedTargetRuns[slot].has_value()) {
+            ImGui::TextDisabled("%s: (none)", slotName);
+            continue;
+        }
+
+        const auto& run = *m_selectedTargetRuns[slot];
+        std::string headerId = std::string(slotName) + "##slot_" + std::to_string(slot);
+        ImGuiTreeNodeFlags nodeFlags = (slot == 0) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+        if (!ImGui::CollapsingHeader(headerId.c_str(), nodeFlags)) {
+            continue;
+        }
+
+        ImGui::Text("Timestamp: %s", run.timestamp.c_str());
+        ImGui::Text("Exit code: %d", run.exitCode);
+        ImGui::TextWrapped("Command: %s", run.commandLine.c_str());
+
+        std::string childId = "run_output_##" + std::to_string(slot);
+        if (ImGui::BeginChild(childId.c_str(), ImVec2(0.0f, 170.0f), true,
+                              ImGuiWindowFlags_HorizontalScrollbar)) {
+            if (run.output.empty()) {
+                ImGui::TextDisabled("(no command line output)");
+            } else {
+                ImGui::TextUnformatted(run.output.c_str());
+            }
+        }
+        ImGui::EndChild();
+    }
+}
+
+void VLauncherScene::updateActiveRuns() {
+    if (m_activeRuns.empty()) {
+        return;
+    }
+
+    size_t index = 0;
+    while (index < m_activeRuns.size()) {
+        auto& activeRun = m_activeRuns[index];
+
+        bool completed = false;
+        uint32_t exitCode = 0;
+        std::string pollError;
+        if (!ProcessLauncher::pollCompletion(activeRun.process, completed, exitCode, pollError)) {
+            addConsoleMessage("Failed to poll process for " + activeRun.entry.targetName + ": " +
+                              pollError);
+
+            ProcessLauncher::release(activeRun.process);
+            std::error_code removeError;
+            std::filesystem::remove(activeRun.process.outputPath, removeError);
+            m_activeRuns.erase(m_activeRuns.begin() + static_cast<std::ptrdiff_t>(index));
+            continue;
+        }
+
+        if (!completed) {
+            ++index;
+            continue;
+        }
+
+        std::string output;
+        std::string outputError;
+        if (!ProcessLauncher::readOutputFile(activeRun.process.outputPath, output, outputError)) {
+            output = "[vlauncher] Failed to read command line output: " + outputError;
+        }
+
+        std::error_code removeError;
+        std::filesystem::remove(activeRun.process.outputPath, removeError);
+
+        StoredRunLog runLog;
+        runLog.timestamp = formatTimestamp(std::chrono::system_clock::now());
+        runLog.exitCode = static_cast<int>(exitCode);
+        runLog.commandLine = activeRun.process.commandLine;
+        runLog.output = truncateOutput(output, kMaxStoredOutputBytes);
+
+        std::string saveError;
+        if (RunLogStorage::saveLatestRun(activeRun.targetId, runLog, saveError)) {
+            addConsoleMessage("Run finished: " + activeRun.entry.targetName +
+                              " (exit code " + std::to_string(runLog.exitCode) + ")");
+        } else {
+            addConsoleMessage("Run finished for " + activeRun.entry.targetName +
+                              " but saving logs failed: " + saveError);
+        }
+
+        if (activeRun.targetId == m_selectedTargetId) {
+            refreshSelectedRunLogs();
+        }
+
+        ProcessLauncher::release(activeRun.process);
+        m_activeRuns.erase(m_activeRuns.begin() + static_cast<std::ptrdiff_t>(index));
+    }
+}
+
+void VLauncherScene::clearActiveRuns() {
+    for (auto& activeRun : m_activeRuns) {
+        ProcessLauncher::release(activeRun.process);
+        std::error_code removeError;
+        std::filesystem::remove(activeRun.process.outputPath, removeError);
+    }
+    m_activeRuns.clear();
 }
 
 std::vector<ExecutableEntry> VLauncherScene::getSortedEntries() const {
@@ -261,6 +456,19 @@ std::vector<ExecutableEntry> VLauncherScene::getSortedEntries() const {
               });
 
     return filtered;
+}
+
+std::string VLauncherScene::truncateOutput(const std::string& output, size_t maxBytes) {
+    if (output.size() <= maxBytes) {
+        return output;
+    }
+
+    const std::string suffix = "\n\n[output truncated by VLauncher]\n";
+    if (maxBytes <= suffix.size()) {
+        return suffix.substr(0, maxBytes);
+    }
+
+    return output.substr(0, maxBytes - suffix.size()) + suffix;
 }
 
 std::string VLauncherScene::formatAge(std::chrono::system_clock::time_point from,
