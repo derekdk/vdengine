@@ -16,6 +16,15 @@ This skill covers all aspects of writing code for the Vulkan Display Engine, fro
 - Writing API documentation
 - Following include patterns
 
+## Completion Handoff
+
+After implementing code changes with this skill, invoke the `completing-work` skill before
+declaring the task complete.
+
+- Treat `writing-code` as implementation guidance only
+- Treat `completing-work` as the required final verification gate
+- Follow the full `completing-work` checklist, including the subagent review loop, until the review is clean
+
 ## Coding Conventions
 
 ### Naming Conventions
@@ -398,6 +407,7 @@ When adding a new class to VDE:
 - [ ] Follow include order in implementation
 - [ ] Document public methods with @brief, @param, @return, @throws
 - [ ] Rebuild project with `cmake --build build --config Debug`
+- [ ] Invoke `completing-work` and finish its verification/review loop before declaring done
 - [ ] Run tests to verify: `./scripts/build-and-test.ps1`
 
 ## Common Patterns

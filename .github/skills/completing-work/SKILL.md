@@ -62,9 +62,28 @@ If the script is supposed to produce a file, list the directory and confirm the 
 Get-ChildItem benchmarks\*.json | Select-Object Name
 ```
 
-### Step 5 — Only then announce completion
+### Step 5 — Run a subagent review (mandatory)
 
-Once you have: run the command, seen a zero exit code, read the output, and confirmed the expected artifact, you may tell the user the task is complete.
+Before declaring completion, launch a subagent to review the full set of changes.
+
+Required behavior:
+- Run a review-focused subagent (for this repo, use `Explore`) against the current diff.
+- Ask it to prioritize bugs, regressions, risky behavior changes, and missing tests.
+- Treat this as a required gate, not an optional best practice.
+
+### Step 6 — Fix findings and re-review until clean
+
+If the subagent reports issues:
+
+1. Fix the issues.
+2. Re-run the relevant verification commands (build/tests/scripts) and read outputs.
+3. Launch the subagent review again on the updated diff.
+
+Repeat until the subagent reports no material issues.
+
+### Step 7 — Only then announce completion
+
+Once you have: run the command, seen a zero exit code, read the output, confirmed the expected artifact, and completed a clean subagent review loop, you may tell the user the task is complete.
 
 Acceptable:
 > "Both benchmark runs completed. The JSON files are in `benchmarks/`. The comparison shows a 3.2% variance between runs, which is expected noise."
@@ -72,6 +91,9 @@ Acceptable:
 Not acceptable:
 > "I've fixed the iterator bug. The script should work now."  
 > "The script looks correct. It's ready to use."
+
+Also not acceptable:
+> "Build and tests passed, so I'm done." (without subagent review)
 
 ---
 
@@ -87,6 +109,19 @@ When fixing a bug in a script:
 4. Only after a clean run may you say the bug is fixed.
 
 The failure mode to avoid: applying several fixes across multiple iterations, then announcing "fixed" after the last edit without running the script one final time.
+
+### Subagent review loop
+
+Subagent review is mandatory before completion and may require multiple passes.
+
+Minimum loop:
+1. Run subagent review on the current changes.
+2. Fix reported issues.
+3. Re-run verification commands.
+4. Run subagent review again.
+5. Stop only when review is clean.
+
+Do not skip this loop just because manual inspection looks correct.
 
 ### Scripts that take a long time
 
