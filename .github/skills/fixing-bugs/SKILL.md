@@ -18,6 +18,8 @@ This skill defines the required process for resolving bugs in the VDE codebase. 
 
 ## Required Workflow
 
+Always perform every step in this list.
+
 ### Step 1 — Understand the bug before touching code
 
 Before making any edits, gather enough context to understand:
@@ -27,7 +29,6 @@ Before making any edits, gather enough context to understand:
 - **Where is the defect?** Use `grep_search`, `semantic_search`, or `read_file` to locate the relevant code. Do not guess at file locations.
 - **Are there related tests?** Search for existing tests that cover the affected code. A failing or missing test is a signal to also fix or add test coverage.
 
-Do not skip this step. Applying a fix without understanding the root cause often produces a patch that masks the symptom without resolving the defect, or introduces a new bug nearby.
 
 ### Step 2 — Apply the fix
 
