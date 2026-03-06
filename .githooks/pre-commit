@@ -1,0 +1,10 @@
+#!/bin/sh
+# Prevent direct commits to the main branch.
+# Main should be updated through GitHub pull requests.
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+if [ "$branch" = "main" ]; then
+    printf >&2 "\n%s\n\n" "Error: Direct commits to 'main' are not allowed. Create a feature branch and open a pull request."
+    exit 1
+fi

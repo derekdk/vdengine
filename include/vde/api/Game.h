@@ -14,6 +14,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -370,6 +371,42 @@ class Game {
     const Window* getWindow() const { return m_window.get(); }
 
     /**
+     * @brief Queue a window/OS operation to run at a scheduler-safe point.
+     *
+     * Operations run on the main thread during the scheduler's Input phase,
+     * before scene updates and rendering begin for the frame.
+     *
+     * If the game is not currently running, the operation is executed
+     * immediately.
+     *
+     * @param operation Operation that receives the window reference.
+     */
+    void scheduleWindowOperation(std::function<void(Window&)> operation);
+
+    /**
+     * @brief Queue a window resize operation to run at a scheduler-safe point.
+     *
+     * If multiple resize requests are queued before the next scheduler tick,
+     * only the latest requested size is applied.
+     *
+     * @param width Target window width in pixels
+     * @param height Target window height in pixels
+     */
+    void scheduleWindowResize(uint32_t width, uint32_t height);
+
+    /**
+     * @brief Queue a fullscreen toggle to run at a scheduler-safe point.
+     * @param fullscreen True to enter fullscreen, false for windowed mode
+     */
+    void scheduleWindowFullscreen(bool fullscreen);
+
+    /**
+     * @brief Queue a resizable-window attribute change to run at a scheduler-safe point.
+     * @param resizable True to allow user resize, false to lock window size
+     */
+    void scheduleWindowResizable(bool resizable);
+
+    /**
      * @brief Get DPI scale factor for the window.
      * @return DPI scale (1.0 = 100%, 1.5 = 150%, 2.0 = 200%)
      *
@@ -630,6 +667,21 @@ class Game {
     // Scheduler
     Scheduler m_scheduler;
 
+    enum class WindowOperationKind {
+        Generic,
+        Resize,
+    };
+
+    struct PendingWindowOperation {
+        WindowOperationKind kind = WindowOperationKind::Generic;
+        std::function<void(Window&)> operation;
+    };
+
+    // Queued window operations (executed in scheduler Input phase on main thread).
+    // Resize requests are de-duplicated so only the latest queued size is applied.
+    std::vector<PendingWindowOperation> m_pendingWindowOperations;
+    std::mutex m_pendingWindowOperationsMutex;
+
     // Input
     InputHandler* m_inputHandler = nullptr;
 
@@ -660,6 +712,7 @@ class Game {
     void pollGamepads();
     void updateTiming();
     void processPendingSceneChange();
+    void executePendingWindowOperations();
     void setupInputCallbacks();
     void createMeshRenderingPipeline();
     void destroyMeshRenderingPipeline();

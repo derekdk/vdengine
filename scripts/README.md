@@ -12,6 +12,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 | **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `\.\scripts\run-vlauncher.ps1` |
+| **install-hooks.ps1** | Configure repo-managed Git hooks | `\.\scripts\install-hooks.ps1` |
 
 ## Quick Start
 
@@ -45,6 +46,11 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 ### Clean Rebuild
 ```powershell
 .\scripts\rebuild.ps1
+```
+
+### Enable Local Main-Branch Protection
+```powershell
+.\scripts\install-hooks.ps1
 ```
 
 ## Detailed Usage
@@ -225,6 +231,29 @@ Format C++ source files using clang-format according to the project's style guid
 - clang-format must be installed and in PATH
 - Install via Visual Studio (C++ clang tools) or LLVM distribution
 
+### install-hooks.ps1
+
+Configure this clone to use tracked hooks from `.githooks/`.
+
+**Syntax:**
+```powershell
+.\scripts\install-hooks.ps1
+```
+
+**What it does:**
+- Sets `core.hooksPath` to `.githooks` (local repository config)
+- Enables the shared `pre-commit` hook that blocks commits on `main`
+- Keeps Git LFS pre-push checks via `.githooks/pre-push`
+
+**Examples:**
+```powershell
+# Run once after cloning
+.\scripts\install-hooks.ps1
+
+# Verify configured hook path
+git config --local --get core.hooksPath
+```
+
 ## Common Workflows
 
 ### Daily Development
@@ -253,6 +282,9 @@ Format C++ source files using clang-format according to the project's style guid
 
 ### Pre-commit Checks
 ```powershell
+# Ensure local hooks are enabled first
+.\scripts\install-hooks.ps1
+
 # Full clean, build, and test
 .\scripts\clean.ps1 -Full
 .\scripts\build.ps1

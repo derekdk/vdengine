@@ -21,6 +21,7 @@ Write-Cmd '.\scripts\rebuild.ps1' 'Clean and rebuild'
 Write-Cmd '.\scripts\clean.ps1' 'Clean build artifacts'
 Write-Cmd '.\scripts\test.ps1' 'Run unit tests'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Run VLauncher (builds target if missing)'
+Write-Cmd '.\scripts\install-hooks.ps1' 'Configure repo-managed Git hooks (blocks commits to main)'
 
 Write-Title "BENCHMARK SCRIPTS"
 Write-Cmd '.\scripts\benchmark-compile.ps1 -Label "baseline"' 'Capture per-TU compile timing (clean build)'
@@ -34,6 +35,7 @@ Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
 Write-Cmd '.\scripts\test.ps1' 'Run all tests'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Launch VLauncher from root'
+Write-Cmd '.\scripts\install-hooks.ps1' 'Enable local main-branch commit protection'
 
 Write-Title "COMMON TASKS"
 Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
@@ -60,6 +62,7 @@ Write-Cmd '.\run-vlauncher.ps1' 'Root shortcut to launch VLauncher'
 Write-Title "HELP & DOCS"
 Write-Cmd '.\scripts\help.ps1' 'Show this help'
 Write-Cmd 'Get-Help .\scripts\build.ps1 -Detailed' 'Detailed help for build.ps1'
+Write-Cmd 'Get-Help .\scripts\install-hooks.ps1 -Detailed' 'Detailed help for install-hooks.ps1'
 Write-Cmd 'cat .\scripts\README.md' 'Read full scripts documentation'
 Write-Cmd 'cat .\.github\skills\build-tool-workflows\SKILL.md' 'Complete build guide'
 

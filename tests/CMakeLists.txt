@@ -60,6 +60,10 @@ set(VDE_TEST_SOURCES
     # Transition tests
     Transition_test.cpp
     TransitionManager_test.cpp
+    VLauncherRunLogStorage_test.cpp
+
+    # VLauncher storage utilities
+    ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
 )
 
 # Create test executable

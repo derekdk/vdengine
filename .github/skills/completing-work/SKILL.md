@@ -22,6 +22,19 @@ Reasoning about whether code is correct is not the same as running it. Scripts c
 
 ## Required Verification Workflow
 
+### Required order for code and executable changes
+
+If you changed code that affects a buildable or runnable artifact (engine code, tests, examples, tools, launch flows, or build/test workflows), the verification order is:
+
+1. Build the project or affected target and read the output.
+2. Run unit tests and confirm they pass.
+3. Run smoke tests when the change affects examples, tools, rendering, input, windowing, launch flows, or other runtime behavior.
+4. Confirm the expected artifact or runtime outcome exists.
+5. Only then run a subagent code review.
+6. If the review causes more edits, repeat the same verification sequence before re-review.
+
+Do not reverse this order. A subagent review is not a substitute for build/test/smoke verification, and build/test/smoke verification is not a substitute for code review.
+
 ### Step 1 — Run the script or command
 
 Execute the script using the terminal. Do not skip this step even if you are confident the code is correct.
@@ -62,9 +75,30 @@ If the script is supposed to produce a file, list the directory and confirm the 
 Get-ChildItem benchmarks\*.json | Select-Object Name
 ```
 
-### Step 5 — Only then announce completion
+### Step 5 — Run a subagent review (mandatory)
 
-Once you have: run the command, seen a zero exit code, read the output, and confirmed the expected artifact, you may tell the user the task is complete.
+Before declaring completion, launch a subagent to review the full set of changes.
+
+Required behavior:
+- Run a review-focused subagent (for this repo, use `Explore`) against the current diff.
+- Ask it to prioritize bugs, regressions, risky behavior changes, and missing tests.
+- Treat this as a required gate, not an optional best practice.
+
+### Step 6 — Fix findings and re-review until clean
+
+If the subagent reports issues:
+
+1. Fix the issues.
+2. Re-run the relevant verification commands in the same order: build, unit tests, smoke tests when applicable, then read the outputs.
+3. Launch the subagent review again on the updated diff.
+
+Repeat until the subagent reports no material issues.
+
+### Step 7 — Only then announce completion
+
+Once you have: run the command, seen a zero exit code, read the output, confirmed the expected artifact, and completed a clean subagent review loop, you may tell the user the task is complete.
+
+For executable/code changes in VDE, interpret this as: build passed, unit tests passed, smoke tests passed when applicable, artifacts were confirmed, and only then was a clean subagent review completed on the verified diff.
 
 Acceptable:
 > "Both benchmark runs completed. The JSON files are in `benchmarks/`. The comparison shows a 3.2% variance between runs, which is expected noise."
@@ -72,6 +106,9 @@ Acceptable:
 Not acceptable:
 > "I've fixed the iterator bug. The script should work now."  
 > "The script looks correct. It's ready to use."
+
+Also not acceptable:
+> "Build and tests passed, so I'm done." (without subagent review)
 
 ---
 
@@ -88,6 +125,19 @@ When fixing a bug in a script:
 
 The failure mode to avoid: applying several fixes across multiple iterations, then announcing "fixed" after the last edit without running the script one final time.
 
+### Subagent review loop
+
+Subagent review is mandatory before completion and may require multiple passes.
+
+Minimum loop:
+1. Run subagent review on the current changes.
+2. Fix reported issues.
+3. Re-run verification commands.
+4. Run subagent review again.
+5. Stop only when review is clean.
+
+Do not skip this loop just because manual inspection looks correct.
+
 ### Scripts that take a long time
 
 For scripts with long runtimes (e.g., full rebuild benchmarks that take 20-30 seconds):
@@ -103,6 +153,18 @@ If a task involves creating multiple scripts (e.g., a benchmark script and a com
 Do not:
 - Run script A, confirm it works, then write script B and announce both are done without running B.
 - Run a simplified version of a script to verify part of it while skipping the full end-to-end path.
+
+### Examples, tools, and other runnable artifacts
+
+When you add or modify an example, tool, launcher flow, or any other runnable executable behavior:
+
+1. Build the project and confirm the target was produced.
+2. Run the unit test suite unless the task is explicitly docs-only.
+3. Run smoke tests. At minimum, run the smoke test that covers the changed executable. If the change touches shared engine/runtime behavior, prefer the broader smoke suite.
+4. After those checks are green, run the subagent review.
+5. If the review causes more edits, repeat build, unit tests, smoke tests, and then review again.
+
+This ordering is mandatory. Do not declare completion after a successful smoke test, and do not run the review before runtime verification is complete.
 
 ### New PowerShell scripts
 

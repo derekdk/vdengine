@@ -200,17 +200,12 @@ void TransitionManager::recreateRenderTargets(uint32_t width, uint32_t height) {
         vkDeviceWaitIdle(m_context->getDevice());
     }
 
-    if (m_source.isValid()) {
-        m_source.recreate(width, height);
-    } else {
-        m_source.create(m_context, offscreenRP, width, height);
-    }
-
-    if (m_dest.isValid()) {
-        m_dest.recreate(width, height);
-    } else {
-        m_dest.create(m_context, offscreenRP, width, height);
-    }
+    // Always pass the freshly-obtained offscreen render pass so that after a
+    // swapchain recreation (which destroys and re-creates the render pass with a
+    // new handle), the framebuffers are built against the current valid handle.
+    // OffscreenRenderTarget::create() calls destroy() internally when already valid.
+    m_source.create(m_context, offscreenRP, width, height);
+    m_dest.create(m_context, offscreenRP, width, height);
 
     // Recreate descriptor set to point to new image views + samplers
     if (m_descriptorSet != VK_NULL_HANDLE) {

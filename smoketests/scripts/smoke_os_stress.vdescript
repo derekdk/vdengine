@@ -1,0 +1,7 @@
+# smoke_os_stress.vdescript
+# Smoke test for the OS stress test demo.
+# Lets the automated window/file operations run for several seconds
+# then exits. The demo's own auto-terminate handles pass/fail.
+wait startup
+wait 8s
+exit

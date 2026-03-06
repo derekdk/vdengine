@@ -74,6 +74,9 @@ VDE provides convenient PowerShell scripts for all build operations:
 
 # Format C++ code
 .\scripts\format.ps1
+
+# Enable local protection: block direct commits to main
+.\scripts\install-hooks.ps1
 ```
 
 For complete documentation, see:

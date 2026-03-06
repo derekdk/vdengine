@@ -174,3 +174,6 @@ add_vde_example(vde_storage_demo "storage_demo/main.cpp")
 # Transition demo - demonstrates screen transition effects (fade, wipe, circle reveal)
 add_vde_example(vde_transition_demo "transition_demo/main.cpp")
 
+# OS Stress Test - validates window/OS operations don't interfere with Vulkan rendering
+add_vde_example(vde_os_stress_demo "os_stress_demo/main.cpp")
+
