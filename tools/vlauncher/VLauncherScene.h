@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -50,15 +51,26 @@ class VLauncherScene : public BaseToolScene {
 
     bool m_showUpToDate = true;
     bool m_showMissingSource = true;
+    bool m_compactView = false;
+    bool m_compactResizePending = false;
+    bool m_forceLauncherWindowSize = false;
+    ImVec2 m_forcedLauncherWindowSize = ImVec2(0.0f, 0.0f);
 
     static constexpr size_t kMaxStoredOutputBytes = 256 * 1024;
+    static constexpr const char* kCompactViewStorageKey = "vlauncher.ui.compactView";
+    static constexpr float kCompactAppWidth = 560.0f;
+    static constexpr float kCompactAppHeight = 440.0f;
 
     std::vector<ExecutableEntry> getSortedEntries() const;
     std::string buildTargetId(const ExecutableEntry& entry) const;
+    void launchEntry(const ExecutableEntry& entry, const std::string& targetId);
 
     void selectTargetForLogView(const ExecutableEntry& entry);
     void refreshSelectedRunLogs();
     void drawRunLogViewer();
+    void loadViewPreferences();
+    void saveCompactViewPreference() const;
+    void applyCompactWindowPresetIfRequested();
 
     void updateActiveRuns();
     void clearActiveRuns();

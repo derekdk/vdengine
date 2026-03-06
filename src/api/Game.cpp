@@ -65,8 +65,10 @@ bool Game::initialize(const GameSettings& settings) {
 
     try {
         // Create window
-        m_window = std::make_unique<Window>(
-            settings.display.windowWidth, settings.display.windowHeight, settings.gameName.c_str());
+        m_window = std::make_unique<Window>(settings.display.windowWidth,
+                                            settings.display.windowHeight,
+                                            settings.gameName.c_str(),
+                                            settings.display.resizable);
 
         if (settings.display.fullscreen) {
             m_window->setFullscreen(true);
@@ -1031,13 +1033,44 @@ float Game::getTransitionSpeed() const {
 }
 
 void Game::applyDisplaySettings(const DisplaySettings& settings) {
-    if (!m_window)
+    if (!m_window) {
         return;
+    }
 
     m_settings.display = settings;
 
-    m_window->setResolution(settings.windowWidth, settings.windowHeight);
-    m_window->setFullscreen(settings.fullscreen);
+    scheduleWindowResize(settings.windowWidth, settings.windowHeight);
+    scheduleWindowFullscreen(settings.fullscreen);
+}
+
+void Game::scheduleWindowOperation(std::function<void(Window&)> operation) {
+    if (!operation || !m_window) {
+        return;
+    }
+
+    if (!m_running) {
+        operation(*m_window);
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
+    m_pendingWindowOperations.push_back(std::move(operation));
+}
+
+void Game::scheduleWindowResize(uint32_t width, uint32_t height) {
+    scheduleWindowOperation([width, height](Window& window) { window.setResolution(width, height); });
+}
+
+void Game::scheduleWindowFullscreen(bool fullscreen) {
+    scheduleWindowOperation([fullscreen](Window& window) { window.setFullscreen(fullscreen); });
+}
+
+void Game::scheduleWindowResizable(bool resizable) {
+    scheduleWindowOperation([resizable](Window& window) {
+        if (auto* handle = window.getHandle()) {
+            glfwSetWindowAttrib(handle, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
+        }
+    });
 }
 
 void Game::applyGraphicsSettings(const GraphicsSettings& settings) {
@@ -1193,6 +1226,27 @@ void Game::processPendingSceneChange() {
     rebuildSchedulerGraph();
 }
 
+void Game::executePendingWindowOperations() {
+    if (!m_window) {
+        return;
+    }
+
+    std::vector<std::function<void(Window&)>> pending;
+    {
+        std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
+        if (m_pendingWindowOperations.empty()) {
+            return;
+        }
+        pending.swap(m_pendingWindowOperations);
+    }
+
+    for (auto& operation : pending) {
+        if (operation) {
+            operation(*m_window);
+        }
+    }
+}
+
 void Game::setupInputCallbacks() {
     if (!m_window)
         return;
@@ -1299,6 +1353,21 @@ void Game::setupInputCallbacks() {
         if (game && game->m_focusCallback) {
             game->m_focusCallback(focused != 0);
         }
+    });
+
+    // Window resize callback (for user-driven OS resize)
+    glfwSetWindowSizeCallback(handle, [](GLFWwindow* window, int width, int height) {
+        Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
+        if (!game || !game->m_window) {
+            return;
+        }
+
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        game->m_window->handleExternalResize(static_cast<uint32_t>(width),
+                             static_cast<uint32_t>(height));
     });
 
     // Joystick/gamepad connection callback
@@ -2656,13 +2725,22 @@ void Game::rebuildSchedulerGraph() {
         m_scheduler.addTask({"input.script", TaskPhase::Input, [this]() { processInputScript(); }});
 
     // ---------------------------------------------------------------
+    // Task 0b: Window/OS operations — execute queued window changes.
+    //          This provides a scheduler-safe point for OS/window API
+    //          calls so swapchain-affecting work never runs mid-render.
+    // ---------------------------------------------------------------
+    TaskId windowOpsTask = m_scheduler.addTask({
+        "window.ops", TaskPhase::Input, [this]() { executePendingWindowOperations(); },
+        {inputScriptTask}});
+
+    // ---------------------------------------------------------------
     // Task 1: GameLogic — onUpdate hook + all scene updates
     // ---------------------------------------------------------------
     // Chain: inputScript -> onUpdate -> update(scene1) | gameLogic(scene1) -> ...
     TaskId prevTask = m_scheduler.addTask({"game.update",
                                            TaskPhase::GameLogic,
                                            [this]() { onUpdate(m_deltaTime); },
-                                           {inputScriptTask}});
+                                           {windowOpsTask}});
 
     // Track per-scene audio tasks so audio.global can depend on all of them
     std::vector<TaskId> audioTasks;

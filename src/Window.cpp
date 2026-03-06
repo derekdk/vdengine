@@ -11,14 +11,13 @@ const Resolution Window::s_resolutions[] = {
     {1920, 1080, "1920x1080 (Full HD)"}, {2560, 1440, "2560x1440 (QHD)"},
     {3840, 2160, "3840x2160 (4K)"}};
 
-Window::Window(uint32_t width, uint32_t height, const char* title)
+Window::Window(uint32_t width, uint32_t height, const char* title, bool resizable)
     : m_width(width), m_height(height), m_windowedWidth(width), m_windowedHeight(height) {
     glfwInit();
 
     // Don't create OpenGL context (we're using Vulkan)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    // Don't allow resizing for now
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 
     m_window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     if (!m_window) {
@@ -68,6 +67,22 @@ void Window::setResolution(uint32_t newWidth, uint32_t newHeight) {
         glfwSetWindowSize(m_window, static_cast<int>(newWidth), static_cast<int>(newHeight));
     } else {
         // In fullscreen, just update stored windowed size for when we exit fullscreen
+        m_windowedWidth = newWidth;
+        m_windowedHeight = newHeight;
+    }
+
+    notifyResize();
+}
+
+void Window::handleExternalResize(uint32_t newWidth, uint32_t newHeight) {
+    if (m_width == newWidth && m_height == newHeight) {
+        return;
+    }
+
+    m_width = newWidth;
+    m_height = newHeight;
+
+    if (!m_isFullscreen) {
         m_windowedWidth = newWidth;
         m_windowedHeight = newHeight;
     }

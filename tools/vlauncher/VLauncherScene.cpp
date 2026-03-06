@@ -30,6 +30,10 @@ void VLauncherScene::onEnter() {
     bool storageOk = vde::StorageManager::getInstance().init_storage("vde_vlauncher");
     if (storageOk) {
         addConsoleMessage("Run-log storage initialized (app='vde_vlauncher').");
+        loadViewPreferences();
+        if (m_compactView) {
+            m_compactResizePending = true;
+        }
     } else {
         addConsoleMessage("WARNING: Failed to initialize run-log storage.");
     }
@@ -45,8 +49,70 @@ void VLauncherScene::onExit() {
     clearActiveRuns();
 }
 
+void VLauncherScene::loadViewPreferences() {
+    auto& storage = vde::StorageManager::getInstance();
+    if (!storage.isInitialized()) {
+        return;
+    }
+
+    const auto compactValue = storage.getBinData<uint8_t>(kCompactViewStorageKey);
+    if (compactValue.has_value()) {
+        m_compactView = (*compactValue != 0);
+    }
+}
+
+void VLauncherScene::saveCompactViewPreference() const {
+    auto& storage = vde::StorageManager::getInstance();
+    if (!storage.isInitialized()) {
+        return;
+    }
+
+    const uint8_t compactValue = m_compactView ? 1u : 0u;
+    storage.setBinData(kCompactViewStorageKey, compactValue);
+}
+
+void VLauncherScene::applyCompactWindowPresetIfRequested() {
+    if (!m_compactResizePending) {
+        return;
+    }
+
+    m_compactResizePending = false;
+
+    auto* game = getGame();
+    if (!game || !game->getWindow()) {
+        return;
+    }
+
+    auto* window = game->getWindow();
+    float dpiScale = window->getDPIScale();
+    if (dpiScale <= 0.0f) {
+        dpiScale = 1.0f;
+    }
+
+    uint32_t targetWidth = window->getWidth();
+    uint32_t targetHeight = window->getHeight();
+
+    if (!window->isFullscreen()) {
+        targetWidth = static_cast<uint32_t>(kCompactAppWidth * dpiScale);
+        targetHeight = static_cast<uint32_t>(kCompactAppHeight * dpiScale);
+        game->scheduleWindowResize(targetWidth, targetHeight);
+    }
+
+    const float contentMargin = 32.0f * dpiScale;
+    const float minPanelWidth = 320.0f * dpiScale;
+    const float minPanelHeight = 280.0f * dpiScale;
+
+    m_forcedLauncherWindowSize =
+        ImVec2(std::max(minPanelWidth, static_cast<float>(targetWidth) - contentMargin),
+               std::max(minPanelHeight, static_cast<float>(targetHeight) - contentMargin));
+    m_forceLauncherWindowSize = true;
+}
+
 void VLauncherScene::update(float deltaTime) {
     BaseToolScene::update(deltaTime);
+
+    // Apply pending window-size changes before ImGui/vulkan draw commands begin.
+    applyCompactWindowPresetIfRequested();
 
     if (m_scanner) {
         m_snapshot = m_scanner->getSnapshot();
@@ -59,7 +125,12 @@ void VLauncherScene::update(float deltaTime) {
 
 void VLauncherScene::drawDebugUI() {
     ImGui::SetNextWindowPos(ImVec2(16, 16), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(1220, 680), ImGuiCond_FirstUseEver);
+    if (m_forceLauncherWindowSize) {
+        ImGui::SetNextWindowSize(m_forcedLauncherWindowSize, ImGuiCond_Always);
+        m_forceLauncherWindowSize = false;
+    } else {
+        ImGui::SetNextWindowSize(ImVec2(1220, 680), ImGuiCond_FirstUseEver);
+    }
 
     if (!ImGui::Begin("VLauncher")) {
         ImGui::End();
@@ -83,6 +154,13 @@ void VLauncherScene::drawDebugUI() {
         m_scanner->requestRefresh();
     }
     ImGui::SameLine();
+    if (ImGui::Checkbox("Compact view", &m_compactView)) {
+        saveCompactViewPreference();
+        if (m_compactView) {
+            m_compactResizePending = true;
+        }
+    }
+    ImGui::SameLine();
     ImGui::Checkbox("Show up-to-date", &m_showUpToDate);
     ImGui::SameLine();
     ImGui::Checkbox("Show missing source", &m_showMissingSource);
@@ -93,128 +171,157 @@ void VLauncherScene::drawDebugUI() {
     ImGui::Text("Detected launch targets: %d", static_cast<int>(entries.size()));
     ImGui::Text("Active launches: %d", static_cast<int>(m_activeRuns.size()));
 
-    ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
-                            ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
+    if (m_compactView) {
+        ImGui::TextDisabled("Compact mode: double-click an executable to launch.");
 
-    if (ImGui::BeginTable("launch_table", 9, flags, ImVec2(0.0f, 0.0f))) {
-        ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch, 2.3f);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-        ImGui::TableSetupColumn("Executable Age", ImGuiTableColumnFlags_WidthFixed, 130.0f);
-        ImGui::TableSetupColumn("Source Age", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 220.0f);
-        ImGui::TableSetupColumn("Git", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-        ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch, 3.6f);
-        ImGui::TableSetupColumn("Run", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-        ImGui::TableSetupColumn("Logs", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-        ImGui::TableHeadersRow();
+        ImGuiTableFlags compactFlags =
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY;
 
-        auto now = std::chrono::system_clock::now();
+        if (ImGui::BeginTable("launch_table_compact", 1, compactFlags, ImVec2(0.0f, 0.0f))) {
+            ImGui::TableSetupColumn("Executable", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+            ImGui::TableHeadersRow();
 
-        for (const auto& entry : entries) {
-            const std::string targetId = buildTargetId(entry);
+            for (const auto& entry : entries) {
+                const std::string targetId = buildTargetId(entry);
 
-            ImGui::TableNextRow();
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
 
-            ImGui::TableSetColumnIndex(0);
-            const bool selected = (targetId == m_selectedTargetId);
-            std::string targetLabel = entry.targetName + "##target_" + targetId;
-            if (ImGui::Selectable(targetLabel.c_str(), selected,
-                                  ImGuiSelectableFlags_AllowOverlap)) {
-                selectTargetForLogView(entry);
-            }
-
-            if (ImGui::BeginPopupContextItem(("target_menu_" + targetId).c_str())) {
-                if (entry.sourceFound) {
-                    if (ImGui::MenuItem("Open in VS Code")) {
-                        auto sourceFile = findMainSourceFile(entry.sourceDirectory);
-                        std::string err;
-                        if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
-                            addConsoleMessage("Opening in VS Code: " + sourceFile.string());
-                        } else {
-                            addConsoleMessage("Failed to open VS Code: " + err);
-                        }
-                    }
-                } else {
-                    ImGui::BeginDisabled();
-                    ImGui::MenuItem("Open in VS Code");
-                    ImGui::EndDisabled();
-                    ImGui::TextDisabled("(source directory not found)");
-                }
-                ImGui::EndPopup();
-            }
-
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextUnformatted(entry.kind.c_str());
-
-            ImGui::TableSetColumnIndex(2);
-            ImGui::TextUnformatted(formatAge(entry.executableWriteTime, now).c_str());
-
-            ImGui::TableSetColumnIndex(3);
-            if (entry.hasNewestSourceWriteTime) {
-                ImGui::TextUnformatted(formatAge(entry.newestSourceWriteTime, now).c_str());
-            } else {
-                ImGui::TextUnformatted("-");
-            }
-
-            ImGui::TableSetColumnIndex(4);
-            if (entry.outOfDate) {
-                ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s",
-                                   entry.outOfDateReason.c_str());
-            } else {
-                ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.45f, 1.0f), "Up to date");
-            }
-
-            ImGui::TableSetColumnIndex(5);
-            if (!entry.gitAvailable) {
-                ImGui::TextUnformatted("Git unavailable");
-            } else if (entry.sourceDirty) {
-                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "Uncommitted changes");
-            } else if (entry.hasLastSourceCommitTime) {
-                std::string age = formatAge(entry.lastSourceCommitTime, now);
-                ImGui::Text("Last commit: %s", age.c_str());
-            } else {
-                ImGui::TextUnformatted("No history");
-            }
-
-            ImGui::TableSetColumnIndex(6);
-            std::error_code relError;
-            std::filesystem::path displayPath = std::filesystem::relative(
-                entry.executablePath, m_snapshot.repositoryRoot, relError);
-            if (relError || displayPath.empty()) {
-                displayPath = entry.executablePath;
-            }
-            ImGui::TextUnformatted(displayPath.generic_string().c_str());
-
-            ImGui::TableSetColumnIndex(7);
-            std::string buttonLabel = "Launch##" + entry.executablePath.string();
-            if (ImGui::Button(buttonLabel.c_str())) {
-                std::string launchError;
-                LaunchedProcess launchedProcess;
-                if (ProcessLauncher::launchWithOutputCapture(entry.executablePath, launchedProcess,
-                                                             launchError)) {
-                    ActiveRun activeRun;
-                    activeRun.entry = entry;
-                    activeRun.targetId = targetId;
-                    activeRun.process = std::move(launchedProcess);
-                    m_activeRuns.push_back(std::move(activeRun));
-
-                    addConsoleMessage("Launched: " + entry.targetName +
-                                      " (capturing command line output)");
+                const bool selected = (targetId == m_selectedTargetId);
+                std::string targetLabel = entry.targetName + "##compact_target_" + targetId;
+                ImGuiSelectableFlags selectFlags =
+                    ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick;
+                if (ImGui::Selectable(targetLabel.c_str(), selected, selectFlags)) {
                     selectTargetForLogView(entry);
-                } else {
-                    addConsoleMessage("Launch failed for " + entry.targetName + ": " + launchError);
+                }
+
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    launchEntry(entry, targetId);
+                }
+
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                    std::error_code relError;
+                    std::filesystem::path displayPath = std::filesystem::relative(
+                        entry.executablePath, m_snapshot.repositoryRoot, relError);
+                    if (relError || displayPath.empty()) {
+                        displayPath = entry.executablePath;
+                    }
+
+                    ImGui::SetTooltip("%s", displayPath.generic_string().c_str());
                 }
             }
 
-            ImGui::TableSetColumnIndex(8);
-            std::string logsButton = "View##logs_" + targetId;
-            if (ImGui::Button(logsButton.c_str())) {
-                selectTargetForLogView(entry);
-                m_showRunLogDialog = true;
-            }
+            ImGui::EndTable();
         }
+    } else {
+        ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
+                                ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
 
-        ImGui::EndTable();
+        if (ImGui::BeginTable("launch_table", 9, flags, ImVec2(0.0f, 0.0f))) {
+            ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch, 2.3f);
+            ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+            ImGui::TableSetupColumn("Executable Age", ImGuiTableColumnFlags_WidthFixed, 130.0f);
+            ImGui::TableSetupColumn("Source Age", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+            ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 220.0f);
+            ImGui::TableSetupColumn("Git", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+            ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch, 3.6f);
+            ImGui::TableSetupColumn("Run", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+            ImGui::TableSetupColumn("Logs", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+            ImGui::TableHeadersRow();
+
+            auto now = std::chrono::system_clock::now();
+
+            for (const auto& entry : entries) {
+                const std::string targetId = buildTargetId(entry);
+
+                ImGui::TableNextRow();
+
+                ImGui::TableSetColumnIndex(0);
+                const bool selected = (targetId == m_selectedTargetId);
+                std::string targetLabel = entry.targetName + "##target_" + targetId;
+                if (ImGui::Selectable(targetLabel.c_str(), selected,
+                                      ImGuiSelectableFlags_AllowOverlap)) {
+                    selectTargetForLogView(entry);
+                }
+
+                if (ImGui::BeginPopupContextItem(("target_menu_" + targetId).c_str())) {
+                    if (entry.sourceFound) {
+                        if (ImGui::MenuItem("Open in VS Code")) {
+                            auto sourceFile = findMainSourceFile(entry.sourceDirectory);
+                            std::string err;
+                            if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
+                                addConsoleMessage("Opening in VS Code: " + sourceFile.string());
+                            } else {
+                                addConsoleMessage("Failed to open VS Code: " + err);
+                            }
+                        }
+                    } else {
+                        ImGui::BeginDisabled();
+                        ImGui::MenuItem("Open in VS Code");
+                        ImGui::EndDisabled();
+                        ImGui::TextDisabled("(source directory not found)");
+                    }
+                    ImGui::EndPopup();
+                }
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(entry.kind.c_str());
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextUnformatted(formatAge(entry.executableWriteTime, now).c_str());
+
+                ImGui::TableSetColumnIndex(3);
+                if (entry.hasNewestSourceWriteTime) {
+                    ImGui::TextUnformatted(formatAge(entry.newestSourceWriteTime, now).c_str());
+                } else {
+                    ImGui::TextUnformatted("-");
+                }
+
+                ImGui::TableSetColumnIndex(4);
+                if (entry.outOfDate) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s",
+                                       entry.outOfDateReason.c_str());
+                } else {
+                    ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.45f, 1.0f), "Up to date");
+                }
+
+                ImGui::TableSetColumnIndex(5);
+                if (!entry.gitAvailable) {
+                    ImGui::TextUnformatted("Git unavailable");
+                } else if (entry.sourceDirty) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "Uncommitted changes");
+                } else if (entry.hasLastSourceCommitTime) {
+                    std::string age = formatAge(entry.lastSourceCommitTime, now);
+                    ImGui::Text("Last commit: %s", age.c_str());
+                } else {
+                    ImGui::TextUnformatted("No history");
+                }
+
+                ImGui::TableSetColumnIndex(6);
+                std::error_code relError;
+                std::filesystem::path displayPath = std::filesystem::relative(
+                    entry.executablePath, m_snapshot.repositoryRoot, relError);
+                if (relError || displayPath.empty()) {
+                    displayPath = entry.executablePath;
+                }
+                ImGui::TextUnformatted(displayPath.generic_string().c_str());
+
+                ImGui::TableSetColumnIndex(7);
+                std::string buttonLabel = "Launch##" + entry.executablePath.string();
+                if (ImGui::Button(buttonLabel.c_str())) {
+                    launchEntry(entry, targetId);
+                }
+
+                ImGui::TableSetColumnIndex(8);
+                std::string logsButton = "View##logs_" + targetId;
+                if (ImGui::Button(logsButton.c_str())) {
+                    selectTargetForLogView(entry);
+                    m_showRunLogDialog = true;
+                }
+            }
+
+            ImGui::EndTable();
+        }
     }
 
     ImGui::End();
@@ -257,6 +364,24 @@ void VLauncherScene::executeCommand(const std::string& cmdLine) {
 
     addConsoleMessage("Unknown command: " + cmdLine);
     addConsoleMessage("Available commands: refresh");
+}
+
+void VLauncherScene::launchEntry(const ExecutableEntry& entry, const std::string& targetId) {
+    std::string launchError;
+    LaunchedProcess launchedProcess;
+    if (ProcessLauncher::launchWithOutputCapture(entry.executablePath, launchedProcess,
+                                                 launchError)) {
+        ActiveRun activeRun;
+        activeRun.entry = entry;
+        activeRun.targetId = targetId;
+        activeRun.process = std::move(launchedProcess);
+        m_activeRuns.push_back(std::move(activeRun));
+
+        addConsoleMessage("Launched: " + entry.targetName + " (capturing command line output)");
+        selectTargetForLogView(entry);
+    } else {
+        addConsoleMessage("Launch failed for " + entry.targetName + ": " + launchError);
+    }
 }
 
 std::string VLauncherScene::buildTargetId(const ExecutableEntry& entry) const {

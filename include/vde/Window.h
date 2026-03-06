@@ -44,7 +44,7 @@ class Window {
      * @param height Window height in pixels
      * @param title Window title
      */
-    Window(uint32_t width, uint32_t height, const char* title);
+    Window(uint32_t width, uint32_t height, const char* title, bool resizable = true);
 
     virtual ~Window();
 
@@ -97,6 +97,17 @@ class Window {
      * @param height New height in pixels
      */
     virtual void setResolution(uint32_t width, uint32_t height);
+
+    /**
+     * @brief Notify the window of an OS-driven resize event.
+     *
+     * Unlike setResolution(), this does not call glfwSetWindowSize and is
+     * intended for GLFW resize callbacks.
+     *
+     * @param width New width in pixels
+     * @param height New height in pixels
+     */
+    virtual void handleExternalResize(uint32_t width, uint32_t height);
 
     /**
      * @brief Toggle fullscreen mode
