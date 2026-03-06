@@ -1,7 +1,7 @@
 #pragma once
 
-#include <chrono>
 #include <array>
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -46,6 +46,7 @@ class VLauncherScene : public BaseToolScene {
     std::string m_selectedTargetId;
     std::string m_selectedTargetName;
     std::array<std::optional<StoredRunLog>, 2> m_selectedTargetRuns;
+    bool m_showRunLogDialog = false;
 
     bool m_showUpToDate = true;
     bool m_showMissingSource = true;

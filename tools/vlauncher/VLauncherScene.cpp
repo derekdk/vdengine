@@ -1,10 +1,10 @@
 #include "VLauncherScene.h"
 
+#include <vde/api/StorageManager.h>
+
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
-
-#include <vde/api/StorageManager.h>
 
 namespace vde::tools {
 
@@ -63,6 +63,7 @@ void VLauncherScene::drawDebugUI() {
 
     if (!ImGui::Begin("VLauncher")) {
         ImGui::End();
+        drawRunLogViewer();
         return;
     }
 
@@ -70,6 +71,7 @@ void VLauncherScene::drawDebugUI() {
         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
                            "Repository root not found. Run this tool from a VDE build output.");
         ImGui::End();
+        drawRunLogViewer();
         return;
     }
 
@@ -116,7 +118,8 @@ void VLauncherScene::drawDebugUI() {
             ImGui::TableSetColumnIndex(0);
             const bool selected = (targetId == m_selectedTargetId);
             std::string targetLabel = entry.targetName + "##target_" + targetId;
-            if (ImGui::Selectable(targetLabel.c_str(), selected, ImGuiSelectableFlags_AllowOverlap)) {
+            if (ImGui::Selectable(targetLabel.c_str(), selected,
+                                  ImGuiSelectableFlags_AllowOverlap)) {
                 selectTargetForLogView(entry);
             }
 
@@ -199,8 +202,7 @@ void VLauncherScene::drawDebugUI() {
                                       " (capturing command line output)");
                     selectTargetForLogView(entry);
                 } else {
-                    addConsoleMessage("Launch failed for " + entry.targetName + ": " +
-                                      launchError);
+                    addConsoleMessage("Launch failed for " + entry.targetName + ": " + launchError);
                 }
             }
 
@@ -208,15 +210,15 @@ void VLauncherScene::drawDebugUI() {
             std::string logsButton = "View##logs_" + targetId;
             if (ImGui::Button(logsButton.c_str())) {
                 selectTargetForLogView(entry);
+                m_showRunLogDialog = true;
             }
         }
 
         ImGui::EndTable();
     }
 
-    drawRunLogViewer();
-
     ImGui::End();
+    drawRunLogViewer();
 }
 
 std::filesystem::path
@@ -286,60 +288,97 @@ void VLauncherScene::refreshSelectedRunLogs() {
 }
 
 void VLauncherScene::drawRunLogViewer() {
-    ImGui::Separator();
-    ImGui::TextUnformatted("Run Logs");
-
-    if (m_selectedTargetId.empty()) {
-        ImGui::TextDisabled("Select a target row or click View to inspect stored run logs.");
+    if (!m_showRunLogDialog) {
         return;
     }
 
-    ImGui::Text("Target: %s", m_selectedTargetName.c_str());
-    if (ImGui::Button("Reload logs")) {
-        refreshSelectedRunLogs();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Clear selection")) {
-        m_selectedTargetId.clear();
-        m_selectedTargetName.clear();
-        m_selectedTargetRuns = {};
-        return;
-    }
+    ImGui::SetNextWindowSize(ImVec2(880.0f, 540.0f), ImGuiCond_FirstUseEver);
+    bool open = m_showRunLogDialog;
+    bool closeRequested = false;
 
-    if (!m_selectedTargetRuns[0].has_value() && !m_selectedTargetRuns[1].has_value()) {
-        ImGui::TextDisabled("No captured runs saved for this target yet.");
-        return;
-    }
+    if (ImGui::Begin("Run Logs", &open)) {
+        if (m_selectedTargetId.empty()) {
+            ImGui::TextDisabled("Select a target and click View to inspect run logs.");
+            if (ImGui::Button("Close")) {
+                closeRequested = true;
+            }
+        } else {
+            ImGui::Text("Target: %s", m_selectedTargetName.c_str());
+            if (ImGui::Button("Reload logs")) {
+                refreshSelectedRunLogs();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear selection")) {
+                m_selectedTargetId.clear();
+                m_selectedTargetName.clear();
+                m_selectedTargetRuns = {};
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Close")) {
+                closeRequested = true;
+            }
 
-    for (size_t slot = 0; slot < m_selectedTargetRuns.size(); ++slot) {
-        const char* slotName = (slot == 0) ? "Latest run" : "Previous run";
-        if (!m_selectedTargetRuns[slot].has_value()) {
-            ImGui::TextDisabled("%s: (none)", slotName);
-            continue;
-        }
+            ImGui::Separator();
 
-        const auto& run = *m_selectedTargetRuns[slot];
-        std::string headerId = std::string(slotName) + "##slot_" + std::to_string(slot);
-        ImGuiTreeNodeFlags nodeFlags = (slot == 0) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-        if (!ImGui::CollapsingHeader(headerId.c_str(), nodeFlags)) {
-            continue;
-        }
+            if (!m_selectedTargetRuns[0].has_value() && !m_selectedTargetRuns[1].has_value()) {
+                const bool hasActiveRun = std::any_of(
+                    m_activeRuns.begin(), m_activeRuns.end(),
+                    [this](const ActiveRun& run) { return run.targetId == m_selectedTargetId; });
 
-        ImGui::Text("Timestamp: %s", run.timestamp.c_str());
-        ImGui::Text("Exit code: %d", run.exitCode);
-        ImGui::TextWrapped("Command: %s", run.commandLine.c_str());
-
-        std::string childId = "run_output_##" + std::to_string(slot);
-        if (ImGui::BeginChild(childId.c_str(), ImVec2(0.0f, 170.0f), true,
-                              ImGuiWindowFlags_HorizontalScrollbar)) {
-            if (run.output.empty()) {
-                ImGui::TextDisabled("(no command line output)");
+                if (hasActiveRun) {
+                    ImGui::TextDisabled(
+                        "Run in progress. Logs appear here after the process exits.");
+                } else {
+                    ImGui::TextDisabled("No captured runs saved for this target yet.");
+                }
             } else {
-                ImGui::TextUnformatted(run.output.c_str());
+                for (size_t slot = 0; slot < m_selectedTargetRuns.size(); ++slot) {
+                    const char* slotName = (slot == 0) ? "Latest run" : "Previous run";
+                    if (!m_selectedTargetRuns[slot].has_value()) {
+                        ImGui::TextDisabled("%s: (none)", slotName);
+                        continue;
+                    }
+
+                    const auto& run = *m_selectedTargetRuns[slot];
+                    std::string headerId = std::string(slotName) + "##slot_" + std::to_string(slot);
+                    ImGuiTreeNodeFlags nodeFlags = (slot == 0) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+                    if (!ImGui::CollapsingHeader(headerId.c_str(), nodeFlags)) {
+                        continue;
+                    }
+
+                    ImGui::Text("Timestamp: %s", run.timestamp.c_str());
+                    ImGui::Text("Exit code: %d", run.exitCode);
+                    ImGui::TextWrapped("Command: %s", run.commandLine.c_str());
+
+                    const float minOutputHeight = 170.0f;
+                    float outputHeight = ImGui::GetContentRegionAvail().y;
+
+                    // Reserve some room for remaining slot headers/buttons so the
+                    // first expanded section doesn't completely hide them.
+                    const size_t remainingSlots = m_selectedTargetRuns.size() - slot - 1;
+                    const float reserveForRemaining = 36.0f * static_cast<float>(remainingSlots);
+                    outputHeight -= reserveForRemaining;
+                    if (outputHeight < minOutputHeight) {
+                        outputHeight = minOutputHeight;
+                    }
+
+                    std::string childId = "run_output_##" + std::to_string(slot);
+                    if (ImGui::BeginChild(childId.c_str(), ImVec2(0.0f, outputHeight), true,
+                                          ImGuiWindowFlags_HorizontalScrollbar)) {
+                        if (run.output.empty()) {
+                            ImGui::TextDisabled("(no command line output)");
+                        } else {
+                            ImGui::TextUnformatted(run.output.c_str());
+                        }
+                    }
+                    ImGui::EndChild();
+                }
             }
         }
-        ImGui::EndChild();
     }
+
+    ImGui::End();
+    m_showRunLogDialog = open && !closeRequested;
 }
 
 void VLauncherScene::updateActiveRuns() {
@@ -387,8 +426,8 @@ void VLauncherScene::updateActiveRuns() {
 
         std::string saveError;
         if (RunLogStorage::saveLatestRun(activeRun.targetId, runLog, saveError)) {
-            addConsoleMessage("Run finished: " + activeRun.entry.targetName +
-                              " (exit code " + std::to_string(runLog.exitCode) + ")");
+            addConsoleMessage("Run finished: " + activeRun.entry.targetName + " (exit code " +
+                              std::to_string(runLog.exitCode) + ")");
         } else {
             addConsoleMessage("Run finished for " + activeRun.entry.targetName +
                               " but saving logs failed: " + saveError);
