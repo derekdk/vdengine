@@ -15,6 +15,18 @@ This skill describes the standard pattern for creating example programs in VDE t
 
 Always build and run the example to verify it works correctly and follows the expected pattern.
 
+## Completion Handoff
+
+After implementing or editing an example with this skill, invoke the `completing-work` skill before declaring the task complete.
+
+For examples, the required verification order is:
+
+1. Build the project and confirm the example executable was produced.
+2. Run the unit test suite and confirm it passes.
+3. Run the example's smoke test and use the broader smoke suite when the change affects shared runtime behavior.
+4. Only after build/tests/smoke are green, run a subagent code review.
+5. If the review causes more edits, repeat build, unit tests, smoke tests, and then review again.
+
 
 ## Example Structure
 
@@ -76,6 +88,9 @@ $smokeScriptMap = @{
 
 # VS Code task: "scripts: smoke-test"
 ```
+
+**Completion requirement:**
+Do not declare a new or modified example complete after only building it or manually running it once. Before announcing completion, you must build, run unit tests, run smoke tests, and then run a subagent code review on the verified changes. Use the `completing-work` skill as the final gate.
 
 ### 1. Include the Base Header
 

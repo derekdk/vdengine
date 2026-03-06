@@ -91,7 +91,7 @@ All 26 executables (23 examples + 3 tools) must pass. If any smoke test fails, t
 
 ### Step 6 — Spawn a subagent code review
 
-After build and tests pass, spawn a subagent to perform a code review of the changes. This is mandatory — do not skip it.
+After build, unit tests, and smoke tests pass, spawn a subagent to perform a code review of the changes. This is mandatory — do not skip it.
 
 The subagent prompt must:
 - Identify every file that was changed and the exact lines modified
@@ -115,7 +115,7 @@ For each change, review:
 Return a written review with specific findings for each changed file, or "No issues found" if the change is clean.
 ```
 
-Read the subagent's review output. If the subagent identifies issues, address them and re-run build and tests before announcing completion.
+Read the subagent's review output. If the subagent identifies issues, address them and re-run build, unit tests, and smoke tests before announcing completion.
 
 ### Step 7 — Announce completion
 
@@ -141,7 +141,7 @@ When fixing a function shared by multiple callers, verify that the fix is correc
 
 ### Forgetting to re-run tests after a follow-up edit
 
-If the subagent review or a build error causes you to make a second round of edits, re-run build and tests from scratch. Do not assume the first passing run covers the second set of changes.
+If the subagent review or a build error causes you to make a second round of edits, re-run build, unit tests, and smoke tests from scratch. Do not assume the first passing run covers the second set of changes.
 
 ### Declaring success based on "the code looks right"
 
