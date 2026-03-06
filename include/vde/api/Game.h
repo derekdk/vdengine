@@ -13,8 +13,8 @@
 #include <vulkan/vulkan.h>
 
 #include <functional>
-#include <mutex>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -385,10 +385,10 @@ class Game {
 
     /**
      * @brief Queue a window resize operation to run at a scheduler-safe point.
-      *
-      * If multiple resize requests are queued before the next scheduler tick,
-      * only the latest requested size is applied.
-      *
+     *
+     * If multiple resize requests are queued before the next scheduler tick,
+     * only the latest requested size is applied.
+     *
      * @param width Target window width in pixels
      * @param height Target window height in pixels
      */
@@ -668,13 +668,13 @@ class Game {
     Scheduler m_scheduler;
 
     enum class WindowOperationKind {
-      Generic,
-      Resize,
+        Generic,
+        Resize,
     };
 
     struct PendingWindowOperation {
-      WindowOperationKind kind = WindowOperationKind::Generic;
-      std::function<void(Window&)> operation;
+        WindowOperationKind kind = WindowOperationKind::Generic;
+        std::function<void(Window&)> operation;
     };
 
     // Queued window operations (executed in scheduler Input phase on main thread).

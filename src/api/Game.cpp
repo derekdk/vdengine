@@ -65,10 +65,9 @@ bool Game::initialize(const GameSettings& settings) {
 
     try {
         // Create window
-        m_window = std::make_unique<Window>(settings.display.windowWidth,
-                                            settings.display.windowHeight,
-                                            settings.gameName.c_str(),
-                                            settings.display.resizable);
+        m_window =
+            std::make_unique<Window>(settings.display.windowWidth, settings.display.windowHeight,
+                                     settings.gameName.c_str(), settings.display.resizable);
 
         if (settings.display.fullscreen) {
             m_window->setFullscreen(true);
@@ -1054,8 +1053,7 @@ void Game::scheduleWindowOperation(std::function<void(Window&)> operation) {
     }
 
     std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
-    m_pendingWindowOperations.push_back(
-        {WindowOperationKind::Generic, std::move(operation)});
+    m_pendingWindowOperations.push_back({WindowOperationKind::Generic, std::move(operation)});
 }
 
 void Game::scheduleWindowResize(uint32_t width, uint32_t height) {
@@ -1392,7 +1390,7 @@ void Game::setupInputCallbacks() {
         }
 
         game->m_window->handleExternalResize(static_cast<uint32_t>(width),
-                             static_cast<uint32_t>(height));
+                                             static_cast<uint32_t>(height));
     });
 
     // Joystick/gamepad connection callback
@@ -2754,9 +2752,10 @@ void Game::rebuildSchedulerGraph() {
     //          This provides a scheduler-safe point for OS/window API
     //          calls so swapchain-affecting work never runs mid-render.
     // ---------------------------------------------------------------
-    TaskId windowOpsTask = m_scheduler.addTask({
-        "window.ops", TaskPhase::Input, [this]() { executePendingWindowOperations(); },
-        {inputScriptTask}});
+    TaskId windowOpsTask = m_scheduler.addTask({"window.ops",
+                                                TaskPhase::Input,
+                                                [this]() { executePendingWindowOperations(); },
+                                                {inputScriptTask}});
 
     // ---------------------------------------------------------------
     // Task 1: GameLogic — onUpdate hook + all scene updates
