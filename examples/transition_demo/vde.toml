@@ -1,0 +1,2 @@
+[smoke]
+scripts = ["smoke_transition_demo.vdescript"]

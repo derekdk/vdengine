@@ -195,6 +195,8 @@ void VLauncherScene::drawDebugUI() {
                     selectTargetForLogView(entry);
                 }
 
+                drawEntryContextMenu(entry, "compact_target_menu_" + targetId);
+
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     launchEntry(entry, targetId);
                 }
@@ -244,25 +246,7 @@ void VLauncherScene::drawDebugUI() {
                     selectTargetForLogView(entry);
                 }
 
-                if (ImGui::BeginPopupContextItem(("target_menu_" + targetId).c_str())) {
-                    if (entry.sourceFound) {
-                        if (ImGui::MenuItem("Open in VS Code")) {
-                            auto sourceFile = findMainSourceFile(entry.sourceDirectory);
-                            std::string err;
-                            if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
-                                addConsoleMessage("Opening in VS Code: " + sourceFile.string());
-                            } else {
-                                addConsoleMessage("Failed to open VS Code: " + err);
-                            }
-                        }
-                    } else {
-                        ImGui::BeginDisabled();
-                        ImGui::MenuItem("Open in VS Code");
-                        ImGui::EndDisabled();
-                        ImGui::TextDisabled("(source directory not found)");
-                    }
-                    ImGui::EndPopup();
-                }
+                drawEntryContextMenu(entry, "target_menu_" + targetId);
 
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextUnformatted(entry.kind.c_str());
@@ -364,6 +348,81 @@ void VLauncherScene::executeCommand(const std::string& cmdLine) {
 
     addConsoleMessage("Unknown command: " + cmdLine);
     addConsoleMessage("Available commands: refresh");
+}
+
+void VLauncherScene::launchEntryWithSmokeTest(const ExecutableEntry& entry,
+                                              const std::string& targetId,
+                                              const std::string& scriptName) {
+    const std::filesystem::path smokeScript =
+        m_snapshot.repositoryRoot / "smoketests" / "scripts" / scriptName;
+
+    std::string launchError;
+    LaunchedProcess launchedProcess;
+    const std::vector<std::string> extraArgs = {"--input-script", smokeScript.string()};
+    if (ProcessLauncher::launchWithOutputCapture(entry.executablePath, launchedProcess, launchError,
+                                                 extraArgs)) {
+        ActiveRun activeRun;
+        activeRun.entry = entry;
+        activeRun.targetId = targetId;
+        activeRun.process = std::move(launchedProcess);
+        m_activeRuns.push_back(std::move(activeRun));
+
+        addConsoleMessage("Smoke test launched: " + entry.targetName + " with " + scriptName);
+        selectTargetForLogView(entry);
+    } else {
+        addConsoleMessage("Smoke test launch failed for " + entry.targetName + ": " + launchError);
+    }
+}
+
+void VLauncherScene::drawEntryContextMenu(const ExecutableEntry& entry,
+                                          const std::string& popupId) {
+    if (!ImGui::BeginPopupContextItem(popupId.c_str())) {
+        return;
+    }
+
+    if (entry.sourceFound) {
+        if (ImGui::MenuItem("Open in VS Code")) {
+            auto sourceFile = findMainSourceFile(entry.sourceDirectory);
+            std::string err;
+            if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
+                addConsoleMessage("Opening in VS Code: " + sourceFile.string());
+            } else {
+                addConsoleMessage("Failed to open VS Code: " + err);
+            }
+        }
+    } else {
+        ImGui::BeginDisabled();
+        ImGui::MenuItem("Open in VS Code");
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("(source directory not found)");
+    }
+
+    if (!entry.smokeScripts.empty()) {
+        if (entry.smokeScripts.size() == 1) {
+            if (ImGui::MenuItem("Run Smoke Test")) {
+                launchEntryWithSmokeTest(entry, buildTargetId(entry), entry.smokeScripts.front());
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", entry.smokeScripts.front().c_str());
+            }
+        } else {
+            if (ImGui::BeginMenu("Run Smoke Test")) {
+                for (const auto& script : entry.smokeScripts) {
+                    if (ImGui::MenuItem(script.c_str())) {
+                        launchEntryWithSmokeTest(entry, buildTargetId(entry), script);
+                    }
+                }
+                ImGui::EndMenu();
+            }
+        }
+    } else {
+        ImGui::BeginDisabled();
+        ImGui::MenuItem("Run Smoke Test");
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("(no smoke scripts in vde.toml)");
+    }
+
+    ImGui::EndPopup();
 }
 
 void VLauncherScene::launchEntry(const ExecutableEntry& entry, const std::string& targetId) {

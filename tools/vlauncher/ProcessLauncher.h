@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace vde::tools {
 
@@ -16,7 +17,8 @@ class ProcessLauncher {
   public:
     static bool launchDetached(const std::filesystem::path& executablePath, std::string& error);
     static bool launchWithOutputCapture(const std::filesystem::path& executablePath,
-                                        LaunchedProcess& launchedProcess, std::string& error);
+                                        LaunchedProcess& launchedProcess, std::string& error,
+                                        const std::vector<std::string>& extraArgs = {});
     static bool pollCompletion(const LaunchedProcess& launchedProcess, bool& completed,
                                uint32_t& exitCode, std::string& error);
     static void release(LaunchedProcess& launchedProcess);

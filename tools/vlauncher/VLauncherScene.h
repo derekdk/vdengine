@@ -75,6 +75,10 @@ class VLauncherScene : public BaseToolScene {
     void updateActiveRuns();
     void clearActiveRuns();
 
+    void launchEntryWithSmokeTest(const ExecutableEntry& entry, const std::string& targetId,
+                                  const std::string& scriptName);
+    void drawEntryContextMenu(const ExecutableEntry& entry, const std::string& popupId);
+
     static std::filesystem::path findMainSourceFile(const std::filesystem::path& sourceDirectory);
     static std::string truncateOutput(const std::string& output, size_t maxBytes);
 

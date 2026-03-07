@@ -75,8 +75,8 @@ bool ProcessLauncher::launchDetached(const std::filesystem::path& executablePath
 }
 
 bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& executablePath,
-                                              LaunchedProcess& launchedProcess,
-                                              std::string& error) {
+                                              LaunchedProcess& launchedProcess, std::string& error,
+                                              const std::vector<std::string>& extraArgs) {
 #ifdef _WIN32
     launchedProcess = {};
 
@@ -103,7 +103,40 @@ bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& execu
         return false;
     }
 
+    // Windows command-line escaping per CommandLineToArgvW rules:
+    // backslashes are only special immediately before a closing quote;
+    // interior quotes are escaped as \".
+    auto escapeArg = [](const std::string& arg) -> std::string {
+        if (arg.find_first_of(" \t\"") == std::string::npos) {
+            return arg;
+        }
+        std::string out = "\"";
+        size_t backslashes = 0;
+        for (char c : arg) {
+            if (c == '\\') {
+                ++backslashes;
+            } else if (c == '"') {
+                out.append(backslashes * 2 + 1, '\\');
+                out += '"';
+                backslashes = 0;
+            } else {
+                out.append(backslashes, '\\');
+                out += c;
+                backslashes = 0;
+            }
+        }
+        out.append(backslashes * 2, '\\');
+        out += '"';
+        return out;
+    };
+
     std::string commandLine = "\"" + executablePath.string() + "\"";
+    for (const auto& arg : extraArgs) {
+        if (arg.empty())
+            continue;
+        commandLine += ' ';
+        commandLine += escapeArg(arg);
+    }
     std::vector<char> commandLineBuffer(commandLine.begin(), commandLine.end());
     commandLineBuffer.push_back('\0');
 

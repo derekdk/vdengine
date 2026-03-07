@@ -1,0 +1,2 @@
+[smoke]
+scripts = ["smoke_textured_cube.vdescript"]

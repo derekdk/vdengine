@@ -19,6 +19,7 @@ add_executable(vde_vlauncher
 target_link_libraries(vde_vlauncher PRIVATE
     vde
     imgui_backend
+    tomlplusplus::tomlplusplus
 )
 
 if(WIN32)
