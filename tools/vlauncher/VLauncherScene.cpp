@@ -353,8 +353,21 @@ void VLauncherScene::executeCommand(const std::string& cmdLine) {
 void VLauncherScene::launchEntryWithSmokeTest(const ExecutableEntry& entry,
                                               const std::string& targetId,
                                               const std::string& scriptName) {
-    const std::filesystem::path smokeScript =
-        m_snapshot.repositoryRoot / "smoketests" / "scripts" / scriptName;
+    std::error_code fsError;
+    std::filesystem::path repoRoot = m_snapshot.repositoryRoot;
+    if (repoRoot.empty()) {
+        repoRoot = std::filesystem::current_path(fsError);
+        if (fsError || repoRoot.empty()) {
+            repoRoot = std::filesystem::path(".");
+        }
+    }
+
+    const std::filesystem::path smokeScript = repoRoot / "smoketests" / "scripts" / scriptName;
+
+    if (!std::filesystem::exists(smokeScript)) {
+        addConsoleMessage("Smoke test script not found: " + smokeScript.string());
+        return;
+    }
 
     std::string launchError;
     LaunchedProcess launchedProcess;
