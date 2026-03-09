@@ -111,6 +111,19 @@ FetchContent_Declare(
     URL https://www.sqlite.org/2025/sqlite-amalgamation-3490100.zip
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
+
+# toml++ for TOML configuration parsing (header-only)
+set(TOMLPLUSPLUS_VERSION_TAG "v3.4.0")
+set(TOMLPLUSPLUS_COMMIT "30172438cee64926dc41fdd9c11fb3ba5b2ba9de")
+set(TOMLPLUSPLUS_ARCHIVE_SHA256 "0BADB114FA26325320CFBCCE28B5953F85942D2A0BB1E4FDD99197497AFD2ED5")
+
+# Use the immutable commit archive for the v3.4.0 release and verify its contents.
+FetchContent_Declare(
+    tomlplusplus
+    URL https://github.com/marzer/tomlplusplus/archive/${TOMLPLUSPLUS_COMMIT}.zip
+    URL_HASH SHA256=${TOMLPLUSPLUS_ARCHIVE_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
 FetchContent_GetProperties(sqlite3)
 if(NOT sqlite3_POPULATED)
     # Policy CMP0169: allow direct FetchContent_Populate for content with no CMakeLists
@@ -124,6 +137,9 @@ if(NOT sqlite3_POPULATED)
         target_compile_options(sqlite3 PRIVATE -w)
     endif()
 endif()
+
+# Make toml++ available
+FetchContent_MakeAvailable(tomlplusplus)
 
 # Library sources
 set(VDE_SOURCES

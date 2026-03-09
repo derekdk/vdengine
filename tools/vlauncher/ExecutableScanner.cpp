@@ -12,6 +12,7 @@
 #include <unordered_set>
 
 #include "GitUtils.h"
+#include <toml++/toml.hpp>
 
 namespace vde::tools {
 
@@ -45,6 +46,34 @@ std::filesystem::path normalizePath(const std::filesystem::path& path) {
         return path;
     }
     return absolutePath.lexically_normal();
+}
+
+std::optional<std::string> sanitizeSmokeScriptName(const std::string& rawScript) {
+    if (rawScript.empty()) {
+        return std::nullopt;
+    }
+
+    if (rawScript.find('/') != std::string::npos || rawScript.find('\\') != std::string::npos) {
+        return std::nullopt;
+    }
+
+    const std::filesystem::path scriptPath(rawScript);
+    if (scriptPath.empty() || scriptPath.is_absolute() || scriptPath.has_parent_path()) {
+        return std::nullopt;
+    }
+
+    for (const auto& part : scriptPath) {
+        if (part.string() == "..") {
+            return std::nullopt;
+        }
+    }
+
+    const std::string fileName = scriptPath.filename().string();
+    if (fileName.empty() || fileName == "." || fileName == "..") {
+        return std::nullopt;
+    }
+
+    return fileName;
 }
 
 }  // namespace
@@ -182,6 +211,8 @@ ScanSnapshot ExecutableScanner::buildSnapshot() const {
         entry.kind = inferKind(entry.sourceDirectory, snapshot.repositoryRoot);
 
         if (entry.sourceFound) {
+            entry.smokeScripts = loadSmokeScripts(entry.sourceDirectory, entry.targetName);
+
             auto newest = newestSourceTimestamp(entry.sourceDirectory);
             if (newest) {
                 entry.newestSourceWriteTime = *newest;
@@ -411,6 +442,49 @@ ExecutableScanner::newestSourceTimestamp(const std::filesystem::path& sourceDir)
     }
 
     return newest;
+}
+
+std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesystem::path& sourceDir,
+                                                             const std::string& targetName) {
+    std::vector<std::string> scripts;
+
+    auto tomlPath = sourceDir / "vde.toml";
+    std::error_code error;
+    if (!std::filesystem::exists(tomlPath, error)) {
+        return scripts;
+    }
+
+    try {
+        auto config = toml::parse_file(tomlPath.string());
+        auto appendScripts = [&scripts](const toml::array& array) {
+            for (const auto& elem : array) {
+                if (auto* str = elem.as_string()) {
+                    if (auto scriptName = sanitizeSmokeScriptName(str->get())) {
+                        scripts.push_back(std::move(*scriptName));
+                    }
+                }
+            }
+        };
+
+        // Per-target section first: [smoke.<targetName>]
+        if (auto* perTarget = config["smoke"][targetName].as_table()) {
+            if (auto* arr = (*perTarget)["scripts"].as_array()) {
+                appendScripts(*arr);
+                return scripts;
+            }
+        }
+
+        // Shared section: [smoke]
+        if (auto* smoke = config["smoke"].as_table()) {
+            if (auto* arr = (*smoke)["scripts"].as_array()) {
+                appendScripts(*arr);
+            }
+        }
+    } catch (const toml::parse_error&) {
+        // Malformed TOML — silently skip.
+    }
+
+    return scripts;
 }
 
 std::string ExecutableScanner::inferKind(const std::filesystem::path& sourceDir,

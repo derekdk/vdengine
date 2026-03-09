@@ -61,9 +61,13 @@ set(VDE_TEST_SOURCES
     Transition_test.cpp
     TransitionManager_test.cpp
     VLauncherRunLogStorage_test.cpp
+    VLauncherUtilities_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
+    ${CMAKE_SOURCE_DIR}/tools/vlauncher/ExecutableScanner.cpp
+    ${CMAKE_SOURCE_DIR}/tools/vlauncher/GitUtils.cpp
+    ${CMAKE_SOURCE_DIR}/tools/vlauncher/ProcessLauncher.cpp
 )
 
 # Create test executable
@@ -73,6 +77,7 @@ target_link_libraries(vde_tests PRIVATE
     vde
     GTest::gtest
     GTest::gtest_main
+    tomlplusplus::tomlplusplus
 )
 
 target_include_directories(vde_tests PRIVATE

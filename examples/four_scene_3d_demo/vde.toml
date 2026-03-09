@@ -1,0 +1,2 @@
+[smoke]
+scripts = ["smoke_four_scene_3d.vdescript"]

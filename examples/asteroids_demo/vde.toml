@@ -1,0 +1,5 @@
+[smoke.vde_asteroids_demo]
+scripts = ["smoke_asteroids.vdescript"]
+
+[smoke.vde_asteroids_physics_demo]
+scripts = ["smoke_asteroids_physics.vdescript"]
