@@ -48,6 +48,34 @@ std::filesystem::path normalizePath(const std::filesystem::path& path) {
     return absolutePath.lexically_normal();
 }
 
+std::optional<std::string> sanitizeSmokeScriptName(const std::string& rawScript) {
+    if (rawScript.empty()) {
+        return std::nullopt;
+    }
+
+    if (rawScript.find('/') != std::string::npos || rawScript.find('\\') != std::string::npos) {
+        return std::nullopt;
+    }
+
+    const std::filesystem::path scriptPath(rawScript);
+    if (scriptPath.empty() || scriptPath.is_absolute() || scriptPath.has_parent_path()) {
+        return std::nullopt;
+    }
+
+    for (const auto& part : scriptPath) {
+        if (part.string() == "..") {
+            return std::nullopt;
+        }
+    }
+
+    const std::string fileName = scriptPath.filename().string();
+    if (fileName.empty() || fileName == "." || fileName == "..") {
+        return std::nullopt;
+    }
+
+    return fileName;
+}
+
 }  // namespace
 
 ExecutableScanner::ExecutableScanner(std::filesystem::path startPath, std::chrono::seconds interval)
@@ -428,15 +456,20 @@ std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesyst
 
     try {
         auto config = toml::parse_file(tomlPath.string());
+        auto appendScripts = [&scripts](const toml::array& array) {
+            for (const auto& elem : array) {
+                if (auto* str = elem.as_string()) {
+                    if (auto scriptName = sanitizeSmokeScriptName(str->get())) {
+                        scripts.push_back(std::move(*scriptName));
+                    }
+                }
+            }
+        };
 
         // Per-target section first: [smoke.<targetName>]
         if (auto* perTarget = config["smoke"][targetName].as_table()) {
             if (auto* arr = (*perTarget)["scripts"].as_array()) {
-                for (auto& elem : *arr) {
-                    if (auto* str = elem.as_string()) {
-                        scripts.push_back(str->get());
-                    }
-                }
+                appendScripts(*arr);
                 return scripts;
             }
         }
@@ -444,11 +477,7 @@ std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesyst
         // Shared section: [smoke]
         if (auto* smoke = config["smoke"].as_table()) {
             if (auto* arr = (*smoke)["scripts"].as_array()) {
-                for (auto& elem : *arr) {
-                    if (auto* str = elem.as_string()) {
-                        scripts.push_back(str->get());
-                    }
-                }
+                appendScripts(*arr);
             }
         }
     } catch (const toml::parse_error&) {

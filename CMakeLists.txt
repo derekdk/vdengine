@@ -113,11 +113,16 @@ FetchContent_Declare(
 )
 
 # toml++ for TOML configuration parsing (header-only)
+set(TOMLPLUSPLUS_VERSION_TAG "v3.4.0")
+set(TOMLPLUSPLUS_COMMIT "30172438cee64926dc41fdd9c11fb3ba5b2ba9de")
+set(TOMLPLUSPLUS_ARCHIVE_SHA256 "0BADB114FA26325320CFBCCE28B5953F85942D2A0BB1E4FDD99197497AFD2ED5")
+
+# Use the immutable commit archive for the v3.4.0 release and verify its contents.
 FetchContent_Declare(
     tomlplusplus
-    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
-    GIT_TAG        v3.4.0
-    GIT_SHALLOW    TRUE
+    URL https://github.com/marzer/tomlplusplus/archive/${TOMLPLUSPLUS_COMMIT}.zip
+    URL_HASH SHA256=${TOMLPLUSPLUS_ARCHIVE_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(sqlite3)
 if(NOT sqlite3_POPULATED)
