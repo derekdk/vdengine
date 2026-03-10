@@ -251,6 +251,10 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/InputScript.h
     # Storage
     include/vde/api/StorageManager.h
+    # Gameplay utility headers
+    include/vde/api/Math2D.h
+    include/vde/api/Timing.h
+    include/vde/api/Random.h
 )
 
 # Create library

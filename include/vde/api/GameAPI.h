@@ -48,6 +48,11 @@
 // Storage
 #include "StorageManager.h"
 
+// Gameplay utilities
+#include "Math2D.h"
+#include "Random.h"
+#include "Timing.h"
+
 // Graphics
 #include "GameCamera.h"
 #include "LightBox.h"

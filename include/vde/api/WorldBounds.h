@@ -270,6 +270,67 @@ struct WorldBounds2D {
         return WorldBounds2D(centerX - halfW, centerY - halfH, centerX + halfW, centerY + halfH);
     }
 
+    // ========================================================================
+    // Gameplay helpers
+    // ========================================================================
+
+    /**
+     * @brief Check if this bounds intersects another (overlapping area > 0).
+     */
+    bool intersects(const WorldBounds2D& other) const {
+        return minX < other.maxX && maxX > other.minX && minY < other.maxY && maxY > other.minY;
+    }
+
+    /**
+     * @brief Check if this bounds fully contains another.
+     */
+    bool contains(const WorldBounds2D& other) const {
+        return other.minX >= minX && other.maxX <= maxX && other.minY >= minY && other.maxY <= maxY;
+    }
+
+    /**
+     * @brief Get the size as a vec2 (width, height).
+     */
+    glm::vec2 size() const { return glm::vec2(width().value, height().value); }
+
+    /**
+     * @brief Get the half-extents (half-width, half-height).
+     */
+    glm::vec2 halfExtents() const { return size() * 0.5f; }
+
+    /**
+     * @brief Clamp a point to lie within this bounds.
+     */
+    glm::vec2 clampPoint(const glm::vec2& point) const {
+        return glm::vec2(std::max(minX.value, std::min(point.x, maxX.value)),
+                         std::max(minY.value, std::min(point.y, maxY.value)));
+    }
+
+    /**
+     * @brief Return a copy translated by a delta.
+     */
+    WorldBounds2D translated(const glm::vec2& delta) const {
+        return WorldBounds2D(Meters(minX.value + delta.x), Meters(minY.value + delta.y),
+                             Meters(maxX.value + delta.x), Meters(maxY.value + delta.y));
+    }
+
+    /**
+     * @brief Return a copy expanded outward by the given amounts.
+     */
+    WorldBounds2D expanded(Meters amountX, Meters amountY) const {
+        return WorldBounds2D(minX - amountX, minY - amountY, maxX + amountX, maxY + amountY);
+    }
+
+    /**
+     * @brief Create centered bounds from a vec2 center and vec2 size.
+     */
+    static WorldBounds2D fromCenterSize(const glm::vec2& center, const glm::vec2& size) {
+        float halfW = size.x * 0.5f;
+        float halfH = size.y * 0.5f;
+        return WorldBounds2D(Meters(center.x - halfW), Meters(center.y - halfH),
+                             Meters(center.x + halfW), Meters(center.y + halfH));
+    }
+
     /**
      * @brief Convert to 3D bounds.
      *
