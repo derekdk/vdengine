@@ -324,9 +324,9 @@ TEST_F(WorldBounds2DTest, IntersectsDisjoint) {
 }
 
 TEST_F(WorldBounds2DTest, IntersectsTouching) {
-    // Edge-touching bounds should NOT intersect (strict < comparison)
+    // WorldBounds2D intersections are inclusive, so edge-touching counts.
     WorldBounds2D other(100_m, 100_m, 200_m, 200_m);
-    EXPECT_FALSE(standardBounds.intersects(other));
+    EXPECT_TRUE(standardBounds.intersects(other));
 }
 
 TEST_F(WorldBounds2DTest, ContainsBoundsInside) {

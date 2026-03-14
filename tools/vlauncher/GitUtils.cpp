@@ -77,6 +77,12 @@ GitUtils::CommandResult GitUtils::runGitCommand(const std::string& args) const {
 
     std::ostringstream command;
     command << "git -C \"" << m_repoRoot.string() << "\" " << args;
+#ifdef _WIN32
+    // Treat Git probe failures as unavailable without leaking stderr noise to callers.
+    command << " 2>nul";
+#else
+    command << " 2>/dev/null";
+#endif
 
     FILE* pipe = popen(command.str().c_str(), "r");
     if (!pipe) {
