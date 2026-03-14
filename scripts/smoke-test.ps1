@@ -8,6 +8,7 @@
 #   .\scripts\smoke-test.ps1 -Category Tools              # Tools only
 #   .\scripts\smoke-test.ps1 -Filter "*physics*"          # Filter by name
 #   .\scripts\smoke-test.ps1 -Build -Verbose              # Build first, verbose output
+#   .\scripts\smoke-test.ps1 -ProblemsOnly                # Emit only warnings/failures plus final PASS/FAIL
 
 param(
     [ValidateSet("All", "Examples", "Tools")]
@@ -23,16 +24,157 @@ param(
 
     [switch]$Build = $false,  # Build before testing
 
-    [switch]$Verbose = $false  # Verbose output
+    [switch]$Verbose = $false,  # Verbose output
+
+    [switch]$ProblemsOnly = $false  # Emit only warnings/failures plus a final PASS/FAIL line
 )
 
 $ErrorActionPreference = "Stop"
 
 # Colors for output
-function Write-Success { param([string]$msg) Write-Host $msg -ForegroundColor Green }
-function Write-Info { param([string]$msg) Write-Host $msg -ForegroundColor Cyan }
-function Write-Warn { param([string]$msg) Write-Host $msg -ForegroundColor Yellow }
-function Write-Err { param([string]$msg) Write-Host $msg -ForegroundColor Red }
+function Write-Success {
+    param([string]$msg)
+    if ($ProblemsOnly) {
+        return
+    }
+    Write-Host $msg -ForegroundColor Green
+}
+function Write-Info {
+    param([string]$msg)
+    if ($ProblemsOnly) {
+        return
+    }
+    Write-Host $msg -ForegroundColor Cyan
+}
+function Write-Warn {
+    param([string]$msg)
+    if ($ProblemsOnly -and $msg -notmatch '^(WARNING|FAILURE|PASS):') {
+        $msg = "WARNING: $msg"
+    }
+    Write-Host $msg -ForegroundColor Yellow
+}
+function Write-Err {
+    param([string]$msg)
+    if ($ProblemsOnly -and $msg -notmatch '^(WARNING|FAILURE|PASS):') {
+        $msg = "FAILURE: $msg"
+    }
+    Write-Host $msg -ForegroundColor Red
+}
+function Write-Pass { param([string]$msg) Write-Host "PASS: $msg" -ForegroundColor Green }
+
+$failurePattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file: Failure|\bFailure\b|\berror\b|\bfatal\b|\bexception\b)'
+$warningPattern = '(?i)\b(warn|warning|validation)\b'
+$problemPattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file: Failure|\bFailure\b|\berror\b|\bfatal\b|\bexception\b|\bwarn\b|\bwarning\b|\bvalidation\b)'
+$outputFailurePattern = '(?i)(assert failed|test failed|unknown file: Failure|\[\s*failed\s*\]|^\s*error\b|\berror:|\bfailed to\b|\bfatal\b|\bexception\b)'
+
+function Get-ProblemLines {
+    param(
+        [string[]]$Lines,
+        [int]$MaxLines = 20
+    )
+
+    if (-not $Lines) {
+        return @()
+    }
+
+    $selected = New-Object System.Collections.Generic.List[string]
+    $captureContext = 0
+
+    foreach ($line in $Lines) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            $captureContext = 0
+            continue
+        }
+
+        if ($line -match $problemPattern) {
+            if (-not $selected.Contains($line)) {
+                $selected.Add($line)
+            }
+            $captureContext = 2
+            if ($selected.Count -ge $MaxLines) {
+                break
+            }
+            continue
+        }
+
+        if ($captureContext -gt 0) {
+            if (-not $selected.Contains($line)) {
+                $selected.Add($line)
+            }
+            $captureContext--
+            if ($selected.Count -ge $MaxLines) {
+                break
+            }
+        }
+    }
+
+    return @($selected | Select-Object -First $MaxLines)
+}
+
+function Test-IsWarningLine {
+    param([string]$Line)
+
+    return ($Line -match $warningPattern) -and ($Line -notmatch $failurePattern)
+}
+
+function Write-ProblemLines {
+    param(
+        [string]$Prefix,
+        [string[]]$Lines
+    )
+
+    foreach ($line in $Lines) {
+        if (Test-IsWarningLine -Line $line) {
+            Write-Warn "WARNING: $Prefix$line"
+        } else {
+            Write-Err "FAILURE: $Prefix$line"
+        }
+    }
+}
+
+function Invoke-BuildForProblemsOnly {
+    param(
+        [string]$BuildScriptPath,
+        [string]$SelectedGenerator,
+        [string]$SelectedConfig
+    )
+
+    $stdout = [IO.Path]::GetTempFileName()
+    $stderr = [IO.Path]::GetTempFileName()
+
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $BuildScriptPath -Generator $SelectedGenerator -Config $SelectedConfig > $stdout 2> $stderr
+        $buildExitCode = $LASTEXITCODE
+
+        $buildLines = @()
+        if (Test-Path $stdout) {
+            $buildLines += Get-Content -Path $stdout -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $stderr) {
+            $buildLines += Get-Content -Path $stderr -ErrorAction SilentlyContinue
+        }
+
+        $problemLines = Get-ProblemLines -Lines $buildLines -MaxLines 40
+        if ($problemLines.Count -eq 0 -and $buildExitCode -ne 0) {
+            $problemLines = @($buildLines | Select-Object -Last 40)
+        }
+
+        Write-ProblemLines -Prefix '' -Lines $problemLines
+
+        if ($buildExitCode -ne 0) {
+            Write-Err "FAILURE: Build failed with exit code $buildExitCode"
+            exit 1
+        }
+    }
+    finally {
+        if (Test-Path $stdout) {
+            Remove-Item $stdout -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $stderr) {
+            Remove-Item $stderr -ErrorAction SilentlyContinue
+        }
+    }
+}
 
 Write-Info "=========================================="
 Write-Info "VDE Smoke Test Script"
@@ -59,11 +201,15 @@ if ($Filter) {
 
 # Build if requested
 if ($Build) {
-    Write-Info "Building before running smoke tests..."
-    & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
-    if ($LASTEXITCODE -ne 0) {
-        Write-Err "Build failed! Cannot run smoke tests."
-        exit 1
+    if ($ProblemsOnly) {
+        Invoke-BuildForProblemsOnly -BuildScriptPath "$scriptDir\build.ps1" -SelectedGenerator $Generator -SelectedConfig $Config
+    } else {
+        Write-Info "Building before running smoke tests..."
+        & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Build failed! Cannot run smoke tests."
+            exit 1
+        }
     }
 }
 
@@ -229,6 +375,9 @@ foreach ($exe in $allExes) {
 
     if (-not (Test-Path $smokeScriptPath)) {
         Write-Warn "  Smoke script not found: $smokeScript (skipping $($exe.Name))"
+        if ($ProblemsOnly) {
+            Write-Warn "WARNING: [$($exe.Category)] $($exe.Name) skipped because smoke script '$smokeScript' was not found"
+        }
         $skipCount++
         $results += [pscustomobject]@{
             exe      = $exe.Name
@@ -254,7 +403,7 @@ foreach ($exe in $allExes) {
     try {
         if ($Verbose) {
             Write-Info "  Testing: $($exe.Name) with $smokeScript"
-        } else {
+        } elseif (-not $ProblemsOnly) {
             Write-Host "  Testing: $($exe.Name)" -NoNewline
         }
 
@@ -293,12 +442,15 @@ foreach ($exe in $allExes) {
     if (Test-Path $stdout) { $allLines += Get-Content -Path $stdout -ErrorAction SilentlyContinue }
     if (Test-Path $stderr) { $allLines += Get-Content -Path $stderr -ErrorAction SilentlyContinue }
 
-    $keyLines = $allLines |
-        Where-Object { $_ -match '(?i)(error|warn|warning|assert|validation|failed|exception|fatal)' } |
-        Select-Object -First 20
+    $keyLines = Get-ProblemLines -Lines $allLines -MaxLines 20
 
     if ((-not $keyLines) -and $startError) {
         $keyLines = @($startError)
+    }
+
+    if ($status -eq 'exited' -and @($allLines | Where-Object { $_ -match $outputFailurePattern }).Count -gt 0) {
+        $status = 'output_failure'
+        $exitCode = 'output_failure'
     }
 
     # Determine pass/fail
@@ -306,20 +458,27 @@ foreach ($exe in $allExes) {
 
     if ($passed) {
         $passCount++
-        if ($Verbose) {
+        if ($ProblemsOnly) {
+            Write-ProblemLines -Prefix "[$($exe.Category)] $($exe.Name): " -Lines @($keyLines | Where-Object { Test-IsWarningLine -Line $_ })
+        } elseif ($Verbose) {
             Write-Success "  PASSED"
         } else {
             Write-Success " PASSED"
         }
     } else {
         $failCount++
-        if ($Verbose) {
+        if ($ProblemsOnly) {
+            Write-Err "FAILURE: [$($exe.Category)] $($exe.Name) (script: $smokeScript, exit code: $exitCode)"
+            if ($keyLines) {
+                Write-ProblemLines -Prefix "[$($exe.Category)] $($exe.Name): " -Lines $keyLines
+            }
+        } elseif ($Verbose) {
             Write-Err "  FAILED (exit code: $exitCode)"
         } else {
             Write-Err " FAILED (exit code: $exitCode)"
         }
 
-        if ($keyLines -and $Verbose) {
+        if ($keyLines -and $Verbose -and -not $ProblemsOnly) {
             Write-Err "  Error output:"
             foreach ($line in $keyLines) {
                 Write-Err "    $line"
@@ -347,6 +506,20 @@ foreach ($exe in $allExes) {
 # --- Summary ---
 
 $totalRun = $passCount + $failCount
+
+if ($ProblemsOnly) {
+    if ($failCount -gt 0) {
+        Write-Err "FAILURE: Smoke tests failed. Passed: $passCount, Failed: $failCount, Skipped: $skipCount"
+        exit 1
+    }
+
+    if ($skipCount -gt 0) {
+        Write-Pass "Smoke tests passed with $skipCount warning(s)."
+    } else {
+        Write-Pass "All smoke tests passed."
+    }
+    exit 0
+}
 
 Write-Info ""
 Write-Info "=========================================="

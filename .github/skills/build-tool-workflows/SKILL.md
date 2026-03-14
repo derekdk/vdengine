@@ -77,6 +77,11 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 .\scripts\test.ps1 -Filter "CameraTest.*"
 ```
 
+**Run tests with AI-friendly failure-only output:**
+```powershell
+.\scripts\test.ps1 -ProblemsOnly
+```
+
 **Build and test in one command:**
 ```powershell
 .\scripts\test.ps1 -Build
@@ -100,6 +105,11 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 **Smoke test with filter:**
 ```powershell
 .\scripts\smoke-test.ps1 -Filter "*physics*"
+```
+
+**Run smoke tests with AI-friendly failure-only output:**
+```powershell
+.\scripts\smoke-test.ps1 -ProblemsOnly
 ```
 
 **Build and smoke test:**
@@ -163,6 +173,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 - `-Filter` - GoogleTest filter pattern (default: "*")
 - `-Build` - Build before running tests
 - `-Verbose` - Verbose test output
+- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
 
 **smoke-test.ps1**
 - `-Category` - All (default), Examples, or Tools
@@ -171,6 +182,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 - `-Config` - Debug (default) or Release
 - `-Build` - Build before running smoke tests
 - `-Verbose` - Verbose output with detailed error messages
+- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
 
 **format.ps1**
 - `-Check` - Check formatting without modifying files (CI/pre-commit)
