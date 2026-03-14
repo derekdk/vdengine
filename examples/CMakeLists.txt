@@ -180,3 +180,16 @@ add_vde_example(vde_os_stress_demo "os_stress_demo/main.cpp")
 # Vertical Shooter demo - demonstrates gameplay utility library (Math2D, Timing, Random, WorldBounds2D)
 add_vde_example(vde_shooter_demo "shooter_demo/main.cpp")
 
+# Vertical Shooter (full) - top-down scrolling shooter with gamepad, procedural map, sprites, audio
+add_executable(vde_vertical_shooter
+    vertical_shooter/main.cpp
+    vertical_shooter/Sprites.cpp
+    vertical_shooter/Audio.cpp
+    vertical_shooter/Map.cpp
+    vertical_shooter/Entities.cpp
+    vertical_shooter/GameScene.cpp
+)
+target_link_libraries(vde_vertical_shooter PRIVATE vde imgui_backend)
+target_compile_definitions(vde_vertical_shooter PRIVATE VDE_EXAMPLE_USE_IMGUI)
+add_dependencies(vde_vertical_shooter copy_example_shaders)
+
