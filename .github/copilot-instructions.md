@@ -7,6 +7,10 @@ VDE is a lightweight Vulkan-based 3D rendering engine for rapid prototyping and 
 Two-layer design with low-level rendering 
 Engine uses modern C++20 with RAII for all Vulkan resources.
 
+Always uses the provided build scripts and tools for building, testing, and running examples to ensure consistency and reliability.
+
+Never use the CMake tools extension directly or bypass the build and tool scripts.
+
 ## Available Skills
 
 The following skills provide domain-specific knowledge for working with VDE:
