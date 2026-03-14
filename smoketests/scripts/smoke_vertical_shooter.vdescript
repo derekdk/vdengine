@@ -3,14 +3,20 @@ wait startup
 wait 500
 press ENTER
 wait 1s
-press SPACE
+keydown SPACE
+wait 300
+keyup SPACE
 wait 500
 press E
 wait 500
-press SPACE
+keydown SPACE
+wait 300
+keyup SPACE
 wait 500
 press E
 wait 300
-press SPACE
+keydown SPACE
+wait 300
+keyup SPACE
 wait 2s
 exit

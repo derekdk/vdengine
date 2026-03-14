@@ -124,6 +124,9 @@ static uint8_t fontRow(char c, int row) {
 
 std::shared_ptr<vde::Texture> createTextTexture(vde::VulkanContext* ctx, const std::string& text,
                                                 int pixelScale, uint8_t r, uint8_t g, uint8_t b) {
+    if (text.empty() || pixelScale <= 0)
+        return nullptr;
+
     constexpr int GLYPH_W = 5;
     constexpr int GLYPH_H = 7;
     constexpr int GAP = 1;    // one-pixel column gap between characters

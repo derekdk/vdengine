@@ -68,7 +68,7 @@ class RandomStream {
     }
 
     /**
-     * @brief Random float in [minValue, maxValue].
+     * @brief Random float in [minValue, maxValue).
      */
     float range(float minValue, float maxValue) {
         std::uniform_real_distribution<float> dist(minValue, maxValue);

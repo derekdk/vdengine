@@ -255,8 +255,8 @@ class ShooterScene : public vde::examples::BaseExampleScene {
             m_player->setPosition(pos2d.x, pos2d.y, 0.0f);
         }
 
-        // Fire bullets
-        if (input->isFireHeld() && m_fireCooldown.tryConsume()) {
+        // Fire bullets — auto-fire while held, or one-shot on press
+        if ((input->isFireHeld() || input->consumeFire()) && m_fireCooldown.tryConsume()) {
             m_fireCooldown.start();
             fireBullet();
         }
@@ -451,5 +451,5 @@ class ShooterGame : public vde::examples::BaseExampleGame<ShooterInputHandler, S
 
 int main(int argc, char** argv) {
     ShooterGame game;
-    return vde::examples::runExample(game, "VDE Vertical Shooter", 600, 840, argc, argv);
+    return vde::examples::runExample(game, "VDE Shooter Demo", 600, 840, argc, argv);
 }

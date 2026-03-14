@@ -25,8 +25,10 @@ class ShooterInput : public vde::examples::BaseExampleInputHandler {
             m_up = true;
         if (key == vde::KEY_DOWN || key == vde::KEY_S)
             m_down = true;
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_fireHeld = true;
+            m_firePressed = true;
+        }
         if (key == vde::KEY_Q)
             m_prevWeapon = true;
         if (key == vde::KEY_E)
@@ -52,10 +54,14 @@ class ShooterInput : public vde::examples::BaseExampleInputHandler {
 
     // -- Gamepad --
     void onGamepadButtonPress(int /*gamepadId*/, int button) override {
-        if (button == vde::GAMEPAD_BUTTON_A)
+        if (button == vde::GAMEPAD_BUTTON_A) {
             m_fireHeld = true;
-        if (button == vde::GAMEPAD_BUTTON_X)
+            m_firePressed = true;
+        }
+        if (button == vde::GAMEPAD_BUTTON_X) {
             m_fireHeld = true;
+            m_firePressed = true;
+        }
         if (button == vde::GAMEPAD_BUTTON_LEFT_BUMPER)
             m_prevWeapon = true;
         if (button == vde::GAMEPAD_BUTTON_RIGHT_BUMPER)
@@ -106,6 +112,11 @@ class ShooterInput : public vde::examples::BaseExampleInputHandler {
     }
 
     bool isFireHeld() const { return m_fireHeld; }
+    bool consumeFire() {
+        bool v = m_firePressed;
+        m_firePressed = false;
+        return v;
+    }
 
     bool consumePrevWeapon() {
         bool v = m_prevWeapon;
@@ -131,6 +142,7 @@ class ShooterInput : public vde::examples::BaseExampleInputHandler {
   private:
     bool m_left = false, m_right = false, m_up = false, m_down = false;
     bool m_fireHeld = false;
+    bool m_firePressed = false;
     bool m_prevWeapon = false, m_nextWeapon = false;
     bool m_restart = false, m_start = false;
     float m_stickX = 0.0f, m_stickY = 0.0f;
