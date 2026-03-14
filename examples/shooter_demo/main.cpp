@@ -141,7 +141,7 @@ class ShooterScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Vertical Shooter"; }
+    std::string getExampleName() const override { return "Shooter Demo"; }
 
     std::vector<std::string> getFeatures() const override {
         return {"Title screen -> Gameplay -> Game Over flow",

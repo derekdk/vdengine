@@ -19,6 +19,7 @@
 #include <cmath>
 #include <random>
 #include <cstdint>
+#include <limits>
 
 namespace vde {
 
@@ -63,8 +64,7 @@ class RandomStream {
      * @brief Random float in [0, 1).
      */
     float unit() {
-        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-        return dist(m_engine);
+        return std::generate_canonical<float, std::numeric_limits<float>::digits>(m_engine);
     }
 
     /**

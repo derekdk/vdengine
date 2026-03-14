@@ -275,10 +275,10 @@ struct WorldBounds2D {
     // ========================================================================
 
     /**
-     * @brief Check if this bounds intersects another (overlapping area > 0).
+     * @brief Check if this bounds intersects another (inclusive; edge-touching returns true).
      */
     bool intersects(const WorldBounds2D& other) const {
-        return minX < other.maxX && maxX > other.minX && minY < other.maxY && maxY > other.minY;
+        return minX <= other.maxX && maxX >= other.minX && minY <= other.maxY && maxY >= other.minY;
     }
 
     /**
