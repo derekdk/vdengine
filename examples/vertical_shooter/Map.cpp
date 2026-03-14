@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <random>
+#include <algorithm>
 
 namespace shooter {
 
