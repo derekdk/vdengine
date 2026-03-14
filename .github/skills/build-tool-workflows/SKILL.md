@@ -7,6 +7,8 @@ description: Build and test workflows for the VDE project. Use this when you nee
 
 This skill provides the essential workflows for building and testing the Vulkan Display Engine project.
 
+For the fast inner loop while debugging one failing unit test, also consult the `test-fix-loop` skill. This skill is the broad command reference; `test-fix-loop` is the focused red-green workflow.
+
 ## When to use this skill
 
 - Building the project with Visual Studio or Ninja
@@ -37,12 +39,12 @@ This skill provides the essential workflows for building and testing the Vulkan 
 
 **Build with Ninja (default):**
 ```powershell
-.\.\scripts\build.ps1
+.\scripts\build.ps1
 ```
 
 **Build with MSBuild:**
 ```powershell
-.\.\scripts\build.ps1 -Generator MSBuild
+.\scripts\build.ps1 -Generator MSBuild
 ```
 
 **Release build:**
@@ -288,10 +290,10 @@ test script (RECOMMENDED)
 **Examples:**
 ```powershell
 # Run all tests (default Ninja Debug)
-.\.\scripts\test.ps1
+.\scripts\test.ps1
 
 # Run all tests with MSBuild
-.\.\scripts\test.ps1 -Generator MSBuild
+.\scripts\test.ps1 -Generator MSBuild
 
 # Run tests matching a pattern
 .\scripts\test.ps1 -Filter "CameraTest.*"

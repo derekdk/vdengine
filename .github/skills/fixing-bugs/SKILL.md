@@ -14,6 +14,10 @@ This skill defines the required process for resolving bugs in the VDE codebase. 
 - Resolving a failing unit test or smoke test
 - Addressing code review feedback that identifies a bug
 
+## Required: Tight test loop
+
+When the bug is represented by a failing unit test, use the `test-fix-loop` skill for the inner red-green cycle. Reproduce with the narrowest `-Filter`, iterate there until green, and only then widen back out to the full unit and smoke verification required by this skill.
+
 ---
 
 ## Required Workflow
@@ -154,5 +158,6 @@ This is explicitly prohibited. See the `completing-work` skill. The only accepta
 
 - `completing-work` skill — mandatory verification checklist before declaring any task done
 - `build-tool-workflows` skill — detailed build and test command reference
+- `test-fix-loop` skill — focused workflow for filtered test iteration while fixing a bug
 - `create-tests` skill — how to add unit tests when test coverage is missing for the buggy code
 - `writing-code` skill — conventions to follow when editing engine code

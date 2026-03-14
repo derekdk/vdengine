@@ -81,6 +81,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Running, debugging, or extending automated smoke tests for examples and tools.  
 **Location:** `.github/skills/smoke-testing/SKILL.md`
 
+### test-fix-loop
+**Purpose:** Guide for reproducing failures and iterating quickly with VDE's build and test scripts.  
+**Use when:** Running a tight test-fix-build-test loop for a failing test before widening back to full verification.  
+**Location:** `.github/skills/test-fix-loop/SKILL.md`
+
 ### 2d-games
 **Purpose:** Guide for creating 2D games, demos, and examples with the VDE API.  
 **Use when:** Building 2D physics, sprite-based, or side-view applications. Setting up Camera2D, physics arenas, or choosing between manual and engine-powered collision detection.  
