@@ -1,4 +1,4 @@
-# smoke_shooter.vdescript - Smoke test for vertical shooter demo
+# smoke_shooter.vdescript - Smoke test for shooter demo
 # Tests title screen -> gameplay flow
 
 wait startup
