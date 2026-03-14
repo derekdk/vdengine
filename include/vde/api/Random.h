@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <random>
+#include <cstdint>
 
 namespace vde {
 
