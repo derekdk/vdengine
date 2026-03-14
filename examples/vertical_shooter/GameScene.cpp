@@ -177,7 +177,7 @@ void GameScene::updateTitle(float dt) {
     }
 
     auto* in = input();
-    if (in && (in->consumeStart() || in->isFireHeld())) {
+    if (in && (in->consumeStart() || in->consumeFire() || in->isFireHeld())) {
         enterPlaying();
     }
 }
@@ -211,7 +211,7 @@ void GameScene::updatePlaying(float dt) {
 
     // Fire
     m_fireCooldown.advance(dt);
-    if (in->isFireHeld() && m_fireCooldown.tryConsume()) {
+    if ((in->isFireHeld() || in->consumeFire()) && m_fireCooldown.tryConsume()) {
         m_fireCooldown.start();
         fireWeapon();
     }

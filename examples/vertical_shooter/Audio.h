@@ -8,6 +8,7 @@
 #include <vde/api/AudioClip.h>
 
 #include <memory>
+#include <string>
 
 namespace shooter {
 
