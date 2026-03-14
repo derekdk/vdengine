@@ -117,12 +117,12 @@ class RepeatingTimer {
         if (m_interval <= 0.0f)
             return 0;
         m_accumulated += deltaTime;
-        int ticks = 0;
-        while (m_accumulated >= m_interval) {
-            m_accumulated -= m_interval;
-            ++ticks;
+        if (m_accumulated >= m_interval) {
+            const int ticks = static_cast<int>(m_accumulated / m_interval);
+            m_accumulated -= m_interval * static_cast<float>(ticks);
+            return ticks;
         }
-        return ticks;
+        return 0;
     }
 
   private:
