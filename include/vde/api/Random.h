@@ -15,6 +15,7 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 #include <cstdint>
@@ -84,8 +85,13 @@ class RandomStream {
 
     /**
      * @brief Return true with the given probability [0, 1].
+     *
+     * Values outside [0, 1] are clamped to this range.
      */
-    bool chance(float probability) { return unit() < probability; }
+    bool chance(float probability) {
+        const float clamped = std::clamp(probability, 0.0f, 1.0f);
+        return unit() < clamped;
+    }
 
     /**
      * @brief Random unit direction on the 2D unit circle.
