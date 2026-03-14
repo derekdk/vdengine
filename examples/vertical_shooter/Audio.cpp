@@ -8,6 +8,7 @@
 
 #include "Audio.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
