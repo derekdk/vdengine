@@ -1,0 +1,26 @@
+# smoke_shooter.vdescript - Smoke test for shooter demo
+# Tests title screen -> gameplay flow
+
+wait startup
+wait 500
+
+# Start game from title screen
+press SPACE
+wait 1s
+
+# Move ship left
+keydown LEFT
+wait 500
+keyup LEFT
+
+# Move ship right
+keydown RIGHT
+wait 500
+keyup RIGHT
+
+# Fire bullets
+press SPACE
+wait 500
+
+wait 1s
+exit

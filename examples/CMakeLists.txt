@@ -65,8 +65,8 @@ add_custom_target(copy_example_shaders ALL
 )
 
 # Helper function to add examples with ImGui support enabled
-function(add_vde_example target_name source_files)
-    add_executable(${target_name} ${source_files})
+function(add_vde_example target_name)
+    add_executable(${target_name} ${ARGN})
     target_link_libraries(${target_name} PRIVATE vde imgui_backend)
     target_compile_definitions(${target_name} PRIVATE VDE_EXAMPLE_USE_IMGUI)
     add_dependencies(${target_name} copy_example_shaders)
@@ -176,4 +176,17 @@ add_vde_example(vde_transition_demo "transition_demo/main.cpp")
 
 # OS Stress Test - validates window/OS operations don't interfere with Vulkan rendering
 add_vde_example(vde_os_stress_demo "os_stress_demo/main.cpp")
+
+# Vertical Shooter demo - demonstrates gameplay utility library (Math2D, Timing, Random, WorldBounds2D)
+add_vde_example(vde_shooter_demo "shooter_demo/main.cpp")
+
+# Vertical Shooter (full) - top-down scrolling shooter with gamepad, procedural map, sprites, audio
+add_vde_example(vde_vertical_shooter
+    vertical_shooter/main.cpp
+    vertical_shooter/Sprites.cpp
+    vertical_shooter/Audio.cpp
+    vertical_shooter/Map.cpp
+    vertical_shooter/Entities.cpp
+    vertical_shooter/GameScene.cpp
+)
 

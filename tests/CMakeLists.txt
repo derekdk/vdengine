@@ -62,6 +62,10 @@ set(VDE_TEST_SOURCES
     TransitionManager_test.cpp
     VLauncherRunLogStorage_test.cpp
     VLauncherUtilities_test.cpp
+    # Gameplay utility tests
+    Math2D_test.cpp
+    Timing_test.cpp
+    Random_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp

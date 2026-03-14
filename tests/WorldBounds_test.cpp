@@ -308,3 +308,81 @@ TEST_F(WorldBounds2DTest, ToWorldBoundsFlat) {
     WorldBounds worldBounds = standardBounds.toWorldBounds();
     EXPECT_TRUE(worldBounds.is2D());
 }
+
+// ============================================================================
+// WorldBounds2D gameplay helper tests
+// ============================================================================
+
+TEST_F(WorldBounds2DTest, IntersectsOverlapping) {
+    WorldBounds2D other(50_m, 50_m, 150_m, 150_m);
+    EXPECT_TRUE(standardBounds.intersects(other));
+}
+
+TEST_F(WorldBounds2DTest, IntersectsDisjoint) {
+    WorldBounds2D other(200_m, 200_m, 300_m, 300_m);
+    EXPECT_FALSE(standardBounds.intersects(other));
+}
+
+TEST_F(WorldBounds2DTest, IntersectsTouching) {
+    // WorldBounds2D intersections are inclusive, so edge-touching counts.
+    WorldBounds2D other(100_m, 100_m, 200_m, 200_m);
+    EXPECT_TRUE(standardBounds.intersects(other));
+}
+
+TEST_F(WorldBounds2DTest, ContainsBoundsInside) {
+    WorldBounds2D inner(-50_m, -50_m, 50_m, 50_m);
+    EXPECT_TRUE(standardBounds.contains(inner));
+}
+
+TEST_F(WorldBounds2DTest, ContainsBoundsOverlapping) {
+    WorldBounds2D overlapping(-50_m, -50_m, 150_m, 50_m);
+    EXPECT_FALSE(standardBounds.contains(overlapping));
+}
+
+TEST_F(WorldBounds2DTest, SizeReturnsWidthHeight) {
+    auto s = standardBounds.size();
+    EXPECT_FLOAT_EQ(s.x, 200.0f);
+    EXPECT_FLOAT_EQ(s.y, 200.0f);
+}
+
+TEST_F(WorldBounds2DTest, HalfExtents) {
+    auto he = standardBounds.halfExtents();
+    EXPECT_FLOAT_EQ(he.x, 100.0f);
+    EXPECT_FLOAT_EQ(he.y, 100.0f);
+}
+
+TEST_F(WorldBounds2DTest, ClampPointInside) {
+    auto p = standardBounds.clampPoint(glm::vec2(50.0f, 50.0f));
+    EXPECT_FLOAT_EQ(p.x, 50.0f);
+    EXPECT_FLOAT_EQ(p.y, 50.0f);
+}
+
+TEST_F(WorldBounds2DTest, ClampPointOutside) {
+    auto p = standardBounds.clampPoint(glm::vec2(200.0f, -200.0f));
+    EXPECT_FLOAT_EQ(p.x, 100.0f);
+    EXPECT_FLOAT_EQ(p.y, -100.0f);
+}
+
+TEST_F(WorldBounds2DTest, TranslatedMovesCorrectly) {
+    auto moved = standardBounds.translated(glm::vec2(10.0f, 20.0f));
+    EXPECT_FLOAT_EQ(moved.minX.value, -90.0f);
+    EXPECT_FLOAT_EQ(moved.maxX.value, 110.0f);
+    EXPECT_FLOAT_EQ(moved.minY.value, -80.0f);
+    EXPECT_FLOAT_EQ(moved.maxY.value, 120.0f);
+}
+
+TEST_F(WorldBounds2DTest, ExpandedGrowsOutward) {
+    auto grown = standardBounds.expanded(10_m, 5_m);
+    EXPECT_FLOAT_EQ(grown.minX.value, -110.0f);
+    EXPECT_FLOAT_EQ(grown.maxX.value, 110.0f);
+    EXPECT_FLOAT_EQ(grown.minY.value, -105.0f);
+    EXPECT_FLOAT_EQ(grown.maxY.value, 105.0f);
+}
+
+TEST_F(WorldBounds2DTest, FromCenterSizeVec2) {
+    auto b = WorldBounds2D::fromCenterSize(glm::vec2(0.0f, 0.0f), glm::vec2(100.0f, 50.0f));
+    EXPECT_FLOAT_EQ(b.minX.value, -50.0f);
+    EXPECT_FLOAT_EQ(b.maxX.value, 50.0f);
+    EXPECT_FLOAT_EQ(b.minY.value, -25.0f);
+    EXPECT_FLOAT_EQ(b.maxY.value, 25.0f);
+}

@@ -1,0 +1,22 @@
+# smoke_vertical_shooter.vdescript — Smoke test for the vertical shooter example
+wait startup
+wait 500
+press ENTER
+wait 1s
+keydown SPACE
+wait 300
+keyup SPACE
+wait 500
+press E
+wait 500
+keydown SPACE
+wait 300
+keyup SPACE
+wait 500
+press E
+wait 300
+keydown SPACE
+wait 300
+keyup SPACE
+wait 2s
+exit
