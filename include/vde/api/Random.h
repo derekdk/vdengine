@@ -4,8 +4,11 @@
  * @file Random.h
  * @brief Seedable randomness for gameplay, tests, and scripted runs
  *
- * Provides a deterministic random stream backed by std::mt19937.
- * Use explicit seeds for reproducible tests and replays.
+ * Provides a deterministic random stream backed by std::mt19937 when used
+ * with a fixed seed on a given platform/standard library implementation.
+ * Use explicit seeds for reproducible tests and replays within the same
+ * build environment; cross-platform bit-identical sequences are not
+ * guaranteed.
  */
 
 #include <vde/api/WorldBounds.h>
@@ -21,9 +24,11 @@ namespace vde {
 /**
  * @brief Seedable random number stream.
  *
- * Backed by std::mt19937 for deterministic, portable behavior.
- * Construct with a fixed seed for reproducible results, or use
- * fromEntropy() for non-deterministic seeding.
+ * Backed by std::mt19937 for deterministic behavior with a fixed seed
+ * when using the same C++ standard library implementation. Construct
+ * with a fixed seed for reproducible results, or use fromEntropy() for
+ * non-deterministic seeding. Cross-platform bit-identical sequences are
+ * not guaranteed.
  */
 class RandomStream {
   public:
