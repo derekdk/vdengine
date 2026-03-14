@@ -139,7 +139,13 @@ static std::shared_ptr<vde::AudioClip> loadGenerated(const std::string& path,
 }
 
 SoundBank generateSoundBank(const std::string& tempDir) {
-    std::filesystem::create_directories(tempDir);
+    std::error_code ec;
+    std::filesystem::create_directories(tempDir, ec);
+    if (ec) {
+        std::cerr << "Audio: failed to create temp dir " << tempDir << ": " << ec.message()
+                  << std::endl;
+        return {};
+    }
     SoundBank bank;
 
     bank.shoot = loadGenerated(tempDir + "/shoot.wav", synthLaser(0.12f, 880.0f, 440.0f, 0.35f));

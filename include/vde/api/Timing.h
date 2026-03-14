@@ -18,12 +18,15 @@ namespace vde {
  */
 class Cooldown {
   public:
-    explicit Cooldown(float durationSeconds = 0.0f) : m_duration(durationSeconds) {}
+    explicit Cooldown(float durationSeconds = 0.0f)
+        : m_duration(durationSeconds < 0.0f ? 0.0f : durationSeconds) {}
 
     /**
      * @brief Change the cooldown duration. Does not reset elapsed time.
      */
-    void setDuration(float durationSeconds) { m_duration = durationSeconds; }
+    void setDuration(float durationSeconds) {
+        m_duration = durationSeconds < 0.0f ? 0.0f : durationSeconds;
+    }
 
     /**
      * @brief Start the cooldown (resets elapsed to 0).
@@ -41,9 +44,11 @@ class Cooldown {
     void finish() { m_elapsed = m_duration; }
 
     /**
-     * @brief Advance time.
+     * @brief Advance time. Non-positive deltaTime is ignored.
      */
     void advance(float deltaTime) {
+        if (deltaTime <= 0.0f)
+            return;
         m_elapsed += deltaTime;
         if (m_elapsed > m_duration)
             m_elapsed = m_duration;
@@ -111,10 +116,10 @@ class RepeatingTimer {
      * @brief Advance time and return the number of ticks that elapsed.
      *
      * If the interval is very small relative to deltaTime, multiple
-     * ticks may fire in a single call.
+     * ticks may fire in a single call. Non-positive deltaTime is ignored.
      */
     int advance(float deltaTime) {
-        if (m_interval <= 0.0f)
+        if (m_interval <= 0.0f || deltaTime <= 0.0f)
             return 0;
         m_accumulated += deltaTime;
         if (m_accumulated >= m_interval) {
