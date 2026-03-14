@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <cctype>
 
 namespace shooter {
 
@@ -107,7 +108,7 @@ static constexpr uint8_t kFont5x7[26][7] = {
 
 // Returns the 5-bit row mask for a character (uppercase output, supports A-Z, space, '/', '-')
 static uint8_t fontRow(char c, int row) {
-    c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     if (c >= 'A' && c <= 'Z')
         return kFont5x7[c - 'A'][row];
     if (c == '/') {
