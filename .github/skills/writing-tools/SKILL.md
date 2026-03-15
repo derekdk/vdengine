@@ -275,41 +275,13 @@ Example use case: Automate testing of the tool's UI by clicking buttons and veri
 
 See the **scripted-input** skill for details on `--input-script` support and creating smoke tests.
 
-## CMakeLists.txt Template
+## CMakeLists.txt
 
-```cmake
-# My Tool
-# Brief description
+Add the tool to `tools/CMakeLists.txt`. See the `writing-code` skill's CMake section for the standard `add_executable` / `target_link_libraries` pattern. Tools must also link `imgui_backend`. Use existing tools in that file as a template.
 
-add_executable(vde_my_tool
-    main.cpp
-    MyToolScene.cpp
-    MyToolScene.h
-    # Add more source files
-)
+## Reference
 
-target_link_libraries(vde_my_tool PRIVATE
-    vde
-    imgui_backend  # Always link ImGui for tools
-)
-
-add_dependencies(vde_my_tool copy_tool_shaders)
-
-# Copy shaders to output directory
-add_custom_command(TARGET vde_my_tool POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/shaders
-        $<TARGET_FILE_DIR:vde_my_tool>/shaders
-    COMMENT "Copying shaders to tool directory..."
-)
-
-# If tool needs additional assets:
-# add_custom_command(TARGET vde_my_tool POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy_directory
-#         ${CMAKE_CURRENT_SOURCE_DIR}/assets
-#         $<TARGET_FILE_DIR:vde_my_tool>/assets
-# )
-```
+The sections below contain command design templates, ImGui UI patterns, testing details, and complete examples. Read only when implementing a tool.
 
 ## Command Design Patterns
 
@@ -471,29 +443,12 @@ ImGui::End();
    - Test error handling
 
 ### Smoke Testing (Automated Input)
-Tools can also use the **scripted-input** system for UI automation and smoke testing. This is separate from tool command scripts:
+Tools use the `scripted-input` system for UI automation and smoke testing. This is separate from tool command scripts:
 
 - **Tool scripts** define _what to create_ (geometry, materials, etc.)
 - **Input scripts** (`.vdescript`) define _how to interact with UI_ (clicks, keys)
 
-**Create a smoke test for your tool:**
-1. Create `smoketests/scripts/smoke_<tool_name>.vdescript`
-2. Test key UI interactions, command execution, etc.
-3. Add to smoke test runner (see writing-examples skill)
-
-**Example:**
-```vdescript
-# smoke_my_tool.vdescript
-wait startup
-wait 500
-press F1          # Toggle UI
-wait 500
-click 640 360     # Click in viewport
-wait 2s
-exit
-```
-
-**Note:** Input scripts test the UI interaction layer, while tool command scripts test the batch processing layer. Both are important for comprehensive testing.
+See the `scripted-input` skill for `.vdescript` syntax and the `smoke-testing` skill for adding your tool to the smoke test runner.
 
 ### Example Scripts
 3. **Create Example Scripts:**

@@ -34,12 +34,15 @@ Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default)'
 Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
 Write-Cmd '.\scripts\test.ps1' 'Run all tests'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'
+Write-Cmd '.\scripts\smoke-test.ps1' 'Run smoke tests'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Launch VLauncher from root'
 Write-Cmd '.\scripts\install-hooks.ps1' 'Enable local main-branch commit protection'
 
 Write-Title "COMMON TASKS"
 Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
 Write-Cmd '.\scripts\test.ps1 -Filter "Camera*"' 'Run specific tests'
+Write-Cmd '.\scripts\test.ps1 -ProblemsOnly' 'Show only warnings/failures plus final status'
+Write-Cmd '.\scripts\smoke-test.ps1 -ProblemsOnly' 'Show only smoke-test warnings/failures plus final status'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean rebuild'
 Write-Cmd '.\scripts\clean.ps1 -Full' 'Full clean (removes build dir)'
 

@@ -1,6 +1,6 @@
 # VDE Test Script
 # Runs unit tests with GoogleTest
-# Usage: .\scripts\test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Filter <pattern>] [-Build] [-Verbose]
+# Usage: .\scripts\test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Filter <pattern>] [-Build] [-Verbose] [-ProblemsOnly]
 
 param(
     [ValidateSet("MSBuild", "Ninja")]
@@ -13,16 +13,18 @@ param(
     
     [switch]$Build = $false,  # Build before testing
     
-    [switch]$Verbose = $false  # Verbose test output
+    [switch]$Verbose = $false,  # Verbose test output
+
+    [switch]$ProblemsOnly = $false  # Emit only warnings/failures plus a final PASS/FAIL line
 )
 
 $ErrorActionPreference = "Stop"
 
-# Colors for output
-function Write-Success { param([string]$msg) Write-Host $msg -ForegroundColor Green }
-function Write-Info { param([string]$msg) Write-Host $msg -ForegroundColor Cyan }
-function Write-Warn { param([string]$msg) Write-Host $msg -ForegroundColor Yellow }
-function Write-Err { param([string]$msg) Write-Host $msg -ForegroundColor Red }
+$failurePattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file:\s*Failure|^\s*error\b|\berror:|\bfatal error\b|\bfailed to\b|\bexception thrown\b)'
+$warningPattern = '(?i)(^\s*warning\b|\bwarning:|\bvalidation layer\b)'
+$problemPattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file:\s*Failure|^\s*error\b|\berror:|\bfatal error\b|\bfailed to\b|\bexception thrown\b|^\s*warning\b|\bwarning:|\bvalidation layer\b)'
+
+. "$PSScriptRoot\vde-problems-only-helpers.ps1"
 
 Write-Info "=========================================="
 Write-Info "VDE Test Script"
@@ -46,11 +48,15 @@ Write-Info "Filter: $Filter"
 
 # Build if requested
 if ($Build) {
-    Write-Info "Building before running tests..."
-    & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
-    if ($LASTEXITCODE -ne 0) {
-        Write-Err "Build failed! Cannot run tests."
-        exit 1
+    if ($ProblemsOnly) {
+        Invoke-BuildForProblemsOnly -BuildScriptPath "$scriptDir\build.ps1" -SelectedGenerator $Generator -SelectedConfig $Config
+    } else {
+        Write-Info "Building before running tests..."
+        & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Build failed! Cannot run tests."
+            exit 1
+        }
     }
 }
 
@@ -85,6 +91,47 @@ if ($Verbose) {
 }
 
 # Run tests
+if ($ProblemsOnly) {
+    $stdout = [IO.Path]::GetTempFileName()
+    $stderr = [IO.Path]::GetTempFileName()
+
+    try {
+        & $testExe $testArgs > $stdout 2> $stderr
+        $testExitCode = $LASTEXITCODE
+
+        $allLines = @()
+        if (Test-Path $stdout) {
+            $allLines += Get-Content -Path $stdout -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $stderr) {
+            $allLines += Get-Content -Path $stderr -ErrorAction SilentlyContinue
+        }
+
+        $problemLines = Get-ProblemLines -Lines $allLines
+        if ($problemLines.Count -eq 0 -and $testExitCode -ne 0) {
+            $problemLines = @($allLines | Select-Object -Last 40)
+        }
+
+        Write-ProblemLines -Lines $problemLines
+
+        if ($testExitCode -ne 0) {
+            Write-Err "FAILURE: Tests FAILED with exit code $testExitCode"
+            exit 1
+        }
+    }
+    finally {
+        if (Test-Path $stdout) {
+            Remove-Item $stdout -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $stderr) {
+            Remove-Item $stderr -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Pass "All tests passed."
+    exit 0
+}
+
 & $testExe $testArgs
 
 if ($LASTEXITCODE -ne 0) {

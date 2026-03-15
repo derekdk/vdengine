@@ -168,11 +168,6 @@ This ordering is mandatory. Do not declare completion after a successful smoke t
 
 ### New PowerShell scripts
 
-PowerShell 5.1 (Windows default) has several sharp edges that are invisible in code review but cause failures at runtime:
-
-- **Encoding**: Non-ASCII characters (em dashes, arrows, Greek letters) in script source cause parse errors under CP1252. Run the script and look for `ParserError` or `OperationStopped` at startup.
-- **No `?.` or `??` operators**: These throw errors at parse time, not runtime.
-- **Automatic variables**: `$matches`, `$input`, `$args`, `$error`, `$null` are reserved; naming a variable with these names causes silent or noisy conflicts.
-- **Collection-in-loop mutation**: `foreach ($x in $ht.Keys)` will throw `InvalidOperationException` if the loop body modifies the hashtable. Snapshot first: `$keys = @($ht.Keys); foreach ($x in $keys)`.
+See the `terminal-management` skill for PowerShell 5.1 encoding pitfalls, unsupported operators, reserved variables, and collection mutation traps.
 
 Always run a new PowerShell script at least once end-to-end before declaring it complete.

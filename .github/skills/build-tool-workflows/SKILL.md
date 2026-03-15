@@ -7,6 +7,8 @@ description: Build and test workflows for the VDE project. Use this when you nee
 
 This skill provides the essential workflows for building and testing the Vulkan Display Engine project.
 
+For the fast inner loop while debugging one failing unit test, also consult the `test-fix-loop` skill. This skill is the broad command reference; `test-fix-loop` is the focused red-green workflow.
+
 ## When to use this skill
 
 - Building the project with Visual Studio or Ninja
@@ -37,12 +39,12 @@ This skill provides the essential workflows for building and testing the Vulkan 
 
 **Build with Ninja (default):**
 ```powershell
-.\.\scripts\build.ps1
+.\scripts\build.ps1
 ```
 
 **Build with MSBuild:**
 ```powershell
-.\.\scripts\build.ps1 -Generator MSBuild
+.\scripts\build.ps1 -Generator MSBuild
 ```
 
 **Release build:**
@@ -75,6 +77,11 @@ This skill provides the essential workflows for building and testing the Vulkan 
 .\scripts\test.ps1 -Filter "CameraTest.*"
 ```
 
+**Run tests with AI-friendly failure-only output:**
+```powershell
+.\scripts\test.ps1 -ProblemsOnly
+```
+
 **Build and test in one command:**
 ```powershell
 .\scripts\test.ps1 -Build
@@ -98,6 +105,11 @@ This skill provides the essential workflows for building and testing the Vulkan 
 **Smoke test with filter:**
 ```powershell
 .\scripts\smoke-test.ps1 -Filter "*physics*"
+```
+
+**Run smoke tests with AI-friendly failure-only output:**
+```powershell
+.\scripts\smoke-test.ps1 -ProblemsOnly
 ```
 
 **Build and smoke test:**
@@ -161,6 +173,7 @@ This skill provides the essential workflows for building and testing the Vulkan 
 - `-Filter` - GoogleTest filter pattern (default: "*")
 - `-Build` - Build before running tests
 - `-Verbose` - Verbose test output
+- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
 
 **smoke-test.ps1**
 - `-Category` - All (default), Examples, or Tools
@@ -169,6 +182,7 @@ This skill provides the essential workflows for building and testing the Vulkan 
 - `-Config` - Debug (default) or Release
 - `-Build` - Build before running smoke tests
 - `-Verbose` - Verbose output with detailed error messages
+- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
 
 **format.ps1**
 - `-Check` - Check formatting without modifying files (CI/pre-commit)
@@ -181,6 +195,10 @@ This skill provides the essential workflows for building and testing the Vulkan 
 
 **help.ps1**
 - No parameters - displays quick reference for all build scripts
+
+## Reference
+
+The sections below contain manual build commands for advanced troubleshooting. The scripts above handle all standard workflows.
 
 ## Manual Build (Advanced)
 
@@ -279,122 +297,19 @@ cmake --build build_ninja
 
 **Problem:** Errors like "fatal error C1034: algorithm: no include path set" or "Cannot open include file: 'stddef.h'"
 **Solution:** The VS Developer environment is not loaded. Run the Step 1 commands above to load the environment, then try building again.
-test script (RECOMMENDED)
+
+## Running Unit Tests
 
 ```powershell
-.\scripts\test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Filter <pattern>] [-Build]
+.\scripts\test.ps1                                    # Run all tests (default Ninja Debug)
+.\scripts\test.ps1 -Filter "CameraTest.*"             # Filter by test name
+.\scripts\test.ps1 -Build                             # Build first, then test
+.\scripts\test.ps1 -Build -Filter "Suite.TestName"    # Build + filtered test
+.\scripts\test.ps1 -ProblemsOnly                      # AI-friendly output
+.\scripts\test.ps1 -Generator MSBuild -Config Release # Non-default config
 ```
 
-**Examples:**
-```powershell
-# Run all tests (default Ninja Debug)
-.\.\scripts\test.ps1
-
-# Run all tests with MSBuild
-.\.\scripts\test.ps1 -Generator MSBuild
-
-# Run tests matching a pattern
-.\scripts\test.ps1 -Filter "CameraTest.*"
-
-# Build and test in one command
-.\scripts\test.ps1 -Build
-
-# Run release tests with Ninja
-.\scripts\test.ps1 -Generator Ninja -Config Release -Build
-```
-
-## Smoke Tests (Automated Example Testing)
-
-Smoke tests auto-discover and run all built examples and tools with automated input scripts to verify they launch and exit cleanly.
-
-```powershell
-.\scripts\smoke-test.ps1 [-Category All|Examples|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Verbose]
-```
-
-**Examples:**
-```powershell
-# Run all smoke tests — examples and tools (default Ninja Debug)
-.\scripts\smoke-test.ps1
-
-# Run only example smoke tests
-.\scripts\smoke-test.ps1 -Category Examples
-
-# Run only tool smoke tests
-.\scripts\smoke-test.ps1 -Category Tools
-
-# Filter to run specific tests by name pattern
-.\scripts\smoke-test.ps1 -Filter "*physics*"
-.\scripts\smoke-test.ps1 -Filter "vde_vlauncher*"
-
-# Build and smoke test in one command
-.\scripts\smoke-test.ps1 -Build
-
-# Verbose mode shows detailed error output
-.\scripts\smoke-test.ps1 -Verbose
-
-# Smoke test with MSBuild Release configuration
-.\scripts\smoke-test.ps1 -Generator MSBuild -Config Release -Build
-```
-
-**VS Code Task:**
-- Run Task: `scripts: smoke-test`
-
-**What it does:**
-- Auto-discovers `vde_*.exe` in the build directory (examples and tools)
-- Runs each executable with its corresponding smoke test script from `scripts/input/`
-- Uses `smoke_quick.vdescript` for executables without custom scripts
-- Reports pass/fail per executable with category breakdown (Examples/Tools)
-- Exits with code 1 if any test fails
-
-**See also:** The **smoke-testing** and **scripted-input** skills for detailed guidance.
-
-### Using the legacy build-and-test script
-
-```powershell
-./scripts/build-and-test.ps1 [-BuildConfig Debug|Release] [-NoBuild] [-NoTest] [-Filter <gtest-pattern>] [-Generator MSBuild|Ninja]
-```
-
-**Note:** This script is deprecated. Use `build.ps1` and `test.ps1` instea
-
-```powershell
-./scripts/build-and-test.ps1 [-BuildConfig Debug|Release] [-NoBuild] [-NoTest] [-Filter <gtest-pattern>]
-```
-
-This script builds and runs tests with GoogleTest filters if provided.
-
-**Examples:**
-```powershell
-# Build and run all tests
-./scripts/build-and-test.ps1
-
-# Run tests without building
-./scripts/build-and-test.ps1 -NoBuild
-
-# RuUse the build scripts for all standard tasks:**
-  - `.\scripts\build.ps1` - Primary build command
-  - `.\scripts\test.ps1` - Run tests efficiently
-  - `.\scripts\rebuild.ps1` - Clean rebuild when needed
-  - `.\scripts\clean.ps1` - Clean build artifacts
-  
-- **Choose the right build system:**
-  - Ninja (default) - Faster builds, better for development/iteration
-  - MSBuild - Multi-configuration, IDE integration, simple setup
-  - Testing efficiently:**
-  - Use `.\scripts\test.ps1` for quick test runs
-  - Use `-Filter` to run specific tests during focused development
-  - Use `-Build` flag to ensure latest code is tested
-  - Run tests frequently during developmen
-```powershell
-ctest --test-dir build --build-config Debug --output-on-failure
-```
-
-**Ninja build:**
-```powershell
-ctest --test-dir build_ninja --output-on-failure
-```
-(default) - Includes symbols and assertions for development
-  - Release - Optimized for performance testing
-  - Scripts handle configuration switching automatically
+For fast red-green iteration with filtered tests, see the `test-fix-loop` skill.
 
 ## Troubleshooting
 
@@ -414,31 +329,9 @@ ctest --test-dir build_ninja --output-on-failure
 
 ## Best Practices
 
-- **Use the build scripts for all standard tasks:**
-  - `.\scripts\build.ps1` - Primary build command
-  - `.\scripts\test.ps1` - Run tests efficiently
-  - `.\scripts\rebuild.ps1` - Clean rebuild when needed
-  - `.\scripts\clean.ps1` - Clean single build directory
-  - `.\scripts\clean-all.ps1` - Clean all build directories at once
-  - `.\scripts\format.ps1` - Format code before committing
-  - `.\scripts\help.ps1` - Quick reference when you need a reminder
-  
-- **Choose the right build system:**
-  - Ninja (default) - Faster builds, better for development/iteration
-  - MSBuild - Multi-configuration, IDE integration, simple setup
-  
-- **Testing efficiently:**
-  - Use `.\scripts\test.ps1` for quick test runs
-  - Use `-Filter` to run specific tests during focused development
-  - Use `-Build` flag to ensure latest code is tested
-  - Run tests frequently during development
-  - Use `.\scripts\smoke-test.ps1` to validate all examples and tools
-  
-- **Code formatting:**
-  - Run `.\scripts\format.ps1 -Check` before committing to verify formatting
-  - Use `.\scripts\format.ps1` to automatically fix formatting issues
-  
-- **Build configurations:**
-  - Debug (default) - Includes symbols and assertions for development
-  - Release - Optimized for performance testing
-  - Scripts handle configuration switching automatically
+- **Use the build scripts for all standard tasks** — never bypass them with raw CMake unless troubleshooting.
+- **Ninja (default)** for faster builds during development. MSBuild for IDE integration.
+- **Use `-Filter`** for focused test runs during development. See `test-fix-loop` skill for the full iteration strategy.
+- **Use `-ProblemsOnly`** when running tests for verification — keeps output small and parseable.
+- **Run `.\scripts\format.ps1 -Check`** before committing to verify formatting.
+- **See the `terminal-management` skill** for PowerShell pitfalls, long-running command handling, and terminal session health.

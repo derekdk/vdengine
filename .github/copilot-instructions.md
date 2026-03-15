@@ -7,6 +7,10 @@ VDE is a lightweight Vulkan-based 3D rendering engine for rapid prototyping and 
 Two-layer design with low-level rendering 
 Engine uses modern C++20 with RAII for all Vulkan resources.
 
+Always uses the provided build scripts and tools for building, testing, and running examples to ensure consistency and reliability.
+
+Never use the CMake tools extension directly or bypass the build and tool scripts.
+
 ## Available Skills
 
 The following skills provide domain-specific knowledge for working with VDE:
@@ -14,11 +18,13 @@ The following skills provide domain-specific knowledge for working with VDE:
 ### using-api
 **Purpose:** Guide for using the VDE Game API to create games, demos, applications, and examples.  
 **Use when:** Creating applications with the high-level Game API, working with Scene/Entity/Resource system, or implementing gameplay features.  
+**Skip when:** Making small edits to an existing scene where the API patterns are already established.  
 **Location:** `.github/skills/using-api/SKILL.md`
 
 ### add-component
 **Purpose:** Guide for adding new components to the VDE engine.  
 **Use when:** Creating new classes, systems, or modules in the engine.  
+**Skip when:** Modifying existing components or working only at the Game API level.  
 **Location:** `.github/skills/add-component/SKILL.md`
 
 ### adding-features
@@ -30,6 +36,12 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Purpose:** Guide for creating new skills in the VDE project.  
 **Use when:** Recognizing a repeatable process with expensive-to-acquire knowledge, or when the user identifies a deficiency in how the AI completed work — create a skill immediately to close the loop.  
 **Location:** `.github/skills/adding-skills/SKILL.md`
+
+### architecture
+**Purpose:** Quick map of engine layout and key systems.  
+**Use when:** You need to understand where files should be located, orient to the repo, or wire new features into the correct directories.  
+**Skip when:** You already know the target directory from context.  
+**Location:** `.github/skills/architecture/SKILL.md`
 
 ### build-tool-workflows
 **Purpose:** Build and test workflows for the VDE project.  
@@ -49,11 +61,13 @@ The following skills provide domain-specific knowledge for working with VDE:
 ### vulkan-patterns
 **Purpose:** Vulkan patterns and common tasks for the VDE engine.  
 **Use when:** Working with Vulkan resources, buffers, textures, or descriptors.  
+**Skip when:** The change doesn't touch Vulkan-level code (e.g., pure gameplay logic or UI).  
 **Location:** `.github/skills/vulkan-patterns/SKILL.md`
 
 ### writing-code
 **Purpose:** Comprehensive guide for writing code in the VDE engine.  
 **Use when:** Need information about coding conventions, file organization, CMake integration, or best practices.  
+**Skip when:** Making edits to existing files where conventions are already established.  
 **Location:** `.github/skills/writing-code/SKILL.md`
 
 ### writing-examples
@@ -69,6 +83,7 @@ The following skills provide domain-specific knowledge for working with VDE:
 ### imgui-integration
 **Purpose:** Guide for integrating Dear ImGui with VDE applications.  
 **Use when:** Adding debug UI, tools, or overlay interfaces to VDE games and examples.  
+**Skip when:** The application already has ImGui set up and you are editing existing UI code.  
 **Location:** `.github/skills/imgui-integration/SKILL.md`
 
 ### scripted-input
@@ -79,7 +94,18 @@ The following skills provide domain-specific knowledge for working with VDE:
 ### smoke-testing
 **Purpose:** Guide for running smoke tests and interpreting the results.  
 **Use when:** Running, debugging, or extending automated smoke tests for examples and tools.  
+**Skip when:** Only running unit tests or the change doesn't affect any runnable executable.  
 **Location:** `.github/skills/smoke-testing/SKILL.md`
+
+### test-fix-loop
+**Purpose:** Guide for reproducing failures and iterating quickly with VDE's build and test scripts.  
+**Use when:** Running a tight test-fix-build-test loop for a failing test before widening back to full verification.  
+**Location:** `.github/skills/test-fix-loop/SKILL.md`
+
+### terminal-management
+**Purpose:** Rules for running commands in the terminal and writing PowerShell scripts in the VDE project.  
+**Use when:** Running long-running commands (smoke tests, full builds), handling terminal output or truncation, writing or editing PowerShell scripts, or diagnosing terminal session issues.  
+**Location:** `.github/skills/terminal-management/SKILL.md`
 
 ### 2d-games
 **Purpose:** Guide for creating 2D games, demos, and examples with the VDE API.  
@@ -90,3 +116,13 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Purpose:** Checklist and rules for verifying that scripts, tools, and workflows actually work before announcing a task is complete.  
 **Use when:** Finishing any task that involves writing or modifying scripts, build tools, automation, or any executable artifact — before telling the user the work is done.  
 **Location:** `.github/skills/completing-work/SKILL.md`
+
+## Testing Decision Tree
+
+| Need | Skill |
+|------|-------|
+| Run existing tests | `build-tool-workflows` |
+| Fix a failing test | `test-fix-loop` |
+| Write a new unit test | `create-tests` |
+| Write a smoke test | `scripted-input` + `smoke-testing` |
+| Verify before declaring done | `completing-work` |
