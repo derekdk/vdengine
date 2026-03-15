@@ -1613,13 +1613,14 @@ void Game::createMeshRenderingPipeline() {
     // Create descriptor pool for mesh texture descriptor sets
     VkDescriptorPoolSize meshTexturePoolSize{};
     meshTexturePoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    meshTexturePoolSize.descriptorCount = 256;
+    meshTexturePoolSize.descriptorCount = 1024;
 
     VkDescriptorPoolCreateInfo meshTexturePoolInfo{};
     meshTexturePoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    meshTexturePoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     meshTexturePoolInfo.poolSizeCount = 1;
     meshTexturePoolInfo.pPoolSizes = &meshTexturePoolSize;
-    meshTexturePoolInfo.maxSets = 256;
+    meshTexturePoolInfo.maxSets = 1024;
 
     if (vkCreateDescriptorPool(device, &meshTexturePoolInfo, nullptr,
                                &m_meshTextureDescriptorPool) != VK_SUCCESS) {
@@ -1888,15 +1889,16 @@ void Game::createSpriteRenderingPipeline() {
     // Create descriptor pool for sprite descriptor sets
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 100;  // Support up to 100 sprite descriptor sets
+    poolSizes[0].descriptorCount = 1024;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = 100;
+    poolSizes[1].descriptorCount = 1024;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = 100;
+    poolInfo.maxSets = 1024;
 
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_spriteDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create sprite descriptor pool");

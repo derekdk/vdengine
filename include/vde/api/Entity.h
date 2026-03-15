@@ -186,9 +186,13 @@ class MeshEntity : public Entity {
 
     /**
      * @brief Set the texture directly (takes shared ownership).
+      *
+      * Automatically retires the old texture when this entity is attached to
+      * a scene so in-flight command buffers can finish safely.
+      *
      * @param texture The texture to use
      */
-    void setTexture(std::shared_ptr<Texture> texture) { m_texture = std::move(texture); }
+     void setTexture(std::shared_ptr<Texture> texture);
 
     /**
      * @brief Get the texture.
@@ -260,9 +264,13 @@ class SpriteEntity : public Entity {
 
     /**
      * @brief Set the sprite texture directly (takes shared ownership).
+     *
+      * Automatically retires the old texture when this entity is attached to
+      * a scene so in-flight command buffers can finish safely.
+     *
      * @param texture The texture to render
      */
-    void setTexture(std::shared_ptr<Texture> texture) { m_texture = std::move(texture); }
+    void setTexture(std::shared_ptr<Texture> texture);
 
     /**
      * @brief Get the texture.

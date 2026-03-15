@@ -352,10 +352,14 @@ void Scene::retireResource(std::shared_ptr<void> resource) {
 }
 
 void Scene::flushDeferredCommands() {
-    // Release resources that were kept alive for GPU lifetime safety.
-    // By the time the update phase runs, the previous frame's command
-    // buffer has completed (drawFrame waits on in-flight fences).
-    m_retiredResources.clear();
+    // Two-stage retirement: destroy resources that have survived two
+    // flush cycles.  With MAX_FRAMES_IN_FLIGHT == 2, by this point
+    // every command buffer that could have referenced them has been
+    // waited on via the in-flight fences in drawFrame().
+    m_retiredResourcesPrev.clear();
+    m_retiredResourcesPrev.swap(m_retiredResources);
+    // m_retiredResources is now empty; m_retiredResourcesPrev holds
+    // resources retired during the previous frame (destroyed next flush).
 
     // Execute queued commands (entity add/remove, mesh swaps, etc.)
     // Swap the queue to a local so that commands can safely queue more

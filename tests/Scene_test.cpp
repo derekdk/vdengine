@@ -5,6 +5,7 @@
  * Tests Scene entity management, camera, lighting, and world bounds.
  */
 
+#include <vde/Texture.h>
 #include <vde/api/CameraBounds.h>
 #include <vde/api/Entity.h>
 #include <vde/api/GameCamera.h>
@@ -533,8 +534,32 @@ TEST_F(SceneTest, RetireResourceKeepsAlive) {
     EXPECT_FALSE(weak.expired());
 
     scene->update(0.016f);
-    // flushDeferredCommands clears retired resources
+    // After one flush the resource moves to the prev-stage; still alive
+    // so that MAX_FRAMES_IN_FLIGHT command buffers can finish safely.
+    EXPECT_FALSE(weak.expired());
+
+    scene->update(0.016f);
+    // Second flush destroys prev-stage resources — now truly gone.
     EXPECT_TRUE(weak.expired());
+}
+
+TEST_F(SceneTest, MeshEntityTextureSwapKeepsOldTextureAliveUntilSecondFlush) {
+    auto entity = scene->addEntity<MeshEntity>();
+    auto firstTexture = std::make_shared<Texture>();
+    auto secondTexture = std::make_shared<Texture>();
+    std::weak_ptr<Texture> firstWeak = firstTexture;
+
+    entity->setTexture(firstTexture);
+    entity->setTexture(secondTexture);
+    firstTexture.reset();
+
+    EXPECT_FALSE(firstWeak.expired());
+
+    scene->update(0.016f);
+    EXPECT_FALSE(firstWeak.expired());
+
+    scene->update(0.016f);
+    EXPECT_TRUE(firstWeak.expired());
 }
 
 TEST_F(SceneTest, DeferCommandCount) {
