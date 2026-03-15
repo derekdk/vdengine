@@ -66,6 +66,8 @@ set(VDE_TEST_SOURCES
     Math2D_test.cpp
     Timing_test.cpp
     Random_test.cpp
+    # Text rendering tests
+    TextRenderer_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
