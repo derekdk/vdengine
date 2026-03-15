@@ -18,6 +18,8 @@ This skill describes how to run smoke tests, interpret their results, add smoke 
 
 ## Required: Smoke tests are long-running
 
+Always poll for output until the final summary block appears. Do not assume the result from early output lines, as the script runs each test sequentially and may take several minutes to complete.
+
 Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the script launches every discovered example and tool one at a time.
 
 If you are an AI agent or otherwise driving the terminal programmatically:
