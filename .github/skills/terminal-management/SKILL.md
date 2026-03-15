@@ -31,7 +31,7 @@ Every VDE script prints an explicit final line. Do not consider a command finish
 
 | Script | Success marker | Failure marker |
 |--------|---------------|----------------|
-| `test.ps1` | `All tests PASSED` | `TESTS FAILED` |
+| `test.ps1` | `All tests PASSED!` or `PASS: All tests passed.` | `Tests FAILED with exit code ...` or `FAILURE: Tests FAILED with exit code ...` |
 | `smoke-test.ps1` | `All smoke tests PASSED!` | `SMOKE TESTS FAILED` |
 | `build.ps1` | `Build succeeded` | `Build FAILED` |
 
