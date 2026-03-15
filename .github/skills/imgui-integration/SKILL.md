@@ -295,6 +295,10 @@ void MyGame::cleanupImGui() {
 }
 ```
 
+## Reference
+
+The sections below contain UI code templates, best practices, pitfalls, and advanced patterns. Read only when implementing or debugging ImGui code.
+
 ## Common UI Patterns
 
 ### Entity Inspector Panel

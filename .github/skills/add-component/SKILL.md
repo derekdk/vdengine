@@ -174,7 +174,7 @@ Follow these conventions from [conventions.md](../../conventions.md):
 ## Best Practices
 
 - **One class per file:** Keep headers and implementations focused
-- **RAII for resources:** Use constructors/destructors for Vulkan resource management
+- **RAII for resources:** Follow the RAII pattern from the `vulkan-patterns` skill: delete copy, implement move, cleanup in destructor
 - **Document public APIs:** Use Doxygen-style comments with @brief, @param, @return, @throws
 - **Error handling:** Throw `std::runtime_error` for unrecoverable issues; return values for recoverable cases
 - **Include guards:** Use `#pragma once` in all headers
@@ -286,12 +286,4 @@ TEST(BufferManagerTest, CreateBufferSucceeds) {
 
 ## Verification
 
-After adding a component:
-
-1. **Build succeeds:** `cmake --build build --config Debug`
-2. **Tests pass:** `./scripts/build-and-test.ps1 -NoBuild`
-3. **No warnings:** Check compiler output for warnings
-4. **Documentation clear:** Review Doxygen comments for clarity
-5. **Follows conventions:** Verify naming and style match project standards
-
-See [build-tool-workflows](../build-tool-workflows/SKILL.md) for build and test commands.
+After adding a component, follow the `completing-work` skill for mandatory build, test, smoke test, and subagent review verification.

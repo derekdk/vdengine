@@ -15,17 +15,9 @@ This skill describes the standard pattern for creating example programs in VDE t
 
 Always build and run the example to verify it works correctly and follows the expected pattern.
 
-## Completion Handoff
+## Completion
 
-After implementing or editing an example with this skill, invoke the `completing-work` skill before declaring the task complete.
-
-For examples, the required verification order is:
-
-1. Build the project and confirm the example executable was produced.
-2. Run the unit test suite and confirm it passes.
-3. Run the example's smoke test and use the broader smoke suite when the change affects shared runtime behavior.
-4. Only after build/tests/smoke are green, run a subagent code review.
-5. If the review causes more edits, repeat build, unit tests, smoke tests, and then review again.
+After implementing or editing an example, follow the `completing-work` skill for mandatory verification before declaring the task complete.
 
 
 ## Example Structure
@@ -257,24 +249,7 @@ int main() {
 
 ## CMakeLists.txt Entry
 
-Add the example to `examples/CMakeLists.txt`:
-
-```cmake
-# [Feature] demo example demonstrating [description]
-add_executable(vde_[feature]_demo
-    [feature]_demo/main.cpp
-)
-
-target_link_libraries(vde_[feature]_demo PRIVATE vde)
-
-# Copy shader files for [feature]_demo example
-add_custom_command(TARGET vde_[feature]_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:vde_[feature]_demo>/shaders
-    COMMENT "Copying shader files..."
-)
-```
+Add the example to `examples/CMakeLists.txt`. See the `writing-code` skill's CMake section for the standard `add_executable` / `target_link_libraries` / shader-copy pattern. Use existing examples in that file as a template.
 
 ## Best Practices
 

@@ -10,6 +10,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **rebuild.ps1** | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator Ninja` |
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
+| **smoke-test.ps1** | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 | **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `\.\scripts\run-vlauncher.ps1` |
 | **install-hooks.ps1** | Configure repo-managed Git hooks | `\.\scripts\install-hooks.ps1` |
@@ -43,6 +44,11 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 .\scripts\test.ps1 -Build
 ```
 
+### Run Smoke Tests
+```powershell
+.\scripts\smoke-test.ps1
+```
+
 ### Clean Rebuild
 ```powershell
 .\scripts\rebuild.ps1
@@ -65,7 +71,7 @@ Build the VDE project with your choice of generator and configuration.
 ```
 
 **Parameters:**
-- `-Generator` - Build system: `MSBuild` (default) or `Ninja`
+- `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Clean` - Clean before building
 - `-Parallel <N>` - Parallel build jobs (0 = auto-detect)
@@ -128,7 +134,7 @@ Clean build artifacts or completely remove the build directory.
 ```
 
 **Parameters:**
-- `-Generator` - Build system: `MSBuild` (default) or `Ninja`
+- `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Full` - Remove entire build directory (requires reconfigure)
 
@@ -154,15 +160,16 @@ Run unit tests with optional filtering and building.
 
 **Syntax:**
 ```powershell
-.\scripts\test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Filter <pattern>] [-Build] [-Verbose]
+.\scripts\test.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Filter <pattern>] [-Build] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
-- `-Generator` - Build system: `MSBuild` (default) or `Ninja`
+- `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Filter <pattern>` - GoogleTest filter pattern (default: "*")
 - `-Build` - Build before running tests
 - `-Verbose` - Verbose test output with timing
+- `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
 
 **Examples:**
 ```powershell
@@ -184,6 +191,9 @@ Run unit tests with optional filtering and building.
 # Verbose output
 .\scripts\test.ps1 -Verbose
 
+# AI-friendly failure summary output
+.\scripts\test.ps1 -ProblemsOnly
+
 # Build, then run filtered tests
 .\scripts\test.ps1 -Build -Filter "CameraTest.*"
 ```
@@ -195,6 +205,42 @@ Run unit tests with optional filtering and building.
 - `*Pattern*` - Tests containing pattern
 - `Test1:Test2` - Multiple tests (colon-separated)
 - `-Pattern*` - Exclude tests matching pattern
+
+### smoke-test.ps1
+
+Run smoke tests against examples and tools, with optional filtering and AI-friendly failure-only output.
+
+**Syntax:**
+```powershell
+.\scripts\smoke-test.ps1 [-Category All|Examples|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Verbose] [-ProblemsOnly]
+```
+
+**Parameters:**
+- `-Category` - `All` (default), `Examples`, or `Tools`
+- `-Filter <pattern>` - Wildcard pattern for executable names (for example `"*physics*"`)
+- `-Generator` - Build system: `Ninja` (default) or `MSBuild`
+- `-Config` - Configuration: `Debug` (default) or `Release`
+- `-Build` - Build before running smoke tests
+- `-Verbose` - Verbose output with detailed error messages
+- `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
+
+**Examples:**
+```powershell
+# Run all smoke tests
+.\scripts\smoke-test.ps1
+
+# Run only example smoke tests
+.\scripts\smoke-test.ps1 -Category Examples
+
+# Run one subset
+.\scripts\smoke-test.ps1 -Filter "*physics*"
+
+# Build, then smoke test
+.\scripts\smoke-test.ps1 -Build
+
+# AI-friendly failure summary output
+.\scripts\smoke-test.ps1 -ProblemsOnly
+```
 
 ### format.ps1
 
