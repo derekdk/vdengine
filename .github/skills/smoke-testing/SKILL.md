@@ -16,6 +16,24 @@ This skill describes how to run smoke tests, interpret their results, add smoke 
 - Filtering smoke tests to run a subset
 - Troubleshooting a failing smoke test
 
+## Required: Smoke tests are long-running
+
+Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the script launches every discovered example and tool one at a time.
+
+If you are an AI agent or otherwise driving the terminal programmatically:
+
+- Expect partial output first and **poll for more output** until the run finishes
+- Do not assume the result from the first chunk of terminal output
+- Do not announce success or failure until you see the final summary block
+- If output is truncated to a sidecar file, read that file and continue checking the tail until the summary appears
+
+The run is only complete when you see one of these final markers:
+
+- `All smoke tests PASSED!`
+- `SMOKE TESTS FAILED`
+
+For broader rules about long-running commands, timeouts, and truncated output, also consult the `terminal-management` skill.
+
 ## Overview
 
 Smoke tests verify that every VDE example and tool can launch, render, and exit cleanly. The system **auto-discovers** all `vde_*.exe` executables in the build directory — you never need to maintain a hardcoded list. Each executable runs with a `.vdescript` input script that automates startup, brief interaction, and clean exit via the `--input-script` CLI argument.
@@ -86,7 +104,7 @@ Smoke scripts live in `smoketests/scripts/` and follow the naming convention `sm
 
 ### Output format
 
-The script prints results as it runs:
+The script prints results as it runs. Early lines are not the final result; keep polling until the summary block appears:
 
 ```
 ==========================================
