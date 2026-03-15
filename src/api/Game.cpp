@@ -2469,12 +2469,14 @@ void Game::renderTransition() {
         VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
 
         // Helper: render a scene into an offscreen framebuffer
-        auto renderSceneOffscreen = [&](const std::string& sceneName, VkFramebuffer framebuffer) {
+        auto renderSceneOffscreen = [&](const std::string& sceneName,
+                                        const OffscreenRenderTarget& target) {
             auto it = m_scenes.find(sceneName);
             if (it == m_scenes.end()) {
                 return;
             }
             Scene* scene = it->second.get();
+            VkFramebuffer framebuffer = target.getFramebuffer();
 
             // Apply camera so UBO is correct
             if (scene->getCamera()) {
@@ -2549,13 +2551,32 @@ void Game::renderTransition() {
             scene->render();
 
             vkCmdEndRenderPass(cmd);
+
+            VkImageMemoryBarrier sampleBarrier{};
+            sampleBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            sampleBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            sampleBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            sampleBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            sampleBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            sampleBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            sampleBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            sampleBarrier.image = target.getColorImage();
+            sampleBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            sampleBarrier.subresourceRange.baseMipLevel = 0;
+            sampleBarrier.subresourceRange.levelCount = 1;
+            sampleBarrier.subresourceRange.baseArrayLayer = 0;
+            sampleBarrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                                 1, &sampleBarrier);
         };
 
         // Pass 1: Render source scene to offscreen target A
-        renderSceneOffscreen(m_transitionSourceScene, m_transitionManager->getSourceFramebuffer());
+        renderSceneOffscreen(m_transitionSourceScene, m_transitionManager->getSourceTarget());
 
         // Pass 2: Render dest scene to offscreen target B
-        renderSceneOffscreen(m_transitionDestScene, m_transitionManager->getDestFramebuffer());
+        renderSceneOffscreen(m_transitionDestScene, m_transitionManager->getDestTarget());
 
         // Pass 3: Composite to swapchain framebuffer
         VkRenderPassBeginInfo rpInfo{};
