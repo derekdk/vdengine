@@ -21,7 +21,9 @@
 #include <vde/api/GameAPI.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <sstream>

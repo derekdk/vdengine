@@ -4,8 +4,8 @@
  * @file TextRenderer.h
  * @brief Utility for rendering text strings into Texture objects.
  *
- * Uses a BitmapFont to rasterize a string into an RGBA texture that can
- * be applied to a SpriteEntity.
+ * Uses a BitmapFont or TrueTypeFont to rasterize a string into an RGBA
+ * texture that can be applied to a SpriteEntity.
  */
 
 #include <vde/api/BitmapFont.h>

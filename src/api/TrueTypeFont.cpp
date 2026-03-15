@@ -47,6 +47,14 @@ bool TrueTypeFont::loadFromFile(VulkanContext* ctx, const std::string& path, flo
     m_loaded = false;
     m_atlas.reset();
     m_glyphs.clear();
+    m_atlasWidth = 0;
+    m_atlasHeight = 0;
+    m_fontSize = 0.0f;
+    m_lineHeight = 0.0f;
+
+    if (sizePixels <= 0.0f) {
+        return false;
+    }
 
     // Read the font file into memory
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -153,6 +161,9 @@ bool TrueTypeFont::loadFromFile(VulkanContext* ctx, const std::string& path, flo
 // ---- Glyph lookup ----------------------------------------------------------
 
 const GlyphInfo* TrueTypeFont::getGlyph(char c) const {
+    if (!m_loaded || m_glyphs.empty()) {
+        return nullptr;
+    }
     if (c < 0x20 || c > 0x7E) {
         return nullptr;
     }

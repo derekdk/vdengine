@@ -235,9 +235,9 @@ class Scene {
      * `flushDeferredCommands()` cycles, which guarantees that all
      * `MAX_FRAMES_IN_FLIGHT` command buffers have been fence-waited.
      *
-    * @note `SpriteEntity::setTexture()` and `MeshEntity::setTexture()`
-    *       call this automatically for the old texture — callers do
-    *       not need to retire manually when swapping entity textures.
+     * @note `SpriteEntity::setTexture()` and `MeshEntity::setTexture()`
+     *       call this automatically for the old texture — callers do
+     *       not need to retire manually when swapping entity textures.
      *
      * @param resource  Any shared_ptr whose destructor must be
      *                  deferred (Entity, Mesh, Texture, etc.)

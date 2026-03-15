@@ -5,8 +5,9 @@
  * @brief TrueType font loading and glyph atlas generation.
  *
  * Loads a .ttf font file via stb_truetype and builds a glyph-atlas Texture
- * for rendering anti-aliased text. Falls back to BitmapFont::small() when
- * the font file cannot be loaded.
+ * for rendering anti-aliased text. Returns false from loadFromFile() when
+ * the font file cannot be loaded; callers should check isLoaded() and fall
+ * back to BitmapFont::small() when needed.
  */
 
 #include <vde/api/BitmapFont.h>

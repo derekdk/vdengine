@@ -21,7 +21,7 @@ bool isPowerOfTwo(int v) {
 
 class TrueTypeFontTest : public ::testing::Test {};
 
-TEST_F(TrueTypeFontTest, MissingFileFallsBackGracefully) {
+TEST_F(TrueTypeFontTest, MissingFileLoadFails) {
     TrueTypeFont font;
     bool result = font.loadFromFile(nullptr, "nonexistent_path/missing.ttf", 32.0f);
     EXPECT_FALSE(result);
