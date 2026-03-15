@@ -177,6 +177,9 @@ add_vde_example(vde_transition_demo "transition_demo/main.cpp")
 # OS Stress Test - validates window/OS operations don't interfere with Vulkan rendering
 add_vde_example(vde_os_stress_demo "os_stress_demo/main.cpp")
 
+# Pixel Arcade demo - retro arcade attract screen using BitmapFont + TextRenderer
+add_vde_example(vde_pixel_arcade_demo "pixel_arcade_demo/main.cpp")
+
 # Vertical Shooter demo - demonstrates gameplay utility library (Math2D, Timing, Random, WorldBounds2D)
 add_vde_example(vde_shooter_demo "shooter_demo/main.cpp")
 

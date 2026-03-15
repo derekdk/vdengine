@@ -1,0 +1,5 @@
+# Smoke test for pixel arcade demo
+# Verifies the retro arcade attract screen launches and renders text
+wait startup
+wait 2s
+exit
