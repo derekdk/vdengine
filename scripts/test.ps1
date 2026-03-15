@@ -51,9 +51,9 @@ function Write-Err {
 }
 function Write-Pass { param([string]$msg) Write-Host "PASS: $msg" -ForegroundColor Green }
 
-$failurePattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file: Failure|\bFailure\b|\berror\b|\bfatal\b|\bexception\b)'
-$warningPattern = '(?i)\b(warn|warning|validation)\b'
-$problemPattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file: Failure|\bFailure\b|\berror\b|\bfatal\b|\bexception\b|\bwarn\b|\bwarning\b|\bvalidation\b)'
+$failurePattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file:\s*Failure|^\s*error\b|\berror:|\bfatal error\b|\bfailed to\b|\bexception thrown\b)'
+$warningPattern = '(?i)(^\s*warning\b|\bwarning:|\bvalidation layer\b)'
+$problemPattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file:\s*Failure|^\s*error\b|\berror:|\bfatal error\b|\bfailed to\b|\bexception thrown\b|^\s*warning\b|\bwarning:|\bvalidation layer\b)'
 
 function Get-ProblemLines {
     param(
