@@ -73,8 +73,27 @@ wait 2s
 exit
 ```
 
-**Add to smoke test runner:**
-Edit `scripts/smoke-test.ps1` to map your example to its smoke script:
+**Register smoke test in vde.toml:**
+Create a `vde.toml` file in your example's source directory. The vlauncher tool reads this file to discover which smoke scripts to run:
+
+```toml
+[smoke]
+scripts = ["smoke_my_demo.vdescript"]
+```
+
+For examples with **multiple executables** in the same source folder (e.g., a folder that produces both `vde_my_demo` and `vde_my_demo_variant`), use per-target sections keyed by executable name (without `.exe`):
+
+```toml
+[smoke.vde_my_demo]
+scripts = ["smoke_my_demo.vdescript"]
+
+[smoke.vde_my_demo_variant]
+scripts = ["smoke_my_demo_variant.vdescript"]
+```
+
+**Also add to smoke-test.ps1:**
+Edit `scripts/smoke-test.ps1` to add your example to the `$smokeScriptMap` for CI validation. Without this entry, the CI runner falls back to `smoke_quick.vdescript` which only verifies launch and exit:
+
 ```powershell
 $smokeScriptMap = @{
   'vde_my_demo.exe' = 'smoke_my_demo.vdescript'

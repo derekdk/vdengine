@@ -477,23 +477,43 @@ Tools can also use the **scripted-input** system for UI automation and smoke tes
 - **Input scripts** (`.vdescript`) define _how to interact with UI_ (clicks, keys)
 
 **Create a smoke test for your tool:**
-1. Create `smoketests/scripts/smoke_<tool_name>.vdescript`
-2. Test key UI interactions, command execution, etc.
-3. Add to smoke test runner (see writing-examples skill)
 
-**Example:**
+1. Create `smoketests/scripts/smoke_<tool_name>.vdescript`:
+
 ```vdescript
 # smoke_my_tool.vdescript
 wait startup
+wait 1s
+
+# Toggle UI visibility
+press F1
 wait 500
-press F1          # Toggle UI
+press F1
 wait 500
-click 640 360     # Click in viewport
-wait 2s
+
+wait 1s
 exit
 ```
 
-**Note:** Input scripts test the UI interaction layer, while tool command scripts test the batch processing layer. Both are important for comprehensive testing.
+2. **Register the smoke script in vde.toml:**
+Create a `vde.toml` file in your tool's source directory. The vlauncher tool reads this file to discover which smoke scripts to run:
+
+```toml
+[smoke]
+scripts = ["smoke_my_tool.vdescript"]
+```
+
+3. **Also add to smoke-test.ps1:**
+Edit `scripts/smoke-test.ps1` to add your tool to the `$smokeScriptMap` for CI validation:
+
+```powershell
+$smokeScriptMap = @{
+    # Tools
+    'vde_my_tool.exe' = 'smoke_my_tool.vdescript'
+}
+```
+
+**Note:** Input scripts test the UI interaction layer, while tool command scripts test the batch processing layer. Both are important for comprehensive testing. See the **scripted-input** skill for full `.vdescript` syntax.
 
 ### Example Scripts
 3. **Create Example Scripts:**
