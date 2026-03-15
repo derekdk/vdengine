@@ -315,6 +315,10 @@ Texture loadTexture(const std::string& path) {
 }
 ```
 
+## Reference
+
+The sections below contain CMake integration details, common code patterns, and advanced examples. Read only when implementing new source files or modifying build configuration.
+
 ## CMake Integration Details
 
 ### Understanding the Build Structure

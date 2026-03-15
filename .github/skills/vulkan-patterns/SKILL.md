@@ -367,6 +367,10 @@ glm::mat4 viewProjection = camera.getViewProjectionMatrix();
 - [Camera.h](../../../include/vde/Camera.h) - Full API documentation
 - [Camera.cpp](../../../src/Camera.cpp) - Implementation details
 
+## Reference
+
+The sections below contain detailed implementation patterns, memory management strategies, and debugging techniques. Read only when implementing or troubleshooting Vulkan code.
+
 ## Memory Management Strategies
 
 ### Staging Buffers for Device-Local Memory
