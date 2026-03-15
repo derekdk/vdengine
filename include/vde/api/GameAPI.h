@@ -62,6 +62,7 @@
 // Text rendering
 #include "BitmapFont.h"
 #include "TextRenderer.h"
+#include "TrueTypeFont.h"
 
 // World coordinates and bounds
 #include "CameraBounds.h"

@@ -193,3 +193,31 @@ add_vde_example(vde_vertical_shooter
     vertical_shooter/GameScene.cpp
 )
 
+# Font Specimen demo - side-by-side type specimen viewer (BitmapFont + TrueTypeFont)
+add_vde_example(vde_font_specimen_demo "font_specimen_demo/main.cpp")
+
+# Sync font assets for the font specimen demo
+file(GLOB_RECURSE VDE_FONT_ASSET_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/assets/fonts/*
+)
+
+set(VDE_FONT_ASSET_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_font_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_FONT_ASSET_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_font_specimen_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets/fonts
+        $<TARGET_FILE_DIR:vde_font_specimen_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_FONT_ASSET_STAMP}
+    DEPENDS ${VDE_FONT_ASSET_FILES}
+    COMMENT "Syncing font assets..."
+    VERBATIM
+)
+
+add_custom_target(vde_font_assets_sync ALL
+    DEPENDS ${VDE_FONT_ASSET_STAMP}
+)
+
+add_dependencies(vde_font_specimen_demo vde_font_assets_sync)
+

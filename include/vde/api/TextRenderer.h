@@ -10,6 +10,7 @@
 
 #include <vde/api/BitmapFont.h>
 #include <vde/api/GameTypes.h>
+#include <vde/api/TrueTypeFont.h>
 
 #include <memory>
 #include <string>
@@ -52,6 +53,19 @@ class TextRenderer {
      */
     static std::shared_ptr<Texture> createTexture(VulkanContext* ctx, const std::string& text,
                                                   const BitmapFont& font,
+                                                  const TextStyle& style = {});
+
+    /**
+     * @brief Render a text string into an RGBA texture using a TrueType font.
+     * @param ctx Vulkan context used to upload the texture to the GPU
+     * @param text The string to render (ASCII printable characters)
+     * @param font TrueType font with a pre-built glyph atlas
+     * @param style Rendering style (color, scale, spacing)
+     * @return Shared pointer to the created texture (always non-null; empty
+     *         strings return a 1x1 transparent texture)
+     */
+    static std::shared_ptr<Texture> createTexture(VulkanContext* ctx, const std::string& text,
+                                                  const TrueTypeFont& font,
                                                   const TextStyle& style = {});
 };
 

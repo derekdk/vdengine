@@ -1,0 +1,9 @@
+# Smoke test for font specimen demo
+# Verifies TTF font loading and text rendering with both bitmap and TrueType fonts
+wait startup
+wait 1s
+press tab
+wait 1s
+press tab
+wait 1s
+exit

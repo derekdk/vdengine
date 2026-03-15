@@ -14,3 +14,7 @@
 // STB Image Write - Image writing library (for screenshot capture)
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+// STB TrueType - TrueType font rasterization
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
