@@ -23,8 +23,10 @@ namespace vde {
 TrueTypeFont::TrueTypeFont(TrueTypeFont&& other) noexcept
     : m_loaded(other.m_loaded), m_fontSize(other.m_fontSize), m_lineHeight(other.m_lineHeight),
       m_atlasWidth(other.m_atlasWidth), m_atlasHeight(other.m_atlasHeight),
-      m_atlas(std::move(other.m_atlas)), m_glyphs(std::move(other.m_glyphs)) {
+            m_atlas(std::move(other.m_atlas)), m_glyphs(std::move(other.m_glyphs)),
+            m_lastError(std::move(other.m_lastError)) {
     other.m_loaded = false;
+        other.m_lastError.clear();
 }
 
 TrueTypeFont& TrueTypeFont::operator=(TrueTypeFont&& other) noexcept {
@@ -36,7 +38,9 @@ TrueTypeFont& TrueTypeFont::operator=(TrueTypeFont&& other) noexcept {
         m_atlasHeight = other.m_atlasHeight;
         m_atlas = std::move(other.m_atlas);
         m_glyphs = std::move(other.m_glyphs);
+        m_lastError = std::move(other.m_lastError);
         other.m_loaded = false;
+        other.m_lastError.clear();
     }
     return *this;
 }
@@ -51,23 +55,28 @@ bool TrueTypeFont::loadFromFile(VulkanContext* ctx, const std::string& path, flo
     m_atlasHeight = 0;
     m_fontSize = 0.0f;
     m_lineHeight = 0.0f;
+    m_lastError.clear();
 
     if (sizePixels <= 0.0f) {
+        m_lastError = "Font size must be greater than zero";
         return false;
     }
 
     // Read the font file into memory
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
+        m_lastError = "Failed to open font file: " + path;
         return false;
     }
     const auto fileSize = file.tellg();
     if (fileSize <= 0) {
+        m_lastError = "Font file is empty: " + path;
         return false;
     }
     file.seekg(0, std::ios::beg);
     std::vector<uint8_t> fontData(static_cast<size_t>(fileSize));
     if (!file.read(reinterpret_cast<char*>(fontData.data()), fileSize)) {
+        m_lastError = "Failed to read font file: " + path;
         return false;
     }
     file.close();
@@ -76,6 +85,7 @@ bool TrueTypeFont::loadFromFile(VulkanContext* ctx, const std::string& path, flo
     stbtt_fontinfo fontInfo;
     if (!stbtt_InitFont(&fontInfo, fontData.data(),
                         stbtt_GetFontOffsetForIndex(fontData.data(), 0))) {
+        m_lastError = "Failed to initialize font data: " + path;
         return false;
     }
 
@@ -112,8 +122,9 @@ bool TrueTypeFont::loadFromFile(VulkanContext* ctx, const std::string& path, flo
         bakeResult = stbtt_BakeFontBitmap(fontData.data(), 0, sizePixels, bitmap.data(), atlasW,
                                           atlasH, kFirstChar, kCharCount, charData.data());
         if (bakeResult < 0) {
-            std::cerr << "TrueTypeFont: glyphs do not fit in 1024x1024 atlas; "
-                         "try a smaller font size (recommended 8-100px)\n";
+            m_lastError = "Glyphs do not fit in 1024x1024 atlas; try a smaller font size "
+                          "(recommended 8-100px)";
+            std::cerr << "TrueTypeFont: " << m_lastError << '\n';
             return false;
         }
     }

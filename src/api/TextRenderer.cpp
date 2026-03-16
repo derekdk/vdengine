@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <vector>
 
 namespace vde {
@@ -148,7 +149,8 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
     const uint8_t* atlasPixels = atlasTex ? atlasTex->getPixelData() : nullptr;
 
     if (!atlasPixels) {
-        // Can't sample atlas — return empty texture
+        std::cerr << "TextRenderer: TrueType atlas CPU pixel data is unavailable; "
+                     "returning an empty texture\n";
         auto tex = std::make_shared<Texture>();
         const uint8_t transparent[4] = {0, 0, 0, 0};
         tex->loadFromData(transparent, 1, 1);
