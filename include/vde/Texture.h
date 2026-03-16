@@ -113,6 +113,14 @@ class Texture : public Resource {
     uint32_t getHeight() const { return m_height; }
 
     /**
+     * @brief Get a pointer to the CPU-side pixel data.
+     * @return Pointer to RGBA pixel data, or nullptr if no data is loaded
+     */
+    const uint8_t* getPixelData() const {
+        return m_pixelData.empty() ? nullptr : m_pixelData.data();
+    }
+
+    /**
      * @brief Check if the texture is valid and ready for use.
      * @return true if image, image view, and sampler are all created
      */

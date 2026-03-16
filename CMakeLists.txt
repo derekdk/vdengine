@@ -189,6 +189,10 @@ set(VDE_SOURCES
     src/api/InputScript.cpp
     # Storage
     src/api/StorageManager.cpp
+    # Text rendering
+    src/api/BitmapFont.cpp
+    src/api/TextRenderer.cpp
+    src/api/TrueTypeFont.cpp
 )
 
 # Public headers
@@ -255,6 +259,10 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/Math2D.h
     include/vde/api/Timing.h
     include/vde/api/Random.h
+    # Text rendering headers
+    include/vde/api/BitmapFont.h
+    include/vde/api/TextRenderer.h
+    include/vde/api/TrueTypeFont.h
 )
 
 # Create library

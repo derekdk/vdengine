@@ -107,6 +107,9 @@ $smokeScriptMap = @{
     'vde_four_scene_3d_demo.exe'       = 'smoke_four_scene_3d.vdescript'
     'vde_transition_demo.exe'          = 'smoke_transition_demo.vdescript'
     'vde_os_stress_demo.exe'            = 'smoke_os_stress.vdescript'
+    'vde_pixel_arcade_demo.exe'         = 'smoke_pixel_arcade_demo.vdescript'
+    'vde_font_specimen_demo.exe'        = 'smoke_font_specimen_demo.vdescript'
+    'vde_text_metrics_demo.exe'         = 'smoke_text_metrics_demo.vdescript'
     'vde_shooter_demo.exe'              = 'smoke_shooter.vdescript'
     'vde_vertical_shooter.exe'          = 'smoke_vertical_shooter.vdescript'
     # Tools

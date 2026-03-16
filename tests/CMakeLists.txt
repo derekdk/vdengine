@@ -66,6 +66,9 @@ set(VDE_TEST_SOURCES
     Math2D_test.cpp
     Timing_test.cpp
     Random_test.cpp
+    # Text rendering tests
+    TextRenderer_test.cpp
+    TrueTypeFont_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
@@ -87,6 +90,10 @@ target_link_libraries(vde_tests PRIVATE
 target_include_directories(vde_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb
+)
+
+target_compile_definitions(vde_tests PRIVATE
+    VDE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
 )
 
 # Register tests with CTest

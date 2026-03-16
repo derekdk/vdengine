@@ -227,16 +227,20 @@ class Scene {
     size_t getDeferredCommandCount() const { return m_deferredCommands.size(); }
 
     /**
-     * @brief Keep a shared resource alive until the next update.
+     * @brief Keep a shared resource alive until in-flight GPU work completes.
      *
-     * When an entity or mesh is removed during the render phase,
-     * its GPU buffers may still be referenced by the in-flight
-     * command buffer.  Call this to extend the resource lifetime
-     * until `flushDeferredCommands()` runs in the next frame,
-     * at which point the GPU has finished with those buffers.
+     * When a texture, mesh, or entity is replaced or removed, its GPU
+     * resources may still be referenced by in-flight command buffers.
+     * Call this to extend the resource lifetime across two
+     * `flushDeferredCommands()` cycles, which guarantees that all
+     * `MAX_FRAMES_IN_FLIGHT` command buffers have been fence-waited.
+     *
+     * @note `SpriteEntity::setTexture()` and `MeshEntity::setTexture()`
+     *       call this automatically for the old texture — callers do
+     *       not need to retire manually when swapping entity textures.
      *
      * @param resource  Any shared_ptr whose destructor must be
-     *                  deferred (Entity, Mesh, etc.)
+     *                  deferred (Entity, Mesh, Texture, etc.)
      */
     void retireResource(std::shared_ptr<void> resource);
 
@@ -649,9 +653,17 @@ class Scene {
     // Deferred command queue (flushed at the start of update / updateGameLogic)
     std::vector<std::function<void()>> m_deferredCommands;
 
-    // Resources whose destruction is deferred until the next update
-    // (keeps GPU buffers alive while in-flight command buffers reference them)
+    // Two-stage retirement ring: resources are kept alive for two flush
+    // cycles so that all MAX_FRAMES_IN_FLIGHT command buffers have been
+    // waited on before the Vulkan handles are destroyed.
+    //   retireResource()  → pushes into m_retiredResources
+    //   flush N            → m_retiredResourcesPrev destroyed (from N-2),
+    //                        m_retiredResources moved to m_retiredResourcesPrev
+    //   flush N+1          → m_retiredResourcesPrev (from N-1) destroyed
+    // With MAX_FRAMES_IN_FLIGHT == 2 the oldest in-flight frame is
+    // guaranteed complete by the second flush after retirement.
     std::vector<std::shared_ptr<void>> m_retiredResources;
+    std::vector<std::shared_ptr<void>> m_retiredResourcesPrev;
 
     /**
      * @brief Flush the deferred command queue and retire list.

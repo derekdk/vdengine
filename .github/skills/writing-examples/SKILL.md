@@ -44,7 +44,64 @@ All examples should use the shared `ExampleBase.h` header which provides base cl
 4. Check that the exit code is `0` for success and `1` for failure
 
 ### Smoke Testing (Automated)
-All examples should have a smoke test script. See the `scripted-input` skill for `.vdescript` syntax and the `smoke-testing` skill for adding your example to the smoke test runner.
+All examples should have a smoke test script for automated verification. See the **scripted-input** skill for details on creating `.vdescript` files.
+
+**Create a smoke test:**
+1. Create a script in `smoketests/scripts/smoke_<example_name>.vdescript`
+2. Use `wait startup` to wait for first frame
+3. Add interactions specific to your example (key presses, mouse clicks, etc.)
+4. Use `wait` commands to let the example run
+5. End with `exit` command
+
+**Example smoke test:**
+```vdescript
+# smoke_materials_demo.vdescript
+wait startup
+wait 500
+press 1            # Switch material
+wait 500
+press 2            # Switch material
+wait 2s
+exit
+```
+
+**Register smoke test in vde.toml:**
+Create a `vde.toml` file in your example's source directory. The vlauncher tool reads this file to discover which smoke scripts to run:
+
+```toml
+[smoke]
+scripts = ["smoke_my_demo.vdescript"]
+```
+
+For examples with **multiple executables** in the same source folder (e.g., a folder that produces both `vde_my_demo` and `vde_my_demo_variant`), use per-target sections keyed by executable name (without `.exe`):
+
+```toml
+[smoke.vde_my_demo]
+scripts = ["smoke_my_demo.vdescript"]
+
+[smoke.vde_my_demo_variant]
+scripts = ["smoke_my_demo_variant.vdescript"]
+```
+
+**Also add to smoke-test.ps1:**
+Edit `scripts/smoke-test.ps1` to add your example to the `$smokeScriptMap` for CI validation. Without this entry, the CI runner falls back to `smoke_quick.vdescript` which only verifies launch and exit:
+
+```powershell
+$smokeScriptMap = @{
+  'vde_my_demo.exe' = 'smoke_my_demo.vdescript'
+}
+```
+
+**Run smoke tests:**
+```bash
+# Run all example smoke tests
+.\scripts\smoke-test.ps1
+
+# VS Code task: "scripts: smoke-test"
+```
+
+**Completion requirement:**
+Do not declare a new or modified example complete after only building it or manually running it once. Before announcing completion, you must build, run unit tests, run smoke tests, and then run a subagent code review on the verified changes. Use the `completing-work` skill as the final gate.
 
 ### 1. Include the Base Header
 

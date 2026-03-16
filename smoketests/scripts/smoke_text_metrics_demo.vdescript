@@ -1,0 +1,9 @@
+# smoke_text_metrics_demo.vdescript
+# Smoke test for text metrics demo
+wait startup
+wait 3s
+press Space
+wait 1s
+press Space
+wait 2s
+exit

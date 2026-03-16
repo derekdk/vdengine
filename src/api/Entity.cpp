@@ -25,13 +25,20 @@ EntityId Entity::s_nextId = 1;
 // Static sprite quad mesh (shared by all SpriteEntity instances)
 static std::shared_ptr<Mesh> s_spriteQuad = nullptr;
 
-// Descriptor set cache for textures per frame (maps {frame, texture} to descriptor set)
-// We need per-frame caching because the UBO buffer changes each frame
-// Note: Descriptor sets are allocated from Game's descriptor pool and cleaned up
-// when the pool is destroyed. This map just tracks which sets exist.
+// Per-frame descriptor-set cache with staleness detection.
+// Keyed by Texture* raw pointer; stores the VkDescriptorSet AND the Vulkan
+// handles that were written into it so we can detect when a destroyed texture
+// address is recycled by the allocator and re-write the descriptor in place
+// instead of leaking an orphaned set from the pool.
+struct CachedDescriptor {
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    VkImageView imageView = VK_NULL_HANDLE;
+    VkSampler sampler = VK_NULL_HANDLE;
+};
+
 static constexpr uint32_t MAX_FRAMES = 2;
-static std::unordered_map<Texture*, VkDescriptorSet> s_textureDescriptorSets[MAX_FRAMES];
-static std::unordered_map<Texture*, VkDescriptorSet> s_meshTextureDescriptorSets[MAX_FRAMES];
+static std::unordered_map<Texture*, CachedDescriptor> s_textureDescriptorSets[MAX_FRAMES];
+static std::unordered_map<Texture*, CachedDescriptor> s_meshTextureDescriptorSets[MAX_FRAMES];
 
 /**
  * @brief Clear sprite descriptor set cache (called on Game shutdown).
@@ -140,6 +147,15 @@ MeshEntity::MeshEntity()
     : Entity(), m_mesh(nullptr), m_texture(nullptr), m_material(nullptr),
       m_meshId(INVALID_RESOURCE_ID), m_textureId(INVALID_RESOURCE_ID), m_color(Color::white()) {}
 
+void MeshEntity::setTexture(std::shared_ptr<Texture> texture) {
+    if (m_texture && m_texture != texture) {
+        if (m_scene) {
+            m_scene->retireResource(m_texture);
+        }
+    }
+    m_texture = std::move(texture);
+}
+
 void MeshEntity::render() {
     // Get the mesh (either direct or via resource ID)
     std::shared_ptr<Mesh> mesh = m_mesh;
@@ -233,14 +249,26 @@ void MeshEntity::render() {
     VkDescriptorSet meshTextureDescSet = VK_NULL_HANDLE;
     auto& frameCache = s_meshTextureDescriptorSets[currentFrame];
     auto textureSetIt = frameCache.find(texturePtr);
-    if (textureSetIt != frameCache.end()) {
-        meshTextureDescSet = textureSetIt->second;
+    if (textureSetIt != frameCache.end() &&
+        textureSetIt->second.imageView == texturePtr->getImageView() &&
+        textureSetIt->second.sampler == texturePtr->getSampler()) {
+        meshTextureDescSet = textureSetIt->second.descriptorSet;
     } else {
-        meshTextureDescSet = game->allocateMeshTextureDescriptorSet();
-        if (meshTextureDescSet != VK_NULL_HANDLE) {
+        if (textureSetIt != frameCache.end()) {
+            // Stale hit — re-write in place.
+            meshTextureDescSet = textureSetIt->second.descriptorSet;
             game->updateMeshTextureDescriptor(meshTextureDescSet, texturePtr->getImageView(),
                                               texturePtr->getSampler());
-            frameCache[texturePtr] = meshTextureDescSet;
+            textureSetIt->second.imageView = texturePtr->getImageView();
+            textureSetIt->second.sampler = texturePtr->getSampler();
+        } else {
+            meshTextureDescSet = game->allocateMeshTextureDescriptorSet();
+            if (meshTextureDescSet != VK_NULL_HANDLE) {
+                game->updateMeshTextureDescriptor(meshTextureDescSet, texturePtr->getImageView(),
+                                                  texturePtr->getSampler());
+                frameCache[texturePtr] = {meshTextureDescSet, texturePtr->getImageView(),
+                                          texturePtr->getSampler()};
+            }
         }
     }
 
@@ -304,6 +332,15 @@ SpriteEntity::SpriteEntity()
 SpriteEntity::SpriteEntity(ResourceId textureId)
     : Entity(), m_texture(nullptr), m_textureId(textureId), m_color(Color::white()), m_uvX(0.0f),
       m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f), m_anchorY(0.5f) {}
+
+void SpriteEntity::setTexture(std::shared_ptr<Texture> texture) {
+    if (m_texture && m_texture != texture) {
+        if (m_scene) {
+            m_scene->retireResource(m_texture);
+        }
+    }
+    m_texture = std::move(texture);
+}
 
 void SpriteEntity::setUVRect(float u, float v, float width, float height) {
     m_uvX = u;
@@ -372,22 +409,33 @@ void SpriteEntity::render() {
     VkDescriptorSet spriteDescSet = VK_NULL_HANDLE;
     auto& frameCache = s_textureDescriptorSets[currentFrame];
     auto it = frameCache.find(texturePtr);
-    if (it != frameCache.end()) {
-        spriteDescSet = it->second;
+    if (it != frameCache.end() && it->second.imageView == texturePtr->getImageView() &&
+        it->second.sampler == texturePtr->getSampler()) {
+        // Cache hit — handles still match the live texture.
+        spriteDescSet = it->second.descriptorSet;
     } else {
-        // Allocate new combined sprite descriptor set
-        spriteDescSet = game->allocateSpriteDescriptorSet();
-        if (spriteDescSet == VK_NULL_HANDLE) {
-            return;
-        }
-
-        // Update descriptor with UBO and texture info
         VkBuffer uboBuffer = context->getCurrentUniformBuffer();
-        game->updateSpriteDescriptor(spriteDescSet, uboBuffer, 192,  // sizeof(UniformBufferObject)
-                                     texturePtr->getImageView(), texturePtr->getSampler());
 
-        // Cache it for this frame
-        frameCache[texturePtr] = spriteDescSet;
+        if (it != frameCache.end()) {
+            // Cache hit but stale (texture address recycled after
+            // destruction).  Re-write the existing descriptor set
+            // in place to avoid leaking pool allocations.
+            spriteDescSet = it->second.descriptorSet;
+            game->updateSpriteDescriptor(spriteDescSet, uboBuffer, 192, texturePtr->getImageView(),
+                                         texturePtr->getSampler());
+            it->second.imageView = texturePtr->getImageView();
+            it->second.sampler = texturePtr->getSampler();
+        } else {
+            // Brand-new texture pointer — allocate from pool.
+            spriteDescSet = game->allocateSpriteDescriptorSet();
+            if (spriteDescSet == VK_NULL_HANDLE) {
+                return;
+            }
+            game->updateSpriteDescriptor(spriteDescSet, uboBuffer, 192, texturePtr->getImageView(),
+                                         texturePtr->getSampler());
+            frameCache[texturePtr] = {spriteDescSet, texturePtr->getImageView(),
+                                      texturePtr->getSampler()};
+        }
     }
 
     // Bind pipeline

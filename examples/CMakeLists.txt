@@ -177,6 +177,9 @@ add_vde_example(vde_transition_demo "transition_demo/main.cpp")
 # OS Stress Test - validates window/OS operations don't interfere with Vulkan rendering
 add_vde_example(vde_os_stress_demo "os_stress_demo/main.cpp")
 
+# Pixel Arcade demo - retro arcade attract screen using BitmapFont + TextRenderer
+add_vde_example(vde_pixel_arcade_demo "pixel_arcade_demo/main.cpp")
+
 # Vertical Shooter demo - demonstrates gameplay utility library (Math2D, Timing, Random, WorldBounds2D)
 add_vde_example(vde_shooter_demo "shooter_demo/main.cpp")
 
@@ -189,4 +192,57 @@ add_vde_example(vde_vertical_shooter
     vertical_shooter/Entities.cpp
     vertical_shooter/GameScene.cpp
 )
+
+# Font Specimen demo - side-by-side type specimen viewer (BitmapFont + TrueTypeFont)
+add_vde_example(vde_font_specimen_demo "font_specimen_demo/main.cpp")
+
+# Sync font assets for the font specimen demo
+file(GLOB_RECURSE VDE_FONT_ASSET_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/assets/fonts/*
+)
+
+set(VDE_FONT_ASSET_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_font_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_FONT_ASSET_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_font_specimen_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets/fonts
+        $<TARGET_FILE_DIR:vde_font_specimen_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_FONT_ASSET_STAMP}
+    DEPENDS ${VDE_FONT_ASSET_FILES}
+    COMMENT "Syncing font assets..."
+    VERBATIM
+)
+
+add_custom_target(vde_font_assets_sync ALL
+    DEPENDS ${VDE_FONT_ASSET_STAMP}
+)
+
+add_dependencies(vde_font_specimen_demo vde_font_assets_sync)
+
+# Text Metrics demo - text layout, alignment, wrapping, and fit-to-rect with animated containers
+add_vde_example(vde_text_metrics_demo "text_metrics_demo/main.cpp")
+
+# Sync font assets for the text metrics demo
+set(VDE_TEXT_METRICS_FONT_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_text_metrics_font_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_TEXT_METRICS_FONT_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_text_metrics_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets/fonts
+        $<TARGET_FILE_DIR:vde_text_metrics_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_TEXT_METRICS_FONT_STAMP}
+    DEPENDS ${VDE_FONT_ASSET_FILES}
+    COMMENT "Syncing font assets for text metrics demo..."
+    VERBATIM
+)
+
+add_custom_target(vde_text_metrics_font_sync ALL
+    DEPENDS ${VDE_TEXT_METRICS_FONT_STAMP}
+)
+
+add_dependencies(vde_text_metrics_demo vde_text_metrics_font_sync)
+
 
