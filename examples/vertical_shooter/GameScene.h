@@ -111,8 +111,8 @@ class GameScene : public vde::examples::BaseExampleScene {
     void checkCollisions();
 
     // Title sprites
-    std::shared_ptr<vde::SpriteEntity> m_titleBanner;
-    std::shared_ptr<vde::SpriteEntity> m_promptSprite;
+    std::shared_ptr<vde::TextEntity> m_titleBanner;
+    std::shared_ptr<vde::TextEntity> m_promptSprite;
     vde::RepeatingTimer m_blinkTimer{0.5f};
     bool m_blinkOn = true;
 
@@ -125,8 +125,6 @@ class GameScene : public vde::examples::BaseExampleScene {
     std::shared_ptr<vde::Texture> m_enemyTex[4];
     std::shared_ptr<vde::Texture> m_enemyBulletTex;
     std::shared_ptr<vde::Texture> m_starTex;
-    std::shared_ptr<vde::Texture> m_titleTex;
-    std::shared_ptr<vde::Texture> m_promptTex;
 
     // Audio
     SoundBank m_sounds;

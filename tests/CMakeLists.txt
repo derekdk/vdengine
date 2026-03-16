@@ -69,6 +69,7 @@ set(VDE_TEST_SOURCES
     # Text rendering tests
     TextRenderer_test.cpp
     TrueTypeFont_test.cpp
+    TextEntity_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp

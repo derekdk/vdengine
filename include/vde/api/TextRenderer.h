@@ -27,6 +27,8 @@ struct TextStyle {
     Color color;            ///< Text foreground color (default: white)
     int pixelScale = 1;     ///< Scale factor applied to each font pixel (>= 1)
     int letterSpacing = 1;  ///< Extra columns between glyphs in font pixels
+
+    bool operator==(const TextStyle&) const = default;
 };
 
 /**

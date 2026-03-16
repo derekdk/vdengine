@@ -52,8 +52,6 @@ void GameScene::onEnter() {
     m_enemyTex[3] = createEnemyTexture(ctx, EnemyType::Tank);
     m_enemyBulletTex = createEnemyBulletTexture(ctx);
     m_starTex = createStarTexture(ctx);
-    m_titleTex = createTextTexture(ctx, "VERTICAL SHOOTER", 3, 0, 229, 255);
-    m_promptTex = createTextTexture(ctx, "PRESS ENTER / START", 2, 255, 255, 255);
 
     // Generate procedural audio
     auto tempDir = (std::filesystem::temp_directory_path() / "vde_vertical_shooter").string();
@@ -90,26 +88,39 @@ void GameScene::enterTitle() {
     clearAll();
     m_state = State::Title;
 
-    m_titleBanner = addEntity<SpriteEntity>();
+    m_titleBanner = addEntity<TextEntity>();
+    m_titleBanner->setText("VERTICAL SHOOTER");
+    m_titleBanner->setFont(BitmapFont::small());
+    m_titleBanner->setStyle({.color = Color(0.0f, 0.898f, 1.0f), .pixelScale = 3, .letterSpacing = 1});
+    m_titleBanner->setAnchor(0.5f, 0.5f);
+    m_titleBanner->setPosition(0.0f, VIEW_HEIGHT * 0.5f + 2.0f, 0.0f);
+    // Force first update to build the texture so we can read its dimensions
+    m_titleBanner->update(0.0f);
     {
-        const float w = 4.5f;
-        const float h = w * static_cast<float>(m_titleTex->getHeight()) /
-                        static_cast<float>(m_titleTex->getWidth());
-        m_titleBanner->setScale(w, h, 1.0f);
-        m_titleBanner->setPosition(0.0f, VIEW_HEIGHT * 0.5f + 2.0f, 0.0f);
-        m_titleBanner->setAnchor(0.5f, 0.5f);
-        m_titleBanner->setTexture(m_titleTex);
+        auto tex = m_titleBanner->getTexture();
+        if (tex && tex->getWidth() > 1) {
+            const float w = 4.5f;
+            const float h = w * static_cast<float>(tex->getHeight()) /
+                            static_cast<float>(tex->getWidth());
+            m_titleBanner->setScale(w, h, 1.0f);
+        }
     }
 
-    m_promptSprite = addEntity<SpriteEntity>();
+    m_promptSprite = addEntity<TextEntity>();
+    m_promptSprite->setText("PRESS ENTER / START");
+    m_promptSprite->setFont(BitmapFont::small());
+    m_promptSprite->setStyle({.color = Color::white(), .pixelScale = 2, .letterSpacing = 1});
+    m_promptSprite->setAnchor(0.5f, 0.5f);
+    m_promptSprite->setPosition(0.0f, VIEW_HEIGHT * 0.5f - 1.5f, 0.0f);
+    m_promptSprite->update(0.0f);
     {
-        const float w = 4.0f;
-        const float h = w * static_cast<float>(m_promptTex->getHeight()) /
-                        static_cast<float>(m_promptTex->getWidth());
-        m_promptSprite->setScale(w, h, 1.0f);
-        m_promptSprite->setPosition(0.0f, VIEW_HEIGHT * 0.5f - 1.5f, 0.0f);
-        m_promptSprite->setAnchor(0.5f, 0.5f);
-        m_promptSprite->setTexture(m_promptTex);
+        auto tex = m_promptSprite->getTexture();
+        if (tex && tex->getWidth() > 1) {
+            const float w = 4.0f;
+            const float h = w * static_cast<float>(tex->getHeight()) /
+                            static_cast<float>(tex->getWidth());
+            m_promptSprite->setScale(w, h, 1.0f);
+        }
     }
 
     // Camera at starting position

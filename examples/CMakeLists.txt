@@ -224,6 +224,9 @@ add_dependencies(vde_font_specimen_demo vde_font_assets_sync)
 # Text Metrics demo - text layout, alignment, wrapping, and fit-to-rect with animated containers
 add_vde_example(vde_text_metrics_demo "text_metrics_demo/main.cpp")
 
+# Mission Control demo - live-updating TextEntity dashboard
+add_vde_example(vde_mission_control_demo "mission_control_demo/main.cpp")
+
 # Sync font assets for the text metrics demo
 set(VDE_TEXT_METRICS_FONT_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_text_metrics_font_assets.stamp)
 

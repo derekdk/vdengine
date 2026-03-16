@@ -9,7 +9,6 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
-#include <cctype>
 
 namespace shooter {
 
@@ -61,109 +60,6 @@ static std::shared_ptr<vde::Texture> uploadTexture(vde::VulkanContext* ctx,
     tex->loadFromData(pixels.data(), static_cast<uint32_t>(size), static_cast<uint32_t>(size));
     tex->uploadToGPU(ctx);
     return tex;
-}
-
-static std::shared_ptr<vde::Texture> uploadTexture(vde::VulkanContext* ctx,
-                                                   std::vector<uint8_t>& pixels, int w, int h) {
-    auto tex = std::make_shared<vde::Texture>();
-    tex->loadFromData(pixels.data(), static_cast<uint32_t>(w), static_cast<uint32_t>(h));
-    tex->uploadToGPU(ctx);
-    return tex;
-}
-
-// ============================================================================
-// Bitmap text font (5x7 pixels, row-major, bit7=leftmost column)
-// ============================================================================
-
-// clang-format off
-static constexpr uint8_t kFont5x7[26][7] = {
-    {0x70, 0x88, 0x88, 0xF8, 0x88, 0x88, 0x88}, // A
-    {0xF0, 0x88, 0x88, 0xF0, 0x88, 0x88, 0xF0}, // B
-    {0x70, 0x80, 0x80, 0x80, 0x80, 0x80, 0x70}, // C
-    {0xF0, 0x88, 0x88, 0x88, 0x88, 0x88, 0xF0}, // D
-    {0xF8, 0x80, 0x80, 0xF0, 0x80, 0x80, 0xF8}, // E
-    {0xF8, 0x80, 0x80, 0xF0, 0x80, 0x80, 0x80}, // F
-    {0x70, 0x80, 0x80, 0x98, 0x88, 0x88, 0x70}, // G
-    {0x88, 0x88, 0x88, 0xF8, 0x88, 0x88, 0x88}, // H
-    {0x70, 0x20, 0x20, 0x20, 0x20, 0x20, 0x70}, // I
-    {0x18, 0x08, 0x08, 0x08, 0x08, 0x88, 0x70}, // J
-    {0x88, 0x90, 0xA0, 0xC0, 0xA0, 0x90, 0x88}, // K
-    {0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0xF8}, // L
-    {0x88, 0xD8, 0xA8, 0x88, 0x88, 0x88, 0x88}, // M
-    {0x88, 0xC8, 0xA8, 0x98, 0x88, 0x88, 0x88}, // N
-    {0x70, 0x88, 0x88, 0x88, 0x88, 0x88, 0x70}, // O
-    {0xF0, 0x88, 0x88, 0xF0, 0x80, 0x80, 0x80}, // P
-    {0x70, 0x88, 0x88, 0x88, 0xA8, 0x98, 0x78}, // Q
-    {0xF0, 0x88, 0x88, 0xF0, 0xA0, 0x90, 0x88}, // R
-    {0x70, 0x80, 0x80, 0x70, 0x08, 0x08, 0x70}, // S
-    {0xF8, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20}, // T
-    {0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x70}, // U
-    {0x88, 0x88, 0x88, 0x88, 0x88, 0x50, 0x20}, // V
-    {0x88, 0x88, 0x88, 0xA8, 0xD8, 0x88, 0x88}, // W
-    {0x88, 0x88, 0x50, 0x20, 0x50, 0x88, 0x88}, // X
-    {0x88, 0x88, 0x50, 0x20, 0x20, 0x20, 0x20}, // Y
-    {0xF8, 0x08, 0x10, 0x20, 0x40, 0x80, 0xF8}, // Z
-};
-// clang-format on
-
-// Returns the 5-bit row mask for a character (uppercase output, supports A-Z, space, '/', '-')
-static uint8_t fontRow(char c, int row) {
-    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    if (c >= 'A' && c <= 'Z')
-        return kFont5x7[c - 'A'][row];
-    if (c == '/') {
-        // Diagonal slash centered in 7 rows
-        constexpr uint8_t kSlash[7] = {0x00, 0x08, 0x10, 0x20, 0x40, 0x80, 0x00};
-        return kSlash[row];
-    }
-    if (c == '-') {
-        return (row == 3) ? 0xF8 : 0x00;
-    }
-    return 0;  // space and unknowns
-}
-
-std::shared_ptr<vde::Texture> createTextTexture(vde::VulkanContext* ctx, const std::string& text,
-                                                int pixelScale, uint8_t r, uint8_t g, uint8_t b) {
-    if (text.empty() || pixelScale <= 0)
-        return nullptr;
-
-    constexpr int GLYPH_W = 5;
-    constexpr int GLYPH_H = 7;
-    constexpr int GAP = 1;    // one-pixel column gap between characters
-    constexpr int PAD_Y = 1;  // one-pixel top/bottom padding
-
-    const int cellW = (GLYPH_W + GAP) * pixelScale;
-    const int texW = static_cast<int>(text.size()) * cellW;
-    const int texH = (GLYPH_H + 2 * PAD_Y) * pixelScale;
-
-    std::vector<uint8_t> px(texW * texH * 4, 0);
-
-    for (int ci = 0; ci < static_cast<int>(text.size()); ++ci) {
-        const int x0 = ci * cellW;
-        for (int row = 0; row < GLYPH_H; ++row) {
-            const uint8_t bits = fontRow(text[ci], row);
-            for (int col = 0; col < GLYPH_W; ++col) {
-                if (!((bits >> (7 - col)) & 1))
-                    continue;
-                // Stamp a pixelScale × pixelScale block
-                for (int py = 0; py < pixelScale; ++py) {
-                    for (int px2 = 0; px2 < pixelScale; ++px2) {
-                        const int tx = x0 + col * pixelScale + px2;
-                        const int ty = (row + PAD_Y) * pixelScale + py;
-                        if (tx < texW && ty < texH) {
-                            const int idx = (ty * texW + tx) * 4;
-                            px[idx + 0] = r;
-                            px[idx + 1] = g;
-                            px[idx + 2] = b;
-                            px[idx + 3] = 255;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return uploadTexture(ctx, px, texW, texH);
 }
 
 // ============================================================================
