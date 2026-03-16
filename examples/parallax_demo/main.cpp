@@ -18,6 +18,11 @@ namespace {
 
 constexpr float kViewWidth = 24.0f;
 constexpr float kViewHeight = 13.5f;
+constexpr float kBackdropCycleDuration = 160.0f;
+constexpr float kBackdropWidth = 42.0f;
+constexpr float kBackdropHeight = kViewHeight * 2.0f;
+constexpr float kBackdropHalfHeight = kBackdropHeight * 0.5f;
+constexpr float kBackdropPivotY = -kViewHeight * 0.5f;
 
 enum class LayerId : size_t {
     Sky = 0,
@@ -53,7 +58,7 @@ struct LayerState {
 
 enum class PieceMode {
     Wrapped,
-    SunArc,
+    RotatingBackdrop,
 };
 
 struct ParallaxPiece {
@@ -67,28 +72,32 @@ struct ParallaxPiece {
     float width = 1.0f;
     float height = 1.0f;
     float roll = 0.0f;
-    float arcStartX = 0.0f;
-    float arcEndX = 0.0f;
-    float arcBaseY = 0.0f;
-    float arcHeight = 0.0f;
-    float arcDuration = 1.0f;
-    float arcStartProgress = 0.0f;
     vde::Color color = vde::Color::white();
     MotionSpec motion;
 };
 
+// Convert a layer enum into the array index used by the scene state tables.
 size_t toIndex(LayerId layer) {
     return static_cast<size_t>(layer);
 }
 
+// Blend between two colors for pulses, highlights, and day/night tinting.
 vde::Color blendColor(const vde::Color& a, const vde::Color& b, float t) {
     const float clamped = std::clamp(t, 0.0f, 1.0f);
     return vde::Color(a.r + (b.r - a.r) * clamped, a.g + (b.g - a.g) * clamped,
                       a.b + (b.b - a.b) * clamped, a.a + (b.a - a.a) * clamped);
 }
 
+// Scale a color's brightness and opacity while keeping channels in range.
+vde::Color scaleColor(const vde::Color& color, float rgbScale, float alphaScale = 1.0f) {
+    return vde::Color(
+        std::clamp(color.r * rgbScale, 0.0f, 1.0f), std::clamp(color.g * rgbScale, 0.0f, 1.0f),
+        std::clamp(color.b * rgbScale, 0.0f, 1.0f), std::clamp(color.a * alphaScale, 0.0f, 1.0f));
+}
+
+// Define the default speed and repeat width for each parallax layer.
 std::array<LayerState, kLayerCount> makeDefaultLayers() {
-    return {{{"Sky & Sun", 0.05f, 0.05f, 32.0f, 0.0f},
+    return {{{"Day / Night", 1.0f, 1.0f, kViewWidth, 0.0f},
              {"Clouds", 0.18f, 0.18f, 30.0f, 0.0f},
              {"Mountains", 0.42f, 0.42f, 28.0f, 0.0f},
              {"Lake", 0.78f, 0.78f, 26.0f, 0.0f},
@@ -98,6 +107,7 @@ std::array<LayerState, kLayerCount> makeDefaultLayers() {
 
 class ParallaxInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
+    // Capture demo-specific keys while preserving the base example shortcuts.
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
@@ -115,24 +125,28 @@ class ParallaxInputHandler : public vde::examples::BaseExampleInputHandler {
         }
     }
 
+    // Return whether pause was requested and clear the one-shot flag.
     bool consumeTogglePause() {
         const bool pressed = m_togglePausePressed;
         m_togglePausePressed = false;
         return pressed;
     }
 
+    // Return whether playback should slow down and clear the one-shot flag.
     bool consumeSlowDown() {
         const bool pressed = m_slowDownPressed;
         m_slowDownPressed = false;
         return pressed;
     }
 
+    // Return whether playback should speed up and clear the one-shot flag.
     bool consumeSpeedUp() {
         const bool pressed = m_speedUpPressed;
         m_speedUpPressed = false;
         return pressed;
     }
 
+    // Return whether the demo should restore its default playback settings.
     bool consumeReset() {
         const bool pressed = m_resetPressed;
         m_resetPressed = false;
@@ -148,11 +162,13 @@ class ParallaxInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class ParallaxScene : public vde::examples::BaseExampleScene {
   public:
+    // Keep the example open long enough to observe multiple parallax loops.
     ParallaxScene() : BaseExampleScene(120.0f) {}
 
+    // Set up the 2D camera, cache UI scale, and build every visual layer once.
     void onEnter() override {
         printExampleHeader();
-        setup2D(kViewWidth, kViewHeight, vde::Color::fromHex(0x8fd2ff));
+        setup2D(kViewWidth, kViewHeight, vde::Color::fromHex(0x060814));
 
         if (auto* camera = dynamic_cast<vde::Camera2D*>(getCamera())) {
             camera->setPosition(0.0f, 0.0f);
@@ -162,7 +178,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
             m_dpiScale = std::max(game->getDPIScale(), 1.0f);
         }
 
-        m_pieces.reserve(800);
+        m_pieces.reserve(900);
 
         createSkyLayer();
         createCloudLayer();
@@ -173,6 +189,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         applyAllPieces();
     }
 
+    // Advance playback time, scroll the looping layers, and re-apply every sprite transform.
     void update(float deltaTime) override {
         BaseExampleScene::update(deltaTime);
 
@@ -182,14 +199,19 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
             const float scaledDeltaTime = deltaTime * m_globalSpeed;
             m_playbackTime += scaledDeltaTime;
 
-            for (auto& layer : m_layers) {
-                advanceLayer(layer, scaledDeltaTime);
+            for (size_t i = 0; i < m_layers.size(); ++i) {
+                if (static_cast<LayerId>(i) == LayerId::Sky) {
+                    continue;
+                }
+
+                advanceLayer(m_layers[i], scaledDeltaTime);
             }
         }
 
         applyAllPieces();
     }
 
+    // Expose the live playback controls and per-layer speeds through ImGui.
     void drawDebugUI() override {
         const float scale = m_dpiScale;
 
@@ -228,6 +250,16 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         for (size_t i = 0; i < m_layers.size(); ++i) {
             auto& layer = m_layers[i];
             std::string label = std::string(layer.name) + "##layerSpeed" + std::to_string(i);
+
+            if (static_cast<LayerId>(i) == LayerId::Sky) {
+                ImGui::SliderFloat(label.c_str(), &layer.speed, 0.25f, 2.50f, "%.2fx");
+                const float effectiveRotation =
+                    m_paused ? 0.0f
+                             : (360.0f / kBackdropCycleDuration) * layer.speed * m_globalSpeed;
+                ImGui::TextDisabled("Effective: %.2f deg/s", effectiveRotation);
+                continue;
+            }
+
             ImGui::SliderFloat(label.c_str(), &layer.speed, 0.0f, 4.5f, "%.2f units/s");
             const float effectiveSpeed = m_paused ? 0.0f : layer.speed * m_globalSpeed;
             ImGui::TextDisabled("Effective: %.2f units/s", effectiveSpeed);
@@ -242,25 +274,30 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
+    // Name shown in the shared example header.
     std::string getExampleName() const override { return "Parallax Scrolling"; }
 
+    // Summarize the main techniques this example demonstrates.
     std::vector<std::string> getFeatures() const override {
-        return {"Six looping parallax layers with a dedicated cloud band",
-                "A single sun that drifts in a slow left-to-right sky arc",
+        return {"An oversized rotating day/night backdrop behind the scrolling world",
+                "The sun, moon, and stars are locked to the rotating sky composition",
                 "Independent per-layer scroll tuning in the debug menu",
                 "Runtime pause, slow down, and speed up controls",
                 "Animated clouds, water shimmer, and swaying foreground foliage"};
     }
 
+    // Describe the important visual beats a user should verify on screen.
     std::vector<std::string> getExpectedVisuals() const override {
-        return {"A blue sky backdrop with a warm sun slowly arcing from left to right",
-                "A separate cloud layer drifting in front of the sky",
+        return {"A large background slowly rotating from blue daytime sky into starry night",
+                "A warm sun on the daytime half and a moon with stars on the nighttime half",
+                "A separate cloud layer drifting in front of the changing backdrop",
                 "Snow-capped mountains sliding slowly behind the scene",
                 "A midground lake with bright shimmering highlights",
                 "Foreground shrubbery, bushes, and trees swaying above a dirt road",
                 "The whole landscape looping forever to imply a runner moving right"};
     }
 
+    // Document the controls added by this demo beyond the base example shortcuts.
     std::vector<std::string> getControls() const override {
         return {"SPACE / P           - Pause or resume the scrolling",
                 "UP / ] / =          - Speed up the playback",
@@ -269,6 +306,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
   private:
+    // Pull one-shot input flags from the handler and convert them into scene state changes.
     void handlePlaybackControls() {
         auto* input = dynamic_cast<ParallaxInputHandler*>(getInputHandler());
         if (!input) {
@@ -289,6 +327,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Restore the default run state so experimentation in the debug UI is reversible.
     void resetPlaybackSettings() {
         m_paused = false;
         m_globalSpeed = 1.0f;
@@ -297,6 +336,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Move a wrapped layer left over time and wrap its offset back into one segment width.
     void advanceLayer(LayerState& layer, float scaledDeltaTime) {
         layer.offset -= layer.speed * scaledDeltaTime;
 
@@ -308,12 +348,14 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Recompute the final transform and color for every stored sprite piece.
     void applyAllPieces() {
         for (auto& piece : m_pieces) {
             applyPiece(piece);
         }
     }
 
+    // Decide how many repeated segment copies a layer needs to avoid visible gaps.
     int getSegmentRadius(LayerId layer) const {
         const float segmentWidth = m_layers[toIndex(layer)].segmentWidth;
 
@@ -322,6 +364,20 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         return std::max(1, static_cast<int>(std::ceil(kViewWidth / segmentWidth)) + 1);
     }
 
+    // Convert playback time into the current rotation angle for the sky backdrop.
+    float getBackdropRotationDegrees() const {
+        return (m_playbackTime * m_layers[toIndex(LayerId::Sky)].speed * 360.0f) /
+               kBackdropCycleDuration;
+    }
+
+    // Map the backdrop rotation into a daylight factor used to tint the whole scene.
+    float getBackdropDaylight() const {
+        const float rotationRadians =
+            getBackdropRotationDegrees() * (std::numbers::pi_v<float> / 180.0f);
+        return 0.5f + 0.5f * std::cos(rotationRadians);
+    }
+
+    // Combine layer scrolling, procedural motion, rotation, and night tinting for one piece.
     void applyPiece(ParallaxPiece& piece) {
         const LayerState& layer = m_layers[toIndex(piece.layer)];
         const float angle = m_playbackTime * piece.motion.frequency + piece.motion.phase;
@@ -330,18 +386,17 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
 
         float x = piece.localX;
         float y = piece.localY;
+        float backdropRoll = 0.0f;
 
-        if (piece.mode == PieceMode::SunArc) {
-            const float speedFactor =
-                (layer.defaultSpeed > 0.0f) ? (layer.speed / layer.defaultSpeed) : 1.0f;
-            float progress = piece.arcStartProgress;
-            if (piece.arcDuration > 0.0f) {
-                progress += (m_playbackTime * speedFactor) / piece.arcDuration;
-            }
-            progress -= std::floor(progress);
-
-            x = piece.arcStartX + (piece.arcEndX - piece.arcStartX) * progress;
-            y = piece.arcBaseY + std::sin(progress * std::numbers::pi_v<float>) * piece.arcHeight;
+        if (piece.mode == PieceMode::RotatingBackdrop) {
+            backdropRoll = getBackdropRotationDegrees();
+            const float backdropRadians = backdropRoll * (std::numbers::pi_v<float> / 180.0f);
+            const float sine = std::sin(backdropRadians);
+            const float cosine = std::cos(backdropRadians);
+            const float rotatedX = x * cosine - y * sine;
+            const float rotatedY = x * sine + y * cosine;
+            x = rotatedX;
+            y = rotatedY + kBackdropPivotY;
         } else {
             x += static_cast<float>(piece.segment) * layer.segmentWidth + layer.offset;
         }
@@ -360,12 +415,38 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
             color = blendColor(piece.color, piece.motion.accentColor, mix);
         }
 
+        const float nightFactor = 1.0f - getBackdropDaylight();
+        switch (piece.layer) {
+        case LayerId::Clouds:
+            color =
+                blendColor(color, vde::Color(0.40f, 0.49f, 0.68f, color.a), 0.70f * nightFactor);
+            color.a *= 1.0f - 0.40f * nightFactor;
+            break;
+        case LayerId::Mountains:
+            color = blendColor(color, scaleColor(color, 0.65f), 0.42f * nightFactor);
+            break;
+        case LayerId::Lake:
+            color =
+                blendColor(color, vde::Color(0.10f, 0.18f, 0.30f, color.a), 0.40f * nightFactor);
+            break;
+        case LayerId::Foliage:
+            color = blendColor(color, scaleColor(color, 0.72f), 0.24f * nightFactor);
+            break;
+        case LayerId::Road:
+            color = blendColor(color, scaleColor(color, 0.68f), 0.22f * nightFactor);
+            break;
+        case LayerId::Sky:
+        case LayerId::Count:
+            break;
+        }
+
         piece.sprite->setPosition(x, y, piece.depth);
         piece.sprite->setScale(width, height, 1.0f);
-        piece.sprite->setRotation(0.0f, 0.0f, roll);
+        piece.sprite->setRotation(0.0f, 0.0f, roll + backdropRoll);
         piece.sprite->setColor(color);
     }
 
+    // Create a scrolling sprite piece and remember the metadata needed to animate it later.
     void addPiece(LayerId layer, int segment, float localX, float localY, float depth, float width,
                   float height, const vde::Color& color, float roll = 0.0f,
                   const MotionSpec& motion = {}) {
@@ -390,9 +471,11 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         m_pieces.push_back(piece);
     }
 
-    void addSunArcPiece(float depth, float width, float height, const vde::Color& color, float roll,
-                        const MotionSpec& motion, float arcStartX, float arcEndX, float arcBaseY,
-                        float arcHeight, float arcDuration, float arcStartProgress) {
+    // Create a sky piece that rotates with the oversized backdrop instead of scrolling
+    // horizontally.
+    void addRotatingBackdropPiece(float localX, float localY, float depth, float width,
+                                  float height, const vde::Color& color, float roll = 0.0f,
+                                  const MotionSpec& motion = {}) {
         auto sprite = addEntity<vde::SpriteEntity>();
         sprite->setColor(color);
         sprite->setScale(width, height, 1.0f);
@@ -401,23 +484,36 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         ParallaxPiece piece;
         piece.sprite = sprite.get();
         piece.layer = LayerId::Sky;
-        piece.mode = PieceMode::SunArc;
+        piece.mode = PieceMode::RotatingBackdrop;
+        piece.localX = localX;
+        piece.localY = localY;
         piece.depth = depth;
         piece.width = width;
         piece.height = height;
         piece.roll = roll;
-        piece.arcStartX = arcStartX;
-        piece.arcEndX = arcEndX;
-        piece.arcBaseY = arcBaseY;
-        piece.arcHeight = arcHeight;
-        piece.arcDuration = arcDuration;
-        piece.arcStartProgress = arcStartProgress;
         piece.color = color;
         piece.motion = motion;
 
         m_pieces.push_back(piece);
     }
 
+    // Build a two-sprite star with a soft glow layer and a twinkling bright core.
+    void addNightStar(float localX, float localY, float size, float phase) {
+        MotionSpec twinkle;
+        twinkle.frequency = 0.85f + size * 1.8f;
+        twinkle.widthScaleAmplitude = 0.16f;
+        twinkle.heightScaleAmplitude = 0.16f;
+        twinkle.phase = phase;
+        twinkle.colorPulse = 0.38f;
+        twinkle.accentColor = vde::Color(1.0f, 0.96f, 0.88f, 0.96f);
+
+        addRotatingBackdropPiece(localX, localY, -0.979f, size * 2.2f, size * 2.2f,
+                                 vde::Color(0.72f, 0.83f, 1.0f, 0.08f), 45.0f);
+        addRotatingBackdropPiece(localX, localY, -0.978f, size, size,
+                                 vde::Color(0.86f, 0.92f, 1.0f, 0.84f), 45.0f, twinkle);
+    }
+
+    // Assemble a stylized cloud from several overlapping sprites with slightly different drift.
     void addCloudCluster(int segment, float centerX, float centerY, float scale, float phase) {
         MotionSpec mainDrift;
         mainDrift.frequency = 0.30f + scale * 0.08f;
@@ -443,6 +539,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
                  mainDrift);
     }
 
+    // Compose a mountain silhouette from broad shapes plus bright snow caps.
     void addMountain(int segment, float centerX, float baseY, float width, float height,
                      const vde::Color& bodyColor, const vde::Color& snowColor, float depth) {
         const vde::Color baseColor = blendColor(bodyColor, vde::Color::fromHex(0x2b3f62), 0.25f);
@@ -462,6 +559,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
                  depth + 0.03f, width * 0.26f, height * 0.09f, snowColor, -18.0f);
     }
 
+    // Build a foreground tree from a trunk and several animated canopy blobs.
     void addTree(int segment, float centerX, float groundY, float trunkHeight, float canopyScale,
                  float phase, const vde::Color& canopyColor, const vde::Color& highlightColor) {
         MotionSpec trunkMotion;
@@ -502,6 +600,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
                  0.66f * canopyScale, canopyColor, 12.0f, rightCanopyMotion);
     }
 
+    // Build a clump of shrubs that sways as one layer in the foreground.
     void addBushCluster(int segment, float centerX, float baseY, float scale, float phase,
                         const vde::Color& bodyColor, const vde::Color& accentColor) {
         MotionSpec sway;
@@ -529,40 +628,99 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
                  0.86f * scale, 0.54f * scale, bodyColor, 0.0f, rightSway);
     }
 
+    // Build the rotating day/night sky, including glow bands, sun, moon, and stars.
     void createSkyLayer() {
-        const int segmentRadius = getSegmentRadius(LayerId::Sky);
-        for (int segment = -segmentRadius; segment <= segmentRadius; ++segment) {
-            const float skyWidth = m_layers[toIndex(LayerId::Sky)].segmentWidth;
-
-            addPiece(LayerId::Sky, segment, 0.0f, 0.70f, -0.99f, skyWidth + 1.0f, 13.0f,
-                     vde::Color::fromHex(0x95d5ff));
-            addPiece(LayerId::Sky, segment, 0.0f, 3.95f, -0.98f, skyWidth + 1.0f, 6.0f,
-                     vde::Color(0.72f, 0.86f, 1.0f, 0.22f));
-            addPiece(LayerId::Sky, segment, 0.0f, -2.55f, -0.97f, skyWidth + 1.0f, 4.8f,
-                     vde::Color(0.88f, 0.95f, 1.0f, 0.16f));
-        }
+        addRotatingBackdropPiece(0.0f, kBackdropHalfHeight * 0.5f, -0.99f, kBackdropWidth,
+                                 kBackdropHalfHeight, vde::Color::fromHex(0x8fd2ff));
+        addRotatingBackdropPiece(0.0f, 10.8f, -0.989f, kBackdropWidth, 6.2f,
+                                 vde::Color(0.95f, 0.98f, 1.0f, 0.22f));
+        addRotatingBackdropPiece(0.0f, 2.8f, -0.988f, kBackdropWidth, 4.2f,
+                                 vde::Color(1.0f, 0.84f, 0.62f, 0.12f));
+        addRotatingBackdropPiece(0.0f, -kBackdropHalfHeight * 0.5f, -0.987f, kBackdropWidth,
+                                 kBackdropHalfHeight, vde::Color::fromHex(0x060814));
+        addRotatingBackdropPiece(0.0f, -10.8f, -0.986f, kBackdropWidth, 7.4f,
+                                 vde::Color(0.03f, 0.04f, 0.10f, 1.0f));
+        addRotatingBackdropPiece(0.0f, -1.8f, -0.985f, kBackdropWidth, 4.4f,
+                                 vde::Color(0.18f, 0.16f, 0.34f, 0.18f));
+        addRotatingBackdropPiece(0.0f, 0.0f, -0.984f, kBackdropWidth, 1.8f,
+                                 vde::Color(0.96f, 0.68f, 0.46f, 0.08f));
 
         MotionSpec sunGlow;
-        sunGlow.frequency = 0.22f;
-        sunGlow.widthScaleAmplitude = 0.06f;
-        sunGlow.heightScaleAmplitude = 0.06f;
-        sunGlow.phase = 0.25f;
-        sunGlow.colorPulse = 0.10f;
-        sunGlow.accentColor = vde::Color(1.0f, 0.97f, 0.85f, 0.28f);
+        sunGlow.frequency = 0.18f;
+        sunGlow.widthScaleAmplitude = 0.08f;
+        sunGlow.heightScaleAmplitude = 0.08f;
+        sunGlow.phase = 0.35f;
+        sunGlow.colorPulse = 0.12f;
+        sunGlow.accentColor = vde::Color(1.0f, 0.97f, 0.87f, 0.28f);
 
         MotionSpec sunCore = sunGlow;
-        sunCore.frequency = 0.35f;
+        sunCore.frequency = 0.28f;
         sunCore.widthScaleAmplitude = 0.03f;
         sunCore.heightScaleAmplitude = 0.03f;
-        sunCore.colorPulse = 0.22f;
-        sunCore.accentColor = vde::Color::fromHex(0xfff1b0);
+        sunCore.colorPulse = 0.20f;
+        sunCore.accentColor = vde::Color::fromHex(0xfff3b4);
 
-        addSunArcPiece(-0.95f, 2.20f, 2.20f, vde::Color(1.0f, 0.91f, 0.60f, 0.18f), 45.0f, sunGlow,
-                       -16.0f, 16.0f, 3.35f, 2.40f, 140.0f, 0.10f);
-        addSunArcPiece(-0.94f, 1.12f, 1.12f, vde::Color::fromHex(0xffdd6b), 45.0f, sunCore, -16.0f,
-                       16.0f, 3.35f, 2.40f, 140.0f, 0.10f);
+        addRotatingBackdropPiece(-8.2f, 10.7f, -0.983f, 4.5f, 4.5f,
+                                 vde::Color(1.0f, 0.90f, 0.60f, 0.16f), 45.0f, sunGlow);
+        addRotatingBackdropPiece(-8.2f, 10.7f, -0.982f, 1.55f, 1.55f, vde::Color::fromHex(0xffdc73),
+                                 45.0f, sunCore);
+        addRotatingBackdropPiece(-7.75f, 10.95f, -0.981f, 0.42f, 0.42f,
+                                 vde::Color::fromHex(0xfff9da), 45.0f);
+
+        MotionSpec moonGlow;
+        moonGlow.frequency = 0.12f;
+        moonGlow.widthScaleAmplitude = 0.05f;
+        moonGlow.heightScaleAmplitude = 0.05f;
+        moonGlow.phase = 1.20f;
+        moonGlow.colorPulse = 0.10f;
+        moonGlow.accentColor = vde::Color(0.88f, 0.93f, 1.0f, 0.22f);
+
+        MotionSpec moonCore = moonGlow;
+        moonCore.frequency = 0.22f;
+        moonCore.widthScaleAmplitude = 0.02f;
+        moonCore.heightScaleAmplitude = 0.02f;
+        moonCore.colorPulse = 0.14f;
+        moonCore.accentColor = vde::Color::fromHex(0xf8fbff);
+
+        addRotatingBackdropPiece(8.0f, -9.6f, -0.980f, 3.6f, 3.6f,
+                                 vde::Color(0.82f, 0.88f, 1.0f, 0.14f), 45.0f, moonGlow);
+        addRotatingBackdropPiece(8.0f, -9.6f, -0.979f, 1.35f, 1.35f, vde::Color::fromHex(0xe4ecff),
+                                 45.0f, moonCore);
+        addRotatingBackdropPiece(8.45f, -9.35f, -0.9785f, 1.18f, 1.18f,
+                                 vde::Color::fromHex(0x060814), 45.0f);
+
+        struct StarSeed {
+            float x;
+            float y;
+            float size;
+            float phase;
+        };
+
+        constexpr std::array<StarSeed, 18> kStars = {{{-14.6f, -4.4f, 0.18f, 0.10f},
+                                                      {-11.2f, -6.5f, 0.14f, 0.58f},
+                                                      {-8.4f, -3.4f, 0.12f, 1.05f},
+                                                      {-5.8f, -7.8f, 0.16f, 1.42f},
+                                                      {-2.6f, -5.2f, 0.13f, 0.72f},
+                                                      {0.8f, -2.8f, 0.15f, 1.78f},
+                                                      {3.9f, -6.1f, 0.12f, 2.24f},
+                                                      {6.5f, -3.9f, 0.17f, 2.72f},
+                                                      {10.6f, -5.8f, 0.13f, 0.34f},
+                                                      {13.7f, -7.2f, 0.15f, 1.16f},
+                                                      {-13.0f, -10.2f, 0.11f, 2.02f},
+                                                      {-9.2f, -12.8f, 0.16f, 0.88f},
+                                                      {-4.6f, -9.6f, 0.12f, 1.64f},
+                                                      {-0.9f, -13.8f, 0.14f, 2.48f},
+                                                      {4.3f, -11.4f, 0.11f, 0.48f},
+                                                      {7.9f, -14.4f, 0.15f, 1.92f},
+                                                      {11.8f, -10.6f, 0.12f, 2.86f},
+                                                      {15.0f, -12.6f, 0.14f, 0.96f}}};
+
+        for (const auto& star : kStars) {
+            addNightStar(star.x, star.y, star.size, star.phase);
+        }
     }
 
+    // Tile multiple cloud clusters across repeated segments so the layer can loop forever.
     void createCloudLayer() {
         const int segmentRadius = getSegmentRadius(LayerId::Clouds);
         for (int segment = -segmentRadius; segment <= segmentRadius; ++segment) {
@@ -574,6 +732,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Lay down wide mountain bands and several peaks for the distant background layer.
     void createMountainLayer() {
         const int segmentRadius = getSegmentRadius(LayerId::Mountains);
         for (int segment = -segmentRadius; segment <= segmentRadius; ++segment) {
@@ -594,6 +753,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Fill the lake layer with broad water bands and animated highlight streaks.
     void createLakeLayer() {
         const int segmentRadius = getSegmentRadius(LayerId::Lake);
         for (int segment = -segmentRadius; segment <= segmentRadius; ++segment) {
@@ -628,6 +788,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Build the near-ground greenery, combining broad color bands with bushes and trees.
     void createFoliageLayer() {
         const int segmentRadius = getSegmentRadius(LayerId::Foliage);
         for (int segment = -segmentRadius; segment <= segmentRadius; ++segment) {
@@ -656,6 +817,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
         }
     }
 
+    // Create the fastest foreground layer, including the road surface, dust streaks, and pebbles.
     void createRoadLayer() {
         const int segmentRadius = getSegmentRadius(LayerId::Road);
         for (int segment = -segmentRadius; segment <= segmentRadius; ++segment) {
@@ -714,11 +876,13 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
 class ParallaxDemoGame
     : public vde::examples::BaseExampleGame<ParallaxInputHandler, ParallaxScene> {
   public:
+    // No extra setup is needed beyond the shared example bootstrap.
     ParallaxDemoGame() = default;
 };
 
 }  // namespace
 
+// Enter the shared example runner, which creates the window and starts the game loop.
 int main(int argc, char** argv) {
     ParallaxDemoGame game;
     return vde::examples::runExample(game, "VDE Parallax Demo", 1280, 720, argc, argv);
