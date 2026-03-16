@@ -21,7 +21,9 @@
 #include <vde/api/GameAPI.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
@@ -46,6 +48,13 @@ struct FontEntry {
     std::string displayName;  ///< Friendly name shown in the UI
     std::string path;         ///< Absolute path to the .ttf file
 };
+
+static std::string toLowerCopy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
 
 /// Scan common font directories for .ttf files and return sorted list.
 static std::vector<FontEntry> enumerateSystemFonts() {
@@ -79,8 +88,7 @@ static std::vector<FontEntry> enumerateSystemFonts() {
                 break;
             if (!entry.is_regular_file(ec))
                 continue;
-            auto ext = entry.path().extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            auto ext = toLowerCopy(entry.path().extension().string());
             if (ext == ".ttf") {
                 FontEntry fe;
                 fe.path = entry.path().string();
@@ -92,10 +100,7 @@ static std::vector<FontEntry> enumerateSystemFonts() {
 
     // Sort by display name (case-insensitive)
     std::sort(fonts.begin(), fonts.end(), [](const FontEntry& a, const FontEntry& b) {
-        std::string la = a.displayName, lb = b.displayName;
-        std::transform(la.begin(), la.end(), la.begin(), ::tolower);
-        std::transform(lb.begin(), lb.end(), lb.begin(), ::tolower);
-        return la < lb;
+        return toLowerCopy(a.displayName) < toLowerCopy(b.displayName);
     });
 
     return fonts;
@@ -351,18 +356,14 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
                 ImGui::InputTextWithHint("##filter", "Filter fonts...", m_fontFilter,
                                          sizeof(m_fontFilter));
 
-                std::string filterLower = m_fontFilter;
-                std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(),
-                               ::tolower);
+                std::string filterLower = toLowerCopy(m_fontFilter);
 
                 // Listbox with filtered font names
                 if (ImGui::BeginListBox("##fontlist", ImVec2(-FLT_MIN, 150 * scale))) {
                     for (int i = 0; i < static_cast<int>(m_fontNames.size()); ++i) {
                         // Apply filter
                         if (!filterLower.empty()) {
-                            std::string nameLower = m_fontNames[i];
-                            std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(),
-                                           ::tolower);
+                            std::string nameLower = toLowerCopy(m_fontNames[i]);
                             if (nameLower.find(filterLower) == std::string::npos)
                                 continue;
                         }

@@ -5,8 +5,10 @@
  * @brief TrueType font loading and glyph atlas generation.
  *
  * Loads a .ttf font file via stb_truetype and builds a glyph-atlas Texture
- * for rendering anti-aliased text. Falls back to BitmapFont::small() when
- * the font file cannot be loaded.
+ * for rendering anti-aliased text. Returns false from loadFromFile() when
+ * the font file cannot be loaded; callers should check isLoaded(), inspect
+ * getLastError() for diagnostics, and fall back to BitmapFont::small() when
+ * needed.
  */
 
 #include <vde/api/BitmapFont.h>
@@ -69,6 +71,7 @@ class TrueTypeFont {
      * @param path Path to the .ttf font file
      * @param sizePixels Desired font size in pixels
      * @return true if the font was loaded and atlas built successfully
+    * @note On failure, getLastError() contains a human-readable reason.
      */
     bool loadFromFile(VulkanContext* ctx, const std::string& path, float sizePixels);
 
@@ -77,6 +80,12 @@ class TrueTypeFont {
      * @return true if loadFromFile() succeeded
      */
     bool isLoaded() const { return m_loaded; }
+
+    /**
+     * @brief Get the last load failure message.
+     * @return Empty string when the last load succeeded or no load was attempted
+     */
+    const std::string& getLastError() const { return m_lastError; }
 
     /**
      * @brief Get the glyph atlas texture.
@@ -125,6 +134,7 @@ class TrueTypeFont {
     int m_atlasHeight = 0;
     std::shared_ptr<Texture> m_atlas;
     std::vector<GlyphInfo> m_glyphs;  ///< Indexed by (char - 0x20), 95 entries
+    std::string m_lastError;
 };
 
 }  // namespace vde

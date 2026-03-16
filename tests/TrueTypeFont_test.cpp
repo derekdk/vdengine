@@ -21,12 +21,13 @@ bool isPowerOfTwo(int v) {
 
 class TrueTypeFontTest : public ::testing::Test {};
 
-TEST_F(TrueTypeFontTest, MissingFileFallsBackGracefully) {
+TEST_F(TrueTypeFontTest, MissingFileLoadFails) {
     TrueTypeFont font;
     bool result = font.loadFromFile(nullptr, "nonexistent_path/missing.ttf", 32.0f);
     EXPECT_FALSE(result);
     EXPECT_FALSE(font.isLoaded());
     EXPECT_EQ(font.getAtlasTexture(), nullptr);
+    EXPECT_NE(font.getLastError().find("Failed to open font file:"), std::string::npos);
 }
 
 TEST_F(TrueTypeFontTest, EmptyPathFails) {
@@ -34,6 +35,13 @@ TEST_F(TrueTypeFontTest, EmptyPathFails) {
     bool result = font.loadFromFile(nullptr, "", 32.0f);
     EXPECT_FALSE(result);
     EXPECT_FALSE(font.isLoaded());
+    EXPECT_FALSE(font.getLastError().empty());
+}
+
+TEST_F(TrueTypeFontTest, InvalidSizeSetsErrorMessage) {
+    TrueTypeFont font;
+    EXPECT_FALSE(font.loadFromFile(nullptr, VDE_ASSETS_DIR "/fonts/VDE_default.ttf", 0.0f));
+    EXPECT_EQ(font.getLastError(), "Font size must be greater than zero");
 }
 
 TEST_F(TrueTypeFontTest, FallbackFontReturnsSmallBitmapFont) {

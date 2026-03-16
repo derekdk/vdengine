@@ -1,6 +1,6 @@
 /**
  * @file TextRenderer.cpp
- * @brief Rasterizes text strings into RGBA textures using BitmapFont data.
+ * @brief Rasterizes text strings into RGBA textures using BitmapFont or TrueTypeFont data.
  */
 
 #include <vde/Texture.h>
@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <vector>
 
 namespace vde {
@@ -132,6 +133,7 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
     const uint8_t r = static_cast<uint8_t>(std::clamp(style.color.r, 0.0f, 1.0f) * 255.0f);
     const uint8_t g = static_cast<uint8_t>(std::clamp(style.color.g, 0.0f, 1.0f) * 255.0f);
     const uint8_t b = static_cast<uint8_t>(std::clamp(style.color.b, 0.0f, 1.0f) * 255.0f);
+    const float styleAlpha = std::clamp(style.color.a, 0.0f, 1.0f);
 
     // Allocate RGBA pixel buffer
     std::vector<uint8_t> pixels(static_cast<size_t>(texW) * texH * 4, 0);
@@ -147,7 +149,8 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
     const uint8_t* atlasPixels = atlasTex ? atlasTex->getPixelData() : nullptr;
 
     if (!atlasPixels) {
-        // Can't sample atlas — return empty texture
+        std::cerr << "TextRenderer: TrueType atlas CPU pixel data is unavailable; "
+                     "returning an empty texture\n";
         auto tex = std::make_shared<Texture>();
         const uint8_t transparent[4] = {0, 0, 0, 0};
         tex->loadFromData(transparent, 1, 1);
@@ -183,9 +186,12 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
                 const int sy = srcY0 + gy;
                 if (sx < 0 || sx >= atlasW || sy < 0 || sy >= atlasH)
                     continue;
-                const uint8_t alpha = atlasPixels[(static_cast<size_t>(sy) * atlasW + sx) * 4 + 3];
-                if (alpha == 0)
+                const uint8_t atlasAlpha =
+                    atlasPixels[(static_cast<size_t>(sy) * atlasW + sx) * 4 + 3];
+                if (atlasAlpha == 0)
                     continue;
+                const uint8_t alpha =
+                    static_cast<uint8_t>(static_cast<float>(atlasAlpha) * styleAlpha);
 
                 // Stamp a scale × scale block
                 for (int py = 0; py < scale; ++py) {

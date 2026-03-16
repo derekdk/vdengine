@@ -15,6 +15,7 @@
 #include <vde/api/GameAPI.h>
 
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <vector>
