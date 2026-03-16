@@ -1,0 +1,19 @@
+# Smoke test for parallax scrolling demo
+# Verifies the demo launches, responds to speed controls, and cleanly exits
+wait startup
+wait 1000
+
+press DOWN
+wait 400
+press UP
+wait 400
+press SPACE
+wait 400
+press SPACE
+wait 400
+press F1
+wait 500
+press R
+wait 1000
+
+exit
