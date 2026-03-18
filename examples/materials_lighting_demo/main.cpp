@@ -68,7 +68,7 @@ class MaterialCube : public vde::MeshEntity {
  */
 class MaterialsLightingScene : public vde::examples::BaseExampleScene {
   public:
-    MaterialsLightingScene() : BaseExampleScene(5.0f) {}
+    MaterialsLightingScene() : BaseExampleScene() {}
 
     void onEnter() override {
         // Print standard header

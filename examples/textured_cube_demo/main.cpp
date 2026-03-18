@@ -276,7 +276,7 @@ std::shared_ptr<vde::Texture> createTextureAtlas() {
  */
 class TexturedCubeScene : public vde::examples::BaseExampleScene {
   public:
-    TexturedCubeScene() : BaseExampleScene(10.0f) {}
+    TexturedCubeScene() : BaseExampleScene() {}
 
     void onEnter() override {
         // Print standard header

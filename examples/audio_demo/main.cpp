@@ -125,7 +125,7 @@ class AudioInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class AudioDemoScene : public vde::examples::BaseExampleScene {
   public:
-    AudioDemoScene() : BaseExampleScene(60.0f) {}
+    AudioDemoScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

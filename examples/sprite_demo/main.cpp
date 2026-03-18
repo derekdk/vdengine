@@ -160,7 +160,7 @@ class AnimatedSprite : public vde::SpriteEntity {
  */
 class SpriteScene : public vde::examples::BaseExampleScene {
   public:
-    SpriteScene() : BaseExampleScene(15.0f) {}
+    SpriteScene() : BaseExampleScene() {}
 
     void onEnter() override {
         // Print standard header

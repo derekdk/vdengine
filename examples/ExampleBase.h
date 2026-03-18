@@ -48,6 +48,31 @@
 namespace vde {
 namespace examples {
 
+namespace detail {
+/// Storage for CLI --timeout override (0 = not specified).
+inline float& cliTimeoutOverride() {
+    static float value = 0.0f;
+    return value;
+}
+}  // namespace detail
+
+/**
+ * @brief Parse --timeout argument from command-line args.
+ * @return Timeout in seconds, or 0 if not specified.
+ */
+inline float parseTimeoutArg(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--timeout" && i + 1 < argc) {
+            return std::stof(argv[i + 1]);
+        }
+        if (arg.size() > 10 && arg.substr(0, 10) == "--timeout=") {
+            return std::stof(arg.substr(10));
+        }
+    }
+    return 0.0f;
+}
+
 inline void setWorkingDirectoryToExecutablePath() {
 #ifdef _WIN32
     char exePathBuffer[MAX_PATH] = {};
@@ -156,10 +181,17 @@ class BaseExampleScene : public vde::Scene {
   public:
     /**
      * @brief Construct a scene with auto-termination time.
-     * @param autoTerminateSeconds Time in seconds before auto-closing (default: 15.0)
+     * @param autoTerminateSeconds Time in seconds before auto-closing (0 = disabled).
+     *        Use --timeout CLI arg to enable at runtime.
      */
-    explicit BaseExampleScene(float autoTerminateSeconds = 15.0f)
-        : m_autoTerminateSeconds(autoTerminateSeconds) {}
+    explicit BaseExampleScene(float autoTerminateSeconds = 0.0f)
+        : m_autoTerminateSeconds(autoTerminateSeconds) {
+        // CLI --timeout overrides built-in default
+        float cliTimeout = detail::cliTimeoutOverride();
+        if (cliTimeout > 0.0f) {
+            m_autoTerminateSeconds = cliTimeout;
+        }
+    }
 
     virtual ~BaseExampleScene() = default;
 
@@ -196,8 +228,8 @@ class BaseExampleScene : public vde::Scene {
             }
         }
 
-        // Auto-terminate after configured time
-        if (m_elapsedTime >= m_autoTerminateSeconds) {
+        // Auto-terminate after configured time (0 = disabled)
+        if (m_autoTerminateSeconds > 0.0f && m_elapsedTime >= m_autoTerminateSeconds) {
             handleTestSuccess();
         }
     }
@@ -299,7 +331,12 @@ class BaseExampleScene : public vde::Scene {
         std::cout << "  F1    - Toggle debug UI" << std::endl;
         std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
         std::cout << "  ESC   - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n" << std::endl;
+        if (m_autoTerminateSeconds > 0.0f) {
+            std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n"
+                      << std::endl;
+        } else {
+            std::cout << "  (Run with --timeout <seconds> to auto-close)\n" << std::endl;
+        }
     }
 
     /**
@@ -594,10 +631,14 @@ class BaseExampleGame : public vde::Game {
 template <typename TGame>
 int runExample(TGame& game, const std::string& gameName, uint32_t width = 1280,
                uint32_t height = 720, int argc = 0, char** argv = nullptr) {
-    // Configure input script from CLI args BEFORE changing working directory
+    // Configure input script and timeout from CLI args BEFORE changing working directory
     // so relative paths resolve from the user's CWD
     if (argc > 0 && argv != nullptr) {
         vde::configureInputScriptFromArgs(game, argc, argv);
+        float timeout = parseTimeoutArg(argc, argv);
+        if (timeout > 0.0f) {
+            detail::cliTimeoutOverride() = timeout;
+        }
     }
 
     setWorkingDirectoryToExecutablePath();

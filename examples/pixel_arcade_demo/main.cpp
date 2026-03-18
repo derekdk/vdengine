@@ -32,7 +32,7 @@ class ArcadeInputHandler : public vde::examples::BaseExampleInputHandler {};
 // ---------------------------------------------------------------------------
 class ArcadeScene : public vde::examples::BaseExampleScene {
   public:
-    ArcadeScene() : BaseExampleScene(15.0f) {}
+    ArcadeScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

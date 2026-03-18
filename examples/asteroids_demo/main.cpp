@@ -279,7 +279,7 @@ class Bullet : public GameObject {
  */
 class AsteroidsScene : public vde::examples::BaseExampleScene {
   public:
-    AsteroidsScene() : BaseExampleScene(60.0f) {}
+    AsteroidsScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

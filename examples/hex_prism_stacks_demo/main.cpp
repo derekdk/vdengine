@@ -77,7 +77,7 @@ class HexPrismStacksInputHandler : public vde::examples::BaseExampleInputHandler
 
 class HexPrismStacksScene : public vde::examples::BaseExampleScene {
   public:
-    HexPrismStacksScene() : BaseExampleScene(45.0f) {}
+    HexPrismStacksScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

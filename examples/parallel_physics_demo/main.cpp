@@ -208,7 +208,7 @@ class PhysicsWorldScene : public vde::Scene {
 
 class CoordinatorScene : public vde::examples::BaseExampleScene {
   public:
-    CoordinatorScene() : BaseExampleScene(12.0f) {}
+    CoordinatorScene() : BaseExampleScene() {}
 
     void setWorldScenes(PhysicsWorldScene* left, PhysicsWorldScene* right) {
         m_leftScene = left;
@@ -458,9 +458,13 @@ class ParallelPhysicsGame : public vde::Game {
 int main(int argc, char** argv) {
     ParallelPhysicsGame game;
 
-    // Configure input script from CLI args if provided
+    // Configure input script and timeout from CLI args if provided
     if (argc > 0 && argv != nullptr) {
         vde::configureInputScriptFromArgs(game, argc, argv);
+        float timeout = vde::examples::parseTimeoutArg(argc, argv);
+        if (timeout > 0.0f) {
+            vde::examples::detail::cliTimeoutOverride() = timeout;
+        }
     }
 
     vde::GameSettings settings;

@@ -85,7 +85,7 @@ class PhysicsInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class PhysicsDemoScene : public vde::examples::BaseExampleScene {
   public:
-    PhysicsDemoScene() : BaseExampleScene(10.0f) {}
+    PhysicsDemoScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

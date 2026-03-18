@@ -282,7 +282,7 @@ static void sizeToFit(TextEntity& te, float worldHeight, float maxWidth = 0.0f) 
 
 class AdventureScene : public vde::examples::BaseExampleScene {
   public:
-    AdventureScene() : BaseExampleScene(30.0f) {}
+    AdventureScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

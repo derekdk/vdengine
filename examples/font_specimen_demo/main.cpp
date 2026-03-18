@@ -47,7 +47,7 @@ class SpecimenInputHandler : public vde::examples::BaseExampleInputHandler {
 // ---------------------------------------------------------------------------
 class SpecimenScene : public vde::examples::BaseExampleScene {
   public:
-    SpecimenScene() : BaseExampleScene(15.0f) {}
+    SpecimenScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

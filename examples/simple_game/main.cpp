@@ -119,7 +119,7 @@ class RotatingCube : public vde::MeshEntity {
  */
 class MainScene : public vde::examples::BaseExampleScene {
   public:
-    MainScene() : BaseExampleScene(15.0f) {}
+    MainScene() : BaseExampleScene() {}
 
     void onEnter() override {
         // Print standard header

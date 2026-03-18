@@ -74,7 +74,7 @@ class BreakoutInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class BreakoutScene : public vde::examples::BaseExampleScene {
   public:
-    BreakoutScene() : BaseExampleScene(30.0f) {}
+    BreakoutScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

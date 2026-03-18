@@ -170,8 +170,8 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
  */
 class DemoScene : public vde::examples::BaseExampleScene {
   public:
-    explicit DemoScene(const std::string& label, float autoTerminate = 120.0f)
-        : BaseExampleScene(autoTerminate), m_label(label) {}
+    explicit DemoScene(const std::string& label)
+        : BaseExampleScene(), m_label(label) {}
 
     // ------ Background simulation toggle ------
 

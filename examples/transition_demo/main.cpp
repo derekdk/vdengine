@@ -148,7 +148,7 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class MainMenuScene : public vde::examples::BaseExampleScene {
   public:
-    MainMenuScene() : BaseExampleScene(60.0f) {}
+    MainMenuScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

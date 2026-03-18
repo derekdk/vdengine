@@ -116,7 +116,7 @@ static const char* TEST_DESCRIPTIONS[TEST_COUNT] = {
 
 class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
   public:
-    PhysicsShowcaseScene() : BaseExampleScene(120.0f) {}
+    PhysicsShowcaseScene() : BaseExampleScene() {}
 
     // -----------------------------------------------------------------------
     void onEnter() override {

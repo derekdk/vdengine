@@ -21,7 +21,7 @@ namespace shooter {
 // Construction
 // ============================================================================
 
-GameScene::GameScene() : BaseExampleScene(130.0f) {}
+GameScene::GameScene() : BaseExampleScene() {}
 
 // ============================================================================
 // Lifecycle

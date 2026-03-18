@@ -56,7 +56,7 @@ static void sizeToFit(TextEntity& te, float worldHeight) {
 
 class MissionScene : public vde::examples::BaseExampleScene {
   public:
-    MissionScene() : BaseExampleScene(20.0f) {}
+    MissionScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

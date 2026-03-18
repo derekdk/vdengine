@@ -153,7 +153,7 @@ class StorageDemoInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class StorageDemoScene : public vde::examples::BaseExampleScene {
   public:
-    StorageDemoScene() : BaseExampleScene(300.0f) {}  // 5-minute interactive timeout
+    StorageDemoScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();
