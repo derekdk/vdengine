@@ -350,8 +350,9 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
 
     // Recompute the final transform and color for every stored sprite piece.
     void applyAllPieces() {
+        const float nightFactor = 1.0f - getBackdropDaylight();
         for (auto& piece : m_pieces) {
-            applyPiece(piece);
+            applyPiece(piece, nightFactor);
         }
     }
 
@@ -359,9 +360,15 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     int getSegmentRadius(LayerId layer) const {
         const float segmentWidth = m_layers[toIndex(layer)].segmentWidth;
 
+        // A single copy is enough when the segment is at least as wide as the
+        // viewport; no wrapping is ever needed in that case.
+        if (segmentWidth >= kViewWidth) {
+            return 1;
+        }
+
         // Layers narrower than the view need additional wrapped copies so the
         // next repeat is already visible before the current one scrolls away.
-        return std::max(1, static_cast<int>(std::ceil(kViewWidth / segmentWidth)) + 1);
+        return static_cast<int>(std::ceil(kViewWidth / segmentWidth)) + 1;
     }
 
     // Convert playback time into the current rotation angle for the sky backdrop.
@@ -378,7 +385,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
     // Combine layer scrolling, procedural motion, rotation, and night tinting for one piece.
-    void applyPiece(ParallaxPiece& piece) {
+    void applyPiece(ParallaxPiece& piece, float nightFactor) {
         const LayerState& layer = m_layers[toIndex(piece.layer)];
         const float angle = m_playbackTime * piece.motion.frequency + piece.motion.phase;
         const float wave = std::sin(angle);
@@ -415,7 +422,6 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
             color = blendColor(piece.color, piece.motion.accentColor, mix);
         }
 
-        const float nightFactor = 1.0f - getBackdropDaylight();
         switch (piece.layer) {
         case LayerId::Clouds:
             color =
