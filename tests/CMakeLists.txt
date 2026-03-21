@@ -69,12 +69,17 @@ set(VDE_TEST_SOURCES
     # Text rendering tests
     TextRenderer_test.cpp
     TrueTypeFont_test.cpp
+    # Sprite Editor tests
+    SpriteDocument_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/ExecutableScanner.cpp
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/GitUtils.cpp
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/ProcessLauncher.cpp
+
+    # Sprite Editor domain sources (no GPU/window needed)
+    ${CMAKE_SOURCE_DIR}/tools/sprite_editor/SpriteDocument.cpp
 )
 
 # Create test executable

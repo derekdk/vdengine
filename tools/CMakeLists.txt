@@ -68,4 +68,5 @@ endfunction()
 # Add tool subdirectories
 add_subdirectory(geometry_repl)
 add_subdirectory(resource_editor)
+add_subdirectory(sprite_editor)
 add_subdirectory(vlauncher)

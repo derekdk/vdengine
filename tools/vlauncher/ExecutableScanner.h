@@ -37,6 +37,11 @@ struct ExecutableEntry {
     // Stored as basenames (e.g. "smoke_breakout.vdescript"), resolved by VLauncher
     // against the smoketests/scripts/ directory.
     std::vector<std::string> smokeScripts;
+
+    // Optional tool-command script run via --exec when launching smoke tests.
+    // Stored as a basename (e.g. "smoke_sprite_editor_commands.txt"), resolved
+    // against smoketests/scripts/ at launch time. Empty if not specified.
+    std::string smokeExecScript;
 };
 
 struct ScanSnapshot {
@@ -89,6 +94,11 @@ class ExecutableScanner {
 
     static std::vector<std::string> loadSmokeScripts(const std::filesystem::path& sourceDir,
                                                      const std::string& targetName);
+
+    // Returns the basename of the tool-command script specified via execScript in vde.toml,
+    // or empty string if none is specified.
+    static std::string loadSmokeExecScript(const std::filesystem::path& sourceDir,
+                                           const std::string& targetName);
 
     static std::string inferKind(const std::filesystem::path& sourceDir,
                                  const std::filesystem::path& repoRoot);

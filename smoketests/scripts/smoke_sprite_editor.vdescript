@@ -1,0 +1,20 @@
+# Sprite Editor smoke test script
+# Tests that the Sprite Editor launches, executes commands via --exec, and exits cleanly
+# The --exec flag feeds tool commands from smoke_sprite_editor_commands.txt
+wait startup
+wait 1s
+
+# Toggle debug UI off and on
+press F1
+wait 500
+press F1
+wait 500
+
+# Scroll to test zoom input
+scroll 640 450 3
+wait 200
+scroll 640 450 -3
+wait 200
+
+wait 5s
+exit

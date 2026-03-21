@@ -371,7 +371,19 @@ void VLauncherScene::launchEntryWithSmokeTest(const ExecutableEntry& entry,
 
     std::string launchError;
     LaunchedProcess launchedProcess;
-    const std::vector<std::string> extraArgs = {"--input-script", smokeScript.string()};
+    std::vector<std::string> extraArgs;
+    if (!entry.smokeExecScript.empty()) {
+        const std::filesystem::path execScriptPath =
+            repoRoot / "smoketests" / "scripts" / entry.smokeExecScript;
+        if (std::filesystem::exists(execScriptPath)) {
+            extraArgs.push_back("--exec");
+            extraArgs.push_back(execScriptPath.string());
+        } else {
+            addConsoleMessage("WARNING: exec script not found: " + execScriptPath.string());
+        }
+    }
+    extraArgs.push_back("--input-script");
+    extraArgs.push_back(smokeScript.string());
     if (ProcessLauncher::launchWithOutputCapture(entry.executablePath, launchedProcess, launchError,
                                                  extraArgs)) {
         ActiveRun activeRun;

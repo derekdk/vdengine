@@ -117,10 +117,16 @@ $smokeScriptMap = @{
     'vde_vlauncher.exe'                = 'smoke_vlauncher.vdescript'
     'vde_geometry_repl.exe'            = 'smoke_geometry_repl.vdescript'
     'vde_resource_editor.exe'          = 'smoke_resource_editor.vdescript'
+    'vde_sprite_editor.exe'            = 'smoke_sprite_editor.vdescript'
 }
 
 $defaultSmoke = 'smoke_quick.vdescript'
 $scriptBaseDir = Join-Path $vdeRoot 'smoketests\scripts'
+
+# Extra CLI arguments for specific executables (passed before --input-script).
+$extraArgsMap = @{
+    'vde_sprite_editor.exe' = @('--exec', (Join-Path $scriptBaseDir 'smoke_sprite_editor_commands.txt'))
+}
 
 # --- Executable Discovery ---
 
@@ -274,12 +280,25 @@ foreach ($exe in $allExes) {
         }
 
         # Run the process with timeout via background job
+        # Extra args are passed as individual strings to avoid PowerShell Start-Job
+        # array serialization issues (CLIXML doesn't reliably round-trip nested arrays).
+        $extraFlatArgs = @()
+        if ($extraArgsMap.ContainsKey($exe.Name)) {
+            $extraFlatArgs = $extraArgsMap[$exe.Name]
+        }
         $job = Start-Job -ScriptBlock {
-            param($exePath, $scriptPath, $workDir, $stdoutFile, $stderrFile)
+            param($exePath, $scriptPath, $workDir, $stdoutFile, $stderrFile, $extraFlat)
             Set-Location $workDir
-            & $exePath "--input-script" $scriptPath > $stdoutFile 2> $stderrFile
+            # $extraFlat is a newline-joined string of extra args; split it back out.
+            $allArgs = @()
+            if ($extraFlat) {
+                $allArgs += ($extraFlat -split "`n")
+            }
+            $allArgs += "--input-script"
+            $allArgs += $scriptPath
+            & $exePath @allArgs > $stdoutFile 2> $stderrFile
             return $LASTEXITCODE
-        } -ArgumentList $exe.FullPath, $smokeScriptPath, $exe.WorkDir, $stdout, $stderr
+        } -ArgumentList $exe.FullPath, $smokeScriptPath, $exe.WorkDir, $stdout, $stderr, ($extraFlatArgs -join "`n")
 
         $started = $true
 

@@ -212,6 +212,7 @@ ScanSnapshot ExecutableScanner::buildSnapshot() const {
 
         if (entry.sourceFound) {
             entry.smokeScripts = loadSmokeScripts(entry.sourceDirectory, entry.targetName);
+            entry.smokeExecScript = loadSmokeExecScript(entry.sourceDirectory, entry.targetName);
 
             auto newest = newestSourceTimestamp(entry.sourceDirectory);
             if (newest) {
@@ -485,6 +486,45 @@ std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesyst
     }
 
     return scripts;
+}
+
+std::string ExecutableScanner::loadSmokeExecScript(const std::filesystem::path& sourceDir,
+                                                   const std::string& targetName) {
+    auto tomlPath = sourceDir / "vde.toml";
+    std::error_code error;
+    if (!std::filesystem::exists(tomlPath, error)) {
+        return {};
+    }
+
+    try {
+        auto config = toml::parse_file(tomlPath.string());
+
+        auto readExecScript = [](const toml::table& table) -> std::string {
+            if (auto* str = table["execScript"].as_string()) {
+                if (auto name = sanitizeSmokeScriptName(str->get())) {
+                    return *name;
+                }
+            }
+            return {};
+        };
+
+        // Per-target section: [smoke.<targetName>]
+        if (auto* perTarget = config["smoke"][targetName].as_table()) {
+            auto result = readExecScript(*perTarget);
+            if (!result.empty()) {
+                return result;
+            }
+        }
+
+        // Shared section: [smoke]
+        if (auto* smoke = config["smoke"].as_table()) {
+            return readExecScript(*smoke);
+        }
+    } catch (const toml::parse_error&) {
+        // Malformed TOML — silently skip.
+    }
+
+    return {};
 }
 
 std::string ExecutableScanner::inferKind(const std::filesystem::path& sourceDir,

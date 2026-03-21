@@ -1,0 +1,22 @@
+# Smoke test commands for Sprite Editor
+# Executes inside onEnter() after welcome messages.
+# NOTE: Avoid commands producing ERROR: output (smoke scanner treats it as failure)
+
+# Document state
+info
+list
+
+# View: exercise zoom
+zoom 2.0
+zoom 0.5
+zoom 1.0
+
+# Animations: create, list, then clean up
+anim create walk_anim
+anim create idle_anim noloop
+anim list
+anim delete idle_anim
+anim delete walk_anim
+
+# Final state
+info
