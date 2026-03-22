@@ -64,10 +64,17 @@ inline float parseTimeoutArg(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg == "--timeout" && i + 1 < argc) {
-            return std::stof(argv[i + 1]);
+            try { return std::stof(argv[i + 1]); } catch (const std::exception&) {
+                std::cerr << "WARNING: invalid --timeout value '" << argv[i + 1] << "', ignoring\n";
+            }
+            return 0.0f;
         }
         if (arg.size() > 10 && arg.substr(0, 10) == "--timeout=") {
-            return std::stof(arg.substr(10));
+            auto val = arg.substr(10);
+            try { return std::stof(val); } catch (const std::exception&) {
+                std::cerr << "WARNING: invalid --timeout value '" << val << "', ignoring\n";
+            }
+            return 0.0f;
         }
     }
     return 0.0f;
