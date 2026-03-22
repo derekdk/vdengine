@@ -227,6 +227,9 @@ add_dependencies(vde_font_specimen_demo vde_font_assets_sync)
 # Text Metrics demo - text layout, alignment, wrapping, and fit-to-rect with animated containers
 add_vde_example(vde_text_metrics_demo "text_metrics_demo/main.cpp")
 
+# Mission Control demo - live-updating TextEntity dashboard
+add_vde_example(vde_mission_control_demo "mission_control_demo/main.cpp")
+
 # Sync font assets for the text metrics demo
 set(VDE_TEXT_METRICS_FONT_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_text_metrics_font_assets.stamp)
 
@@ -248,4 +251,26 @@ add_custom_target(vde_text_metrics_font_sync ALL
 
 add_dependencies(vde_text_metrics_demo vde_text_metrics_font_sync)
 
+# Text Adventure demo - interactive text adventure capstone (Phase 4)
+add_vde_example(vde_text_adventure_demo "text_adventure_demo/main.cpp")
 
+# Sync font assets for the text adventure demo
+set(VDE_TEXT_ADVENTURE_FONT_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_text_adventure_font_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_TEXT_ADVENTURE_FONT_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_text_adventure_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets/fonts
+        $<TARGET_FILE_DIR:vde_text_adventure_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_TEXT_ADVENTURE_FONT_STAMP}
+    DEPENDS ${VDE_FONT_ASSET_FILES}
+    COMMENT "Syncing font assets for text adventure demo..."
+    VERBATIM
+)
+
+add_custom_target(vde_text_adventure_font_sync ALL
+    DEPENDS ${VDE_TEXT_ADVENTURE_FONT_STAMP}
+)
+
+add_dependencies(vde_text_adventure_demo vde_text_adventure_font_sync)

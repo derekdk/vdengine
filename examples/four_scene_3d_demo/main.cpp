@@ -860,20 +860,23 @@ class FourScene3DDemo : public vde::Game {
         if (m_input->consumeSpace())
             printStatus();
 
-        // Auto-terminate
+        // Auto-terminate (only when --timeout is active)
         m_elapsed += getDeltaTime();
-        if (m_elapsed >= 60.0f) {
-            std::cout << "\nTEST PASSED: Demo completed (60s)\n";
+        if (m_autoTerminateSeconds > 0.0f && m_elapsed >= m_autoTerminateSeconds) {
+            std::cout << "\nTEST PASSED: Demo completed (" << m_elapsed << "s)\n";
             quit();
         }
     }
 
     int getExitCode() const { return m_exitCode; }
 
+    void setAutoTerminateSeconds(float s) { m_autoTerminateSeconds = s; }
+
   private:
     std::unique_ptr<FourScene3DInputHandler> m_input;
     int m_focusIndex = 0;
     float m_elapsed = 0.0f;
+    float m_autoTerminateSeconds = 0.0f;
     int m_exitCode = 0;
     bool m_failed = false;
 
@@ -998,9 +1001,14 @@ class FourScene3DDemo : public vde::Game {
 int main(int argc, char** argv) {
     FourScene3DDemo demo;
 
-    // Configure input script from CLI args if provided
+    // Configure input script and timeout from CLI args if provided
     if (argc > 0 && argv != nullptr) {
         vde::configureInputScriptFromArgs(demo, argc, argv);
+        float timeout = vde::examples::parseTimeoutArg(argc, argv);
+        if (timeout > 0.0f) {
+            demo.setAutoTerminateSeconds(timeout);
+            vde::examples::detail::cliTimeoutOverride() = timeout;
+        }
     }
 
     vde::GameSettings settings;

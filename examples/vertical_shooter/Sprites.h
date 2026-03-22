@@ -9,7 +9,6 @@
 #include <vde/VulkanContext.h>
 
 #include <memory>
-#include <string>
 
 #include "Types.h"
 
@@ -21,11 +20,5 @@ std::shared_ptr<vde::Texture> createEnemyTexture(vde::VulkanContext* ctx, EnemyT
 std::shared_ptr<vde::Texture> createEnemyBulletTexture(vde::VulkanContext* ctx);
 std::shared_ptr<vde::Texture> createStarTexture(vde::VulkanContext* ctx);
 std::shared_ptr<vde::Texture> createExplosionTexture(vde::VulkanContext* ctx);
-
-/// Render @p text using a built-in 5x7 pixel font.
-/// @p pixelScale enlarges each pixel (1 = tiny, 3 = comfortable).
-/// RGBA colour is set by r, g, b (alpha always 255 for lit pixels, 0 for background).
-std::shared_ptr<vde::Texture> createTextTexture(vde::VulkanContext* ctx, const std::string& text,
-                                                int pixelScale, uint8_t r, uint8_t g, uint8_t b);
 
 }  // namespace shooter

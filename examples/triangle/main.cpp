@@ -23,9 +23,10 @@
 #include <array>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
-// Configuration
-constexpr float AUTO_TERMINATE_SECONDS = 15.0f;
+// Configuration (0 = auto-terminate disabled; use --timeout to enable)
+constexpr float DEFAULT_AUTO_TERMINATE_SECONDS = 0.0f;
 
 // Triangle vertices with positions and colors
 const std::vector<vde::Vertex> triangleVertices = {
@@ -52,6 +53,8 @@ class TriangleApp {
 
     int getExitCode() const { return m_exitCode; }
 
+    void setAutoTerminateSeconds(float s) { m_autoTerminateSeconds = s; }
+
   private:
     vde::Window* m_window = nullptr;
     vde::VulkanContext m_context;
@@ -67,6 +70,7 @@ class TriangleApp {
     double m_startTime = 0.0;
     bool m_shouldQuit = false;
     int m_exitCode = 0;
+    float m_autoTerminateSeconds = DEFAULT_AUTO_TERMINATE_SECONDS;
 
     void initWindow() {
         m_window = new vde::Window(1280, 720, "VDE Triangle Example");
@@ -115,7 +119,12 @@ class TriangleApp {
         std::cout << "\nControls:" << std::endl;
         std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
         std::cout << "  ESC   - Exit early" << std::endl;
-        std::cout << "  (Auto-closes in " << AUTO_TERMINATE_SECONDS << " seconds)\n" << std::endl;
+        if (m_autoTerminateSeconds > 0.0f) {
+            std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n"
+                      << std::endl;
+        } else {
+            std::cout << "  (Run with --timeout <seconds> to auto-close)\n" << std::endl;
+        }
     }
 
     void initVulkan() {
@@ -395,9 +404,9 @@ class TriangleApp {
         while (!m_window->shouldClose() && !m_shouldQuit) {
             m_window->pollEvents();
 
-            // Check auto-terminate
+            // Check auto-terminate (only when --timeout is active)
             double elapsed = glfwGetTime() - m_startTime;
-            if (elapsed >= AUTO_TERMINATE_SECONDS) {
+            if (m_autoTerminateSeconds > 0.0f && elapsed >= m_autoTerminateSeconds) {
                 std::cout << "\n========================================" << std::endl;
                 std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
                 std::cout << "  Duration: " << elapsed << " seconds" << std::endl;
@@ -437,8 +446,22 @@ class TriangleApp {
     }
 };
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        // Parse --timeout argument
+        float timeoutOverride = 0.0f;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg == "--timeout" && i + 1 < argc) {
+                timeoutOverride = std::stof(argv[i + 1]);
+                break;
+            }
+            if (arg.size() > 10 && arg.substr(0, 10) == "--timeout=") {
+                timeoutOverride = std::stof(arg.substr(10));
+                break;
+            }
+        }
+
         // Initialize glslang for shader compilation
         if (!vde::initializeGlslang()) {
             std::cerr << "Failed to initialize glslang!" << std::endl;
@@ -446,6 +469,9 @@ int main() {
         }
 
         TriangleApp app;
+        if (timeoutOverride > 0.0f) {
+            app.setAutoTerminateSeconds(timeoutOverride);
+        }
         app.run();
 
         // Finalize glslang

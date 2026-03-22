@@ -394,6 +394,16 @@ void Game::processInputScript() {
             if (handler) {
                 handler->onKeyPress(cmd.keyCode);
                 handler->onKeyRelease(cmd.keyCode);
+                // Mirror GLFW behavior: printable keys also fire onCharInput.
+                // GLFW key codes for printable ASCII (32-126) match their ASCII
+                // values.  Letters (65-90) produce lowercase codepoints without
+                // shift; all other printable ASCII keys pass through as-is.
+                int k = cmd.keyCode;
+                if (k >= KEY_A && k <= KEY_Z) {
+                    handler->onCharInput(static_cast<unsigned int>(k + 32));
+                } else if (k >= KEY_SPACE && k <= 126) {
+                    handler->onCharInput(static_cast<unsigned int>(k));
+                }
             }
             state.currentCommand++;
             break;
@@ -1305,6 +1315,25 @@ void Game::setupInputCallbacks() {
             } else if (action == GLFW_REPEAT) {
                 handler->onKeyRepeat(key);
             }
+        }
+    });
+
+    // Character input callback (for text entry)
+    glfwSetCharCallback(handle, [](GLFWwindow* window, unsigned int codepoint) {
+        Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
+        if (!game)
+            return;
+
+        InputHandler* handler = nullptr;
+        Scene* focusedScene = game->getFocusedScene();
+        if (focusedScene && focusedScene->getInputHandler()) {
+            handler = focusedScene->getInputHandler();
+        } else if (game->m_inputHandler) {
+            handler = game->m_inputHandler;
+        }
+
+        if (handler) {
+            handler->onCharInput(codepoint);
         }
     });
 

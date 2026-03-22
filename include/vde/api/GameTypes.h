@@ -44,6 +44,8 @@ struct Color {
                      (hex & 0xFF) / 255.0f, 1.0f);
     }
 
+    bool operator==(const Color&) const = default;
+
     glm::vec3 toVec3() const { return glm::vec3(r, g, b); }
     glm::vec4 toVec4() const { return glm::vec4(r, g, b, a); }
 

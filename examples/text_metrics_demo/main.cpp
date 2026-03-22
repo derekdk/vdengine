@@ -229,7 +229,7 @@ class TextMetricsInputHandler : public vde::examples::BaseExampleInputHandler {
 // ---------------------------------------------------------------------------
 class TextMetricsScene : public vde::examples::BaseExampleScene {
   public:
-    TextMetricsScene() : BaseExampleScene(30.0f) {}
+    TextMetricsScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

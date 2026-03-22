@@ -35,7 +35,6 @@ namespace fs = std::filesystem;
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-static constexpr float kAutoTerminateSec = 20.0f;
 static constexpr float kOperationInterval = 0.35f;  // seconds between OS ops
 static constexpr int kInitialWidth = 1024;
 static constexpr int kInitialHeight = 768;
@@ -94,7 +93,7 @@ struct OpLogEntry {
 // ---------------------------------------------------------------------------
 class OsStressScene : public vde::examples::BaseExampleScene {
   public:
-    OsStressScene() : BaseExampleScene(kAutoTerminateSec) {}
+    OsStressScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();
@@ -212,7 +211,11 @@ class OsStressScene : public vde::examples::BaseExampleScene {
         ImGui::SetNextWindowSize(ImVec2(420, 350), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("OS Stress Test")) {
             ImGui::Text("FPS: %.1f  Frame: %llu", game->getFPS(), game->getFrameCount());
-            ImGui::Text("Elapsed: %.1f / %.0f s", m_elapsedTime, kAutoTerminateSec);
+            if (m_autoTerminateSeconds > 0.0f) {
+                ImGui::Text("Elapsed: %.1f / %.0f s", m_elapsedTime, m_autoTerminateSeconds);
+            } else {
+                ImGui::Text("Elapsed: %.1f s", m_elapsedTime);
+            }
             ImGui::Text("Entities: %zu", getEntities().size());
             ImGui::Separator();
 

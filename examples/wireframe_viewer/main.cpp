@@ -158,7 +158,7 @@ class ViewerInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class WireframeViewerScene : public vde::examples::BaseExampleScene {
   public:
-    WireframeViewerScene() : BaseExampleScene(600.0f) {}
+    WireframeViewerScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

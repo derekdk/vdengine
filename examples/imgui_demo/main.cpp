@@ -60,7 +60,7 @@ class ImGuiDemoInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class ImGuiDemoScene : public vde::examples::BaseExampleScene {
   public:
-    ImGuiDemoScene() : BaseExampleScene(60.0f) {}  // 60s timeout for interactive demo
+    ImGuiDemoScene() : BaseExampleScene() {}  // Use --timeout for auto-close
 
     void onEnter() override {
         printExampleHeader();

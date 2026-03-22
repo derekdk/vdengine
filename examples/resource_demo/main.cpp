@@ -105,7 +105,7 @@ class StatDisplay : public vde::Entity {
  */
 class ResourceDemoScene : public vde::examples::BaseExampleScene {
   public:
-    ResourceDemoScene() : BaseExampleScene(20.0f) {}  // 20 second timeout
+    ResourceDemoScene() : BaseExampleScene() {}
 
     void onEnter() override {
         // Print standard header

@@ -193,6 +193,7 @@ set(VDE_SOURCES
     src/api/BitmapFont.cpp
     src/api/TextRenderer.cpp
     src/api/TrueTypeFont.cpp
+    src/api/TextEntity.cpp
 )
 
 # Public headers
@@ -263,6 +264,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/BitmapFont.h
     include/vde/api/TextRenderer.h
     include/vde/api/TrueTypeFont.h
+    include/vde/api/TextEntity.h
 )
 
 # Create library

@@ -77,7 +77,7 @@ class PhysicsAudioInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class PhysicsAudioScene : public vde::examples::BaseExampleScene {
   public:
-    PhysicsAudioScene() : BaseExampleScene(15.0f) {}
+    PhysicsAudioScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();
@@ -152,8 +152,8 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
             }
         }
 
-        // Auto-terminate
-        if (m_elapsedTime >= m_autoTerminateSeconds) {
+        // Auto-terminate (only when --timeout is active)
+        if (m_autoTerminateSeconds > 0.0f && m_elapsedTime >= m_autoTerminateSeconds) {
             handleTestSuccess();
             return;
         }

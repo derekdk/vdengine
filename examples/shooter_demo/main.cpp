@@ -102,7 +102,7 @@ class ShooterInputHandler : public vde::examples::BaseExampleInputHandler {
 
 class ShooterScene : public vde::examples::BaseExampleScene {
   public:
-    ShooterScene() : BaseExampleScene(30.0f) {}
+    ShooterScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

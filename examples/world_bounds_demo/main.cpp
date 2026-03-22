@@ -122,7 +122,7 @@ class WorldMarker : public SpriteEntity {
  */
 class WorldBoundsScene : public vde::examples::BaseExampleScene {
   public:
-    WorldBoundsScene() : BaseExampleScene(15.0f) {}
+    WorldBoundsScene() : BaseExampleScene() {}
 
     void onEnter() override {
         // Print standard header

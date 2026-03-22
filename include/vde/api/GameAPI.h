@@ -61,6 +61,7 @@
 
 // Text rendering
 #include "BitmapFont.h"
+#include "TextEntity.h"
 #include "TextRenderer.h"
 #include "TrueTypeFont.h"
 

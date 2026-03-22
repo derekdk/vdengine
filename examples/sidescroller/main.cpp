@@ -306,7 +306,7 @@ class SidescrollerInputHandler : public vde::examples::BaseExampleInputHandler {
  */
 class SidescrollerScene : public vde::examples::BaseExampleScene {
   public:
-    SidescrollerScene() : BaseExampleScene(60.0f) {}  // Run for 60 seconds
+    SidescrollerScene() : BaseExampleScene() {}
 
     void onEnter() override {
         printExampleHeader();

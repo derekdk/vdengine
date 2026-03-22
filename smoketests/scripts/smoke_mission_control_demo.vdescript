@@ -1,0 +1,5 @@
+# Smoke test for mission control demo
+# Verifies the live-updating TextEntity dashboard launches and runs
+wait startup
+wait 3s
+exit
