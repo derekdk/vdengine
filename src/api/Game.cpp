@@ -395,12 +395,13 @@ void Game::processInputScript() {
                 handler->onKeyPress(cmd.keyCode);
                 handler->onKeyRelease(cmd.keyCode);
                 // Mirror GLFW behavior: printable keys also fire onCharInput.
-                // GLFW key codes for printable ASCII match their ASCII values.
-                // Letters (65-90) produce lowercase codepoints without shift.
+                // GLFW key codes for printable ASCII (32-126) match their ASCII
+                // values.  Letters (65-90) produce lowercase codepoints without
+                // shift; all other printable ASCII keys pass through as-is.
                 int k = cmd.keyCode;
                 if (k >= KEY_A && k <= KEY_Z) {
                     handler->onCharInput(static_cast<unsigned int>(k + 32));
-                } else if ((k >= KEY_0 && k <= KEY_9) || k == KEY_SPACE) {
+                } else if (k >= KEY_SPACE && k <= 126) {
                     handler->onCharInput(static_cast<unsigned int>(k));
                 }
             }

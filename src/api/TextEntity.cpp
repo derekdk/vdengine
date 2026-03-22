@@ -61,16 +61,21 @@ void TextEntity::setStyle(const TextStyle& style) {
 void TextEntity::onAttach(Scene* scene) {
     SpriteEntity::onAttach(scene);
 
-    // Create a 1x1 transparent placeholder so rendering never crashes
-    auto placeholder = std::make_shared<Texture>();
-    std::vector<uint8_t> transparent(4, 0);
-    placeholder->loadFromData(transparent.data(), 1, 1);
+    // Only install a 1x1 transparent placeholder when no texture has been
+    // set yet (e.g. text/style configured before attach).  Either way, mark
+    // dirty so the first scene update rebuilds the real text texture.
+    if (!getTexture()) {
+        auto placeholder = std::make_shared<Texture>();
+        std::vector<uint8_t> transparent(4, 0);
+        placeholder->loadFromData(transparent.data(), 1, 1);
 
-    Game* game = scene->getGame();
-    if (game) {
-        placeholder->uploadToGPU(game->getVulkanContext());
+        Game* game = scene->getGame();
+        if (game) {
+            placeholder->uploadToGPU(game->getVulkanContext());
+        }
+        setTexture(placeholder);
     }
-    setTexture(placeholder);
+    markDirty();
 }
 
 void TextEntity::update(float deltaTime) {
