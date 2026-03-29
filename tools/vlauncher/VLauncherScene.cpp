@@ -376,13 +376,12 @@ void VLauncherScene::drawDebugUI() {
 
                 // Executable Age column
                 ImGui::TableSetColumnIndex(2);
-                ImGui::TextUnformatted(formatAge(defaultEntry.executableWriteTime, now).c_str());
+                drawAgeIndicator(defaultEntry.executableWriteTime, now);
 
                 // Source Age column
                 ImGui::TableSetColumnIndex(3);
                 if (defaultEntry.hasNewestSourceWriteTime) {
-                    ImGui::TextUnformatted(
-                        formatAge(defaultEntry.newestSourceWriteTime, now).c_str());
+                    drawAgeIndicator(defaultEntry.newestSourceWriteTime, now);
                 } else {
                     ImGui::TextUnformatted("-");
                 }
@@ -512,13 +511,12 @@ void VLauncherScene::drawDebugUI() {
 
                         // Executable Age
                         ImGui::TableSetColumnIndex(2);
-                        ImGui::TextUnformatted(formatAge(entry.executableWriteTime, now).c_str());
+                        drawAgeIndicator(entry.executableWriteTime, now);
 
                         // Source Age
                         ImGui::TableSetColumnIndex(3);
                         if (entry.hasNewestSourceWriteTime) {
-                            ImGui::TextUnformatted(
-                                formatAge(entry.newestSourceWriteTime, now).c_str());
+                            drawAgeIndicator(entry.newestSourceWriteTime, now);
                         } else {
                             ImGui::TextUnformatted("-");
                         }
@@ -1079,6 +1077,57 @@ std::string VLauncherScene::truncateOutput(const std::string& output, size_t max
     }
 
     return output.substr(0, maxBytes - suffix.size()) + suffix;
+}
+
+void VLauncherScene::drawAgeIndicator(std::chrono::system_clock::time_point from,
+                                      std::chrono::system_clock::time_point now) {
+    if (from.time_since_epoch().count() == 0) {
+        ImGui::TextDisabled("-");
+        return;
+    }
+
+    auto diff = now - from;
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(diff).count();
+    if (seconds < 0) {
+        seconds = 0;
+    }
+
+    ImVec4 color;
+    if (seconds < 3600) {
+        color = ImVec4(0.35f, 1.0f, 0.45f, 1.0f);  // green
+    } else if (seconds < 86400) {
+        color = ImVec4(1.0f, 0.85f, 0.2f, 1.0f);  // yellow
+    } else {
+        color = ImVec4(1.0f, 0.45f, 0.35f, 1.0f);  // red
+    }
+
+    const float radius = 5.0f;
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float lineH = ImGui::GetTextLineHeight();
+    ImVec2 center = ImVec2(pos.x + radius, pos.y + lineH * 0.5f);
+    ImGui::GetWindowDrawList()->AddCircleFilled(center, radius,
+                                                ImGui::ColorConvertFloat4ToU32(color));
+    ImGui::Dummy(ImVec2(radius * 2.0f, lineH));
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        // Show age as a decimal value with the largest applicable unit
+        char ageText[64];
+        if (seconds < 60) {
+            std::snprintf(ageText, sizeof(ageText), "%.1f seconds ago",
+                          static_cast<double>(seconds));
+        } else if (seconds < 3600) {
+            std::snprintf(ageText, sizeof(ageText), "%.1f minutes ago",
+                          static_cast<double>(seconds) / 60.0);
+        } else if (seconds < 86400) {
+            std::snprintf(ageText, sizeof(ageText), "%.1f hours ago",
+                          static_cast<double>(seconds) / 3600.0);
+        } else {
+            std::snprintf(ageText, sizeof(ageText), "%.1f days ago",
+                          static_cast<double>(seconds) / 86400.0);
+        }
+        ImGui::TextUnformatted(ageText);
+        ImGui::EndTooltip();
+    }
 }
 
 std::string VLauncherScene::formatAge(std::chrono::system_clock::time_point from,

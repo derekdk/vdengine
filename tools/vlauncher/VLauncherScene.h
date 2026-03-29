@@ -107,6 +107,8 @@ class VLauncherScene : public BaseToolScene {
     static std::string formatAge(std::chrono::system_clock::time_point from,
                                  std::chrono::system_clock::time_point now);
     static std::string formatTimestamp(std::chrono::system_clock::time_point value);
+    static void drawAgeIndicator(std::chrono::system_clock::time_point from,
+                                 std::chrono::system_clock::time_point now);
 };
 
 }  // namespace vde::tools

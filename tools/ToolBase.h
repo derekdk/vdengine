@@ -483,6 +483,26 @@ class BaseToolGame : public vde::Game {
 
         ImGui_ImplVulkan_Init(&initInfo);
 
+        // Load a system font with broad Unicode coverage so that symbols and
+        // non-ASCII characters render correctly. Segoe UI Symbol ships with
+        // Windows and contains monochrome outline glyphs for Geometric Shapes,
+        // Arrows, Misc Symbols, and Dingbats (U+2190–U+27BF) among others.
+        // Note: colour emoji (e.g. 🎮) require FreeType+colour support and are
+        // not available with ImGui's default stb_truetype rasteriser.
+#ifdef _WIN32
+        {
+            const char* unicodeFontPath = "C:\\Windows\\Fonts\\seguisym.ttf";
+            if (std::filesystem::exists(unicodeFontPath)) {
+                static const ImWchar unicodeRanges[] = {
+                    0x0020, 0x00FF,  // Basic Latin + Latin Supplement
+                    0x2190, 0x27BF,  // Arrows, Math, Geometric Shapes, Misc Symbols, Dingbats
+                    0,
+                };
+                io.Fonts->AddFontFromFileTTF(unicodeFontPath, 15.0f, nullptr, unicodeRanges);
+            }
+        }
+#endif
+
         ImGui_ImplVulkan_CreateFontsTexture();
 
         m_imguiInitialized = true;
