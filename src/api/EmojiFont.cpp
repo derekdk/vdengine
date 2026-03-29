@@ -148,8 +148,7 @@ bool parseCPAL(const uint8_t* data, uint32_t length, std::vector<PaletteColor>& 
 }
 
 /// Binary search for a base glyph in the sorted COLR base glyph array.
-const ColrBaseGlyph* findBaseGlyph(const std::vector<ColrBaseGlyph>& baseGlyphs,
-                                   uint16_t glyphID) {
+const ColrBaseGlyph* findBaseGlyph(const std::vector<ColrBaseGlyph>& baseGlyphs, uint16_t glyphID) {
     auto it =
         std::lower_bound(baseGlyphs.begin(), baseGlyphs.end(), glyphID,
                          [](const ColrBaseGlyph& bg, uint16_t id) { return bg.glyphID < id; });
@@ -519,8 +518,7 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
             for (int y = 0; y < sizePixels; ++y) {
                 const uint8_t* src = cellBuffer.data() + static_cast<size_t>(y) * sizePixels * 4;
                 uint8_t* dst =
-                    atlasPixels.data() +
-                    (static_cast<size_t>(cellY + y) * atlasW + cellX) * 4;
+                    atlasPixels.data() + (static_cast<size_t>(cellY + y) * atlasW + cellX) * 4;
                 std::memcpy(dst, src, static_cast<size_t>(sizePixels) * 4);
             }
 

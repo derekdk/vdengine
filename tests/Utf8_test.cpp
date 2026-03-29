@@ -184,7 +184,8 @@ TEST_F(Utf8EncodeTest, RoundTrip) {
 
         size_t pos = 0;
         char32_t decoded = utf8::decode(encoded, pos);
-        EXPECT_EQ(decoded, cp) << "Round-trip failed for U+" << std::hex << static_cast<uint32_t>(cp);
+        EXPECT_EQ(decoded, cp) << "Round-trip failed for U+" << std::hex
+                               << static_cast<uint32_t>(cp);
         EXPECT_EQ(pos, encoded.size());
     }
 }

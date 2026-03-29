@@ -82,8 +82,7 @@ class TextRenderer {
      *         strings return a 1x1 transparent texture)
      */
     static std::shared_ptr<Texture> createTexture(VulkanContext* ctx, const std::string& utf8Text,
-                                                  const TrueTypeFont& font,
-                                                  const EmojiFont* emoji,
+                                                  const TrueTypeFont& font, const EmojiFont* emoji,
                                                   const TextStyle& style = {});
 };
 

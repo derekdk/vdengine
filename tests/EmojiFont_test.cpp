@@ -8,10 +8,10 @@
 #include <vde/api/TextRenderer.h>
 #include <vde/api/TrueTypeFont.h>
 
-#include <gtest/gtest.h>
-
 #include <cstring>
 #include <filesystem>
+
+#include <gtest/gtest.h>
 
 namespace vde {
 namespace test {
@@ -236,8 +236,8 @@ TEST_F(TextRendererEmojiTest, EmojiOnlyText) {
     TextStyle style;
     style.pixelScale = 1;
     // Two emoji: 😀🚀
-    auto tex = TextRenderer::createTexture(nullptr, "\xF0\x9F\x98\x80\xF0\x9F\x9A\x80",
-                                           m_font, &m_emoji, style);
+    auto tex = TextRenderer::createTexture(nullptr, "\xF0\x9F\x98\x80\xF0\x9F\x9A\x80", m_font,
+                                           &m_emoji, style);
     ASSERT_NE(tex, nullptr);
     EXPECT_GT(tex->getWidth(), 0u);
     EXPECT_GT(tex->getHeight(), 0u);
@@ -246,8 +246,8 @@ TEST_F(TextRendererEmojiTest, EmojiOnlyText) {
 TEST_F(TextRendererEmojiTest, MixedTextAndEmoji) {
     TextStyle style;
     style.pixelScale = 1;
-    auto tex = TextRenderer::createTexture(nullptr, "Hi \xF0\x9F\x98\x80 world",
-                                           m_font, &m_emoji, style);
+    auto tex =
+        TextRenderer::createTexture(nullptr, "Hi \xF0\x9F\x98\x80 world", m_font, &m_emoji, style);
     ASSERT_NE(tex, nullptr);
     EXPECT_GT(tex->getWidth(), 0u);
     EXPECT_GT(tex->getHeight(), 0u);
@@ -257,8 +257,8 @@ TEST_F(TextRendererEmojiTest, NullEmojiFontFallsBack) {
     TextStyle style;
     style.pixelScale = 1;
     // nullptr emoji font should still work (emoji codepoints will be skipped)
-    auto tex = TextRenderer::createTexture(nullptr, "Hello \xF0\x9F\x98\x80", m_font,
-                                           nullptr, style);
+    auto tex =
+        TextRenderer::createTexture(nullptr, "Hello \xF0\x9F\x98\x80", m_font, nullptr, style);
     ASSERT_NE(tex, nullptr);
     EXPECT_GT(tex->getWidth(), 0u);
 }

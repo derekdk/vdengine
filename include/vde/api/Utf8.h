@@ -46,8 +46,7 @@ inline char32_t decode(const std::string& s, size_t& pos) {
             pos += 1;
             return kReplacementChar;
         }
-        char32_t cp = (static_cast<char32_t>(b0 & 0x1F) << 6) |
-                      static_cast<char32_t>(b1 & 0x3F);
+        char32_t cp = (static_cast<char32_t>(b0 & 0x1F) << 6) | static_cast<char32_t>(b1 & 0x3F);
         pos += 2;
         return cp < 0x80 ? kReplacementChar : cp;  // reject overlong
     }
@@ -65,8 +64,7 @@ inline char32_t decode(const std::string& s, size_t& pos) {
             return kReplacementChar;
         }
         char32_t cp = (static_cast<char32_t>(b0 & 0x0F) << 12) |
-                      (static_cast<char32_t>(b1 & 0x3F) << 6) |
-                      static_cast<char32_t>(b2 & 0x3F);
+                      (static_cast<char32_t>(b1 & 0x3F) << 6) | static_cast<char32_t>(b2 & 0x3F);
         pos += 3;
         return cp < 0x800 ? kReplacementChar : cp;  // reject overlong
     }
@@ -86,8 +84,7 @@ inline char32_t decode(const std::string& s, size_t& pos) {
         }
         char32_t cp = (static_cast<char32_t>(b0 & 0x07) << 18) |
                       (static_cast<char32_t>(b1 & 0x3F) << 12) |
-                      (static_cast<char32_t>(b2 & 0x3F) << 6) |
-                      static_cast<char32_t>(b3 & 0x3F);
+                      (static_cast<char32_t>(b2 & 0x3F) << 6) | static_cast<char32_t>(b3 & 0x3F);
         pos += 4;
         if (cp < 0x10000 || cp > 0x10FFFF)
             return kReplacementChar;

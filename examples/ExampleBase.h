@@ -65,14 +65,18 @@ inline float parseTimeoutArg(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg == "--timeout" && i + 1 < argc) {
-            try { return std::stof(argv[i + 1]); } catch (const std::exception&) {
+            try {
+                return std::stof(argv[i + 1]);
+            } catch (const std::exception&) {
                 std::cerr << "WARNING: invalid --timeout value '" << argv[i + 1] << "', ignoring\n";
             }
             return 0.0f;
         }
         if (arg.size() > 10 && arg.substr(0, 10) == "--timeout=") {
             auto val = arg.substr(10);
-            try { return std::stof(val); } catch (const std::exception&) {
+            try {
+                return std::stof(val);
+            } catch (const std::exception&) {
                 std::cerr << "WARNING: invalid --timeout value '" << val << "', ignoring\n";
             }
             return 0.0f;
@@ -614,9 +618,9 @@ class BaseExampleGame : public vde::Game {
             if (!glyph)
                 continue;
 
-            int rectIdx = io.Fonts->AddCustomRectFontGlyph(
-                defaultFont, static_cast<ImWchar>(cp), glyph->width, glyph->height,
-                glyph->advanceX, ImVec2(0, 0));
+            int rectIdx = io.Fonts->AddCustomRectFontGlyph(defaultFont, static_cast<ImWchar>(cp),
+                                                           glyph->width, glyph->height,
+                                                           glyph->advanceX, ImVec2(0, 0));
             emojiRects.push_back({cp, rectIdx});
         }
 

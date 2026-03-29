@@ -9,12 +9,12 @@
  * - Multiple emoji at different sizes
  */
 
-#include "../ExampleBase.h"
-
 #include <vde/api/EmojiFont.h>
 #include <vde/api/TextEntity.h>
 #include <vde/api/TextRenderer.h>
 #include <vde/api/TrueTypeFont.h>
+
+#include "../ExampleBase.h"
 
 // ============================================================================
 // Input Handler
@@ -116,7 +116,7 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
             ImGui::Text("Nature: \xF0\x9F\x94\xA5 \xF0\x9F\x92\xA7 \xE2\xAD\x90 "
                         "\xE2\x98\x80 \xE2\x98\x81");
             ImGui::Text("Objects: \xF0\x9F\x8E\xAE \xF0\x9F\x8E\xAF \xF0\x9F\x8F\x86 "
-                         "\xF0\x9F\x92\x8E");
+                        "\xF0\x9F\x92\x8E");
             ImGui::Text("Food:   \xF0\x9F\x8D\x95 \xF0\x9F\x8D\x94 \xF0\x9F\x8D\x9F "
                         "\xF0\x9F\x8C\xAD \xF0\x9F\x8D\xA9");
             ImGui::Text("Travel: \xF0\x9F\x9A\x80 \xF0\x9F\x9A\x97 \xE2\x9C\x88 "
@@ -127,13 +127,13 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
 
             if (m_emojiFont) {
                 ImGui::Separator();
-                ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f), "Emoji atlas: %dx%d (%zu glyphs)",
-                                   m_emojiFont->atlasWidth(), m_emojiFont->atlasHeight(),
+                ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1.0f),
+                                   "Emoji atlas: %dx%d (%zu glyphs)", m_emojiFont->atlasWidth(),
+                                   m_emojiFont->atlasHeight(),
                                    m_emojiFont->getAvailableCodepoints().size());
             } else {
                 ImGui::Separator();
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f),
-                                   "No system emoji font found");
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "No system emoji font found");
             }
         }
         ImGui::End();
@@ -187,8 +187,8 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
             addEmojiLabel(ctx, "Smiley: \xF0\x9F\x98\x80\xF0\x9F\x98\x83\xF0\x9F\x98\x84",
                           whiteStyle, 0.0f, yPos);
             yPos += yStep;
-            addEmojiLabel(ctx, "Hearts: \xE2\x9D\xA4\xF0\x9F\x92\x9B\xF0\x9F\x92\x99",
-                          whiteStyle, 0.0f, yPos);
+            addEmojiLabel(ctx, "Hearts: \xE2\x9D\xA4\xF0\x9F\x92\x9B\xF0\x9F\x92\x99", whiteStyle,
+                          0.0f, yPos);
             yPos += yStep;
             addEmojiLabel(ctx, "Stars: \xE2\xAD\x90\xF0\x9F\x8C\x9F", whiteStyle, 0.0f, yPos);
             break;
@@ -210,8 +210,8 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
             addEmojiLabel(ctx, "Rocket \xF0\x9F\x9A\x80 Car \xF0\x9F\x9A\x97", whiteStyle, 0.0f,
                           yPos);
             yPos += yStep;
-            addEmojiLabel(ctx, "Pizza \xF0\x9F\x8D\x95 Burger \xF0\x9F\x8D\x94", whiteStyle,
-                          0.0f, yPos);
+            addEmojiLabel(ctx, "Pizza \xF0\x9F\x8D\x95 Burger \xF0\x9F\x8D\x94", whiteStyle, 0.0f,
+                          yPos);
             break;
         }
     }
@@ -227,8 +227,8 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
         buildScene(ctx);
     }
 
-    void addTextLabel(vde::VulkanContext* ctx, const std::string& text,
-                      const vde::TextStyle& style, float x, float y) {
+    void addTextLabel(vde::VulkanContext* ctx, const std::string& text, const vde::TextStyle& style,
+                      float x, float y) {
         if (!m_ttfFont || !m_ttfFont->isLoaded())
             return;
         auto tex = vde::TextRenderer::createTexture(ctx, text, *m_ttfFont, style);
@@ -243,8 +243,8 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
                        const vde::TextStyle& style, float x, float y) {
         if (!m_ttfFont || !m_ttfFont->isLoaded())
             return;
-        auto tex = vde::TextRenderer::createTexture(ctx, utf8Text, *m_ttfFont,
-                                                    m_emojiFont.get(), style);
+        auto tex =
+            vde::TextRenderer::createTexture(ctx, utf8Text, *m_ttfFont, m_emojiFont.get(), style);
         auto entity = addEntity<vde::SpriteEntity>();
         entity->setTexture(tex);
         entity->setPosition(x, y, 0.0f);
@@ -262,8 +262,7 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
 // Game
 // ============================================================================
 
-class EmojiDemoGame
-    : public vde::examples::BaseExampleGame<EmojiDemoInputHandler, EmojiDemoScene> {
+class EmojiDemoGame : public vde::examples::BaseExampleGame<EmojiDemoInputHandler, EmojiDemoScene> {
   public:
     EmojiDemoGame() = default;
 };
