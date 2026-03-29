@@ -70,7 +70,6 @@ class VLauncherScene : public BaseToolScene {
     std::unordered_set<std::string> m_expandedGroups;
     std::unordered_map<std::string, std::string>
         m_groupDefaults;  // targetName -> relative exe path
-    bool m_groupDefaultsLoaded = false;
 
     static constexpr size_t kMaxStoredOutputBytes = 256 * 1024;
     static constexpr const char* kCompactViewStorageKey = "vlauncher.ui.compactView";
@@ -78,7 +77,7 @@ class VLauncherScene : public BaseToolScene {
     static constexpr float kCompactAppWidth = 560.0f;
     static constexpr float kCompactAppHeight = 440.0f;
 
-    std::vector<TargetGroup> buildGroupedEntries() const;
+    std::vector<TargetGroup> buildGroupedEntries();
     void resolveGroupDefault(TargetGroup& group) const;
     void saveGroupDefault(const std::string& targetName, const ExecutableEntry& entry);
     void loadGroupDefaults(const std::vector<TargetGroup>& groups);

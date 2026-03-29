@@ -39,8 +39,6 @@ void VLauncherScene::onEnter() {
         addConsoleMessage("WARNING: Failed to initialize run-log storage.");
     }
 
-    m_groupDefaultsLoaded = false;
-
     addConsoleMessage("VLauncher started. Monitoring examples/tools for executable updates.");
 }
 
@@ -169,14 +167,6 @@ void VLauncherScene::drawDebugUI() {
     ImGui::Checkbox("Show missing source", &m_showMissingSource);
 
     ImGui::Separator();
-
-    if (!m_groupDefaultsLoaded) {
-        // First pass: build groups to discover multi-entry target names, then load
-        // persisted defaults. Rebuild groups so resolveGroupDefault() picks them up.
-        auto initialGroups = buildGroupedEntries();
-        loadGroupDefaults(initialGroups);
-        m_groupDefaultsLoaded = true;
-    }
 
     auto groups = buildGroupedEntries();
 
@@ -918,7 +908,7 @@ void VLauncherScene::clearActiveRuns() {
     m_activeRuns.clear();
 }
 
-std::vector<VLauncherScene::TargetGroup> VLauncherScene::buildGroupedEntries() const {
+std::vector<VLauncherScene::TargetGroup> VLauncherScene::buildGroupedEntries() {
     auto sorted = getSortedEntries();
 
     // Collect entries into groups by targetName, preserving first-seen order.
@@ -937,6 +927,11 @@ std::vector<VLauncherScene::TargetGroup> VLauncherScene::buildGroupedEntries() c
             groups[it->second].entries.push_back(std::move(entry));
         }
     }
+
+    // Incrementally load persisted defaults for any multi-entry groups whose
+    // saved preference has not been loaded yet (handles groups that appear
+    // after startup when new build outputs are created).
+    loadGroupDefaults(groups);
 
     for (auto& group : groups) {
         resolveGroupDefault(group);
@@ -965,6 +960,12 @@ void VLauncherScene::resolveGroupDefault(TargetGroup& group) const {
             }
             auto relPath = std::filesystem::relative(group.entries[i].executablePath, root, ec);
             if (!ec && relPath.generic_string() == savedPath) {
+                group.defaultIndex = i;
+                return;
+            }
+            // Fallback: compare using the absolute path so that defaults saved
+            // when relative() failed (absolute format) can still match.
+            if (ec && group.entries[i].executablePath.generic_string() == savedPath) {
                 group.defaultIndex = i;
                 return;
             }
@@ -1005,6 +1006,11 @@ void VLauncherScene::loadGroupDefaults(const std::vector<TargetGroup>& groups) {
 
     for (const auto& group : groups) {
         if (group.entries.size() <= 1) {
+            continue;
+        }
+
+        // Skip groups whose default has already been loaded.
+        if (m_groupDefaults.count(group.targetName) > 0) {
             continue;
         }
 
