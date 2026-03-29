@@ -207,15 +207,12 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
 
     // Persistent GitUtils: reuse the same instance across scan cycles.
     // Worker-thread-only — never accessed from UI or other threads.
-    static std::unique_ptr<GitUtils> persistentGit;
-    static std::filesystem::path persistentGitRoot;
-
-    if (!persistentGit || persistentGitRoot != snapshot.repositoryRoot) {
-        persistentGit = std::make_unique<GitUtils>(snapshot.repositoryRoot);
-        persistentGitRoot = snapshot.repositoryRoot;
+    if (!m_git || m_gitRoot != snapshot.repositoryRoot) {
+        m_git = std::make_unique<GitUtils>(snapshot.repositoryRoot);
+        m_gitRoot = snapshot.repositoryRoot;
     }
 
-    snapshot.gitAvailable = persistentGit->isAvailable();
+    snapshot.gitAvailable = m_git->isAvailable();
 
     // Collect unique source directories first for batch git operations.
     std::vector<std::filesystem::path> sourceDirs;
@@ -271,8 +268,18 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
     // Batch git operations: one `git status --porcelain` for the whole repo,
     // then batch commit-time queries for all unique source directories.
     if (snapshot.gitAvailable) {
-        persistentGit->refreshDirtyCache();
-        persistentGit->refreshCommitTimeCache(sourceDirs);
+        // Deduplicate source directories before batching to avoid redundant git log calls.
+        // Use lexically_normal() to normalize separators before comparing.
+        std::unordered_set<std::string> seen;
+        std::vector<std::filesystem::path> uniqueSourceDirs;
+        for (const auto& dir : sourceDirs) {
+            std::filesystem::path normalized = dir.lexically_normal();
+            if (seen.insert(normalized.string()).second) {
+                uniqueSourceDirs.push_back(normalized);
+            }
+        }
+        m_git->refreshDirtyCache();
+        m_git->refreshCommitTimeCache(uniqueSourceDirs);
     }
 
     // Second pass: build final entries using cached git data.
@@ -302,9 +309,9 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
             }
 
             if (snapshot.gitAvailable) {
-                entry.sourceDirty = persistentGit->hasUncommittedChanges(entry.sourceDirectory);
+                entry.sourceDirty = m_git->hasUncommittedChanges(entry.sourceDirectory);
 
-                auto commit = persistentGit->getLastCommitTime(entry.sourceDirectory);
+                auto commit = m_git->getLastCommitTime(entry.sourceDirectory);
                 if (commit) {
                     entry.lastSourceCommitTime = *commit;
                     entry.hasLastSourceCommitTime = true;

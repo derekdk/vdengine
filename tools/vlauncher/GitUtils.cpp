@@ -79,14 +79,9 @@ bool GitUtils::hasUncommittedChanges(const std::filesystem::path& pathInRepo) co
             if (dirtyDir == normalizedStr) {
                 return true;
             }
-            // dirtyDir is under normalizedStr.
+            // dirtyDir is under normalizedStr (queried path contains dirty content).
             if (dirtyDir.size() > normalizedStr.size() && dirtyDir.find(normalizedStr) == 0 &&
                 (dirtyDir[normalizedStr.size()] == '/' || dirtyDir[normalizedStr.size()] == '\\')) {
-                return true;
-            }
-            // normalizedStr is under dirtyDir.
-            if (normalizedStr.size() > dirtyDir.size() && normalizedStr.find(dirtyDir) == 0 &&
-                (normalizedStr[dirtyDir.size()] == '/' || normalizedStr[dirtyDir.size()] == '\\')) {
                 return true;
             }
         }

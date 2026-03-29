@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -13,6 +12,8 @@
 #include <vector>
 
 namespace vde::tools {
+
+class GitUtils;
 
 struct ExecutableEntry {
     std::string targetName;
@@ -60,7 +61,7 @@ class ExecutableScanner {
     void stop();
     void requestRefresh();
 
-    /// Returns a shared pointer to the latest snapshot (cheap atomic load, no deep copy).
+    /// Returns a shared pointer to the latest snapshot (mutex-protected, no deep copy).
     std::shared_ptr<const ScanSnapshot> getSnapshot() const;
 
   private:
@@ -68,7 +69,7 @@ class ExecutableScanner {
     std::chrono::seconds m_idleInterval;
     std::chrono::seconds m_fastInterval;
 
-    // Shared-pointer snapshot: UI reads via atomic load, scanner writes via atomic store.
+    // Shared-pointer snapshot: UI reads via mutex-protected load, scanner writes via mutex-protected store.
     std::shared_ptr<const ScanSnapshot> m_snapshot;
     mutable std::mutex m_snapshotMutex;
 
@@ -89,6 +90,10 @@ class ExecutableScanner {
         std::unordered_map<std::string, std::filesystem::file_time_type> cmakeTimestamps;
     };
     CachedTargetSourceMap m_cachedTargetMap;
+
+    // Persistent GitUtils instance: reused across scan cycles, owned by this scanner.
+    std::unique_ptr<GitUtils> m_git;
+    std::filesystem::path m_gitRoot;
 
     void workerLoop();
     ScanSnapshot buildSnapshot();
