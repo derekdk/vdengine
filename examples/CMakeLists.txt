@@ -32,6 +32,9 @@ target_link_libraries(imgui_backend PUBLIC
     glfw
 )
 
+# Enable 32-bit ImWchar for full Unicode/emoji support in ImGui
+target_compile_definitions(imgui_backend PUBLIC IMGUI_USE_WCHAR32)
+
 # Track shader source files so updates trigger copy without requiring executable relink
 file(GLOB_RECURSE VDE_SHADER_FILES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/shaders/*
@@ -274,3 +277,27 @@ add_custom_target(vde_text_adventure_font_sync ALL
 )
 
 add_dependencies(vde_text_adventure_demo vde_text_adventure_font_sync)
+
+# Emoji demo - demonstrates color emoji rendering in both engine text and ImGui
+add_vde_example(vde_emoji_demo "emoji_demo/main.cpp")
+
+# Sync font assets for the emoji demo
+set(VDE_EMOJI_FONT_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vde_emoji_font_assets.stamp)
+
+add_custom_command(
+    OUTPUT ${VDE_EMOJI_FONT_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_emoji_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets/fonts
+        $<TARGET_FILE_DIR:vde_emoji_demo>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_EMOJI_FONT_STAMP}
+    DEPENDS ${VDE_FONT_ASSET_FILES}
+    COMMENT "Syncing font assets for emoji demo..."
+    VERBATIM
+)
+
+add_custom_target(vde_emoji_font_sync ALL
+    DEPENDS ${VDE_EMOJI_FONT_STAMP}
+)
+
+add_dependencies(vde_emoji_demo vde_emoji_font_sync)

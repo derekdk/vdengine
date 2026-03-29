@@ -9,6 +9,7 @@
  */
 
 #include <vde/api/BitmapFont.h>
+#include <vde/api/EmojiFont.h>
 #include <vde/api/GameTypes.h>
 #include <vde/api/TrueTypeFont.h>
 
@@ -68,6 +69,21 @@ class TextRenderer {
      */
     static std::shared_ptr<Texture> createTexture(VulkanContext* ctx, const std::string& text,
                                                   const TrueTypeFont& font,
+                                                  const TextStyle& style = {});
+
+    /**
+     * @brief Render a UTF-8 text string with inline color emoji support.
+     * @param ctx Vulkan context used to upload the texture to the GPU
+     * @param utf8Text The string to render (UTF-8 encoded, may contain emoji)
+     * @param font TrueType font for regular text glyphs
+     * @param emoji Color emoji font for emoji codepoints (may be nullptr)
+     * @param style Rendering style (color affects text only; emoji keep original colors)
+     * @return Shared pointer to the created texture (always non-null; empty
+     *         strings return a 1x1 transparent texture)
+     */
+    static std::shared_ptr<Texture> createTexture(VulkanContext* ctx, const std::string& utf8Text,
+                                                  const TrueTypeFont& font,
+                                                  const EmojiFont* emoji,
                                                   const TextStyle& style = {});
 };
 
