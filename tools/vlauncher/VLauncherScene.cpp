@@ -138,7 +138,7 @@ void VLauncherScene::drawDebugUI() {
         return;
     }
 
-    if (m_snapshot.repositoryRoot.empty()) {
+    if (!m_snapshot || m_snapshot->repositoryRoot.empty()) {
         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
                            "Repository root not found. Run this tool from a VDE build output.");
         ImGui::End();
@@ -146,9 +146,9 @@ void VLauncherScene::drawDebugUI() {
         return;
     }
 
-    ImGui::Text("Repository: %s", m_snapshot.repositoryRoot.string().c_str());
-    ImGui::Text("Last scan: %s", formatTimestamp(m_snapshot.scanTime).c_str());
-    ImGui::Text("Git: %s", m_snapshot.gitAvailable ? "available" : "not available");
+    ImGui::Text("Repository: %s", m_snapshot->repositoryRoot.string().c_str());
+    ImGui::Text("Last scan: %s", formatTimestamp(m_snapshot->scanTime).c_str());
+    ImGui::Text("Git: %s", m_snapshot->gitAvailable ? "available" : "not available");
 
     if (ImGui::Button("Refresh now") && m_scanner) {
         m_scanner->requestRefresh();
@@ -204,7 +204,7 @@ void VLauncherScene::drawDebugUI() {
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                     std::error_code relError;
                     std::filesystem::path displayPath = std::filesystem::relative(
-                        entry.executablePath, m_snapshot.repositoryRoot, relError);
+                        entry.executablePath, m_snapshot->repositoryRoot, relError);
                     if (relError || displayPath.empty()) {
                         displayPath = entry.executablePath;
                     }
@@ -284,7 +284,7 @@ void VLauncherScene::drawDebugUI() {
                 ImGui::TableSetColumnIndex(6);
                 std::error_code relError;
                 std::filesystem::path displayPath = std::filesystem::relative(
-                    entry.executablePath, m_snapshot.repositoryRoot, relError);
+                    entry.executablePath, m_snapshot->repositoryRoot, relError);
                 if (relError || displayPath.empty()) {
                     displayPath = entry.executablePath;
                 }
@@ -354,7 +354,10 @@ void VLauncherScene::launchEntryWithSmokeTest(const ExecutableEntry& entry,
                                               const std::string& targetId,
                                               const std::string& scriptName) {
     std::error_code fsError;
-    std::filesystem::path repoRoot = m_snapshot.repositoryRoot;
+    std::filesystem::path repoRoot;
+    if (m_snapshot) {
+        repoRoot = m_snapshot->repositoryRoot;
+    }
     if (repoRoot.empty()) {
         repoRoot = std::filesystem::current_path(fsError);
         if (fsError || repoRoot.empty()) {
@@ -458,7 +461,10 @@ void VLauncherScene::launchEntry(const ExecutableEntry& entry, const std::string
 
 std::string VLauncherScene::buildTargetId(const ExecutableEntry& entry) const {
     std::error_code error;
-    std::filesystem::path root = m_snapshot.repositoryRoot;
+    std::filesystem::path root;
+    if (m_snapshot) {
+        root = m_snapshot->repositoryRoot;
+    }
     if (root.empty()) {
         root = std::filesystem::current_path(error);
         if (error || root.empty()) {
@@ -651,7 +657,11 @@ void VLauncherScene::clearActiveRuns() {
 std::vector<ExecutableEntry> VLauncherScene::getSortedEntries() const {
     std::vector<ExecutableEntry> filtered;
 
-    for (const auto& entry : m_snapshot.entries) {
+    if (!m_snapshot) {
+        return filtered;
+    }
+
+    for (const auto& entry : m_snapshot->entries) {
         if (!m_showUpToDate && !entry.outOfDate) {
             continue;
         }

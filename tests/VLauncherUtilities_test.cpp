@@ -48,13 +48,14 @@ vde::tools::ScanSnapshot waitForSnapshotEntries(vde::tools::ExecutableScanner& s
                                                 size_t minimumEntries) {
     for (int attempt = 0; attempt < 100; ++attempt) {
         auto snapshot = scanner.getSnapshot();
-        if (snapshot.entries.size() >= minimumEntries) {
-            return snapshot;
+        if (snapshot && snapshot->entries.size() >= minimumEntries) {
+            return *snapshot;
         }
         std::this_thread::sleep_for(20ms);
     }
 
-    return scanner.getSnapshot();
+    auto snapshot = scanner.getSnapshot();
+    return snapshot ? *snapshot : vde::tools::ScanSnapshot{};
 }
 
 #if defined(_WIN32)
@@ -119,7 +120,8 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
                   "\"\"]\n");
     writeTextFile(executablePath, "");
 
-    vde::tools::ExecutableScanner scanner(repoRoot, std::chrono::seconds(1));
+    vde::tools::ExecutableScanner scanner(repoRoot, std::chrono::seconds(1),
+                                          std::chrono::seconds(1));
     scanner.start();
     const auto snapshot = waitForSnapshotEntries(scanner, 1);
     scanner.stop();

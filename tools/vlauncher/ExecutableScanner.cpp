@@ -78,8 +78,11 @@ std::optional<std::string> sanitizeSmokeScriptName(const std::string& rawScript)
 
 }  // namespace
 
-ExecutableScanner::ExecutableScanner(std::filesystem::path startPath, std::chrono::seconds interval)
-    : m_startPath(std::move(startPath)), m_interval(interval) {}
+ExecutableScanner::ExecutableScanner(std::filesystem::path startPath,
+                                     std::chrono::seconds idleInterval,
+                                     std::chrono::seconds fastInterval)
+    : m_startPath(std::move(startPath)), m_idleInterval(idleInterval),
+      m_fastInterval(fastInterval) {}
 
 ExecutableScanner::~ExecutableScanner() {
     stop();
@@ -120,7 +123,7 @@ void ExecutableScanner::requestRefresh() {
     m_controlCv.notify_all();
 }
 
-ScanSnapshot ExecutableScanner::getSnapshot() const {
+std::shared_ptr<const ScanSnapshot> ExecutableScanner::getSnapshot() const {
     std::lock_guard<std::mutex> lock(m_snapshotMutex);
     return m_snapshot;
 }
@@ -135,28 +138,57 @@ void ExecutableScanner::workerLoop() {
         }
 
         ScanSnapshot fresh = buildSnapshot();
+
+        // Detect whether the scan produced different results from the previous snapshot.
+        bool changed = true;
         {
             std::lock_guard<std::mutex> lock(m_snapshotMutex);
-            m_snapshot = std::move(fresh);
+            if (m_snapshot) {
+                changed = (fresh.entries.size() != m_snapshot->entries.size());
+                if (!changed) {
+                    for (size_t i = 0; i < fresh.entries.size(); ++i) {
+                        const auto& a = fresh.entries[i];
+                        const auto& b = m_snapshot->entries[i];
+                        if (a.outOfDate != b.outOfDate || a.sourceDirty != b.sourceDirty ||
+                            a.targetName != b.targetName ||
+                            a.executableWriteTime != b.executableWriteTime) {
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            m_snapshot = std::make_shared<const ScanSnapshot>(std::move(fresh));
         }
+
+        // Adaptive interval: use fast interval while changes are detected,
+        // decelerate to idle interval after several unchanged scans.
+        if (changed) {
+            m_unchangedScanCount = 0;
+        } else {
+            ++m_unchangedScanCount;
+        }
+
+        std::chrono::seconds sleepInterval =
+            (m_unchangedScanCount >= kFastToIdleThreshold) ? m_idleInterval : m_fastInterval;
 
         std::unique_lock<std::mutex> lock(m_controlMutex);
         m_forceRefresh = false;
 
-        bool wake = m_controlCv.wait_for(lock, m_interval,
-                                         [this]() { return !m_running || m_forceRefresh; });
+        m_controlCv.wait_for(lock, sleepInterval,
+                             [this]() { return !m_running || m_forceRefresh; });
 
         if (!m_running) {
             break;
         }
 
-        if (!wake) {
-            m_forceRefresh = true;
+        if (m_forceRefresh) {
+            m_unchangedScanCount = 0;
         }
     }
 }
 
-ScanSnapshot ExecutableScanner::buildSnapshot() const {
+ScanSnapshot ExecutableScanner::buildSnapshot() {
     ScanSnapshot snapshot;
     snapshot.scanTime = std::chrono::system_clock::now();
 
@@ -165,33 +197,52 @@ ScanSnapshot ExecutableScanner::buildSnapshot() const {
         return snapshot;
     }
 
-    auto targetSourceMap = buildTargetSourceMap(snapshot.repositoryRoot);
+    // Incremental CMake map: only rebuild if any CMakeLists.txt changed.
+    if (m_cachedTargetMap.targetMap.empty() || isCmakeMapStale(snapshot.repositoryRoot)) {
+        m_cachedTargetMap.targetMap = buildTargetSourceMap(snapshot.repositoryRoot);
+        m_cachedTargetMap.cmakeTimestamps = collectCmakeTimestamps(snapshot.repositoryRoot);
+    }
+
     auto executablePaths = findExecutablePaths(snapshot.repositoryRoot);
 
-    GitUtils git(snapshot.repositoryRoot);
-    snapshot.gitAvailable = git.isAvailable();
+    // Persistent GitUtils: reuse the same instance across scan cycles.
+    // Worker-thread-only — never accessed from UI or other threads.
+    static std::unique_ptr<GitUtils> persistentGit;
+    static std::filesystem::path persistentGitRoot;
 
-    std::unordered_map<std::string, bool> dirtyCache;
-    std::unordered_map<std::string, std::optional<std::chrono::system_clock::time_point>>
-        commitCache;
+    if (!persistentGit || persistentGitRoot != snapshot.repositoryRoot) {
+        persistentGit = std::make_unique<GitUtils>(snapshot.repositoryRoot);
+        persistentGitRoot = snapshot.repositoryRoot;
+    }
+
+    snapshot.gitAvailable = persistentGit->isAvailable();
+
+    // Collect unique source directories first for batch git operations.
+    std::vector<std::filesystem::path> sourceDirs;
+
+    // First pass: resolve source directories and collect for batching.
+    struct PreEntry {
+        std::filesystem::path exePath;
+        std::string targetName;
+        std::filesystem::path sourceDir;
+        bool sourceFound = false;
+        std::string kind;
+    };
+
+    std::vector<PreEntry> preEntries;
+    preEntries.reserve(executablePaths.size());
 
     for (const auto& exePath : executablePaths) {
-        ExecutableEntry entry;
-        entry.executablePath = exePath;
-        entry.targetName = exePath.stem().string();
+        PreEntry pre;
+        pre.exePath = exePath;
+        pre.targetName = exePath.stem().string();
 
-        std::error_code error;
-        auto exeWrite = std::filesystem::last_write_time(exePath, error);
-        if (!error) {
-            entry.executableWriteTime = fileTimeToSystemClock(exeWrite);
-        }
-
-        auto sourceIt = targetSourceMap.find(entry.targetName);
-        if (sourceIt != targetSourceMap.end()) {
-            entry.sourceDirectory = sourceIt->second;
-            entry.sourceFound = std::filesystem::exists(entry.sourceDirectory);
+        auto sourceIt = m_cachedTargetMap.targetMap.find(pre.targetName);
+        if (sourceIt != m_cachedTargetMap.targetMap.end()) {
+            pre.sourceDir = sourceIt->second;
+            pre.sourceFound = std::filesystem::exists(pre.sourceDir);
         } else {
-            std::string baseName = entry.targetName;
+            std::string baseName = pre.targetName;
             if (baseName.rfind("vde_", 0) == 0) {
                 baseName = baseName.substr(4);
             }
@@ -200,15 +251,44 @@ ScanSnapshot ExecutableScanner::buildSnapshot() const {
             std::filesystem::path toolGuess = snapshot.repositoryRoot / "tools" / baseName;
 
             if (std::filesystem::exists(exampleGuess)) {
-                entry.sourceDirectory = exampleGuess;
-                entry.sourceFound = true;
+                pre.sourceDir = exampleGuess;
+                pre.sourceFound = true;
             } else if (std::filesystem::exists(toolGuess)) {
-                entry.sourceDirectory = toolGuess;
-                entry.sourceFound = true;
+                pre.sourceDir = toolGuess;
+                pre.sourceFound = true;
             }
         }
 
-        entry.kind = inferKind(entry.sourceDirectory, snapshot.repositoryRoot);
+        pre.kind = inferKind(pre.sourceDir, snapshot.repositoryRoot);
+
+        if (pre.sourceFound) {
+            sourceDirs.push_back(pre.sourceDir);
+        }
+
+        preEntries.push_back(std::move(pre));
+    }
+
+    // Batch git operations: one `git status --porcelain` for the whole repo,
+    // then batch commit-time queries for all unique source directories.
+    if (snapshot.gitAvailable) {
+        persistentGit->refreshDirtyCache();
+        persistentGit->refreshCommitTimeCache(sourceDirs);
+    }
+
+    // Second pass: build final entries using cached git data.
+    for (auto& pre : preEntries) {
+        ExecutableEntry entry;
+        entry.executablePath = pre.exePath;
+        entry.targetName = pre.targetName;
+        entry.sourceDirectory = pre.sourceDir;
+        entry.sourceFound = pre.sourceFound;
+        entry.kind = pre.kind;
+
+        std::error_code error;
+        auto exeWrite = std::filesystem::last_write_time(pre.exePath, error);
+        if (!error) {
+            entry.executableWriteTime = fileTimeToSystemClock(exeWrite);
+        }
 
         if (entry.sourceFound) {
             entry.smokeScripts = loadSmokeScripts(entry.sourceDirectory, entry.targetName);
@@ -221,27 +301,12 @@ ScanSnapshot ExecutableScanner::buildSnapshot() const {
                     entry.newestSourceWriteTime > entry.executableWriteTime;
             }
 
-            std::string sourceKey = entry.sourceDirectory.string();
             if (snapshot.gitAvailable) {
-                auto dirtyIt = dirtyCache.find(sourceKey);
-                if (dirtyIt == dirtyCache.end()) {
-                    bool dirty = git.hasUncommittedChanges(entry.sourceDirectory);
-                    dirtyCache[sourceKey] = dirty;
-                    entry.sourceDirty = dirty;
-                } else {
-                    entry.sourceDirty = dirtyIt->second;
-                }
+                entry.sourceDirty = persistentGit->hasUncommittedChanges(entry.sourceDirectory);
 
-                auto commitIt = commitCache.find(sourceKey);
-                if (commitIt == commitCache.end()) {
-                    auto commit = git.getLastCommitTime(entry.sourceDirectory);
-                    commitCache[sourceKey] = commit;
-                    if (commit) {
-                        entry.lastSourceCommitTime = *commit;
-                        entry.hasLastSourceCommitTime = true;
-                    }
-                } else if (commitIt->second) {
-                    entry.lastSourceCommitTime = *commitIt->second;
+                auto commit = persistentGit->getLastCommitTime(entry.sourceDirectory);
+                if (commit) {
+                    entry.lastSourceCommitTime = *commit;
                     entry.hasLastSourceCommitTime = true;
                 }
             }
@@ -343,10 +408,12 @@ ExecutableScanner::buildTargetSourceMap(const std::filesystem::path& repoRoot) {
     std::unordered_map<std::string, std::filesystem::path> targetMap;
 
     std::vector<std::filesystem::path> roots = {repoRoot / "examples", repoRoot / "tools"};
-    std::regex addExecutableRegex(R"(add_executable\s*\(\s*([A-Za-z0-9_\-]+)\s+\"?([^\s\)\"]+)\"?)",
-                                  std::regex::icase);
-    std::regex addVdeExampleRegex(R"(add_vde_example\s*\(\s*([A-Za-z0-9_\-]+)\s+\"([^\"]+)\")",
-                                  std::regex::icase);
+
+    // Static regex objects: compiled once, reused across all scan cycles.
+    static const std::regex addExecutableRegex(
+        R"(add_executable\s*\(\s*([A-Za-z0-9_\-]+)\s+\"?([^\s\)\"]+)\"?)", std::regex::icase);
+    static const std::regex addVdeExampleRegex(
+        R"(add_vde_example\s*\(\s*([A-Za-z0-9_\-]+)\s+\"([^\"]+)\")", std::regex::icase);
 
     for (const auto& root : roots) {
         if (!std::filesystem::exists(root)) {
@@ -509,6 +576,60 @@ std::string ExecutableScanner::inferKind(const std::filesystem::path& sourceDir,
     }
 
     return "Unknown";
+}
+
+bool ExecutableScanner::isCmakeMapStale(const std::filesystem::path& repoRoot) const {
+    if (m_cachedTargetMap.cmakeTimestamps.empty()) {
+        return true;
+    }
+
+    auto currentTimestamps = collectCmakeTimestamps(repoRoot);
+
+    // Stale if any file was added, removed, or modified.
+    if (currentTimestamps.size() != m_cachedTargetMap.cmakeTimestamps.size()) {
+        return true;
+    }
+
+    for (const auto& [path, timestamp] : currentTimestamps) {
+        auto it = m_cachedTargetMap.cmakeTimestamps.find(path);
+        if (it == m_cachedTargetMap.cmakeTimestamps.end() || it->second != timestamp) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+std::unordered_map<std::string, std::filesystem::file_time_type>
+ExecutableScanner::collectCmakeTimestamps(const std::filesystem::path& repoRoot) {
+    std::unordered_map<std::string, std::filesystem::file_time_type> timestamps;
+
+    std::vector<std::filesystem::path> roots = {repoRoot / "examples", repoRoot / "tools"};
+
+    for (const auto& root : roots) {
+        if (!std::filesystem::exists(root)) {
+            continue;
+        }
+
+        std::error_code error;
+        for (std::filesystem::recursive_directory_iterator it(root, error), end; it != end;
+             it.increment(error)) {
+            if (error || !it->is_regular_file()) {
+                continue;
+            }
+
+            if (it->path().filename() != "CMakeLists.txt") {
+                continue;
+            }
+
+            auto writeTime = std::filesystem::last_write_time(it->path(), error);
+            if (!error) {
+                timestamps[it->path().string()] = writeTime;
+            }
+        }
+    }
+
+    return timestamps;
 }
 
 }  // namespace vde::tools

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -48,22 +50,27 @@ struct ScanSnapshot {
 
 class ExecutableScanner {
   public:
+    /// Default idle interval is 10 seconds; drops to fast interval after changes detected.
     explicit ExecutableScanner(std::filesystem::path startPath,
-                               std::chrono::seconds interval = std::chrono::seconds(4));
+                               std::chrono::seconds idleInterval = std::chrono::seconds(10),
+                               std::chrono::seconds fastInterval = std::chrono::seconds(4));
     ~ExecutableScanner();
 
     void start();
     void stop();
     void requestRefresh();
 
-    ScanSnapshot getSnapshot() const;
+    /// Returns a shared pointer to the latest snapshot (cheap atomic load, no deep copy).
+    std::shared_ptr<const ScanSnapshot> getSnapshot() const;
 
   private:
     std::filesystem::path m_startPath;
-    std::chrono::seconds m_interval;
+    std::chrono::seconds m_idleInterval;
+    std::chrono::seconds m_fastInterval;
 
+    // Shared-pointer snapshot: UI reads via atomic load, scanner writes via atomic store.
+    std::shared_ptr<const ScanSnapshot> m_snapshot;
     mutable std::mutex m_snapshotMutex;
-    ScanSnapshot m_snapshot;
 
     std::thread m_worker;
     mutable std::mutex m_controlMutex;
@@ -71,8 +78,22 @@ class ExecutableScanner {
     bool m_running = false;
     bool m_forceRefresh = false;
 
+    // Adaptive interval state (only touched from the worker thread).
+    int m_unchangedScanCount = 0;
+    static constexpr int kFastToIdleThreshold = 3;
+
+    // Cached target-source map to avoid re-parsing CMakeLists.txt every cycle.
+    struct CachedTargetSourceMap {
+        std::unordered_map<std::string, std::filesystem::path> targetMap;
+        // Timestamps of CMakeLists.txt files at the time of last parse.
+        std::unordered_map<std::string, std::filesystem::file_time_type> cmakeTimestamps;
+    };
+    CachedTargetSourceMap m_cachedTargetMap;
+
     void workerLoop();
-    ScanSnapshot buildSnapshot() const;
+    ScanSnapshot buildSnapshot();
+
+    bool isCmakeMapStale(const std::filesystem::path& repoRoot) const;
 
     static std::filesystem::path findRepositoryRoot(const std::filesystem::path& fromPath);
     static std::vector<std::filesystem::path>
@@ -92,6 +113,10 @@ class ExecutableScanner {
 
     static std::string inferKind(const std::filesystem::path& sourceDir,
                                  const std::filesystem::path& repoRoot);
+
+    /// Collect the file_time_type of every CMakeLists.txt under examples/ and tools/.
+    static std::unordered_map<std::string, std::filesystem::file_time_type>
+    collectCmakeTimestamps(const std::filesystem::path& repoRoot);
 };
 
 }  // namespace vde::tools

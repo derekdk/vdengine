@@ -41,7 +41,7 @@ class VLauncherScene : public BaseToolScene {
     };
 
     std::unique_ptr<ExecutableScanner> m_scanner;
-    ScanSnapshot m_snapshot;
+    std::shared_ptr<const ScanSnapshot> m_snapshot;
     std::vector<ActiveRun> m_activeRuns;
 
     std::string m_selectedTargetId;

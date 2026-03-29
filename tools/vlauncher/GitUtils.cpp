@@ -17,11 +17,83 @@ GitUtils::GitUtils(std::filesystem::path repoRoot) : m_repoRoot(std::move(repoRo
     m_gitAvailable = (result.exitCode == 0 && trimmed == "true");
 }
 
+void GitUtils::refreshDirtyCache() {
+    m_dirtyDirs.clear();
+    m_dirtyCacheValid = false;
+
+    if (!m_gitAvailable) {
+        return;
+    }
+
+    // Single git status call for the entire repo.
+    CommandResult result = runGitCommand("status --porcelain");
+    if (result.exitCode != 0) {
+        return;
+    }
+
+    m_dirtyCacheValid = true;
+
+    // Parse each line: first 2 chars are status, then a space, then the path.
+    std::istringstream stream(result.output);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (line.size() < 4) {
+            continue;
+        }
+
+        // Extract the file path (skip the 3-char status prefix "XY ").
+        std::string filePath = line.substr(3);
+
+        // Handle rename lines "XY old -> new".
+        auto arrowPos = filePath.find(" -> ");
+        if (arrowPos != std::string::npos) {
+            filePath = filePath.substr(arrowPos + 4);
+        }
+
+        // Normalize to the directory containing the dirty file.
+        std::filesystem::path dirtyFile = m_repoRoot / filePath;
+        std::filesystem::path dirtyDir = dirtyFile.parent_path();
+        m_dirtyDirs.insert(dirtyDir.lexically_normal().string());
+    }
+}
+
 bool GitUtils::hasUncommittedChanges(const std::filesystem::path& pathInRepo) const {
     if (!m_gitAvailable) {
         return false;
     }
 
+    // Use the batch cache if available.
+    if (m_dirtyCacheValid) {
+        std::error_code error;
+        std::filesystem::path normalized = std::filesystem::absolute(pathInRepo, error);
+        if (error) {
+            normalized = pathInRepo;
+        }
+        normalized = normalized.lexically_normal();
+        std::string normalizedStr = normalized.string();
+
+        // Check if any dirty directory is within or equal to the queried path,
+        // using path-separator-aware containment to avoid false positives
+        // (e.g. "examples/foo" must not match "examples/foobar").
+        for (const auto& dirtyDir : m_dirtyDirs) {
+            if (dirtyDir == normalizedStr) {
+                return true;
+            }
+            // dirtyDir is under normalizedStr.
+            if (dirtyDir.size() > normalizedStr.size() && dirtyDir.find(normalizedStr) == 0 &&
+                (dirtyDir[normalizedStr.size()] == '/' || dirtyDir[normalizedStr.size()] == '\\')) {
+                return true;
+            }
+            // normalizedStr is under dirtyDir.
+            if (normalizedStr.size() > dirtyDir.size() && normalizedStr.find(dirtyDir) == 0 &&
+                (normalizedStr[dirtyDir.size()] == '/' || normalizedStr[dirtyDir.size()] == '\\')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Fallback: per-directory git status call.
     std::error_code error;
     std::filesystem::path rel = std::filesystem::relative(pathInRepo, m_repoRoot, error);
     if (error) {
@@ -39,12 +111,60 @@ bool GitUtils::hasUncommittedChanges(const std::filesystem::path& pathInRepo) co
     return !trim(result.output).empty();
 }
 
+void GitUtils::refreshCommitTimeCache(const std::vector<std::filesystem::path>& sourceDirs) {
+    m_commitTimeCache.clear();
+
+    if (!m_gitAvailable) {
+        return;
+    }
+
+    for (const auto& sourceDir : sourceDirs) {
+        std::error_code error;
+        std::filesystem::path rel = std::filesystem::relative(sourceDir, m_repoRoot, error);
+        if (error) {
+            continue;
+        }
+
+        std::ostringstream args;
+        args << "log -1 --format=%ct -- \"" << rel.generic_string() << "\"";
+
+        CommandResult result = runGitCommand(args.str());
+        std::string key = sourceDir.string();
+
+        if (result.exitCode != 0) {
+            m_commitTimeCache[key] = std::nullopt;
+            continue;
+        }
+
+        std::string trimmed = trim(result.output);
+        if (trimmed.empty()) {
+            m_commitTimeCache[key] = std::nullopt;
+            continue;
+        }
+
+        try {
+            std::time_t commitEpoch = static_cast<std::time_t>(std::stoll(trimmed));
+            m_commitTimeCache[key] = std::chrono::system_clock::from_time_t(commitEpoch);
+        } catch (...) {
+            m_commitTimeCache[key] = std::nullopt;
+        }
+    }
+}
+
 std::optional<std::chrono::system_clock::time_point>
 GitUtils::getLastCommitTime(const std::filesystem::path& pathInRepo) const {
     if (!m_gitAvailable) {
         return std::nullopt;
     }
 
+    // Use the batch cache if the path is there.
+    std::string key = pathInRepo.string();
+    auto it = m_commitTimeCache.find(key);
+    if (it != m_commitTimeCache.end()) {
+        return it->second;
+    }
+
+    // Fallback: per-directory git log call.
     std::error_code error;
     std::filesystem::path rel = std::filesystem::relative(pathInRepo, m_repoRoot, error);
     if (error) {
