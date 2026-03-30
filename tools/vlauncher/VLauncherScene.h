@@ -7,6 +7,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "../ToolBase.h"
@@ -40,8 +42,16 @@ class VLauncherScene : public BaseToolScene {
         LaunchedProcess process;
     };
 
+    struct TargetGroup {
+        std::string targetName;
+        std::vector<ExecutableEntry> entries;
+        size_t defaultIndex = 0;
+
+        const ExecutableEntry& defaultEntry() const { return entries[defaultIndex]; }
+    };
+
     std::unique_ptr<ExecutableScanner> m_scanner;
-    ScanSnapshot m_snapshot;
+    std::shared_ptr<const ScanSnapshot> m_snapshot;
     std::vector<ActiveRun> m_activeRuns;
 
     std::string m_selectedTargetId;
@@ -56,10 +66,21 @@ class VLauncherScene : public BaseToolScene {
     bool m_forceLauncherWindowSize = false;
     ImVec2 m_forcedLauncherWindowSize = ImVec2(0.0f, 0.0f);
 
+    // Grouping state
+    std::unordered_set<std::string> m_expandedGroups;
+    std::unordered_map<std::string, std::string>
+        m_groupDefaults;  // targetName -> relative exe path
+
     static constexpr size_t kMaxStoredOutputBytes = 256 * 1024;
     static constexpr const char* kCompactViewStorageKey = "vlauncher.ui.compactView";
+    static constexpr const char* kGroupDefaultKeyPrefix = "vlauncher.group.default.";
     static constexpr float kCompactAppWidth = 560.0f;
     static constexpr float kCompactAppHeight = 440.0f;
+
+    std::vector<TargetGroup> buildGroupedEntries();
+    void resolveGroupDefault(TargetGroup& group) const;
+    void saveGroupDefault(const std::string& targetName, const ExecutableEntry& entry);
+    void loadGroupDefaults(const std::vector<TargetGroup>& groups);
 
     std::vector<ExecutableEntry> getSortedEntries() const;
     std::string buildTargetId(const ExecutableEntry& entry) const;
@@ -85,6 +106,8 @@ class VLauncherScene : public BaseToolScene {
     static std::string formatAge(std::chrono::system_clock::time_point from,
                                  std::chrono::system_clock::time_point now);
     static std::string formatTimestamp(std::chrono::system_clock::time_point value);
+    static void drawAgeIndicator(std::chrono::system_clock::time_point from,
+                                 std::chrono::system_clock::time_point now);
 };
 
 }  // namespace vde::tools

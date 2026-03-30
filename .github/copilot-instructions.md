@@ -117,6 +117,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Finishing any task that involves writing or modifying scripts, build tools, automation, or any executable artifact — before telling the user the work is done.  
 **Location:** `.github/skills/completing-work/SKILL.md`
 
+### common-sense
+**Purpose:** Decision-making principles for planning, designing, and implementing features on the user's behalf.  
+**Use when:** Making design choices, planning features, evaluating tradeoffs, or reviewing your own work before presenting it.  
+**Location:** `.github/skills/common-sense/SKILL.md`
+
 ## Testing Decision Tree
 
 | Need | Skill |

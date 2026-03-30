@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <map>
 #include <sstream>
 
 namespace vde::tools {
@@ -138,7 +139,7 @@ void VLauncherScene::drawDebugUI() {
         return;
     }
 
-    if (m_snapshot.repositoryRoot.empty()) {
+    if (!m_snapshot || m_snapshot->repositoryRoot.empty()) {
         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
                            "Repository root not found. Run this tool from a VDE build output.");
         ImGui::End();
@@ -146,9 +147,9 @@ void VLauncherScene::drawDebugUI() {
         return;
     }
 
-    ImGui::Text("Repository: %s", m_snapshot.repositoryRoot.string().c_str());
-    ImGui::Text("Last scan: %s", formatTimestamp(m_snapshot.scanTime).c_str());
-    ImGui::Text("Git: %s", m_snapshot.gitAvailable ? "available" : "not available");
+    ImGui::Text("Repository: %s", m_snapshot->repositoryRoot.string().c_str());
+    ImGui::Text("Last scan: %s", formatTimestamp(m_snapshot->scanTime).c_str());
+    ImGui::Text("Git: %s", m_snapshot->gitAvailable ? "available" : "not available");
 
     if (ImGui::Button("Refresh now") && m_scanner) {
         m_scanner->requestRefresh();
@@ -167,12 +168,18 @@ void VLauncherScene::drawDebugUI() {
 
     ImGui::Separator();
 
-    auto entries = getSortedEntries();
-    ImGui::Text("Detected launch targets: %d", static_cast<int>(entries.size()));
+    auto groups = buildGroupedEntries();
+
+    size_t totalEntries = 0;
+    for (const auto& g : groups) {
+        totalEntries += g.entries.size();
+    }
+    ImGui::Text("Detected launch targets: %d (%d groups)", static_cast<int>(totalEntries),
+                static_cast<int>(groups.size()));
     ImGui::Text("Active launches: %d", static_cast<int>(m_activeRuns.size()));
 
     if (m_compactView) {
-        ImGui::TextDisabled("Compact mode: double-click an executable to launch.");
+        ImGui::TextDisabled("Compact mode: double-click a group to launch the default.");
 
         ImGuiTableFlags compactFlags =
             ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY;
@@ -181,35 +188,110 @@ void VLauncherScene::drawDebugUI() {
             ImGui::TableSetupColumn("Executable", ImGuiTableColumnFlags_WidthStretch, 1.0f);
             ImGui::TableHeadersRow();
 
-            for (const auto& entry : entries) {
-                const std::string targetId = buildTargetId(entry);
+            for (auto& group : groups) {
+                const bool isMulti = group.entries.size() > 1;
+                const auto& defaultEntry = group.defaultEntry();
+                const std::string defaultTargetId = buildTargetId(defaultEntry);
+                const bool expanded = m_expandedGroups.count(group.targetName) > 0;
 
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
 
-                const bool selected = (targetId == m_selectedTargetId);
-                std::string targetLabel = entry.targetName + "##compact_target_" + targetId;
+                // Disclosure toggle for multi-entry groups
+                if (isMulti) {
+                    std::string arrowId = "##disc_compact_" + group.targetName;
+                    const char* arrow = expanded ? "v" : ">";
+                    float arrowWidth = ImGui::CalcTextSize("v ").x;
+                    if (ImGui::InvisibleButton(arrowId.c_str(),
+                                               ImVec2(arrowWidth, ImGui::GetTextLineHeight()))) {
+                        if (expanded) {
+                            m_expandedGroups.erase(group.targetName);
+                        } else {
+                            m_expandedGroups.insert(group.targetName);
+                        }
+                    }
+                    ImVec2 arrowPos = ImGui::GetItemRectMin();
+                    ImGui::GetWindowDrawList()->AddText(
+                        arrowPos, ImGui::GetColorU32(ImGuiCol_TextDisabled), arrow);
+                    ImGui::SameLine(0.0f, 0.0f);
+                }
+
+                const bool selected = (defaultTargetId == m_selectedTargetId);
+                std::string groupLabel = group.targetName + "##compact_group_" + group.targetName;
                 ImGuiSelectableFlags selectFlags =
                     ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick;
-                if (ImGui::Selectable(targetLabel.c_str(), selected, selectFlags)) {
-                    selectTargetForLogView(entry);
+                if (ImGui::Selectable(groupLabel.c_str(), selected, selectFlags)) {
+                    selectTargetForLogView(defaultEntry);
                 }
 
-                drawEntryContextMenu(entry, "compact_target_menu_" + targetId);
+                drawEntryContextMenu(defaultEntry, "compact_group_menu_" + group.targetName);
 
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                    launchEntry(entry, targetId);
+                    launchEntry(defaultEntry, defaultTargetId);
                 }
 
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-                    std::error_code relError;
-                    std::filesystem::path displayPath = std::filesystem::relative(
-                        entry.executablePath, m_snapshot.repositoryRoot, relError);
-                    if (relError || displayPath.empty()) {
-                        displayPath = entry.executablePath;
-                    }
+                if (isMulti && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                    ImGui::SetTooltip("%zu versions available", group.entries.size());
+                }
 
-                    ImGui::SetTooltip("%s", displayPath.generic_string().c_str());
+                // Expanded sub-entries
+                if (isMulti && expanded) {
+                    for (size_t i = 0; i < group.entries.size(); ++i) {
+                        const auto& entry = group.entries[i];
+                        const std::string targetId = buildTargetId(entry);
+                        const bool isDefault = (i == group.defaultIndex);
+
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+
+                        std::error_code relError;
+                        std::filesystem::path displayPath = std::filesystem::relative(
+                            entry.executablePath, m_snapshot->repositoryRoot, relError);
+                        if (relError || displayPath.empty()) {
+                            displayPath = entry.executablePath;
+                        }
+
+                        std::string subLabel = "    ";
+                        if (isDefault) {
+                            subLabel += "[default] ";
+                        }
+                        subLabel += displayPath.generic_string();
+                        subLabel += "##compact_sub_" + targetId;
+
+                        const bool subSelected = (targetId == m_selectedTargetId);
+                        if (ImGui::Selectable(subLabel.c_str(), subSelected,
+                                              ImGuiSelectableFlags_SpanAllColumns |
+                                                  ImGuiSelectableFlags_AllowDoubleClick)) {
+                            selectTargetForLogView(entry);
+                        }
+
+                        if (ImGui::IsItemHovered() &&
+                            ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                            launchEntry(entry, targetId);
+                        }
+
+                        if (ImGui::BeginPopupContextItem(
+                                ("compact_sub_menu_" + targetId).c_str())) {
+                            if (!isDefault && ImGui::MenuItem("Set as default")) {
+                                saveGroupDefault(group.targetName, entry);
+                            }
+
+                            if (entry.sourceFound) {
+                                if (ImGui::MenuItem("Open in VS Code")) {
+                                    auto sourceFile = findMainSourceFile(entry.sourceDirectory);
+                                    std::string err;
+                                    if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
+                                        addConsoleMessage("Opening in VS Code: " +
+                                                          sourceFile.string());
+                                    } else {
+                                        addConsoleMessage("Failed to open VS Code: " + err);
+                                    }
+                                }
+                            }
+
+                            ImGui::EndPopup();
+                        }
+                    }
                 }
             }
 
@@ -233,74 +315,246 @@ void VLauncherScene::drawDebugUI() {
 
             auto now = std::chrono::system_clock::now();
 
-            for (const auto& entry : entries) {
-                const std::string targetId = buildTargetId(entry);
+            for (auto& group : groups) {
+                const bool isMulti = group.entries.size() > 1;
+                const auto& defaultEntry = group.defaultEntry();
+                const std::string defaultTargetId = buildTargetId(defaultEntry);
+                const bool expanded = m_expandedGroups.count(group.targetName) > 0;
 
                 ImGui::TableNextRow();
 
+                // Target column — group header with disclosure icon
                 ImGui::TableSetColumnIndex(0);
-                const bool selected = (targetId == m_selectedTargetId);
-                std::string targetLabel = entry.targetName + "##target_" + targetId;
-                if (ImGui::Selectable(targetLabel.c_str(), selected,
-                                      ImGuiSelectableFlags_AllowOverlap)) {
-                    selectTargetForLogView(entry);
+                {
+                    if (isMulti) {
+                        std::string arrowId = "##disc_full_" + group.targetName;
+                        const char* arrow = expanded ? "v" : ">";
+                        float arrowWidth = ImGui::CalcTextSize("v ").x;
+                        if (ImGui::InvisibleButton(
+                                arrowId.c_str(), ImVec2(arrowWidth, ImGui::GetTextLineHeight()))) {
+                            if (expanded) {
+                                m_expandedGroups.erase(group.targetName);
+                            } else {
+                                m_expandedGroups.insert(group.targetName);
+                            }
+                        }
+                        ImVec2 arrowPos = ImGui::GetItemRectMin();
+                        ImGui::GetWindowDrawList()->AddText(
+                            arrowPos, ImGui::GetColorU32(ImGuiCol_TextDisabled), arrow);
+                        ImGui::SameLine(0.0f, 0.0f);
+                    }
+
+                    const bool selected = (defaultTargetId == m_selectedTargetId);
+                    std::string targetLabel = group.targetName + "##group_" + group.targetName;
+                    ImGuiSelectableFlags selectFlags =
+                        ImGuiSelectableFlags_AllowOverlap | ImGuiSelectableFlags_AllowDoubleClick;
+                    if (ImGui::Selectable(targetLabel.c_str(), selected, selectFlags)) {
+                        selectTargetForLogView(defaultEntry);
+                    }
+
+                    if (ImGui::IsItemHovered() &&
+                        ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                        launchEntry(defaultEntry, defaultTargetId);
+                    }
+
+                    drawEntryContextMenu(defaultEntry, "group_menu_" + group.targetName);
                 }
 
-                drawEntryContextMenu(entry, "target_menu_" + targetId);
-
+                // Type column
                 ImGui::TableSetColumnIndex(1);
-                ImGui::TextUnformatted(entry.kind.c_str());
+                ImGui::TextUnformatted(defaultEntry.kind.c_str());
 
+                // Executable Age column
                 ImGui::TableSetColumnIndex(2);
-                ImGui::TextUnformatted(formatAge(entry.executableWriteTime, now).c_str());
+                drawAgeIndicator(defaultEntry.executableWriteTime, now);
 
+                // Source Age column
                 ImGui::TableSetColumnIndex(3);
-                if (entry.hasNewestSourceWriteTime) {
-                    ImGui::TextUnformatted(formatAge(entry.newestSourceWriteTime, now).c_str());
+                if (defaultEntry.hasNewestSourceWriteTime) {
+                    drawAgeIndicator(defaultEntry.newestSourceWriteTime, now);
                 } else {
                     ImGui::TextUnformatted("-");
                 }
 
+                // Status column
                 ImGui::TableSetColumnIndex(4);
-                if (entry.outOfDate) {
+                if (defaultEntry.outOfDate) {
                     ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s",
-                                       entry.outOfDateReason.c_str());
+                                       defaultEntry.outOfDateReason.c_str());
                 } else {
                     ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.45f, 1.0f), "Up to date");
                 }
 
+                // Git column
                 ImGui::TableSetColumnIndex(5);
-                if (!entry.gitAvailable) {
+                if (!defaultEntry.gitAvailable) {
                     ImGui::TextUnformatted("Git unavailable");
-                } else if (entry.sourceDirty) {
+                } else if (defaultEntry.sourceDirty) {
                     ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "Uncommitted changes");
-                } else if (entry.hasLastSourceCommitTime) {
-                    std::string age = formatAge(entry.lastSourceCommitTime, now);
+                } else if (defaultEntry.hasLastSourceCommitTime) {
+                    std::string age = formatAge(defaultEntry.lastSourceCommitTime, now);
                     ImGui::Text("Last commit: %s", age.c_str());
                 } else {
                     ImGui::TextUnformatted("No history");
                 }
 
+                // Path column
                 ImGui::TableSetColumnIndex(6);
-                std::error_code relError;
-                std::filesystem::path displayPath = std::filesystem::relative(
-                    entry.executablePath, m_snapshot.repositoryRoot, relError);
-                if (relError || displayPath.empty()) {
-                    displayPath = entry.executablePath;
+                {
+                    std::error_code relError;
+                    std::filesystem::path displayPath = std::filesystem::relative(
+                        defaultEntry.executablePath, m_snapshot->repositoryRoot, relError);
+                    if (relError || displayPath.empty()) {
+                        displayPath = defaultEntry.executablePath;
+                    }
+                    if (isMulti) {
+                        std::string pathText = displayPath.generic_string() + " (+" +
+                                               std::to_string(group.entries.size() - 1) + " more)";
+                        ImGui::TextUnformatted(pathText.c_str());
+                    } else {
+                        ImGui::TextUnformatted(displayPath.generic_string().c_str());
+                    }
                 }
-                ImGui::TextUnformatted(displayPath.generic_string().c_str());
 
+                // Run column
                 ImGui::TableSetColumnIndex(7);
-                std::string buttonLabel = "Launch##" + entry.executablePath.string();
-                if (ImGui::Button(buttonLabel.c_str())) {
-                    launchEntry(entry, targetId);
+                {
+                    std::string buttonLabel = "Launch##" + defaultEntry.executablePath.string();
+                    if (ImGui::Button(buttonLabel.c_str())) {
+                        launchEntry(defaultEntry, defaultTargetId);
+                    }
                 }
 
+                // Logs column
                 ImGui::TableSetColumnIndex(8);
-                std::string logsButton = "View##logs_" + targetId;
-                if (ImGui::Button(logsButton.c_str())) {
-                    selectTargetForLogView(entry);
-                    m_showRunLogDialog = true;
+                {
+                    std::string logsButton = "View##logs_" + defaultTargetId;
+                    if (ImGui::Button(logsButton.c_str())) {
+                        selectTargetForLogView(defaultEntry);
+                        m_showRunLogDialog = true;
+                    }
+                }
+
+                // Expanded sub-entries for multi-entry groups
+                if (isMulti && expanded) {
+                    for (size_t i = 0; i < group.entries.size(); ++i) {
+                        const auto& entry = group.entries[i];
+                        const std::string targetId = buildTargetId(entry);
+                        const bool isDefault = (i == group.defaultIndex);
+
+                        ImGui::TableNextRow();
+
+                        // Target column — indented sub-entry
+                        ImGui::TableSetColumnIndex(0);
+                        {
+                            std::string subLabel = "    ";
+                            if (isDefault) {
+                                subLabel += "*  ";
+                            }
+
+                            std::error_code relError;
+                            std::filesystem::path displayPath = std::filesystem::relative(
+                                entry.executablePath, m_snapshot->repositoryRoot, relError);
+                            if (relError || displayPath.empty()) {
+                                displayPath = entry.executablePath;
+                            }
+                            subLabel += displayPath.generic_string();
+                            subLabel += "##sub_" + targetId;
+
+                            const bool subSelected = (targetId == m_selectedTargetId);
+                            if (ImGui::Selectable(subLabel.c_str(), subSelected,
+                                                  ImGuiSelectableFlags_AllowOverlap |
+                                                      ImGuiSelectableFlags_AllowDoubleClick)) {
+                                selectTargetForLogView(entry);
+                            }
+
+                            if (ImGui::IsItemHovered() &&
+                                ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                                launchEntry(entry, targetId);
+                            }
+
+                            if (ImGui::BeginPopupContextItem(("sub_menu_" + targetId).c_str())) {
+                                if (!isDefault && ImGui::MenuItem("Set as default")) {
+                                    saveGroupDefault(group.targetName, entry);
+                                }
+
+                                if (entry.sourceFound) {
+                                    if (ImGui::MenuItem("Open in VS Code")) {
+                                        auto sourceFile = findMainSourceFile(entry.sourceDirectory);
+                                        std::string err;
+                                        if (ProcessLauncher::openFileInVSCode(sourceFile, err)) {
+                                            addConsoleMessage("Opening in VS Code: " +
+                                                              sourceFile.string());
+                                        } else {
+                                            addConsoleMessage("Failed to open VS Code: " + err);
+                                        }
+                                    }
+                                }
+
+                                ImGui::EndPopup();
+                            }
+                        }
+
+                        // Type
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(entry.kind.c_str());
+
+                        // Executable Age
+                        ImGui::TableSetColumnIndex(2);
+                        drawAgeIndicator(entry.executableWriteTime, now);
+
+                        // Source Age
+                        ImGui::TableSetColumnIndex(3);
+                        if (entry.hasNewestSourceWriteTime) {
+                            drawAgeIndicator(entry.newestSourceWriteTime, now);
+                        } else {
+                            ImGui::TextUnformatted("-");
+                        }
+
+                        // Status
+                        ImGui::TableSetColumnIndex(4);
+                        if (entry.outOfDate) {
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s",
+                                               entry.outOfDateReason.c_str());
+                        } else {
+                            ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.45f, 1.0f), "Up to date");
+                        }
+
+                        // Git
+                        ImGui::TableSetColumnIndex(5);
+                        ImGui::TextUnformatted("");
+
+                        // Path
+                        ImGui::TableSetColumnIndex(6);
+                        {
+                            std::error_code relError;
+                            std::filesystem::path displayPath = std::filesystem::relative(
+                                entry.executablePath, m_snapshot->repositoryRoot, relError);
+                            if (relError || displayPath.empty()) {
+                                displayPath = entry.executablePath;
+                            }
+                            ImGui::TextUnformatted(displayPath.generic_string().c_str());
+                        }
+
+                        // Run
+                        ImGui::TableSetColumnIndex(7);
+                        {
+                            std::string buttonLabel = "Launch##" + entry.executablePath.string();
+                            if (ImGui::Button(buttonLabel.c_str())) {
+                                launchEntry(entry, targetId);
+                            }
+                        }
+
+                        // Logs
+                        ImGui::TableSetColumnIndex(8);
+                        {
+                            std::string logsButton = "View##logs_" + targetId;
+                            if (ImGui::Button(logsButton.c_str())) {
+                                selectTargetForLogView(entry);
+                                m_showRunLogDialog = true;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -354,7 +608,10 @@ void VLauncherScene::launchEntryWithSmokeTest(const ExecutableEntry& entry,
                                               const std::string& targetId,
                                               const std::string& scriptName) {
     std::error_code fsError;
-    std::filesystem::path repoRoot = m_snapshot.repositoryRoot;
+    std::filesystem::path repoRoot;
+    if (m_snapshot) {
+        repoRoot = m_snapshot->repositoryRoot;
+    }
     if (repoRoot.empty()) {
         repoRoot = std::filesystem::current_path(fsError);
         if (fsError || repoRoot.empty()) {
@@ -458,7 +715,10 @@ void VLauncherScene::launchEntry(const ExecutableEntry& entry, const std::string
 
 std::string VLauncherScene::buildTargetId(const ExecutableEntry& entry) const {
     std::error_code error;
-    std::filesystem::path root = m_snapshot.repositoryRoot;
+    std::filesystem::path root;
+    if (m_snapshot) {
+        root = m_snapshot->repositoryRoot;
+    }
     if (root.empty()) {
         root = std::filesystem::current_path(error);
         if (error || root.empty()) {
@@ -648,10 +908,128 @@ void VLauncherScene::clearActiveRuns() {
     m_activeRuns.clear();
 }
 
+std::vector<VLauncherScene::TargetGroup> VLauncherScene::buildGroupedEntries() {
+    auto sorted = getSortedEntries();
+
+    // Collect entries into groups by targetName, preserving first-seen order.
+    std::map<std::string, size_t> nameToGroupIndex;
+    std::vector<TargetGroup> groups;
+
+    for (auto& entry : sorted) {
+        auto it = nameToGroupIndex.find(entry.targetName);
+        if (it == nameToGroupIndex.end()) {
+            nameToGroupIndex[entry.targetName] = groups.size();
+            TargetGroup group;
+            group.targetName = entry.targetName;
+            group.entries.push_back(std::move(entry));
+            groups.push_back(std::move(group));
+        } else {
+            groups[it->second].entries.push_back(std::move(entry));
+        }
+    }
+
+    // Incrementally load persisted defaults for any multi-entry groups whose
+    // saved preference has not been loaded yet (handles groups that appear
+    // after startup when new build outputs are created).
+    loadGroupDefaults(groups);
+
+    for (auto& group : groups) {
+        resolveGroupDefault(group);
+    }
+
+    return groups;
+}
+
+void VLauncherScene::resolveGroupDefault(TargetGroup& group) const {
+    if (group.entries.size() <= 1) {
+        group.defaultIndex = 0;
+        return;
+    }
+
+    auto it = m_groupDefaults.find(group.targetName);
+    if (it != m_groupDefaults.end()) {
+        const auto& savedPath = it->second;
+        for (size_t i = 0; i < group.entries.size(); ++i) {
+            std::error_code ec;
+            std::filesystem::path root;
+            if (m_snapshot) {
+                root = m_snapshot->repositoryRoot;
+            }
+            if (root.empty()) {
+                root = std::filesystem::current_path(ec);
+            }
+            auto relPath = std::filesystem::relative(group.entries[i].executablePath, root, ec);
+            if (!ec && relPath.generic_string() == savedPath) {
+                group.defaultIndex = i;
+                return;
+            }
+            // Fallback: compare using the absolute path so that defaults saved
+            // when relative() failed (absolute format) can still match.
+            if (ec && group.entries[i].executablePath.generic_string() == savedPath) {
+                group.defaultIndex = i;
+                return;
+            }
+        }
+    }
+
+    // No saved default or saved path not found; pick the first entry.
+    group.defaultIndex = 0;
+}
+
+void VLauncherScene::saveGroupDefault(const std::string& targetName, const ExecutableEntry& entry) {
+    auto& storage = vde::StorageManager::getInstance();
+    if (!storage.isInitialized()) {
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::path root;
+    if (m_snapshot) {
+        root = m_snapshot->repositoryRoot;
+    }
+    if (root.empty()) {
+        root = std::filesystem::current_path(ec);
+    }
+
+    auto relPath = std::filesystem::relative(entry.executablePath, root, ec);
+    std::string pathStr = ec ? entry.executablePath.generic_string() : relPath.generic_string();
+
+    m_groupDefaults[targetName] = pathStr;
+    storage.setStringData(std::string(kGroupDefaultKeyPrefix) + targetName, pathStr);
+}
+
+void VLauncherScene::loadGroupDefaults(const std::vector<TargetGroup>& groups) {
+    auto& storage = vde::StorageManager::getInstance();
+    if (!storage.isInitialized()) {
+        return;
+    }
+
+    for (const auto& group : groups) {
+        if (group.entries.size() <= 1) {
+            continue;
+        }
+
+        // Skip groups whose default has already been loaded.
+        if (m_groupDefaults.count(group.targetName) > 0) {
+            continue;
+        }
+
+        std::string key = std::string(kGroupDefaultKeyPrefix) + group.targetName;
+        auto value = storage.getStringData(key);
+        if (value.has_value()) {
+            m_groupDefaults[group.targetName] = *value;
+        }
+    }
+}
+
 std::vector<ExecutableEntry> VLauncherScene::getSortedEntries() const {
     std::vector<ExecutableEntry> filtered;
 
-    for (const auto& entry : m_snapshot.entries) {
+    if (!m_snapshot) {
+        return filtered;
+    }
+
+    for (const auto& entry : m_snapshot->entries) {
         if (!m_showUpToDate && !entry.outOfDate) {
             continue;
         }
@@ -705,6 +1083,57 @@ std::string VLauncherScene::truncateOutput(const std::string& output, size_t max
     }
 
     return output.substr(0, maxBytes - suffix.size()) + suffix;
+}
+
+void VLauncherScene::drawAgeIndicator(std::chrono::system_clock::time_point from,
+                                      std::chrono::system_clock::time_point now) {
+    if (from.time_since_epoch().count() == 0) {
+        ImGui::TextDisabled("-");
+        return;
+    }
+
+    auto diff = now - from;
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(diff).count();
+    if (seconds < 0) {
+        seconds = 0;
+    }
+
+    ImVec4 color;
+    if (seconds < 3600) {
+        color = ImVec4(0.35f, 1.0f, 0.45f, 1.0f);  // green
+    } else if (seconds < 86400) {
+        color = ImVec4(1.0f, 0.85f, 0.2f, 1.0f);  // yellow
+    } else {
+        color = ImVec4(1.0f, 0.45f, 0.35f, 1.0f);  // red
+    }
+
+    const float radius = 5.0f;
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float lineH = ImGui::GetTextLineHeight();
+    ImVec2 center = ImVec2(pos.x + radius, pos.y + lineH * 0.5f);
+    ImGui::GetWindowDrawList()->AddCircleFilled(center, radius,
+                                                ImGui::ColorConvertFloat4ToU32(color));
+    ImGui::Dummy(ImVec2(radius * 2.0f, lineH));
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        // Show age as a decimal value with the largest applicable unit
+        char ageText[64];
+        if (seconds < 60) {
+            std::snprintf(ageText, sizeof(ageText), "%.1f seconds ago",
+                          static_cast<double>(seconds));
+        } else if (seconds < 3600) {
+            std::snprintf(ageText, sizeof(ageText), "%.1f minutes ago",
+                          static_cast<double>(seconds) / 60.0);
+        } else if (seconds < 86400) {
+            std::snprintf(ageText, sizeof(ageText), "%.1f hours ago",
+                          static_cast<double>(seconds) / 3600.0);
+        } else {
+            std::snprintf(ageText, sizeof(ageText), "%.1f days ago",
+                          static_cast<double>(seconds) / 86400.0);
+        }
+        ImGui::TextUnformatted(ageText);
+        ImGui::EndTooltip();
+    }
 }
 
 std::string VLauncherScene::formatAge(std::chrono::system_clock::time_point from,
