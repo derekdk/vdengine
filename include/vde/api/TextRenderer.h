@@ -9,7 +9,6 @@
  */
 
 #include <vde/api/BitmapFont.h>
-#include <vde/api/EmojiFont.h>
 #include <vde/api/GameTypes.h>
 #include <vde/api/TrueTypeFont.h>
 
@@ -18,6 +17,7 @@
 
 namespace vde {
 
+class EmojiFont;
 class Texture;
 class VulkanContext;
 

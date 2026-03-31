@@ -8,6 +8,7 @@
  * codepoints back to UTF-8, and classifying emoji codepoint ranges.
  */
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -23,7 +24,7 @@ constexpr char32_t kReplacementChar = 0xFFFD;
  * @param pos Current byte position; advanced past consumed bytes on return
  * @return Decoded codepoint, or kReplacementChar on invalid sequences
  */
-inline char32_t decode(const std::string& s, size_t& pos) {
+inline char32_t decode(const std::string& s, std::size_t& pos) {
     if (pos >= s.size())
         return kReplacementChar;
 
@@ -66,7 +67,11 @@ inline char32_t decode(const std::string& s, size_t& pos) {
         char32_t cp = (static_cast<char32_t>(b0 & 0x0F) << 12) |
                       (static_cast<char32_t>(b1 & 0x3F) << 6) | static_cast<char32_t>(b2 & 0x3F);
         pos += 3;
-        return cp < 0x800 ? kReplacementChar : cp;  // reject overlong
+        if (cp < 0x800)  // reject overlong encodings
+            return kReplacementChar;
+        if (cp >= 0xD800 && cp <= 0xDFFF)  // reject surrogate range (not valid Unicode scalar values)
+            return kReplacementChar;
+        return cp;
     }
 
     // 4-byte: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
@@ -195,7 +200,7 @@ inline bool isEmoji(char32_t cp) {
  */
 template <typename Fn>
 inline void forEach(const std::string& s, Fn fn) {
-    size_t pos = 0;
+    std::size_t pos = 0;
     while (pos < s.size()) {
         fn(decode(s, pos));
     }
@@ -206,9 +211,9 @@ inline void forEach(const std::string& s, Fn fn) {
  * @param s UTF-8 encoded string
  * @return Number of codepoints
  */
-inline size_t length(const std::string& s) {
-    size_t count = 0;
-    size_t pos = 0;
+inline std::size_t length(const std::string& s) {
+    std::size_t count = 0;
+    std::size_t pos = 0;
     while (pos < s.size()) {
         decode(s, pos);
         ++count;

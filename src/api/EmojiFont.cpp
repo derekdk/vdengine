@@ -90,8 +90,8 @@ bool parseCOLR(const uint8_t* data, uint32_t length, std::vector<ColrBaseGlyph>&
     if (length < 14)
         return false;
     uint16_t version = readU16BE(data);
-    if (version > 1)
-        return false;  // COLR v0 and v1 (v1 is v0-backwards-compatible)
+    if (version != 0)
+        return false;  // Only COLR v0 is supported; v1 has a different layout
 
     uint16_t numBaseGlyphs = readU16BE(data + 2);
     uint32_t bgOffset = readU32BE(data + 4);

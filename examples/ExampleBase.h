@@ -38,7 +38,9 @@
 
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <stdexcept>
 
 #include <imgui.h>
@@ -604,16 +606,23 @@ class BaseExampleGame : public vde::Game {
         }
         ImFont* defaultFont = io.Fonts->Fonts[0];
 
-        // Register custom rect glyphs for each available emoji
+        // Register custom rect glyphs for a limited subset of available emoji to
+        // avoid excessively large ImGui font atlases.
         const auto& codepoints = m_imguiEmojiFont->getAvailableCodepoints();
         struct EmojiRect {
             char32_t cp;
             int rectIdx;
         };
+        // Hard cap the number of emoji injected into the atlas. This keeps atlas
+        // build time, memory usage, and GPU upload cost bounded even on systems
+        // with very large emoji fonts.
+        constexpr std::size_t kMaxEmojiGlyphs = 512;
         std::vector<EmojiRect> emojiRects;
-        emojiRects.reserve(codepoints.size());
+        emojiRects.reserve(std::min<std::size_t>(codepoints.size(), kMaxEmojiGlyphs));
 
         for (char32_t cp : codepoints) {
+            if (emojiRects.size() >= kMaxEmojiGlyphs)
+                break;
             const auto* glyph = m_imguiEmojiFont->getGlyph(cp);
             if (!glyph)
                 continue;
@@ -621,7 +630,9 @@ class BaseExampleGame : public vde::Game {
             int rectIdx = io.Fonts->AddCustomRectFontGlyph(defaultFont, static_cast<ImWchar>(cp),
                                                            glyph->width, glyph->height,
                                                            glyph->advanceX, ImVec2(0, 0));
-            emojiRects.push_back({cp, rectIdx});
+            if (rectIdx >= 0) {
+                emojiRects.push_back({cp, rectIdx});
+            }
         }
 
         if (emojiRects.empty()) {
