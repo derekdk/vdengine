@@ -2,11 +2,17 @@
 
 /**
  * @file EmojiFont.h
- * @brief Color emoji font loader supporting COLR/CPAL vector-layered emoji.
+ * @brief Color emoji font loader with best-effort COLR/CPAL support.
  *
  * Loads a color emoji font file (e.g., Segoe UI Emoji on Windows, Noto Color
- * Emoji on Linux), parses COLR v0/v1 and CPAL tables, and renders multi-layer
- * color emoji glyphs into a texture atlas via stb_truetype.
+ * Emoji on Linux), parses COLR v0 plus a best-effort subset of COLR v1 with
+ * CPAL tables, and renders color emoji glyphs into a texture atlas via
+ * stb_truetype.
+ *
+ * COLR v1 handling is not a complete implementation of the OpenType rendering
+ * model. Fonts that rely on unsupported paint formats, blend modes, or other
+ * advanced COLR v1 behavior may load partially or render differently from a
+ * full COLR v1 renderer.
  *
  * Usage:
  * @code
@@ -45,12 +51,14 @@ struct EmojiGlyph {
 /**
  * @brief Loads a color emoji font and builds a color glyph atlas.
  *
- * Supports COLR v0/v1 + CPAL (vector-layered) emoji fonts. Each layer glyph
- * is rendered with stb_truetype and composited with palette colors using
- * premultiplied alpha blending.
+ * Supports COLR v0 and a best-effort subset of COLR v1 + CPAL emoji fonts.
+ * Each layer glyph is rendered with stb_truetype and composited with palette
+ * colors using premultiplied alpha blending.
  *
  * The atlas is a simple grid of fixed-size cells. All emoji are rendered
  * at the requested pixel size and packed into the atlas texture.
+ * Advanced COLR v1 paint graphs may be simplified or skipped if they rely on
+ * features this loader does not implement.
  */
 class EmojiFont {
   public:
@@ -72,6 +80,8 @@ class EmojiFont {
      * @param sizePixels Desired emoji render size in pixels
      * @return true if the font was loaded and at least one color emoji was found
      * @note On failure, getLastError() contains a human-readable reason.
+     * @note COLR v1 support is best-effort only and may not match a full
+     * OpenType COLR v1 renderer for complex paint graphs.
      */
     bool loadFromFile(VulkanContext* ctx, const std::string& path, int sizePixels);
 

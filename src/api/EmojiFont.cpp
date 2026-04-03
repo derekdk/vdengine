@@ -1,6 +1,8 @@
 /**
  * @file EmojiFont.cpp
  * @brief Color emoji font loader and atlas builder using COLR/CPAL tables.
+ *
+ * Implements full COLR v0 parsing plus a best-effort subset of COLR v1.
  */
 
 #include <vde/Texture.h>
