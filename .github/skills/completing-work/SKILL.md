@@ -35,6 +35,21 @@ If you changed code that affects a buildable or runnable artifact (engine code, 
 
 Do not reverse this order. A subagent review is not a substitute for build/test/smoke verification, and build/test/smoke verification is not a substitute for code review.
 
+### Preferred: run all gates with `verify.ps1`
+
+For final verification, use `verify.ps1` to run all gates in one command and capture results to a known log path:
+
+```powershell
+.\scripts\verify.ps1
+```
+
+Then read the results:
+```
+read_file("logs/verify-latest.log", startLine=1, endLine=80)
+```
+
+This writes to `logs/verify-latest.log` inside the workspace, so `read_file` works directly without permission prompts or temp-file management. See the `ai-verification` skill for the full workflow and parameter reference.
+
 ### Step 1 — Run the script or command
 
 Execute the script using the terminal. Do not skip this step even if you are confident the code is correct.
