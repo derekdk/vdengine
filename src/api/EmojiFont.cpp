@@ -36,6 +36,11 @@ inline uint32_t readU32BE(const uint8_t* p) {
            (static_cast<uint32_t>(p[2]) << 8) | static_cast<uint32_t>(p[3]);
 }
 
+inline uint32_t readU24BE(const uint8_t* p) {
+    return (static_cast<uint32_t>(p[0]) << 16) | (static_cast<uint32_t>(p[1]) << 8) |
+           static_cast<uint32_t>(p[2]);
+}
+
 // ---- OpenType table lookup -------------------------------------------------
 
 constexpr uint32_t kTagCOLR = 0x434F4C52;  // 'COLR'
@@ -84,41 +89,243 @@ struct PaletteColor {
     uint8_t r, g, b, a;
 };
 
-/// Parse COLR v0 table.
+// ---- COLR v1 paint tree support --------------------------------------------
+
+constexpr uint8_t kPaintColrLayers = 1;
+constexpr uint8_t kPaintSolid = 2;
+constexpr uint8_t kPaintVarSolid = 3;
+constexpr uint8_t kPaintGlyph = 10;
+constexpr uint8_t kPaintColrGlyph = 11;
+constexpr uint8_t kPaintComposite = 32;
+constexpr int kMaxPaintDepth = 64;
+
+/// Context for walking COLR v1 paint trees.
+struct ColrV1Ctx {
+    const uint8_t* data;
+    uint32_t length;
+    uint32_t layerListOff;
+    uint32_t layerListNum;
+    uint32_t baseGlyphListOff;
+    uint32_t baseGlyphListNum;
+};
+
+/// Try to resolve a paint at @p off to a CPAL palette index.
+/// Returns 0xFFFF (foreground-color fallback) for unsupported paint types.
+uint16_t resolvePaintColor(const ColrV1Ctx& ctx, uint32_t off, int depth) {
+    if (depth > kMaxPaintDepth || off + 1 > ctx.length)
+        return 0xFFFF;
+
+    uint8_t fmt = ctx.data[off];
+    switch (fmt) {
+    case kPaintSolid:
+    case kPaintVarSolid:
+        if (off + 3 > ctx.length)
+            return 0xFFFF;
+        return readU16BE(ctx.data + off + 1);
+    default:
+        // Transform formats (12-31) wrap a child paint at Offset24 +1
+        if (fmt >= 12 && fmt <= 31) {
+            if (off + 4 > ctx.length)
+                return 0xFFFF;
+            return resolvePaintColor(ctx, off + readU24BE(ctx.data + off + 1), depth + 1);
+        }
+        return 0xFFFF;
+    }
+}
+
+/// Flatten a v1 paint tree at @p off into ColrLayerRecord entries.
+bool flattenPaint(const ColrV1Ctx& ctx, uint32_t off, std::vector<ColrLayerRecord>& out,
+                  int depth) {
+    if (depth > kMaxPaintDepth || off + 1 > ctx.length)
+        return false;
+
+    const size_t prevSize = out.size();
+    uint8_t fmt = ctx.data[off];
+
+    switch (fmt) {
+    case kPaintColrLayers: {
+        if (off + 6 > ctx.length)
+            return false;
+        uint8_t numLayers = ctx.data[off + 1];
+        uint32_t firstIdx = readU32BE(ctx.data + off + 2);
+        if (ctx.layerListOff == 0)
+            return false;
+        for (uint8_t i = 0; i < numLayers; ++i) {
+            uint32_t idx = firstIdx + i;
+            if (idx >= ctx.layerListNum)
+                break;
+            // Use uint64_t to prevent overflow on malformed data
+            uint64_t entryAddr = static_cast<uint64_t>(ctx.layerListOff) + 4 + idx * 4;
+            if (entryAddr + 4 > ctx.length)
+                break;
+            uint32_t paintOff = readU32BE(ctx.data + entryAddr);
+            flattenPaint(ctx, ctx.layerListOff + paintOff, out, depth + 1);
+        }
+        return out.size() > prevSize;
+    }
+
+    case kPaintGlyph: {
+        if (off + 6 > ctx.length)
+            return false;
+        uint32_t childOff = readU24BE(ctx.data + off + 1);
+        uint16_t glyphID = readU16BE(ctx.data + off + 4);
+        uint16_t paletteIdx = resolvePaintColor(ctx, off + childOff, depth + 1);
+        out.push_back({glyphID, paletteIdx});
+        return true;
+    }
+
+    case kPaintColrGlyph: {
+        if (off + 3 > ctx.length)
+            return false;
+        uint16_t glyphID = readU16BE(ctx.data + off + 1);
+        if (ctx.baseGlyphListOff == 0 || ctx.baseGlyphListOff + 4 > ctx.length)
+            return false;
+        // Binary search in sorted BaseGlyphList
+        uint32_t lo = 0, hi = ctx.baseGlyphListNum;
+        while (lo < hi) {
+            uint32_t mid = lo + (hi - lo) / 2;
+            uint32_t recOff = ctx.baseGlyphListOff + 4 + mid * 6;
+            if (recOff + 6 > ctx.length)
+                return false;
+            uint16_t g = readU16BE(ctx.data + recOff);
+            if (g < glyphID)
+                lo = mid + 1;
+            else if (g > glyphID)
+                hi = mid;
+            else {
+                uint32_t paintOff = readU32BE(ctx.data + recOff + 2);
+                return flattenPaint(ctx, ctx.baseGlyphListOff + paintOff, out, depth + 1);
+            }
+        }
+        return false;
+    }
+
+    case kPaintComposite: {
+        if (off + 8 > ctx.length)
+            return false;
+        uint32_t sourceOff = readU24BE(ctx.data + off + 1);
+        uint32_t backdropOff = readU24BE(ctx.data + off + 5);
+        flattenPaint(ctx, off + backdropOff, out, depth + 1);
+        flattenPaint(ctx, off + sourceOff, out, depth + 1);
+        return out.size() > prevSize;
+    }
+
+    default: {
+        // Transform formats (12-31) wrap a child paint at Offset24 +1
+        if (fmt >= 12 && fmt <= 31) {
+            if (off + 4 > ctx.length)
+                return false;
+            return flattenPaint(ctx, off + readU24BE(ctx.data + off + 1), out, depth + 1);
+        }
+        return false;
+    }
+    }
+}
+
+/// Parse COLR v1 BaseGlyphList and add entries to existing v0 arrays.
+void parseCOLRv1(const ColrV1Ctx& ctx, std::vector<ColrBaseGlyph>& baseGlyphs,
+                 std::vector<ColrLayerRecord>& layers) {
+    if (ctx.baseGlyphListOff == 0 || ctx.baseGlyphListOff + 4 > ctx.length)
+        return;
+    if (ctx.baseGlyphListOff + 4 + static_cast<uint64_t>(ctx.baseGlyphListNum) * 6 > ctx.length)
+        return;
+
+    // Snapshot v0 glyph IDs for duplicate detection (already sorted by spec)
+    std::vector<uint16_t> v0IDs;
+    v0IDs.reserve(baseGlyphs.size());
+    for (const auto& bg : baseGlyphs)
+        v0IDs.push_back(bg.glyphID);
+
+    bool anyAdded = false;
+    for (uint32_t i = 0; i < ctx.baseGlyphListNum; ++i) {
+        uint32_t recOff = ctx.baseGlyphListOff + 4 + i * 6;
+        uint16_t glyphID = readU16BE(ctx.data + recOff);
+        uint32_t paintOff = readU32BE(ctx.data + recOff + 2);
+
+        if (std::binary_search(v0IDs.begin(), v0IDs.end(), glyphID))
+            continue;
+        if (layers.size() > 65000)
+            break;
+
+        std::vector<ColrLayerRecord> glyphLayers;
+        if (!flattenPaint(ctx, ctx.baseGlyphListOff + paintOff, glyphLayers, 0))
+            continue;
+        if (glyphLayers.empty() || layers.size() + glyphLayers.size() > 65535)
+            continue;
+
+        auto firstIdx = static_cast<uint16_t>(layers.size());
+        auto numLayers = static_cast<uint16_t>(glyphLayers.size());
+        layers.insert(layers.end(), glyphLayers.begin(), glyphLayers.end());
+        baseGlyphs.push_back({glyphID, firstIdx, numLayers});
+        anyAdded = true;
+    }
+
+    if (anyAdded) {
+        std::sort(
+            baseGlyphs.begin(), baseGlyphs.end(),
+            [](const ColrBaseGlyph& a, const ColrBaseGlyph& b) { return a.glyphID < b.glyphID; });
+    }
+}
+
+// ---- COLR/CPAL parsing -----------------------------------------------------
+
+/// Parse COLR table (v0 and v1).
 bool parseCOLR(const uint8_t* data, uint32_t length, std::vector<ColrBaseGlyph>& baseGlyphs,
                std::vector<ColrLayerRecord>& layers) {
     if (length < 14)
         return false;
     uint16_t version = readU16BE(data);
-    if (version != 0)
-        return false;  // Only COLR v0 is supported; v1 has a different layout
+    if (version > 1)
+        return false;
 
+    // ---- v0 fields (present in both v0 and v1 headers) ----
     uint16_t numBaseGlyphs = readU16BE(data + 2);
     uint32_t bgOffset = readU32BE(data + 4);
     uint32_t layerOffset = readU32BE(data + 8);
     uint16_t numLayers = readU16BE(data + 12);
 
-    if (bgOffset + static_cast<uint32_t>(numBaseGlyphs) * 6 > length)
-        return false;
-    if (layerOffset + static_cast<uint32_t>(numLayers) * 4 > length)
-        return false;
+    if (numBaseGlyphs > 0) {
+        if (bgOffset + static_cast<uint32_t>(numBaseGlyphs) * 6 > length)
+            return false;
+        if (layerOffset + static_cast<uint32_t>(numLayers) * 4 > length)
+            return false;
 
-    baseGlyphs.resize(numBaseGlyphs);
-    for (uint16_t i = 0; i < numBaseGlyphs; ++i) {
-        const uint8_t* p = data + bgOffset + i * 6;
-        baseGlyphs[i].glyphID = readU16BE(p);
-        baseGlyphs[i].firstLayerIndex = readU16BE(p + 2);
-        baseGlyphs[i].numLayers = readU16BE(p + 4);
+        baseGlyphs.resize(numBaseGlyphs);
+        for (uint16_t i = 0; i < numBaseGlyphs; ++i) {
+            const uint8_t* p = data + bgOffset + i * 6;
+            baseGlyphs[i].glyphID = readU16BE(p);
+            baseGlyphs[i].firstLayerIndex = readU16BE(p + 2);
+            baseGlyphs[i].numLayers = readU16BE(p + 4);
+        }
+
+        layers.resize(numLayers);
+        for (uint16_t i = 0; i < numLayers; ++i) {
+            const uint8_t* p = data + layerOffset + i * 4;
+            layers[i].glyphID = readU16BE(p);
+            layers[i].paletteIndex = readU16BE(p + 2);
+        }
     }
 
-    layers.resize(numLayers);
-    for (uint16_t i = 0; i < numLayers; ++i) {
-        const uint8_t* p = data + layerOffset + i * 4;
-        layers[i].glyphID = readU16BE(p);
-        layers[i].paletteIndex = readU16BE(p + 2);
+    // ---- v1 extensions ----
+    if (version == 1) {
+        if (length < 22)
+            return false;
+
+        uint32_t baseGlyphListOff = readU32BE(data + 14);
+        uint32_t layerListOff = readU32BE(data + 18);
+
+        if (baseGlyphListOff != 0 && baseGlyphListOff + 4 <= length) {
+            uint32_t layerListNum = 0;
+            if (layerListOff != 0 && layerListOff + 4 <= length)
+                layerListNum = readU32BE(data + layerListOff);
+
+            ColrV1Ctx ctx{data,         length,           layerListOff,
+                          layerListNum, baseGlyphListOff, readU32BE(data + baseGlyphListOff)};
+            parseCOLRv1(ctx, baseGlyphs, layers);
+        }
     }
 
-    return true;
+    return !baseGlyphs.empty();
 }
 
 /// Parse CPAL table (color palette).

@@ -110,6 +110,7 @@ $smokeScriptMap = @{
     'vde_os_stress_demo.exe'            = 'smoke_os_stress.vdescript'
     'vde_pixel_arcade_demo.exe'         = 'smoke_pixel_arcade_demo.vdescript'
     'vde_font_specimen_demo.exe'        = 'smoke_font_specimen_demo.vdescript'
+    'vde_emoji_demo.exe'                = 'smoke_emoji_demo.vdescript'
     'vde_text_metrics_demo.exe'         = 'smoke_text_metrics_demo.vdescript'
     'vde_mission_control_demo.exe'      = 'smoke_mission_control_demo.vdescript'
     'vde_shooter_demo.exe'              = 'smoke_shooter.vdescript'

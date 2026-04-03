@@ -5,7 +5,7 @@
  * @brief Color emoji font loader supporting COLR/CPAL vector-layered emoji.
  *
  * Loads a color emoji font file (e.g., Segoe UI Emoji on Windows, Noto Color
- * Emoji on Linux), parses the COLR v0 and CPAL tables, and renders multi-layer
+ * Emoji on Linux), parses COLR v0/v1 and CPAL tables, and renders multi-layer
  * color emoji glyphs into a texture atlas via stb_truetype.
  *
  * Usage:
@@ -45,7 +45,7 @@ struct EmojiGlyph {
 /**
  * @brief Loads a color emoji font and builds a color glyph atlas.
  *
- * Supports COLR v0 + CPAL (vector-layered) emoji fonts. Each layer glyph
+ * Supports COLR v0/v1 + CPAL (vector-layered) emoji fonts. Each layer glyph
  * is rendered with stb_truetype and composited with palette colors using
  * premultiplied alpha blending.
  *

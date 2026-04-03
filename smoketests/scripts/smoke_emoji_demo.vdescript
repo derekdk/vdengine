@@ -1,0 +1,9 @@
+# Smoke test for emoji demo
+# Verifies COLR color emoji loading and rendering across all three display pages
+wait startup
+wait 1s
+press tab
+wait 1s
+press tab
+wait 1s
+exit
