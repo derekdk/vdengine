@@ -43,6 +43,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Skip when:** You already know the target directory from context.  
 **Location:** `.github/skills/architecture/SKILL.md`
 
+### ai-verification
+**Purpose:** Canonical guide for AI agents running build/test/smoke verification using verify.ps1 and reading logs/verify-latest.log with read_file.  
+**Use when:** Running end-to-end verification after a feature or fix, or any time logs need to be captured without workspace-external temp files.  
+**Location:** `.github/skills/ai-verification/SKILL.md`
+
 ### build-tool-workflows
 **Purpose:** Build and test workflows for the VDE project.  
 **Use when:** Building the project or running tests.  
@@ -126,8 +131,9 @@ The following skills provide domain-specific knowledge for working with VDE:
 
 | Need | Skill |
 |------|-------|
-| Run existing tests | `build-tool-workflows` |
+| Run full verification (all gates) | `ai-verification` |
+| Run existing tests (interactive) | `build-tool-workflows` |
 | Fix a failing test | `test-fix-loop` |
 | Write a new unit test | `create-tests` |
 | Write a smoke test | `scripted-input` + `smoke-testing` |
-| Verify before declaring done | `completing-work` |
+| Verify before declaring done | `completing-work` + `ai-verification` |

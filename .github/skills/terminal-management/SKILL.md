@@ -39,19 +39,26 @@ If you don't see the marker, the command is still running or was truncated. Read
 
 ### Prefer the log-file pattern for verification runs
 
-When verifying that a fix works, redirect to a temp file instead of relying on terminal output. This avoids truncation and is immune to terminal session problems:
+**For end-to-end verification (build + tests + smoke), use `verify.ps1`** — it writes to a known workspace-relative path and eliminates workspace-external temp file issues. See the `ai-verification` skill for the canonical workflow:
 
 ```powershell
+.\scripts\verify.ps1
+# Then use read_file on logs/verify-latest.log
+```
+
+When running individual scripts and needing to capture output (e.g. running just tests in the inner loop), redirect to a workspace-relative path so `read_file` works without permission prompts:
+
+```powershell
+.\scripts\test.ps1 -ProblemsOnly *> logs/test-latest.log
+```
+
+The old `$env:TEMP` pattern still works but requires the user to grant file-read permission; avoid it:
+
+```powershell
+# AVOID - $env:TEMP is outside the workspace; read_file triggers permission prompts
 $logFile = Join-Path $env:TEMP 'vde-verify.log'
 & .\scripts\test.ps1 -ProblemsOnly *> $logFile
 Get-Content $logFile -Tail 30
-```
-
-For smoke tests:
-```powershell
-$logFile = Join-Path $env:TEMP 'vde-smoke-verify.log'
-& .\scripts\smoke-test.ps1 -ProblemsOnly *> $logFile
-Get-Content $logFile -Tail 40
 ```
 
 ## Required: Terminal Session Health
