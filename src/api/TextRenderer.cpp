@@ -5,6 +5,7 @@
 
 #include <vde/Texture.h>
 #include <vde/VulkanContext.h>
+#include <vde/api/EmojiFont.h>
 #include <vde/api/TextRenderer.h>
 #include <vde/api/Utf8.h>
 
