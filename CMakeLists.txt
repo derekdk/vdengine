@@ -194,6 +194,7 @@ set(VDE_SOURCES
     src/api/TextRenderer.cpp
     src/api/TrueTypeFont.cpp
     src/api/TextEntity.cpp
+    src/api/EmojiFont.cpp
 )
 
 # Public headers
@@ -265,6 +266,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/TextRenderer.h
     include/vde/api/TrueTypeFont.h
     include/vde/api/TextEntity.h
+    include/vde/api/EmojiFont.h
+    include/vde/api/Utf8.h
 )
 
 # Create library

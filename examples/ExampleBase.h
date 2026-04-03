@@ -34,10 +34,13 @@
 // ImGui includes (optional - only used if VDE_EXAMPLE_USE_IMGUI is defined)
 #ifdef VDE_EXAMPLE_USE_IMGUI
 #include <vde/VulkanContext.h>
+#include <vde/api/EmojiFont.h>
 
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <stdexcept>
 
 #include <imgui.h>
@@ -64,14 +67,18 @@ inline float parseTimeoutArg(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg == "--timeout" && i + 1 < argc) {
-            try { return std::stof(argv[i + 1]); } catch (const std::exception&) {
+            try {
+                return std::stof(argv[i + 1]);
+            } catch (const std::exception&) {
                 std::cerr << "WARNING: invalid --timeout value '" << argv[i + 1] << "', ignoring\n";
             }
             return 0.0f;
         }
         if (arg.size() > 10 && arg.substr(0, 10) == "--timeout=") {
             auto val = arg.substr(10);
-            try { return std::stof(val); } catch (const std::exception&) {
+            try {
+                return std::stof(val);
+            } catch (const std::exception&) {
                 std::cerr << "WARNING: invalid --timeout value '" << val << "', ignoring\n";
             }
             return 0.0f;
@@ -493,6 +500,7 @@ class BaseExampleGame : public vde::Game {
 #ifdef VDE_EXAMPLE_USE_IMGUI
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
     bool m_imguiInitialized = false;
+    std::unique_ptr<vde::EmojiFont> m_imguiEmojiFont;
 
     /**
      * @brief Create a descriptor pool for ImGui's internal use.
@@ -560,10 +568,115 @@ class BaseExampleGame : public vde::Game {
 
         ImGui_ImplVulkan_Init(&initInfo);
 
-        // Upload font atlas textures
+        // ── Color emoji injection into ImGui font atlas ──────────────
+        //
+        // Try to load the system color emoji font and inject emoji
+        // as custom rect glyphs into ImGui's font atlas. This gives
+        // all ImGui::Text() calls automatic emoji rendering.
+        injectImGuiEmoji(io);
+
+        // Upload font atlas textures (includes our custom emoji rects)
         ImGui_ImplVulkan_CreateFontsTexture();
 
         m_imguiInitialized = true;
+    }
+
+    /**
+     * @brief Inject color emoji into ImGui's font atlas.
+     *
+     * Loads the system emoji font, renders emoji glyphs, and writes
+     * their color pixel data into ImGui custom rect regions.
+     */
+    void injectImGuiEmoji(ImGuiIO& io) {
+        std::string emojiPath = vde::EmojiFont::findSystemEmojiFont();
+        if (emojiPath.empty())
+            return;
+
+        m_imguiEmojiFont = std::make_unique<vde::EmojiFont>();
+        // ImGui default font (Proggy Clean) is 13px; use 16px for better emoji clarity
+        int emojiSize = 16;
+        if (!m_imguiEmojiFont->loadFromFile(nullptr, emojiPath, emojiSize)) {
+            m_imguiEmojiFont.reset();
+            return;
+        }
+
+        // Ensure default font exists first
+        if (io.Fonts->Fonts.empty()) {
+            io.Fonts->AddFontDefault();
+        }
+        ImFont* defaultFont = io.Fonts->Fonts[0];
+
+        // Register custom rect glyphs for a limited subset of available emoji to
+        // avoid excessively large ImGui font atlases.
+        const auto& codepoints = m_imguiEmojiFont->getAvailableCodepoints();
+        struct EmojiRect {
+            char32_t cp;
+            int rectIdx;
+        };
+        // Hard cap the number of emoji injected into the atlas. This keeps atlas
+        // build time, memory usage, and GPU upload cost bounded even on systems
+        // with very large emoji fonts.
+        constexpr std::size_t kMaxEmojiGlyphs = 512;
+        std::vector<EmojiRect> emojiRects;
+        emojiRects.reserve(std::min<std::size_t>(codepoints.size(), kMaxEmojiGlyphs));
+
+        for (char32_t cp : codepoints) {
+            if (emojiRects.size() >= kMaxEmojiGlyphs)
+                break;
+            const auto* glyph = m_imguiEmojiFont->getGlyph(cp);
+            if (!glyph)
+                continue;
+
+            int rectIdx = io.Fonts->AddCustomRectFontGlyph(defaultFont, static_cast<ImWchar>(cp),
+                                                           glyph->width, glyph->height,
+                                                           glyph->advanceX, ImVec2(0, 0));
+            if (rectIdx >= 0) {
+                emojiRects.push_back({cp, rectIdx});
+            }
+        }
+
+        if (emojiRects.empty()) {
+            m_imguiEmojiFont.reset();
+            return;
+        }
+
+        // Build the font atlas (allocates pixel data with space for custom rects)
+        io.Fonts->Build();
+
+        // Get the RGBA atlas pixel buffer
+        unsigned char* texPixels = nullptr;
+        int texW = 0, texH = 0;
+        io.Fonts->GetTexDataAsRGBA32(&texPixels, &texW, &texH);
+
+        if (!texPixels) {
+            m_imguiEmojiFont.reset();
+            return;
+        }
+
+        // Copy each emoji's color pixels into the atlas at the custom rect position
+        std::vector<uint8_t> glyphPixels;
+        for (const auto& er : emojiRects) {
+            const ImFontAtlasCustomRect* rect = io.Fonts->GetCustomRectByIndex(er.rectIdx);
+            if (!rect || !rect->IsPacked())
+                continue;
+
+            const auto* glyph = m_imguiEmojiFont->getGlyph(er.cp);
+            if (!glyph)
+                continue;
+
+            glyphPixels.resize(static_cast<size_t>(glyph->width) * glyph->height * 4);
+            if (!m_imguiEmojiFont->copyGlyphPixels(er.cp, glyphPixels.data()))
+                continue;
+
+            // Blit emoji pixels into the atlas
+            for (int y = 0; y < glyph->height && (rect->Y + y) < texH; ++y) {
+                unsigned char* dst =
+                    texPixels + (static_cast<size_t>(rect->Y + y) * texW + rect->X) * 4;
+                const uint8_t* src = glyphPixels.data() + static_cast<size_t>(y) * glyph->width * 4;
+                int copyW = std::min(glyph->width, texW - static_cast<int>(rect->X));
+                std::memcpy(dst, src, static_cast<size_t>(copyW) * 4);
+            }
+        }
     }
 
     /**
