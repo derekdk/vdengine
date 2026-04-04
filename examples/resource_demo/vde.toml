@@ -1,3 +1,4 @@
 [smoke]
 scripts = ["smoke_resource.vdescript"]
+priority = 1
 sections = ["resource", "entity"]

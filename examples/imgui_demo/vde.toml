@@ -1,3 +1,4 @@
 [smoke]
 scripts = ["smoke_imgui.vdescript"]
+priority = 1
 sections = ["ui", "entity", "lighting"]

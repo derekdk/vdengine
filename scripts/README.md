@@ -10,7 +10,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **rebuild.ps1** | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator Ninja` |
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
-| **smoke-test.ps1** | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
+| **smoke-test.ps1** | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Extended -Filter "*physics*"` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 | **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `\.\scripts\run-vlauncher.ps1` |
 | **install-hooks.ps1** | Configure repo-managed Git hooks | `\.\scripts\install-hooks.ps1` |
@@ -47,6 +47,11 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 ### Run Smoke Tests
 ```powershell
 .\scripts\smoke-test.ps1
+```
+
+### Run Extended Smoke Tests
+```powershell
+.\scripts\smoke-test.ps1 -Extended
 ```
 
 ### Clean Rebuild
@@ -208,11 +213,11 @@ Run unit tests with optional filtering and building.
 
 ### smoke-test.ps1
 
-Run smoke tests against examples and tools, with optional filtering and AI-friendly failure-only output.
+Run smoke tests against examples and tools, with optional filtering, priority-based example selection, and AI-friendly failure-only output.
 
 **Syntax:**
 ```powershell
-.\scripts\smoke-test.ps1 [-Category All|Examples|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Verbose] [-ProblemsOnly]
+.\scripts\smoke-test.ps1 [-Category All|Examples|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
@@ -221,6 +226,7 @@ Run smoke tests against examples and tools, with optional filtering and AI-frien
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests
+- `-Extended` - Include priority 2 examples; default runs only priority 1 examples while tools always run
 - `-Verbose` - Verbose output with detailed error messages
 - `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
 
@@ -228,6 +234,9 @@ Run smoke tests against examples and tools, with optional filtering and AI-frien
 ```powershell
 # Run all smoke tests
 .\scripts\smoke-test.ps1
+
+# Run the extended example set (priority 1 + 2)
+.\scripts\smoke-test.ps1 -Extended
 
 # Run only example smoke tests
 .\scripts\smoke-test.ps1 -Category Examples

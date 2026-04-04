@@ -10,6 +10,7 @@
 #   .\scripts\verify.ps1                                           # Full verification
 #   .\scripts\verify.ps1 -SkipBuild                               # Tests + smoke only
 #   .\scripts\verify.ps1 -SkipSmoke                               # Build + unit tests only
+#   .\scripts\verify.ps1 -SmokeExtended                           # Include priority 2 examples in smoke tests
 #   .\scripts\verify.ps1 -Filter "Suite.*"                        # Targeted unit tests
 #   .\scripts\verify.ps1 -SmokeFilter "*emoji*"                   # Targeted smoke test
 #   .\scripts\verify.ps1 -SkipBuild -SkipSmoke -Filter "Suite.*"  # Fast inner loop
@@ -28,6 +29,8 @@ param(
 
     # Executable wildcard filter (passed to smoke-test.ps1 -Filter)
     [string]$SmokeFilter = "",
+
+    [switch]$SmokeExtended,
 
     [ValidateSet("MSBuild", "Ninja")]
     [string]$Generator = "Ninja",
@@ -163,6 +166,7 @@ if (-not $testPass) { $overallPass = $false }
 if (-not $SkipSmoke) {
     $smokeArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
     if ($SmokeFilter) { $smokeArgs += "-Filter", $SmokeFilter }
+    if ($SmokeExtended) { $smokeArgs += "-Extended" }
     $smokePass = Invoke-Stage "SMOKE TESTS" "smoke-test.ps1" $smokeArgs
     $stageResults["SMOKE TESTS"] = $smokePass
     if (-not $smokePass) { $overallPass = $false }
