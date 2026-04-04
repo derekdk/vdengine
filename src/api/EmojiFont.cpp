@@ -206,7 +206,8 @@ bool flattenPaint(const ColrV1Ctx& ctx, uint32_t off, std::vector<ColrLayerRecor
         if (off + 8 > ctx.length)
             return false;
         uint32_t sourceOff = readU24BE(ctx.data + off + 1);
-        uint32_t backdropOff = readU24BE(ctx.data + off + 4);
+        // Skip compositeMode byte at off+4; backdrop offset is at off+5
+        uint32_t backdropOff = readU24BE(ctx.data + off + 5);
         flattenPaint(ctx, off + backdropOff, out, depth + 1);
         flattenPaint(ctx, off + sourceOff, out, depth + 1);
         return out.size() > prevSize;
