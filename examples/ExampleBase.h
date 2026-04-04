@@ -615,8 +615,9 @@ class BaseExampleGame : public vde::Game {
         };
         // Hard cap the number of emoji injected into the atlas. This keeps atlas
         // build time, memory usage, and GPU upload cost bounded even on systems
-        // with very large emoji fonts.
-        constexpr std::size_t kMaxEmojiGlyphs = 512;
+        // with very large emoji fonts. At 16px per glyph, 4096 emoji add ~4 MB
+        // to the atlas — negligible on modern GPUs.
+        constexpr std::size_t kMaxEmojiGlyphs = 4096;
         std::vector<EmojiRect> emojiRects;
         emojiRects.reserve(std::min<std::size_t>(codepoints.size(), kMaxEmojiGlyphs));
 
