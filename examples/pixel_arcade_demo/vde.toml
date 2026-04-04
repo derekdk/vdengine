@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_pixel_arcade_demo.vdescript"]
+priority = 2
+sections = ["text"]

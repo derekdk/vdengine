@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_breakout.vdescript"]
+priority = 1
+sections = ["physics", "input", "entity"]

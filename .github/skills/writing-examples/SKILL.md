@@ -44,7 +44,10 @@ All examples should use the shared `ExampleBase.h` header which provides base cl
 4. Check that the exit code is `0` for success and `1` for failure
 
 ### Smoke Testing (Automated)
-All examples should have a smoke test script for automated verification. See the **scripted-input** skill for details on creating `.vdescript` files.
+All Game API examples should have a smoke test script and `vde.toml` metadata for automated
+verification. Low-level examples that do not use the Game API input-script flow, such as the
+triangle example, are the exception and may be excluded from the smoke-test discovery path. See
+the **scripted-input** skill for details on creating `.vdescript` files.
 
 **Create a smoke test:**
 1. Create a script in `smoketests/scripts/smoke_<example_name>.vdescript`
@@ -71,16 +74,24 @@ Create a `vde.toml` file in your example's source directory. The vlauncher tool 
 ```toml
 [smoke]
 scripts = ["smoke_my_demo.vdescript"]
+sections = ["entity", "input"]
 ```
+
+Use `sections` to classify which canonical API areas the smoke test directly validates. Keep the
+list to 1-3 identifiers, and use the canonical identifier list documented in `API-DOC.md`
+under `Canonical Smoke Coverage Sections`. Use `text` for `TextEntity` and font/layout coverage;
+reserve `entity` for mesh, sprite, and transform-focused coverage.
 
 For examples with **multiple executables** in the same source folder (e.g., a folder that produces both `vde_my_demo` and `vde_my_demo_variant`), use per-target sections keyed by executable name (without `.exe`):
 
 ```toml
 [smoke.vde_my_demo]
 scripts = ["smoke_my_demo.vdescript"]
+sections = ["entity"]
 
 [smoke.vde_my_demo_variant]
 scripts = ["smoke_my_demo_variant.vdescript"]
+sections = ["physics", "input"]
 ```
 
 **Also add to smoke-test.ps1:**

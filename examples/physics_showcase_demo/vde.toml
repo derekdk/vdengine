@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_physics_showcase.vdescript"]
+priority = 2
+sections = ["physics"]

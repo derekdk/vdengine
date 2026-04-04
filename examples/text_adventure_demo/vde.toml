@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_text_adventure_demo.vdescript"]
+priority = 1
+sections = ["text", "input"]

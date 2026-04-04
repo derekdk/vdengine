@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_physics_demo.vdescript"]
+priority = 1
+sections = ["physics", "input", "entity"]

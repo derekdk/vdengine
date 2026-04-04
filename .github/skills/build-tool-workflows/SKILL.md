@@ -87,9 +87,14 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 .\scripts\test.ps1 -Build
 ```
 
-**Run smoke tests on all examples and tools:**
+**Run priority 1 smoke tests (default):**
 ```powershell
 .\scripts\smoke-test.ps1
+```
+
+**Run all smoke tests (priority 1 + 2):**
+```powershell
+.\scripts\smoke-test.ps1 -Extended
 ```
 
 **Smoke test only examples:**
@@ -178,6 +183,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 **smoke-test.ps1**
 - `-Category` - All (default), Examples, or Tools
 - `-Filter` - Wildcard pattern for executable names (e.g. `"*physics*"`)
+- `-Extended` - Include priority 2 examples (default runs only priority 1)
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Build` - Build before running smoke tests

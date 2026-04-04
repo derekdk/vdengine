@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_textured_cube.vdescript"]
+priority = 2
+sections = ["entity", "resource"]

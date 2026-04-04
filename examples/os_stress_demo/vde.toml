@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_os_stress.vdescript"]
+priority = 2
+sections = ["core"]

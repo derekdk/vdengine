@@ -217,7 +217,11 @@ void VLauncherScene::drawDebugUI() {
                 }
 
                 const bool selected = (defaultTargetId == m_selectedTargetId);
-                std::string groupLabel = group.targetName + "##compact_group_" + group.targetName;
+                std::string groupLabel = group.targetName;
+                if (defaultEntry.smokePriority == 2) {
+                    groupLabel += "  [P2]";
+                }
+                groupLabel += "##compact_group_" + group.targetName;
                 ImGuiSelectableFlags selectFlags =
                     ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick;
                 if (ImGui::Selectable(groupLabel.c_str(), selected, selectFlags)) {
@@ -301,9 +305,10 @@ void VLauncherScene::drawDebugUI() {
         ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
                                 ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
 
-        if (ImGui::BeginTable("launch_table", 9, flags, ImVec2(0.0f, 0.0f))) {
+        if (ImGui::BeginTable("launch_table", 10, flags, ImVec2(0.0f, 0.0f))) {
             ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch, 2.3f);
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+            ImGui::TableSetupColumn("Pri", ImGuiTableColumnFlags_WidthFixed, 30.0f);
             ImGui::TableSetupColumn("Executable Age", ImGuiTableColumnFlags_WidthFixed, 130.0f);
             ImGui::TableSetupColumn("Source Age", ImGuiTableColumnFlags_WidthFixed, 120.0f);
             ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 220.0f);
@@ -364,12 +369,20 @@ void VLauncherScene::drawDebugUI() {
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextUnformatted(defaultEntry.kind.c_str());
 
-                // Executable Age column
+                // Priority column
                 ImGui::TableSetColumnIndex(2);
+                if (defaultEntry.smokePriority > 0) {
+                    ImGui::Text("%d", defaultEntry.smokePriority);
+                } else {
+                    ImGui::TextUnformatted("-");
+                }
+
+                // Executable Age column
+                ImGui::TableSetColumnIndex(3);
                 drawAgeIndicator(defaultEntry.executableWriteTime, now);
 
                 // Source Age column
-                ImGui::TableSetColumnIndex(3);
+                ImGui::TableSetColumnIndex(4);
                 if (defaultEntry.hasNewestSourceWriteTime) {
                     drawAgeIndicator(defaultEntry.newestSourceWriteTime, now);
                 } else {
@@ -377,7 +390,7 @@ void VLauncherScene::drawDebugUI() {
                 }
 
                 // Status column
-                ImGui::TableSetColumnIndex(4);
+                ImGui::TableSetColumnIndex(5);
                 if (defaultEntry.outOfDate) {
                     ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s",
                                        defaultEntry.outOfDateReason.c_str());
@@ -386,7 +399,7 @@ void VLauncherScene::drawDebugUI() {
                 }
 
                 // Git column
-                ImGui::TableSetColumnIndex(5);
+                ImGui::TableSetColumnIndex(6);
                 if (!defaultEntry.gitAvailable) {
                     ImGui::TextUnformatted("Git unavailable");
                 } else if (defaultEntry.sourceDirty) {
@@ -399,7 +412,7 @@ void VLauncherScene::drawDebugUI() {
                 }
 
                 // Path column
-                ImGui::TableSetColumnIndex(6);
+                ImGui::TableSetColumnIndex(7);
                 {
                     std::error_code relError;
                     std::filesystem::path displayPath = std::filesystem::relative(
@@ -417,7 +430,7 @@ void VLauncherScene::drawDebugUI() {
                 }
 
                 // Run column
-                ImGui::TableSetColumnIndex(7);
+                ImGui::TableSetColumnIndex(8);
                 {
                     std::string buttonLabel = "Launch##" + defaultEntry.executablePath.string();
                     if (ImGui::Button(buttonLabel.c_str())) {
@@ -426,7 +439,7 @@ void VLauncherScene::drawDebugUI() {
                 }
 
                 // Logs column
-                ImGui::TableSetColumnIndex(8);
+                ImGui::TableSetColumnIndex(9);
                 {
                     std::string logsButton = "View##logs_" + defaultTargetId;
                     if (ImGui::Button(logsButton.c_str())) {
@@ -499,12 +512,20 @@ void VLauncherScene::drawDebugUI() {
                         ImGui::TableSetColumnIndex(1);
                         ImGui::TextUnformatted(entry.kind.c_str());
 
-                        // Executable Age
+                        // Priority
                         ImGui::TableSetColumnIndex(2);
+                        if (entry.smokePriority > 0) {
+                            ImGui::Text("%d", entry.smokePriority);
+                        } else {
+                            ImGui::TextUnformatted("-");
+                        }
+
+                        // Executable Age
+                        ImGui::TableSetColumnIndex(3);
                         drawAgeIndicator(entry.executableWriteTime, now);
 
                         // Source Age
-                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TableSetColumnIndex(4);
                         if (entry.hasNewestSourceWriteTime) {
                             drawAgeIndicator(entry.newestSourceWriteTime, now);
                         } else {
@@ -512,7 +533,7 @@ void VLauncherScene::drawDebugUI() {
                         }
 
                         // Status
-                        ImGui::TableSetColumnIndex(4);
+                        ImGui::TableSetColumnIndex(5);
                         if (entry.outOfDate) {
                             ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s",
                                                entry.outOfDateReason.c_str());
@@ -521,11 +542,11 @@ void VLauncherScene::drawDebugUI() {
                         }
 
                         // Git
-                        ImGui::TableSetColumnIndex(5);
+                        ImGui::TableSetColumnIndex(6);
                         ImGui::TextUnformatted("");
 
                         // Path
-                        ImGui::TableSetColumnIndex(6);
+                        ImGui::TableSetColumnIndex(7);
                         {
                             std::error_code relError;
                             std::filesystem::path displayPath = std::filesystem::relative(
@@ -537,7 +558,7 @@ void VLauncherScene::drawDebugUI() {
                         }
 
                         // Run
-                        ImGui::TableSetColumnIndex(7);
+                        ImGui::TableSetColumnIndex(8);
                         {
                             std::string buttonLabel = "Launch##" + entry.executablePath.string();
                             if (ImGui::Button(buttonLabel.c_str())) {
@@ -546,7 +567,7 @@ void VLauncherScene::drawDebugUI() {
                         }
 
                         // Logs
-                        ImGui::TableSetColumnIndex(8);
+                        ImGui::TableSetColumnIndex(9);
                         {
                             std::string logsButton = "View##logs_" + targetId;
                             if (ImGui::Button(logsButton.c_str())) {

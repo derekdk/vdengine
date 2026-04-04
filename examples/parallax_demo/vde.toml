@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_parallax_demo.vdescript"]
+priority = 2
+sections = ["entity", "camera"]

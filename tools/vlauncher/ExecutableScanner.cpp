@@ -298,7 +298,9 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
         }
 
         if (entry.sourceFound) {
-            entry.smokeScripts = loadSmokeScripts(entry.sourceDirectory, entry.targetName);
+            auto smokeInfo = loadSmokeMetadata(entry.sourceDirectory, entry.targetName);
+            entry.smokeScripts = std::move(smokeInfo.scripts);
+            entry.smokePriority = smokeInfo.priority;
 
             auto newest = newestSourceTimestamp(entry.sourceDirectory);
             if (newest) {
@@ -518,24 +520,34 @@ ExecutableScanner::newestSourceTimestamp(const std::filesystem::path& sourceDir)
     return newest;
 }
 
-std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesystem::path& sourceDir,
-                                                             const std::string& targetName) {
-    std::vector<std::string> scripts;
+ExecutableScanner::SmokeMetadata
+ExecutableScanner::loadSmokeMetadata(const std::filesystem::path& sourceDir,
+                                     const std::string& targetName) {
+    SmokeMetadata result;
 
     auto tomlPath = sourceDir / "vde.toml";
     std::error_code error;
     if (!std::filesystem::exists(tomlPath, error)) {
-        return scripts;
+        return result;
     }
 
     try {
         auto config = toml::parse_file(tomlPath.string());
-        auto appendScripts = [&scripts](const toml::array& array) {
+        auto appendScripts = [&result](const toml::array& array) {
             for (const auto& elem : array) {
                 if (auto* str = elem.as_string()) {
                     if (auto scriptName = sanitizeSmokeScriptName(str->get())) {
-                        scripts.push_back(std::move(*scriptName));
+                        result.scripts.push_back(std::move(*scriptName));
                     }
+                }
+            }
+        };
+
+        auto readPriority = [&result](const toml::table& table) {
+            if (auto val = table["priority"].as_integer()) {
+                int p = static_cast<int>(val->get());
+                if (p == 1 || p == 2) {
+                    result.priority = p;
                 }
             }
         };
@@ -544,7 +556,10 @@ std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesyst
         if (auto* perTarget = config["smoke"][targetName].as_table()) {
             if (auto* arr = (*perTarget)["scripts"].as_array()) {
                 appendScripts(*arr);
-                return scripts;
+            }
+            readPriority(*perTarget);
+            if (!result.scripts.empty()) {
+                return result;
             }
         }
 
@@ -553,12 +568,15 @@ std::vector<std::string> ExecutableScanner::loadSmokeScripts(const std::filesyst
             if (auto* arr = (*smoke)["scripts"].as_array()) {
                 appendScripts(*arr);
             }
+            if (result.priority == 0) {
+                readPriority(*smoke);
+            }
         }
     } catch (const toml::parse_error&) {
         // Malformed TOML — silently skip.
     }
 
-    return scripts;
+    return result;
 }
 
 std::string ExecutableScanner::inferKind(const std::filesystem::path& sourceDir,

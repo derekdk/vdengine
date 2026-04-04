@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_emoji_demo.vdescript"]
+priority = 2
+sections = ["text", "ui"]

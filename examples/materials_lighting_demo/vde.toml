@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_materials.vdescript"]
+priority = 1
+sections = ["lighting", "entity"]

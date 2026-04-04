@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_text_metrics_demo.vdescript"]
+priority = 1
+sections = ["text", "ui"]

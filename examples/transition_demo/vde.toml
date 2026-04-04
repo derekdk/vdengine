@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_transition_demo.vdescript"]
+priority = 1
+sections = ["transitions", "input", "core"]

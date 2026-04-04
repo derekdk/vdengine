@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_font_specimen_demo.vdescript"]
+priority = 2
+sections = ["text", "input"]

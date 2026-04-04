@@ -4,6 +4,7 @@
 #
 # Usage:
 #   .\scripts\smoke-test.ps1                              # Run all (examples + tools)
+#   .\scripts\smoke-test.ps1 -Extended                    # Run priority 1 and 2 examples
 #   .\scripts\smoke-test.ps1 -Category Examples           # Examples only
 #   .\scripts\smoke-test.ps1 -Category Tools              # Tools only
 #   .\scripts\smoke-test.ps1 -Filter "*physics*"          # Filter by name
@@ -23,6 +24,8 @@ param(
     [string]$Config = "Debug",
 
     [switch]$Build = $false,  # Build before testing
+
+    [switch]$Extended = $false,  # Include priority 2 examples
 
     [switch]$Verbose = $false,  # Verbose output
 
@@ -57,6 +60,11 @@ Write-Info "Generator: $Generator"
 Write-Info "Build Directory: $buildDir"
 Write-Info "Configuration: $Config"
 Write-Info "Category: $Category"
+if ($Extended) {
+    Write-Info "Smoke Set: Extended (priority 1 and 2 examples)"
+} else {
+    Write-Info "Smoke Set: Normal (priority 1 examples only)"
+}
 if ($Filter) {
     Write-Info "Filter: $Filter"
 }
@@ -88,42 +96,259 @@ $excludeFromExamples = @(
 $excludeFromTools = @(
 )
 
-# Map of executable names to their specific smoke scripts.
-# If not listed here, uses smoke_quick.vdescript as fallback.
-$smokeScriptMap = @{
-    # Examples
-    'vde_physics_demo.exe'             = 'smoke_physics_demo.vdescript'
-    'vde_physics_showcase_demo.exe'    = 'smoke_physics_showcase.vdescript'
-    'vde_breakout_demo.exe'            = 'smoke_breakout.vdescript'
-    'vde_asteroids_demo.exe'           = 'smoke_asteroids.vdescript'
-    'vde_asteroids_physics_demo.exe'   = 'smoke_asteroids_physics.vdescript'
-    'vde_sprite_demo.exe'              = 'smoke_sprite.vdescript'
-    'vde_parallax_demo.exe'            = 'smoke_parallax_demo.vdescript'
-    'vde_multi_scene_demo.exe'         = 'smoke_multi_scene.vdescript'
-    'vde_imgui_demo.exe'               = 'smoke_imgui.vdescript'
-    'vde_audio_demo.exe'               = 'smoke_audio.vdescript'
-    'vde_materials_lighting_demo.exe'  = 'smoke_materials.vdescript'
-    'vde_textured_cube_demo.exe'       = 'smoke_textured_cube.vdescript'
-    'vde_resource_demo.exe'            = 'smoke_resource.vdescript'
-    'vde_four_scene_3d_demo.exe'       = 'smoke_four_scene_3d.vdescript'
-    'vde_transition_demo.exe'          = 'smoke_transition_demo.vdescript'
-    'vde_os_stress_demo.exe'            = 'smoke_os_stress.vdescript'
-    'vde_pixel_arcade_demo.exe'         = 'smoke_pixel_arcade_demo.vdescript'
-    'vde_font_specimen_demo.exe'        = 'smoke_font_specimen_demo.vdescript'
-    'vde_emoji_demo.exe'                = 'smoke_emoji_demo.vdescript'
-    'vde_text_metrics_demo.exe'         = 'smoke_text_metrics_demo.vdescript'
-    'vde_mission_control_demo.exe'      = 'smoke_mission_control_demo.vdescript'
-    'vde_shooter_demo.exe'              = 'smoke_shooter.vdescript'
-    'vde_vertical_shooter.exe'          = 'smoke_vertical_shooter.vdescript'
-    'vde_text_adventure_demo.exe'        = 'smoke_text_adventure_demo.vdescript'
-    # Tools
+# Tools still use an explicit mapping; example smoke metadata is read from
+# each source directory's vde.toml.
+$toolSmokeScriptMap = @{
     'vde_vlauncher.exe'                = 'smoke_vlauncher.vdescript'
     'vde_geometry_repl.exe'            = 'smoke_geometry_repl.vdescript'
     'vde_resource_editor.exe'          = 'smoke_resource_editor.vdescript'
 }
 
 $defaultSmoke = 'smoke_quick.vdescript'
+$defaultSmokePriority = 1
 $scriptBaseDir = Join-Path $vdeRoot 'smoketests\scripts'
+$exampleTargetSourceMap = @{}
+$explicitExampleTomlTargetMap = @{}
+$missingExampleMetadataWarnings = @{}
+$smokeTomlCache = @{}
+
+function Add-TargetSourceMapEntry {
+    param(
+        [hashtable]$TargetMap,
+        [string]$TargetName,
+        [string[]]$BlockLines
+    )
+
+    if ([string]::IsNullOrWhiteSpace($TargetName) -or $TargetName -notlike 'vde_*') {
+        return
+    }
+
+    $blockText = $BlockLines -join "`n"
+    $pathMatches = [regex]::Matches($blockText, '["'']?(?<path>[A-Za-z0-9_./-]+/[^"''\s\)]+)["'']?')
+    foreach ($pathMatch in $pathMatches) {
+        $sourcePath = $pathMatch.Groups['path'].Value
+        if (-not $sourcePath) {
+            continue
+        }
+
+        if ($sourcePath.StartsWith('$')) {
+            continue
+        }
+
+        $sourceDir = $sourcePath.Split('/')[0]
+        if (-not $sourceDir -or $sourceDir -in @('assets', 'shaders')) {
+            continue
+        }
+
+        $TargetMap[$TargetName] = Join-Path (Join-Path $vdeRoot 'examples') $sourceDir
+        return
+    }
+}
+
+function Get-ExampleTargetSourceMap {
+    param([string]$CmakePath)
+
+    $targetMap = @{}
+    if (-not (Test-Path $CmakePath)) {
+        return $targetMap
+    }
+
+    $collecting = $false
+    $currentTarget = ''
+    $currentBlockLines = @()
+
+    foreach ($line in Get-Content -Path $CmakePath) {
+        if (-not $collecting) {
+            if ($line -match '^\s*(add_vde_example|add_executable)\(\s*([A-Za-z0-9_]+)') {
+                $currentTarget = $Matches[2]
+                $currentBlockLines = @($line)
+
+                if ($line -match '\)') {
+                    Add-TargetSourceMapEntry -TargetMap $targetMap -TargetName $currentTarget -BlockLines $currentBlockLines
+                    $currentTarget = ''
+                    $currentBlockLines = @()
+                } else {
+                    $collecting = $true
+                }
+            }
+
+            continue
+        }
+
+        $currentBlockLines += $line
+        if ($line -match '\)') {
+            Add-TargetSourceMapEntry -TargetMap $targetMap -TargetName $currentTarget -BlockLines $currentBlockLines
+            $collecting = $false
+            $currentTarget = ''
+            $currentBlockLines = @()
+        }
+    }
+
+    return $targetMap
+}
+
+function Get-SmokeSectionMap {
+    param([string]$TomlPath)
+
+    if ($smokeTomlCache.ContainsKey($TomlPath)) {
+        return $smokeTomlCache[$TomlPath]
+    }
+
+    $sectionMap = @{}
+    $currentSection = ''
+
+    if (Test-Path $TomlPath) {
+        foreach ($rawLine in Get-Content -Path $TomlPath) {
+            $line = $rawLine.Trim()
+            if (-not $line -or $line.StartsWith('#')) {
+                continue
+            }
+
+            if ($line -match '^\[(.+)\]\s*$') {
+                $currentSection = $Matches[1]
+                if ($currentSection -like 'smoke*' -and -not $sectionMap.ContainsKey($currentSection)) {
+                    $sectionMap[$currentSection] = [ordered]@{
+                        Scripts  = @()
+                        Priority = $null
+                    }
+                }
+                continue
+            }
+
+            if (-not $currentSection -or -not $sectionMap.ContainsKey($currentSection)) {
+                continue
+            }
+
+            if ($line -match '^scripts\s*=\s*\[(.*)\]\s*$') {
+                $scripts = @()
+                foreach ($scriptMatch in [regex]::Matches($Matches[1], '"([^"]+)"')) {
+                    $scripts += [System.IO.Path]::GetFileName($scriptMatch.Groups[1].Value)
+                }
+                $sectionMap[$currentSection]['Scripts'] = @($scripts)
+                continue
+            }
+
+            if ($line -match '^priority\s*=\s*([0-9]+)\s*$') {
+                $sectionMap[$currentSection]['Priority'] = [int]$Matches[1]
+            }
+        }
+    }
+
+    $smokeTomlCache[$TomlPath] = $sectionMap
+    return $sectionMap
+}
+
+function Get-ExampleSmokeMetadata {
+    param([string]$ExeName)
+
+    $targetName = [System.IO.Path]::GetFileNameWithoutExtension($ExeName)
+    $sourceDir = Resolve-ExampleSourceDir -TargetName $targetName
+    if (-not $sourceDir -and -not $missingExampleMetadataWarnings.ContainsKey($targetName)) {
+        Write-Warn "No vde.toml source mapping found for $targetName; using default smoke metadata"
+        $missingExampleMetadataWarnings[$targetName] = $true
+    }
+
+    $tomlPath = $null
+    if ($sourceDir) {
+        $tomlPath = Join-Path $sourceDir 'vde.toml'
+    }
+
+    $sectionMap = @{}
+    if ($tomlPath) {
+        $sectionMap = Get-SmokeSectionMap -TomlPath $tomlPath
+    }
+
+    $section = $null
+    $perTargetSection = "smoke.$targetName"
+    if ($sectionMap.ContainsKey($perTargetSection)) {
+        $section = $sectionMap[$perTargetSection]
+    } elseif ($sectionMap.ContainsKey('smoke')) {
+        $section = $sectionMap['smoke']
+    }
+
+    $smokeScript = $defaultSmoke
+    if ($section -and $section['Scripts'].Count -gt 0) {
+        $smokeScript = $section['Scripts'][0]
+    }
+
+    $smokePriority = $defaultSmokePriority
+    if ($section -and $null -ne $section['Priority']) {
+        $smokePriority = [int]$section['Priority']
+        if ($smokePriority -notin @(1, 2)) {
+            Write-Warn "Invalid smoke priority $smokePriority for $targetName in $tomlPath; using priority $defaultSmokePriority"
+            $smokePriority = $defaultSmokePriority
+        }
+    }
+
+    return [pscustomobject]@{
+        SmokeScript   = $smokeScript
+        SmokePriority = $smokePriority
+        SourceDir     = $sourceDir
+        TomlPath      = $tomlPath
+    }
+}
+
+function Get-ExplicitExampleTomlTargetMap {
+    param([string]$ExamplesDir)
+
+    $targetMap = @{}
+    if (-not (Test-Path $ExamplesDir)) {
+        return $targetMap
+    }
+
+    foreach ($tomlFile in Get-ChildItem -Path $ExamplesDir -Filter 'vde.toml' -Recurse -File) {
+        $sectionMap = Get-SmokeSectionMap -TomlPath $tomlFile.FullName
+        foreach ($sectionName in $sectionMap.Keys) {
+            if ($sectionName -notlike 'smoke.*') {
+                continue
+            }
+
+            $targetName = $sectionName.Substring('smoke.'.Length)
+            if (-not $targetName -or $targetMap.ContainsKey($targetName)) {
+                continue
+            }
+
+            $targetMap[$targetName] = Split-Path -Parent $tomlFile.FullName
+        }
+    }
+
+    return $targetMap
+}
+
+function Resolve-ExampleSourceDir {
+    param([string]$TargetName)
+
+    if ($exampleTargetSourceMap.ContainsKey($TargetName)) {
+        return $exampleTargetSourceMap[$TargetName]
+    }
+
+    if ($explicitExampleTomlTargetMap.ContainsKey($TargetName)) {
+        return $explicitExampleTomlTargetMap[$TargetName]
+    }
+
+    $candidateNames = @()
+    if ($TargetName.StartsWith('vde_')) {
+        $candidateNames += $TargetName.Substring(4)
+    } else {
+        $candidateNames += $TargetName
+    }
+
+    if ($candidateNames[0].EndsWith('_example')) {
+        $candidateNames += $candidateNames[0].Substring(0, $candidateNames[0].Length - '_example'.Length)
+    }
+
+    foreach ($candidateName in ($candidateNames | Select-Object -Unique)) {
+        $candidateDir = Join-Path (Join-Path $vdeRoot 'examples') $candidateName
+        if (Test-Path (Join-Path $candidateDir 'vde.toml')) {
+            return $candidateDir
+        }
+    }
+
+    return $null
+}
+
+$exampleTargetSourceMap = Get-ExampleTargetSourceMap -CmakePath (Join-Path $vdeRoot 'examples\CMakeLists.txt')
+$explicitExampleTomlTargetMap = Get-ExplicitExampleTomlTargetMap -ExamplesDir (Join-Path $vdeRoot 'examples')
 
 # --- Executable Discovery ---
 
@@ -142,11 +367,14 @@ function Get-ExampleExes {
     $exes = Get-ChildItem -Path $dir -Filter "vde_*.exe" -File |
         Where-Object { $_.Name -notin $excludeFromExamples } |
         ForEach-Object {
+            $metadata = Get-ExampleSmokeMetadata -ExeName $_.Name
             [pscustomobject]@{
-                Name     = $_.Name
-                FullPath = $_.FullName
-                WorkDir  = $_.DirectoryName
-                Category = "Example"
+                Name          = $_.Name
+                FullPath      = $_.FullName
+                WorkDir       = $_.DirectoryName
+                Category      = "Example"
+                SmokeScript   = $metadata.SmokeScript
+                SmokePriority = $metadata.SmokePriority
             }
         }
     return @($exes)
@@ -165,11 +393,18 @@ function Get-ToolExes {
     $exes = Get-ChildItem -Path $dir -Recurse -Filter "vde_*.exe" -File |
         Where-Object { $_.Name -notin $excludeFromTools } |
         ForEach-Object {
+            $smokeScript = $defaultSmoke
+            if ($toolSmokeScriptMap.ContainsKey($_.Name)) {
+                $smokeScript = $toolSmokeScriptMap[$_.Name]
+            }
+
             [pscustomobject]@{
-                Name     = $_.Name
-                FullPath = $_.FullName
-                WorkDir  = $_.DirectoryName
-                Category = "Tool"
+                Name          = $_.Name
+                FullPath      = $_.FullName
+                WorkDir       = $_.DirectoryName
+                Category      = "Tool"
+                SmokeScript   = $smokeScript
+                SmokePriority = 1
             }
         }
     return @($exes)
@@ -191,10 +426,20 @@ if ($Filter) {
     $allExes = @($allExes | Where-Object { $_.Name -like $Filter })
 }
 
+$discoveredCount = $allExes.Count
+$filteredPriority2Count = 0
+if (-not $Extended) {
+    $filteredPriority2Count = @($allExes | Where-Object { $_.Category -eq 'Example' -and $_.SmokePriority -eq 2 }).Count
+    $allExes = @($allExes | Where-Object { $_.Category -ne 'Example' -or $_.SmokePriority -eq 1 })
+}
+
 if ($allExes.Count -eq 0) {
     Write-Warn "No executables found to test."
     if ($Filter) {
         Write-Warn "Filter '$Filter' matched nothing. Try a different pattern."
+    }
+    if (-not $Extended -and $filteredPriority2Count -gt 0) {
+        Write-Warn "Only priority 2 examples matched. Re-run with -Extended to include them."
     }
     Write-Warn "Run with -Build flag to build first, or run .\scripts\build.ps1"
     exit 1
@@ -204,11 +449,14 @@ if ($allExes.Count -eq 0) {
 $allExes = @($allExes | Sort-Object Category, Name)
 
 Write-Info ""
-Write-Info "Discovered $($allExes.Count) executable(s) to test:"
+Write-Info "Selected $($allExes.Count) executable(s) to test (from $discoveredCount discovered):"
 $exampleCount = @($allExes | Where-Object { $_.Category -eq "Example" }).Count
 $toolCount = @($allExes | Where-Object { $_.Category -eq "Tool" }).Count
 if ($exampleCount -gt 0) { Write-Info "  Examples: $exampleCount" }
 if ($toolCount -gt 0) { Write-Info "  Tools:    $toolCount" }
+if (-not $Extended -and $filteredPriority2Count -gt 0) {
+    Write-Info "  Priority 2 examples excluded: $filteredPriority2Count"
+}
 
 # --- Run Smoke Tests ---
 
@@ -235,9 +483,9 @@ foreach ($exe in $allExes) {
     }
 
     # Select smoke script
-    $smokeScript = $defaultSmoke
-    if ($smokeScriptMap.ContainsKey($exe.Name)) {
-        $smokeScript = $smokeScriptMap[$exe.Name]
+    $smokeScript = $exe.SmokeScript
+    if (-not $smokeScript) {
+        $smokeScript = $defaultSmoke
     }
 
     $smokeScriptPath = Join-Path $scriptBaseDir $smokeScript

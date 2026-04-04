@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_quick.vdescript"]
+priority = 1
+sections = ["core", "entity", "input"]

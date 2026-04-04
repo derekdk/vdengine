@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_audio.vdescript"]
+priority = 1
+sections = ["audio", "input"]

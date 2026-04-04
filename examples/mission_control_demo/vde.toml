@@ -1,2 +1,4 @@
 [smoke]
 scripts = ["smoke_mission_control_demo.vdescript"]
+priority = 2
+sections = ["text"]
