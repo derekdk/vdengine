@@ -184,7 +184,7 @@ Smoke Test Summary
 Total: 18 (discovered: 35, skipped: 0)
   Examples: 15 run, 15 passed, 0 failed
   Tools: 3 run, 3 passed, 0 failed
-Passed: 22
+Passed: 18
 
 ==========================================
 All smoke tests PASSED!

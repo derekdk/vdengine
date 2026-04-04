@@ -174,8 +174,9 @@ Example `vde.toml` files classify smoke coverage with a `sections` array under e
 or `[smoke.<target>]` table. Use the following canonical identifiers so coverage metadata stays
 consistent across examples, VLauncher discovery, and future reporting.
 
-Current runtime consumers read `scripts` only; `sections` is repository metadata used to keep smoke
-coverage classification consistent and ready for future reporting or validation.
+`sections` is repository metadata used to keep smoke coverage classification consistent and ready
+for future reporting or validation. Runtime tools read `scripts` and, where applicable,
+`priority` from `vde.toml`.
 
 Each Game API example must keep this metadata in `examples/<name>/vde.toml`:
 
