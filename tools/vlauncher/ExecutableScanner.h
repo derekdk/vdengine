@@ -40,6 +40,10 @@ struct ExecutableEntry {
     // Stored as basenames (e.g. "smoke_breakout.vdescript"), resolved by VLauncher
     // against the smoketests/scripts/ directory.
     std::vector<std::string> smokeScripts;
+
+    // Smoke test priority (1 = core / default run, 2 = extended).
+    // 0 means no priority was specified in vde.toml.
+    int smokePriority = 0;
 };
 
 struct ScanSnapshot {
@@ -69,7 +73,8 @@ class ExecutableScanner {
     std::chrono::seconds m_idleInterval;
     std::chrono::seconds m_fastInterval;
 
-    // Shared-pointer snapshot: UI reads via mutex-protected load, scanner writes via mutex-protected store.
+    // Shared-pointer snapshot: UI reads via mutex-protected load, scanner writes via
+    // mutex-protected store.
     std::shared_ptr<const ScanSnapshot> m_snapshot;
     mutable std::mutex m_snapshotMutex;
 
@@ -113,8 +118,13 @@ class ExecutableScanner {
     static std::optional<std::chrono::system_clock::time_point>
     newestSourceTimestamp(const std::filesystem::path& sourceDir);
 
-    static std::vector<std::string> loadSmokeScripts(const std::filesystem::path& sourceDir,
-                                                     const std::string& targetName);
+    struct SmokeMetadata {
+        std::vector<std::string> scripts;
+        int priority = 0;
+    };
+
+    static SmokeMetadata loadSmokeMetadata(const std::filesystem::path& sourceDir,
+                                           const std::string& targetName);
 
     static std::string inferKind(const std::filesystem::path& sourceDir,
                                  const std::filesystem::path& repoRoot);

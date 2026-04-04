@@ -5,7 +5,7 @@ description: Canonical guide for AI agents running build/test/smoke verification
 
 # AI Verification Workflow
 
-This skill defines the exact commands AI agents should use to run verification and read results in VDE. It replaces the manual pattern of redirecting to `$env:TEMP` and calling `Get-Content`, which requires reading files outside the workspace and may trigger permission prompts.
+This skill defines the exact commands AI agents should use to run verification and read results in VDE. 
 
 ## When to use this skill
 
@@ -13,21 +13,11 @@ This skill defines the exact commands AI agents should use to run verification a
 - Getting verification output into a readable file rather than relying on terminal streaming
 - Understanding why `read_file` is preferred over terminal output for log inspection
 
-## Core Problem This Solves
 
-The old manual workflow used `$env:TEMP` for log capture:
 
-```powershell
-# OLD - requires workspace-external file access (triggers permission prompts)
-$logFile = Join-Path $env:TEMP 'vde-verify.log'
-& .\scripts\test.ps1 -ProblemsOnly *> $logFile
-Get-Content $logFile -Tail 30
-```
-
-The new workflow writes to `logs/` inside the workspace:
+The workflow writes to `logs/` inside the workspace:
 
 ```powershell
-# NEW - log is workspace-relative; read_file works directly
 .\scripts\verify.ps1
 # Then use read_file on logs/verify-latest.log
 ```
@@ -122,6 +112,12 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 .\scripts\verify.ps1 -SmokeFilter "*emoji*"
 ```
 
+### Extended smoke tests (include priority 2)
+
+```powershell
+.\scripts\verify.ps1 -SmokeExtended
+```
+
 ### Release configuration
 
 ```powershell
@@ -138,6 +134,7 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 | `-SkipSmoke` | — | Skip smoke tests; faster iteration on unit test failures |
 | `-Filter <pattern>` | `*` | GoogleTest filter for unit tests (e.g. `"EmojiFont*"`) |
 | `-SmokeFilter <pattern>` | — | Exe wildcard for smoke tests (e.g. `"*emoji*"`) |
+| `-SmokeExtended` | — | Include priority 2 examples in smoke tests |
 | `-Generator` | `Ninja` | `Ninja` or `MSBuild` |
 | `-Config` | `Debug` | `Debug` or `Release` |
 

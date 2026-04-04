@@ -20,12 +20,41 @@ This skill describes how to run smoke tests, interpret their results, add smoke 
 
 Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the script launches every discovered example and tool one at a time.
 
-If you are an AI agent or otherwise driving the terminal programmatically:
+### Preferred approach for AI agents: use verify.ps1
+
+Rather than running `smoke-test.ps1` directly and polling terminal output, AI agents should use `verify.ps1`, which captures all output to a workspace-relative log file that can be read with `read_file` without permission prompts:
+
+```powershell
+.\scripts\verify.ps1
+# Then use read_file on logs/verify-latest.log
+```
+
+`verify.ps1` runs Build → Unit Tests → Smoke Tests and writes to:
+
+| File | Purpose |
+|------|---------|
+| `logs/verify-latest.log` | Always overwritten with the latest run |
+| `logs/verify-YYYYMMDD-HHmmss.log` | Timestamped archive |
+
+Read the log after it completes:
+```
+read_file("logs/verify-latest.log", startLine=1, endLine=80)
+```
+
+The smoke stage result appears in the final summary at the bottom of the log:
+```
+  SMOKE TESTS : PASSED
+  OVERALL: ALL STAGES PASSED
+```
+
+See the `ai-verification` skill for the full workflow, log management commands, and `verify.ps1` parameters.
+
+### When running smoke-test.ps1 directly
+
+If you must run `smoke-test.ps1` directly (e.g. for an interactive filtered run):
 
 - Expect partial output first and **poll for more output** until the run finishes
-- Do not assume the result from the first chunk of terminal output
 - Do not announce success or failure until you see the final summary block
-- If output is truncated to a sidecar file, read that file and continue checking the tail until the summary appears
 
 The run is only complete when you see one of these final markers:
 
@@ -42,7 +71,8 @@ Smoke tests verify that every VDE example and tool can launch, render, and exit 
 
 | Task | Command |
 |------|---------|
-| Run all smoke tests | `.\scripts\smoke-test.ps1` |
+| Run priority 1 smoke tests | `.\scripts\smoke-test.ps1` |
+| Run all (priority 1 + 2) | `.\scripts\smoke-test.ps1 -Extended` |
 | Examples only | `.\scripts\smoke-test.ps1 -Category Examples` |
 | Tools only | `.\scripts\smoke-test.ps1 -Category Tools` |
 | Filter by name | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
@@ -57,10 +87,39 @@ Smoke tests verify that every VDE example and tool can launch, render, and exit 
 |-----------|--------|---------|-------------|
 | `-Category` | `All`, `Examples`, `Tools` | `All` | Which category of executables to test |
 | `-Filter` | Wildcard pattern | (none) | Filter executable names (e.g. `"*physics*"`, `"vde_vlauncher*"`) |
+| `-Extended` | switch | `$false` | Include priority 2 examples (default run only tests priority 1) |
 | `-Generator` | `MSBuild`, `Ninja` | `Ninja` | Which build system output to test |
 | `-Config` | `Debug`, `Release` | `Debug` | Build configuration |
 | `-Build` | switch | `$false` | Build the project before testing |
 | `-Verbose` | switch | `$false` | Show detailed error output for failures |
+
+## Smoke Priority Model
+
+Each example declares a **smoke priority** (1 or 2) in its `vde.toml` file:
+
+- **Priority 1** — Core examples that cover unique API subsystems. Run by default in every smoke test invocation, `verify.ps1`, and CI. The priority-1 set is chosen so that every canonical API section (`core`, `entity`, `resource`, `input`, `camera`, `lighting`, `physics`, `audio`, `multi_scene`, `transitions`, `text`, `ui`, `storage`, `world_bounds`) is covered by at least one priority-1 example.
+- **Priority 2** — Extended examples that provide additional coverage or showcase variations of already-covered features. Only included when `-Extended` is passed.
+
+Tools always run regardless of priority.
+
+### When to use `-Extended`
+
+- Before merging a feature branch that touches many subsystems
+- When investigating a failure that only reproduces in less-common examples
+- Periodic full-coverage CI runs
+
+### Assigning priority to a new example
+
+When adding a new example, set its priority in `examples/<name>/vde.toml`:
+
+```toml
+[smoke]
+scripts = ["smoke_my_demo.vdescript"]
+priority = 1
+sections = ["entity", "input"]
+```
+
+Use **priority 1** if the example is the **only** (or primary) smoke coverage for a canonical API section. Use **priority 2** if other priority-1 examples already cover the same sections.
 
 ## How Discovery Works
 
@@ -75,29 +134,19 @@ When a new example or tool is added and built, it is automatically discovered on
 
 ## Smoke Script Selection
 
-Each executable is tested with a `.vdescript` input script:
-
-1. The script checks a **smoke script map** (in `smoke-test.ps1`) for executable-specific scripts
-2. If no specific script is mapped, it falls back to `smoke_quick.vdescript`
+Each example's smoke script and priority are read from its `vde.toml` file under the `[smoke]` or `[smoke.<targetName>]` section. Tool smoke scripts are mapped explicitly in `smoke-test.ps1`. If no script is specified, the fallback is `smoke_quick.vdescript`.
 
 Smoke scripts live in `smoketests/scripts/` and follow the naming convention `smoke_<name>.vdescript`.
 
-### Current smoke script map
+### Tool smoke script map
+
+Tools still use an explicit mapping in `smoke-test.ps1`:
 
 | Executable | Script |
 |-----------|--------|
-| `vde_physics_demo.exe` | `smoke_physics_demo.vdescript` |
-| `vde_breakout_demo.exe` | `smoke_breakout.vdescript` |
-| `vde_asteroids_demo.exe` | `smoke_asteroids.vdescript` |
-| `vde_asteroids_physics_demo.exe` | `smoke_asteroids_physics.vdescript` |
-| `vde_sprite_demo.exe` | `smoke_sprite.vdescript` |
-| `vde_multi_scene_demo.exe` | `smoke_multi_scene.vdescript` |
-| `vde_imgui_demo.exe` | `smoke_imgui.vdescript` |
-| `vde_audio_demo.exe` | `smoke_audio.vdescript` |
-| `vde_materials_lighting_demo.exe` | `smoke_materials.vdescript` |
-| `vde_resource_demo.exe` | `smoke_resource.vdescript` |
 | `vde_vlauncher.exe` | `smoke_vlauncher.vdescript` |
 | `vde_geometry_repl.exe` | `smoke_geometry_repl.vdescript` |
+| `vde_resource_editor.exe` | `smoke_resource_editor.vdescript` |
 | All others | `smoke_quick.vdescript` (fallback) |
 
 ## Interpreting Results
@@ -111,9 +160,11 @@ The script prints results as it runs. Early lines are not the final result; keep
 VDE Smoke Test Script
 ==========================================
 ...
-Discovered 22 executable(s) to test:
-  Examples: 20
-  Tools:    2
+Smoke Set: Normal (priority 1 examples only)
+Selected 18 executable(s) to test (from 35 discovered):
+  Examples: 15
+  Tools:    3
+  Priority 2 examples excluded: 17
 
 Running smoke tests...
 ==========================================
@@ -130,9 +181,9 @@ Running smoke tests...
 ==========================================
 Smoke Test Summary
 ==========================================
-Total: 22 (discovered: 22, skipped: 0)
-  Examples: 20 run, 20 passed, 0 failed
-  Tools: 2 run, 2 passed, 0 failed
+Total: 18 (discovered: 35, skipped: 0)
+  Examples: 15 run, 15 passed, 0 failed
+  Tools: 3 run, 3 passed, 0 failed
 Passed: 22
 
 ==========================================
@@ -175,7 +226,24 @@ After adding a new example or tool and building, run:
 
 The new executable will be auto-discovered and tested with `smoke_quick.vdescript`.
 
-### Step 2 (optional): Create a custom smoke script
+### Step 2: Add vde.toml metadata
+
+Create or update `examples/<name>/vde.toml` with the smoke section:
+
+```toml
+[smoke]
+scripts = ["smoke_my_demo.vdescript"]
+priority = 1
+sections = ["entity", "input"]
+```
+
+- Set **priority = 1** if this is the primary (or only) smoke coverage for its API sections.
+- Set **priority = 2** if other priority-1 examples already cover the same sections.
+- Use the canonical section identifiers from `API-DOC.md`.
+
+For tools, add the mapping to `$toolSmokeScriptMap` in `scripts/smoke-test.ps1` instead.
+
+### Step 3 (optional): Create a custom smoke script
 
 If the executable needs specific interaction beyond "launch and exit":
 
@@ -195,16 +263,7 @@ wait 2s
 exit
 ```
 
-2. Add the mapping to `$smokeScriptMap` in `scripts/smoke-test.ps1`:
-
-```powershell
-$smokeScriptMap = @{
-    ...
-    'vde_my_new_tool.exe' = 'smoke_my_new_tool.vdescript'
-}
-```
-
-### Step 3: Exclude an executable (rare)
+### Step 4: Exclude an executable (rare)
 
 If an executable should never be smoke-tested (e.g. it doesn't use the Game API):
 
