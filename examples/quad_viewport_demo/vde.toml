@@ -1,2 +1,3 @@
 [smoke]
 scripts = ["smoke_quick.vdescript"]
+sections = ["multi_scene", "camera"]

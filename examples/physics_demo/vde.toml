@@ -1,2 +1,3 @@
 [smoke]
 scripts = ["smoke_physics_demo.vdescript"]
+sections = ["physics", "input", "entity"]

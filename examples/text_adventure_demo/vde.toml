@@ -1,2 +1,3 @@
 [smoke]
 scripts = ["smoke_text_adventure_demo.vdescript"]
+sections = ["text", "input"]

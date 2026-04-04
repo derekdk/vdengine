@@ -1,2 +1,3 @@
 [smoke]
 scripts = ["smoke_shooter.vdescript"]
+sections = ["entity", "input"]

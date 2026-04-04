@@ -7,6 +7,7 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Overview](#overview)
 - [Getting Started](#getting-started)
 - [API Structure](#api-structure)
+- [Canonical Smoke Coverage Sections](#canonical-smoke-coverage-sections)
 - [Core Classes](#core-classes)
   - [Game](#game)
   - [GameSettings](#gamesettings)
@@ -164,6 +165,49 @@ The API is organized into several interconnected systems:
 | `Camera` | Owned by `Scene` (unique_ptr) |
 | `LightBox` | Owned by `Scene` (unique_ptr) |
 | `InputHandler` | NOT owned (raw pointer) |
+
+---
+
+## Canonical Smoke Coverage Sections
+
+Example `vde.toml` files classify smoke coverage with a `sections` array under each `[smoke]`
+or `[smoke.<target>]` table. Use the following canonical identifiers so coverage metadata stays
+consistent across examples, VLauncher discovery, and future reporting.
+
+Current runtime consumers read `scripts` only; `sections` is repository metadata used to keep smoke
+coverage classification consistent and ready for future reporting or validation.
+
+Each Game API example must keep this metadata in `examples/<name>/vde.toml`:
+
+```toml
+[smoke]
+scripts = ["smoke_my_demo.vdescript"]
+sections = ["entity", "input"]
+```
+
+For folders that produce multiple executables, place `scripts` and `sections` under the matching
+`[smoke.<target>]` table for each executable.
+
+| Identifier | Covers |
+|------------|--------|
+| `core` | `Game`, `GameSettings`, scene lifecycle, scheduling, and engine-level runtime behavior |
+| `entity` | `Entity`, `MeshEntity`, `SpriteEntity`, transforms, and visual object composition |
+| `resource` | `Resource`, `ResourceManager`, mesh loading, texture loading, and material setup |
+| `input` | `InputHandler`, keyboard, mouse, and gamepad interaction |
+| `camera` | `SimpleCamera`, `OrbitCamera`, `Camera2D`, and camera control |
+| `lighting` | `LightBox`, light types, emissive/material lighting, and lit scene rendering |
+| `physics` | `PhysicsScene`, `PhysicsEntity`, collisions, forces, impulses, and scene queries |
+| `audio` | `AudioClip`, `AudioManager`, `AudioSource`, and queued audio events |
+| `multi_scene` | `SceneGroup`, split-screen, multiple active scenes, and per-scene viewports |
+| `transitions` | Screen-transition APIs and transition controls between scenes or viewports |
+| `text` | `TextEntity`, bitmap fonts, TrueType fonts, emoji fonts, and text layout/rendering |
+| `storage` | Persistent storage and save/load style workflows |
+| `ui` | Dear ImGui integration and debug/editor overlays |
+| `world_bounds` | `WorldUnits`, `WorldBounds`, `WorldBounds2D`, and `CameraBounds2D` |
+
+When an example touches many systems, prefer the 1-3 sections that its smoke test most directly
+validates rather than listing every incidental dependency. Use `text` for `TextEntity`-driven font
+and layout coverage; reserve `entity` for mesh, sprite, and transform-focused behavior.
 
 ---
 

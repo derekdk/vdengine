@@ -1,5 +1,7 @@
 [smoke.vde_asteroids_demo]
 scripts = ["smoke_asteroids.vdescript"]
+sections = ["entity", "input", "camera"]
 
 [smoke.vde_asteroids_physics_demo]
 scripts = ["smoke_asteroids_physics.vdescript"]
+sections = ["physics", "input", "camera"]

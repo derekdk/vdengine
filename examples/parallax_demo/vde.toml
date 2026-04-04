@@ -1,2 +1,3 @@
 [smoke]
 scripts = ["smoke_parallax_demo.vdescript"]
+sections = ["entity", "camera"]
