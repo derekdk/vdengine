@@ -160,9 +160,12 @@ void MeshEntity::render() {
     // Get the mesh (either direct or via resource ID)
     std::shared_ptr<Mesh> mesh = m_mesh;
     if (!mesh && m_scene && m_meshId != INVALID_RESOURCE_ID) {
-        // TODO: Get mesh from scene resources when resource management is implemented
-        // For now, only direct mesh references work
-        return;
+        Mesh* sceneMesh = m_scene->getResource<Mesh>(m_meshId);
+        if (!sceneMesh) {
+            return;
+        }
+        // Non-owning shared_ptr — Scene's resource map keeps it alive during render
+        mesh.reset(sceneMesh, [](Mesh*) {});
     }
 
     if (!mesh || !m_scene) {
@@ -183,7 +186,10 @@ void MeshEntity::render() {
     // Resolve texture (or fallback to default white)
     std::shared_ptr<Texture> texture = m_texture;
     if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
-        // TODO: Get texture from scene resources when resource management is implemented
+        Texture* sceneTexture = m_scene->getResource<Texture>(m_textureId);
+        if (sceneTexture) {
+            texture.reset(sceneTexture, [](Texture*) {});
+        }
     }
 
     if (texture && !texture->isOnGPU()) {
@@ -353,8 +359,11 @@ void SpriteEntity::render() {
     // Get the texture (either direct or via resource ID)
     std::shared_ptr<Texture> texture = m_texture;
     if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
-        // TODO: Get texture from scene resources when resource management is implemented
-        return;
+        Texture* sceneTexture = m_scene->getResource<Texture>(m_textureId);
+        if (!sceneTexture) {
+            return;
+        }
+        texture.reset(sceneTexture, [](Texture*) {});
     }
 
     // Get Game and Vulkan context
