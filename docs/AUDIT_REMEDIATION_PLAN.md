@@ -67,7 +67,7 @@ Move the `imgui_backend` static library target (Vulkan + GLFW backends) to root 
 
 ---
 
-## Phase 3 — Resource Safety
+## Phase 3 — Resource Safety ✅ COMPLETE
 
 Fix Vulkan resource leak paths. Changes are localized to two files.
 
