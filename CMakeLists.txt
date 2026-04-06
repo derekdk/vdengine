@@ -187,6 +187,7 @@ set(VDE_SOURCES
     src/api/AudioSource.cpp
     # Input script
     src/api/InputScript.cpp
+    src/api/InputScriptExecutor.cpp
     # Storage
     src/api/StorageManager.cpp
     # Text rendering
@@ -255,6 +256,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/AudioSource.h
     # Input script
     include/vde/api/InputScript.h
+    include/vde/api/InputScriptExecutor.h
+    include/vde/api/ScriptEnvironment.h
     # Storage
     include/vde/api/StorageManager.h
     # Gameplay utility headers

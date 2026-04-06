@@ -1,0 +1,477 @@
+/**
+ * @file InputScriptExecutor.cpp
+ * @brief Implementation of InputScriptExecutor — owns script state and dispatch
+ */
+
+#include <vde/api/InputHandler.h>
+#include <vde/api/InputScriptExecutor.h>
+#include <vde/api/KeyCodes.h>
+#include <vde/api/Scene.h>
+#include <vde/api/SceneGroup.h>
+#include <vde/api/ScriptEnvironment.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+
+#include "stb_image.h"
+
+namespace vde {
+
+namespace {
+
+void emitScriptCharInput(InputHandler& handler, int keyCode) {
+    if (keyCode >= KEY_A && keyCode <= KEY_Z) {
+        handler.onCharInput(static_cast<unsigned int>(keyCode + 32));
+    } else if (keyCode >= KEY_SPACE && keyCode <= 126) {
+        handler.onCharInput(static_cast<unsigned int>(keyCode));
+    }
+}
+
+std::string makeScreenshotFramePath(const std::string& basePath, uint64_t frameNumber) {
+    const size_t dotPos = basePath.find_last_of('.');
+    if (dotPos == std::string::npos) {
+        return basePath + "_frame_" + std::to_string(frameNumber) + ".png";
+    }
+
+    return basePath.substr(0, dotPos) + "_frame_" + std::to_string(frameNumber) +
+           basePath.substr(dotPos);
+}
+
+bool isSceneInActiveGroup(const SceneGroup& group, const std::string& sceneName) {
+    return std::any_of(
+        group.sceneNames.begin(), group.sceneNames.end(),
+        [&](const std::string& activeSceneName) { return activeSceneName == sceneName; });
+}
+
+bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, Scene* targetScene,
+                                     bool inActiveGroup, const ScriptCommand& cmd,
+                                     double& fieldValue) {
+    if (cmd.assertField == "was_rendered" || cmd.assertField == "not_blank") {
+        fieldValue = (targetScene && inActiveGroup) ? 1.0 : 0.0;
+        return true;
+    }
+
+    if (cmd.assertField == "draw_calls") {
+        if (targetScene && inActiveGroup) {
+            fieldValue = targetScene->getEntities().empty() ? 0.0 : 1.0;
+        }
+        return true;
+    }
+
+    if (cmd.assertField == "entities_drawn") {
+        if (targetScene && inActiveGroup) {
+            fieldValue = static_cast<double>(targetScene->getEntities().size());
+        }
+        return true;
+    }
+
+    if (cmd.assertField == "viewport_width" || cmd.assertField == "viewport_height") {
+        if (!targetScene) {
+            fieldValue = 0.0;
+            return true;
+        }
+
+        const auto& viewport = targetScene->getViewportRect();
+        fieldValue = cmd.assertField == "viewport_width"
+                         ? static_cast<double>(viewport.width * swapExtent.first)
+                         : static_cast<double>(viewport.height * swapExtent.second);
+        return true;
+    }
+
+    return false;
+}
+
+double computeImageRmse(const unsigned char* imageA, const unsigned char* imageB,
+                        size_t sampleCount) {
+    double sumSqErr = 0.0;
+    for (size_t i = 0; i < sampleCount; ++i) {
+        const double diff =
+            (static_cast<double>(imageA[i]) - static_cast<double>(imageB[i])) / 255.0;
+        sumSqErr += diff * diff;
+    }
+
+    return std::sqrt(sumSqErr / static_cast<double>(sampleCount));
+}
+
+}  // namespace
+
+// ============================================================================
+// Dispatch table
+// ============================================================================
+
+const InputScriptExecutor::Handler InputScriptExecutor::s_handlers[] = {
+    &InputScriptExecutor::handleWaitStartup,       // WaitStartup
+    &InputScriptExecutor::handleWaitMs,            // WaitMs
+    &InputScriptExecutor::handlePress,             // Press
+    &InputScriptExecutor::handleKeyDown,           // KeyDown
+    &InputScriptExecutor::handleKeyUp,             // KeyUp
+    &InputScriptExecutor::handleClick,             // Click
+    &InputScriptExecutor::handleClickRight,        // ClickRight
+    &InputScriptExecutor::handleMouseDown,         // MouseDown
+    &InputScriptExecutor::handleMouseUp,           // MouseUp
+    &InputScriptExecutor::handleMouseMove,         // MouseMove
+    &InputScriptExecutor::handleScroll,            // Scroll
+    &InputScriptExecutor::handleScreenshot,        // Screenshot
+    &InputScriptExecutor::handlePrint,             // Print
+    &InputScriptExecutor::handleLabel,             // Label
+    &InputScriptExecutor::handleLoop,              // Loop
+    &InputScriptExecutor::handleExit,              // Exit
+    &InputScriptExecutor::handleWaitFrames,        // WaitFrames
+    &InputScriptExecutor::handleAssertSceneCount,  // AssertSceneCount
+    &InputScriptExecutor::handleAssertScene,       // AssertScene
+    &InputScriptExecutor::handleCompare,           // Compare
+    &InputScriptExecutor::handleSet,               // Set
+};
+
+InputScriptExecutor::InputScriptExecutor(ScriptEnvironment& env) : m_env(env) {
+    static_assert(std::size(s_handlers) == static_cast<size_t>(InputCommandType::Set) + 1,
+                  "Dispatch table out of sync with InputCommandType enum");
+}
+
+void InputScriptExecutor::loadScript(const std::string& scriptPath) {
+    m_state = std::make_unique<InputScriptState>();
+    std::string errorMsg;
+
+    if (!parseInputScript(scriptPath, m_state->commands, m_state->labels, errorMsg)) {
+        std::cerr << "[VDE:InputScript] " << errorMsg << std::endl;
+        m_state.reset();
+        return;
+    }
+
+    m_state->scriptPath = scriptPath;
+    std::cout << "[VDE:InputScript] Loaded " << m_state->commands.size() << " commands from "
+              << scriptPath << std::endl;
+}
+
+bool InputScriptExecutor::processFrame(float deltaTime) {
+    if (!m_state || m_state->finished) {
+        return false;
+    }
+
+    m_deltaTime = deltaTime;
+    m_state->frameNumber++;
+
+    // Handle pending mouse release from previous frame.
+    if (m_state->pendingMouseRelease) {
+        m_state->pendingMouseRelease = false;
+        if (auto* handler = m_env.resolveInputHandler()) {
+            handler->onMouseButtonRelease(m_state->pendingMouseButton, m_state->pendingMouseX,
+                                          m_state->pendingMouseY);
+        }
+    }
+
+    while (m_state->currentCommand < m_state->commands.size()) {
+        const auto& cmd = m_state->commands[m_state->currentCommand];
+        const auto index = static_cast<size_t>(cmd.type);
+
+        // Safety: unknown command type -> advance and skip.
+        if (index >= std::size(s_handlers)) {
+            m_state->currentCommand++;
+            continue;
+        }
+
+        if (!(this->*s_handlers[index])(*m_state, cmd)) {
+            return true;  // Yield until next frame.
+        }
+    }
+
+    // All commands consumed.
+    if (m_state->assertionFailed) {
+        m_env.setExitCode(1);
+    }
+    m_state->finished = true;
+    return false;
+}
+
+bool InputScriptExecutor::isRunning() const {
+    return m_state && !m_state->finished;
+}
+
+bool InputScriptExecutor::hasAssertionFailure() const {
+    return m_state && m_state->assertionFailed;
+}
+
+// ============================================================================
+// Command handlers
+// ============================================================================
+
+bool InputScriptExecutor::handleWaitStartup(InputScriptState& state, const ScriptCommand&) {
+    if (!state.startupComplete) {
+        state.startupComplete = true;
+        state.currentCommand++;
+        return false;
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleWaitMs(InputScriptState& state, const ScriptCommand& cmd) {
+    state.waitAccumulator += static_cast<double>(m_deltaTime) * 1000.0;
+    if (state.waitAccumulator >= cmd.waitMs) {
+        state.waitAccumulator = 0.0;
+        state.currentCommand++;
+        return true;
+    }
+
+    return false;
+}
+
+bool InputScriptExecutor::handlePress(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onKeyPress(cmd.keyCode);
+        handler->onKeyRelease(cmd.keyCode);
+        emitScriptCharInput(*handler, cmd.keyCode);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleKeyDown(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onKeyPress(cmd.keyCode);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleKeyUp(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onKeyRelease(cmd.keyCode);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleClick(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+        handler->onMouseButtonPress(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+        state.pendingMouseRelease = true;
+        state.pendingMouseButton = MOUSE_BUTTON_LEFT;
+        state.pendingMouseX = cmd.mouseX;
+        state.pendingMouseY = cmd.mouseY;
+    }
+
+    state.currentCommand++;
+    return false;
+}
+
+bool InputScriptExecutor::handleClickRight(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+        handler->onMouseButtonPress(MOUSE_BUTTON_RIGHT, cmd.mouseX, cmd.mouseY);
+        state.pendingMouseRelease = true;
+        state.pendingMouseButton = MOUSE_BUTTON_RIGHT;
+        state.pendingMouseX = cmd.mouseX;
+        state.pendingMouseY = cmd.mouseY;
+    }
+
+    state.currentCommand++;
+    return false;
+}
+
+bool InputScriptExecutor::handleMouseDown(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+        handler->onMouseButtonPress(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleMouseUp(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onMouseButtonRelease(MOUSE_BUTTON_LEFT, cmd.mouseX, cmd.mouseY);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleMouseMove(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleScroll(InputScriptState& state, const ScriptCommand& cmd) {
+    if (InputHandler* handler = m_env.resolveInputHandler()) {
+        handler->onMouseMove(cmd.mouseX, cmd.mouseY);
+        handler->onMouseScroll(0.0, cmd.scrollDelta);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleScreenshot(InputScriptState& state, const ScriptCommand& cmd) {
+    m_env.captureScreenshot(makeScreenshotFramePath(cmd.argument, state.frameNumber));
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handlePrint(InputScriptState& state, const ScriptCommand& cmd) {
+    std::cout << "[VDE:InputScript] " << cmd.argument << std::endl;
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleLabel(InputScriptState& state, const ScriptCommand&) {
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleLoop(InputScriptState& state, const ScriptCommand& cmd) {
+    auto labelIt = state.labels.find(cmd.argument);
+    if (labelIt == state.labels.end()) {
+        std::cerr << "[VDE:InputScript] Error at line " << cmd.lineNumber << ": undefined label '"
+                  << cmd.argument << "'" << std::endl;
+        state.finished = true;
+        return false;
+    }
+
+    auto& labelState = labelIt->second;
+    if (cmd.loopCount == 0) {
+        state.currentCommand = labelState.commandIndex + 1;
+        return true;
+    }
+
+    labelState.remainingIterations =
+        labelState.remainingIterations < 0 ? cmd.loopCount - 1 : labelState.remainingIterations - 1;
+    if (labelState.remainingIterations > 0) {
+        state.currentCommand = labelState.commandIndex + 1;
+        return true;
+    }
+
+    labelState.remainingIterations = -1;
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleExit(InputScriptState& state, const ScriptCommand&) {
+    std::cout << "[VDE:InputScript] exit" << std::endl;
+    if (state.assertionFailed) {
+        m_env.setExitCode(1);
+    }
+
+    state.finished = true;
+    m_env.quit();
+    return false;
+}
+
+bool InputScriptExecutor::handleWaitFrames(InputScriptState& state, const ScriptCommand& cmd) {
+    if (state.frameWaitCounter == 0) {
+        state.frameWaitCounter = cmd.waitFrames;
+    }
+
+    state.frameWaitCounter--;
+    if (state.frameWaitCounter > 0) {
+        return false;
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
+                                                 const ScriptCommand& cmd) {
+    const double count = static_cast<double>(m_env.getActiveSceneGroup().sceneNames.size());
+    if (!evaluateComparison(count, cmd.assertOp, cmd.assertValue)) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                  << ": rendered_scene_count (" << static_cast<int>(count) << ") "
+                  << compareOpToString(cmd.assertOp) << " " << static_cast<int>(cmd.assertValue)
+                  << std::endl;
+        state.assertionFailed = true;
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const ScriptCommand& cmd) {
+    const auto& activeGroup = m_env.getActiveSceneGroup();
+    Scene* targetScene = m_env.getScene(cmd.assertSceneName);
+    const bool inActiveGroup = isSceneInActiveGroup(activeGroup, cmd.assertSceneName);
+    double fieldValue = 0.0;
+
+    if (!tryResolveAssertSceneFieldValue(m_env.getSwapChainExtent(), targetScene, inActiveGroup,
+                                         cmd, fieldValue)) {
+        std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                  << ": unknown field '" << cmd.assertField << "'" << std::endl;
+        state.assertionFailed = true;
+    } else if (!evaluateComparison(fieldValue, cmd.assertOp, cmd.assertValue)) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber << ": scene \""
+                  << cmd.assertSceneName << "\" " << cmd.assertField << " (" << fieldValue << ") "
+                  << compareOpToString(cmd.assertOp) << " " << cmd.assertValue << std::endl;
+        state.assertionFailed = true;
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleCompare(InputScriptState& state, const ScriptCommand& cmd) {
+    std::cout << "[VDE:InputScript] compare " << cmd.argument << " vs " << cmd.comparePath
+              << " (threshold " << cmd.compareThreshold << ")" << std::endl;
+
+    int actualWidth = 0, actualHeight = 0, actualChannels = 0;
+    int goldenWidth = 0, goldenHeight = 0, goldenChannels = 0;
+    unsigned char* actualImage =
+        stbi_load(cmd.argument.c_str(), &actualWidth, &actualHeight, &actualChannels, 4);
+    unsigned char* goldenImage =
+        stbi_load(cmd.comparePath.c_str(), &goldenWidth, &goldenHeight, &goldenChannels, 4);
+
+    if (!actualImage) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                  << ": cannot load image '" << cmd.argument << "'" << std::endl;
+        state.assertionFailed = true;
+    } else if (!goldenImage) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                  << ": cannot load golden image '" << cmd.comparePath << "'" << std::endl;
+        state.assertionFailed = true;
+    } else if (actualWidth != goldenWidth || actualHeight != goldenHeight) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                  << ": dimension mismatch — actual (" << actualWidth << "x" << actualHeight
+                  << ") vs golden (" << goldenWidth << "x" << goldenHeight << ")" << std::endl;
+        state.assertionFailed = true;
+    } else {
+        const size_t sampleCount = static_cast<size_t>(actualWidth) * actualHeight * 4;
+        const double rmse = computeImageRmse(actualImage, goldenImage, sampleCount);
+        if (rmse > cmd.compareThreshold) {
+            std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
+                      << ": image mismatch — RMSE " << rmse << " > threshold "
+                      << cmd.compareThreshold << std::endl;
+            state.assertionFailed = true;
+        } else {
+            std::cout << "[VDE:InputScript] compare PASSED (RMSE " << rmse
+                      << " <= " << cmd.compareThreshold << ")" << std::endl;
+        }
+    }
+
+    if (actualImage) {
+        stbi_image_free(actualImage);
+    }
+    if (goldenImage) {
+        stbi_image_free(goldenImage);
+    }
+
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleSet(InputScriptState& state, const ScriptCommand& cmd) {
+    state.variables[cmd.setVarName] = cmd.setVarValue;
+    state.currentCommand++;
+    return true;
+}
+
+}  // namespace vde

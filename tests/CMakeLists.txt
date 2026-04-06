@@ -53,6 +53,7 @@ set(VDE_TEST_SOURCES
     Joystick_test.cpp
     # Input script tests
     InputScript_test.cpp
+    GameInputScriptExecution_test.cpp
     # Storage tests
     StorageManager_test.cpp
     # Offscreen render target tests
@@ -97,6 +98,7 @@ target_include_directories(vde_tests PRIVATE
 )
 
 target_compile_definitions(vde_tests PRIVATE
+    VDE_TEST_ACCESSORS
     VDE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
 )
 
