@@ -37,7 +37,7 @@ Three TODO comments in `src/api/Entity.cpp` (lines 165, 186, 356) say *"when res
 
 ---
 
-## Phase 2 — CMake Consolidation
+## Phase 2 — CMake Consolidation ✅ COMPLETE
 
 Structural build-system improvement. No runtime behavior changes.
 

@@ -1,40 +1,5 @@
 # VDE Examples CMakeLists.txt
 
-# Fetch ImGui for all examples that want to use it
-include(FetchContent)
-
-FetchContent_Declare(
-    imgui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG        v1.91.8-docking
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(imgui)
-
-# Build ImGui as a static library for use in examples
-add_library(imgui_backend STATIC
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
-)
-
-target_include_directories(imgui_backend PUBLIC
-    ${imgui_SOURCE_DIR}
-    ${imgui_SOURCE_DIR}/backends
-)
-
-target_link_libraries(imgui_backend PUBLIC
-    Vulkan::Vulkan
-    glfw
-)
-
-# Enable 32-bit ImWchar for full Unicode/emoji support in ImGui
-target_compile_definitions(imgui_backend PUBLIC IMGUI_USE_WCHAR32)
-
 # Track shader source files so updates trigger copy without requiring executable relink
 file(GLOB_RECURSE VDE_SHADER_FILES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/shaders/*
@@ -67,21 +32,24 @@ add_custom_target(copy_example_shaders ALL
     DEPENDS ${VDE_EXAMPLE_SHADER_STAMP}
 )
 
-# Helper function to add examples with ImGui support enabled
+# Helper function to add examples with optional ImGui support
+# Usage: add_vde_example(target_name [NO_IMGUI] source1.cpp source2.cpp ...)
 function(add_vde_example target_name)
-    add_executable(${target_name} ${ARGN})
-    target_link_libraries(${target_name} PRIVATE vde imgui_backend)
-    target_compile_definitions(${target_name} PRIVATE VDE_EXAMPLE_USE_IMGUI)
+    cmake_parse_arguments(ARG "NO_IMGUI" "" "" ${ARGN})
+    add_executable(${target_name} ${ARG_UNPARSED_ARGUMENTS})
+    if(ARG_NO_IMGUI)
+        target_link_libraries(${target_name} PRIVATE vde)
+    else()
+        target_link_libraries(${target_name} PRIVATE vde imgui_backend)
+        target_compile_definitions(${target_name} PRIVATE VDE_EXAMPLE_USE_IMGUI)
+    endif()
     add_dependencies(${target_name} copy_example_shaders)
 endfunction()
 
 # Basic triangle example (low-level, no ImGui)
-add_executable(vde_triangle_example
+add_vde_example(vde_triangle_example NO_IMGUI
     triangle/main.cpp
 )
-
-target_link_libraries(vde_triangle_example PRIVATE vde)
-add_dependencies(vde_triangle_example copy_example_shaders)
 
 # Simple game example using Game API
 add_vde_example(vde_simple_game_example "simple_game/main.cpp")
