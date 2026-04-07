@@ -260,6 +260,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/ScriptEnvironment.h
     # Storage
     include/vde/api/StorageManager.h
+    # Default constants
+    include/vde/api/Defaults.h
     # Gameplay utility headers
     include/vde/api/Math2D.h
     include/vde/api/Timing.h

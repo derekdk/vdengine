@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <string>
 
 namespace vde {
 
@@ -529,7 +530,9 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
         sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else {
-        throw std::invalid_argument("Unsupported layout transition!");
+        throw std::invalid_argument("Unsupported layout transition: oldLayout=" +
+                                    std::to_string(static_cast<int>(oldLayout)) +
+                                    " newLayout=" + std::to_string(static_cast<int>(newLayout)));
     }
 
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1,

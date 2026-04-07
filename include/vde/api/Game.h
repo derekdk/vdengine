@@ -61,7 +61,7 @@ class VulkanContext;
  *     settings.display.windowHeight = 720;
  *
  *     game.initialize(settings);
- *     game.addScene("main", new MainScene());
+ *     game.addScene("main", std::make_unique<MainScene>());
  *     game.setActiveScene("main");
  *     game.run();
  *

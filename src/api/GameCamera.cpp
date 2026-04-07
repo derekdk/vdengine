@@ -4,6 +4,7 @@
  */
 
 #include <vde/VulkanContext.h>
+#include <vde/api/Defaults.h>
 #include <vde/api/GameCamera.h>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -257,7 +258,8 @@ void OrbitCamera::updateCamera() {
 
 Camera2D::Camera2D()
     : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_zoom(1.0f), m_rotation(0.0f),
-      m_viewportWidth(1920.0f), m_viewportHeight(1080.0f) {
+      m_viewportWidth(defaults::DEFAULT_SCREEN_WIDTH),
+      m_viewportHeight(defaults::DEFAULT_SCREEN_HEIGHT) {
     updateCamera();
 }
 

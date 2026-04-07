@@ -12,6 +12,7 @@
 
 #include <memory>
 
+#include "Defaults.h"
 #include "GameTypes.h"
 
 namespace vde {
@@ -384,8 +385,8 @@ class Camera2D : public GameCamera {
     Position m_position;
     float m_zoom = 1.0f;
     float m_rotation = 0.0f;
-    float m_viewportWidth = 1920.0f;
-    float m_viewportHeight = 1080.0f;
+    float m_viewportWidth = defaults::DEFAULT_SCREEN_WIDTH;
+    float m_viewportHeight = defaults::DEFAULT_SCREEN_HEIGHT;
 
     void updateCamera();
 };
