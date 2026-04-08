@@ -187,6 +187,7 @@ set(VDE_SOURCES
     src/api/AudioSource.cpp
     # Input script
     src/api/InputScript.cpp
+    src/api/InputScriptExecutor.cpp
     # Storage
     src/api/StorageManager.cpp
     # Text rendering
@@ -255,8 +256,12 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/AudioSource.h
     # Input script
     include/vde/api/InputScript.h
+    include/vde/api/InputScriptExecutor.h
+    include/vde/api/ScriptEnvironment.h
     # Storage
     include/vde/api/StorageManager.h
+    # Default constants
+    include/vde/api/Defaults.h
     # Gameplay utility headers
     include/vde/api/Math2D.h
     include/vde/api/Timing.h
@@ -331,6 +336,44 @@ install(DIRECTORY include/vde
 # Note: Full CMake package config is not provided since dependencies (glfw, glm, glslang)
 # are not exported. For proper package installation, use FetchContent or add_subdirectory
 # to include VDE in your project.
+
+# ImGui for examples and tools (single declaration shared by both)
+if(VDE_BUILD_EXAMPLES OR VDE_BUILD_TOOLS)
+    if(NOT TARGET imgui)
+        FetchContent_Declare(
+            imgui
+            GIT_REPOSITORY https://github.com/ocornut/imgui.git
+            GIT_TAG        v1.91.8-docking
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(imgui)
+    endif()
+
+    if(NOT TARGET imgui_backend)
+        add_library(imgui_backend STATIC
+            ${imgui_SOURCE_DIR}/imgui.cpp
+            ${imgui_SOURCE_DIR}/imgui_demo.cpp
+            ${imgui_SOURCE_DIR}/imgui_draw.cpp
+            ${imgui_SOURCE_DIR}/imgui_tables.cpp
+            ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+            ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+            ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+        )
+
+        target_include_directories(imgui_backend PUBLIC
+            ${imgui_SOURCE_DIR}
+            ${imgui_SOURCE_DIR}/backends
+        )
+
+        target_link_libraries(imgui_backend PUBLIC
+            Vulkan::Vulkan
+            glfw
+        )
+
+        # Enable 32-bit ImWchar for full Unicode/emoji support in ImGui
+        target_compile_definitions(imgui_backend PUBLIC IMGUI_USE_WCHAR32)
+    endif()
+endif()
 
 # Examples
 if(VDE_BUILD_EXAMPLES)

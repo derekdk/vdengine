@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <string>
 
 namespace vde {
 
@@ -139,17 +140,34 @@ bool Texture::uploadToGPU(VulkanContext* context) {
         BufferUtils::init(m_device, m_physicalDevice, m_commandPool, m_graphicsQueue);
     }
 
-    // Create staging buffer
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingMemory;
+    // Create staging buffer with RAII guard to prevent leaks on exception
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
     BufferUtils::createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                               stagingBuffer, stagingMemory);
 
+    // RAII guard: cleans up staging resources on scope exit (normal or exception)
+    struct StagingGuard {
+        VkDevice device;
+        VkBuffer buffer;
+        VkDeviceMemory memory;
+        ~StagingGuard() {
+            if (buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, buffer, nullptr);
+            }
+            if (memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, memory, nullptr);
+            }
+        }
+    } stagingGuard{m_device, stagingBuffer, stagingMemory};
+
     // Copy pixel data to staging buffer
     void* data;
-    vkMapMemory(m_device, stagingMemory, 0, imageSize, 0, &data);
+    if (vkMapMemory(m_device, stagingMemory, 0, imageSize, 0, &data) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to map staging buffer memory!");
+    }
     memcpy(data, m_pixelData.data(), static_cast<size_t>(imageSize));
     vkUnmapMemory(m_device, stagingMemory);
 
@@ -167,10 +185,6 @@ bool Texture::uploadToGPU(VulkanContext* context) {
     // Transition to shader read
     transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    // Cleanup staging buffer
-    vkDestroyBuffer(m_device, stagingBuffer, nullptr);
-    vkFreeMemory(m_device, stagingMemory, nullptr);
 
     // Create image view
     createImageView(VK_FORMAT_R8G8B8A8_SRGB);
@@ -514,7 +528,9 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
         sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else {
-        throw std::invalid_argument("Unsupported layout transition!");
+        throw std::invalid_argument("Unsupported layout transition: oldLayout=" +
+                                    std::to_string(static_cast<int>(oldLayout)) +
+                                    " newLayout=" + std::to_string(static_cast<int>(newLayout)));
     }
 
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1,

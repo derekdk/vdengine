@@ -17,15 +17,18 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "GameSettings.h"
 #include "InputHandler.h"
 #include "InputScript.h"
+#include "InputScriptExecutor.h"
 #include "ResourceManager.h"
 #include "Scene.h"
 #include "SceneGroup.h"
 #include "Scheduler.h"
+#include "ScriptEnvironment.h"
 #include "Transition.h"
 #include "TransitionManager.h"
 #include "ViewportRect.h"
@@ -58,7 +61,7 @@ class VulkanContext;
  *     settings.display.windowHeight = 720;
  *
  *     game.initialize(settings);
- *     game.addScene("main", new MainScene());
+ *     game.addScene("main", std::make_unique<MainScene>());
  *     game.setActiveScene("main");
  *     game.run();
  *
@@ -66,7 +69,7 @@ class VulkanContext;
  * }
  * @endcode
  */
-class Game {
+class Game : private ScriptEnvironment {
   public:
     Game();
     virtual ~Game();
@@ -108,7 +111,7 @@ class Game {
     /**
      * @brief Request the game to exit.
      */
-    void quit();
+    void quit() override;
 
     // Input script
 
@@ -153,7 +156,7 @@ class Game {
      * @param name Scene name
      * @return Pointer to scene, or nullptr if not found
      */
-    Scene* getScene(const std::string& name);
+    Scene* getScene(const std::string& name) override;
 
     /**
      * @brief Set the active scene.
@@ -180,7 +183,7 @@ class Game {
     /**
      * @brief Get the currently active scene group.
      */
-    const SceneGroup& getActiveSceneGroup() const { return m_activeSceneGroup; }
+    const SceneGroup& getActiveSceneGroup() const override { return m_activeSceneGroup; }
 
     /**
      * @brief Get the currently active scene.
@@ -566,13 +569,16 @@ class Game {
      *
      * @param code Exit code (0 = success, 1 = failure)
      */
-    void setExitCode(int code);
+    void setExitCode(int code) override;
 
     /**
      * @brief Get the current exit code.
      * @return 0 for success, 1 for failure
      */
     int getExitCode() const { return m_exitCode; }
+
+    /// Get the script executor (for test inspection).
+    InputScriptExecutor* getScriptExecutor() { return m_scriptExecutor.get(); }
 
     // =========================================================================
     // Screenshot Capture (A2)
@@ -587,7 +593,7 @@ class Game {
      * @param outputPath Path for the output PNG file
      * @return true if capture and write succeeded
      */
-    bool captureScreenshot(const std::string& outputPath);
+    bool captureScreenshot(const std::string& outputPath) override;
 
   protected:
     // Virtual methods for subclassing
@@ -696,7 +702,7 @@ class Game {
 
     // Input script
     std::string m_inputScriptFile;
-    std::unique_ptr<InputScriptState> m_inputScriptState;
+    std::unique_ptr<InputScriptExecutor> m_scriptExecutor;
 
     // Exit code (B6 minimal)
     int m_exitCode = 0;
@@ -704,6 +710,10 @@ class Game {
     // Callbacks
     std::function<void(uint32_t, uint32_t)> m_resizeCallback;
     std::function<void(bool)> m_focusCallback;
+
+    // ScriptEnvironment overrides (private, no public declaration)
+    InputHandler* resolveInputHandler() override;
+    std::pair<uint32_t, uint32_t> getSwapChainExtent() const override;
 
     // Internal methods
     void processInput();

@@ -29,6 +29,7 @@
 
 #include <glm/glm.hpp>
 
+#include "Defaults.h"
 #include "WorldBounds.h"
 #include "WorldUnits.h"
 
@@ -71,7 +72,7 @@ struct ScreenSize {
     Pixels width;
     Pixels height;
 
-    ScreenSize() : width(1920.0f), height(1080.0f) {}
+    ScreenSize() : width(defaults::DEFAULT_SCREEN_WIDTH), height(defaults::DEFAULT_SCREEN_HEIGHT) {}
     ScreenSize(Pixels w, Pixels h) : width(w), height(h) {}
     ScreenSize(uint32_t w, uint32_t h)
         : width(static_cast<float>(w)), height(static_cast<float>(h)) {}
@@ -377,7 +378,8 @@ class CameraBounds2D {
     bool isVisible(const WorldBounds2D& bounds) const;
 
   private:
-    ScreenSize m_screenSize{1920_px, 1080_px};
+    ScreenSize m_screenSize{Pixels(defaults::DEFAULT_SCREEN_WIDTH),
+                            Pixels(defaults::DEFAULT_SCREEN_HEIGHT)};
     Meters m_centerX{0.0f};
     Meters m_centerY{0.0f};
     Meters m_baseWorldWidth{16.0f};

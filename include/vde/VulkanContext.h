@@ -458,6 +458,9 @@ class VulkanContext {
     void createImageViews();
 
     void createRenderPass();
+    void createMainRenderPass();
+    void createLoadRenderPass();
+    void createOffscreenRenderPass();
     void createDepthResources();
     void createFramebuffers();
 

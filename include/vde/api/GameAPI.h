@@ -43,7 +43,9 @@
 // Input handling
 #include "InputHandler.h"
 #include "InputScript.h"
+#include "InputScriptExecutor.h"
 #include "KeyCodes.h"
+#include "ScriptEnvironment.h"
 
 // Storage
 #include "StorageManager.h"
