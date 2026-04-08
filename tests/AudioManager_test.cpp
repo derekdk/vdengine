@@ -25,6 +25,11 @@ class AudioManagerTest : public ::testing::Test {
     AudioManager& mgr = AudioManager::getInstance();
 
     void SetUp() override {
+        // Ensure the singleton is not initialised — other test suites
+        // (or future tests) may have called initialize(), which would
+        // make NotInitializedWithoutExplicitInit order-dependent.
+        mgr.shutdown();
+
         // Reset to sensible defaults (AudioManager is a singleton,
         // so state leaks between tests without explicit reset).
         mgr.setMasterVolume(1.0f);
