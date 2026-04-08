@@ -158,14 +158,10 @@ void MeshEntity::setTexture(std::shared_ptr<Texture> texture) {
 
 void MeshEntity::render() {
     // Get the mesh (either direct or via resource ID)
-    std::shared_ptr<Mesh> mesh = m_mesh;
+    std::shared_ptr<Mesh> meshOwner = m_mesh;
+    Mesh* mesh = meshOwner.get();
     if (!mesh && m_scene && m_meshId != INVALID_RESOURCE_ID) {
-        Mesh* sceneMesh = m_scene->getResource<Mesh>(m_meshId);
-        if (!sceneMesh) {
-            return;
-        }
-        // Non-owning shared_ptr — Scene's resource map keeps it alive during render
-        mesh.reset(sceneMesh, [](Mesh*) {});
+        mesh = m_scene->getResource<Mesh>(m_meshId);
     }
 
     if (!mesh || !m_scene) {
@@ -184,19 +180,17 @@ void MeshEntity::render() {
     }
 
     // Resolve texture (or fallback to default white)
-    std::shared_ptr<Texture> texture = m_texture;
+    std::shared_ptr<Texture> textureOwner = m_texture;
+    Texture* texture = textureOwner.get();
     if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
-        Texture* sceneTexture = m_scene->getResource<Texture>(m_textureId);
-        if (sceneTexture) {
-            texture.reset(sceneTexture, [](Texture*) {});
-        }
+        texture = m_scene->getResource<Texture>(m_textureId);
     }
 
     if (texture && !texture->isOnGPU()) {
         texture->uploadToGPU(context);
     }
 
-    Texture* texturePtr = texture ? texture.get() : game->getDefaultWhiteTexture();
+    Texture* texturePtr = texture ? texture : game->getDefaultWhiteTexture();
     if (!texturePtr || !texturePtr->isValid()) {
         return;
     }
@@ -357,13 +351,13 @@ void SpriteEntity::setUVRect(float u, float v, float width, float height) {
 
 void SpriteEntity::render() {
     // Get the texture (either direct or via resource ID)
-    std::shared_ptr<Texture> texture = m_texture;
+    std::shared_ptr<Texture> textureOwner = m_texture;
+    Texture* texture = textureOwner.get();
     if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
-        Texture* sceneTexture = m_scene->getResource<Texture>(m_textureId);
-        if (!sceneTexture) {
+        texture = m_scene->getResource<Texture>(m_textureId);
+        if (!texture) {
             return;
         }
-        texture.reset(sceneTexture, [](Texture*) {});
     }
 
     // Get Game and Vulkan context
@@ -378,7 +372,7 @@ void SpriteEntity::render() {
     }
 
     // Use default white texture if no texture is assigned (for solid color sprites)
-    Texture* texturePtr = texture ? texture.get() : game->getDefaultWhiteTexture();
+    Texture* texturePtr = texture ? texture : game->getDefaultWhiteTexture();
     if (!texturePtr || !texturePtr->isValid()) {
         return;
     }

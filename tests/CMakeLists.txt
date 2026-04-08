@@ -102,7 +102,6 @@ target_include_directories(vde_tests PRIVATE
 )
 
 target_compile_definitions(vde_tests PRIVATE
-    VDE_TEST_ACCESSORS
     VDE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
 )
 

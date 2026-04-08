@@ -151,16 +151,14 @@ bool Texture::uploadToGPU(VulkanContext* context) {
     // RAII guard: cleans up staging resources on scope exit (normal or exception)
     struct StagingGuard {
         VkDevice device;
-        VkBuffer& buffer;
-        VkDeviceMemory& memory;
+        VkBuffer buffer;
+        VkDeviceMemory memory;
         ~StagingGuard() {
             if (buffer != VK_NULL_HANDLE) {
                 vkDestroyBuffer(device, buffer, nullptr);
-                buffer = VK_NULL_HANDLE;
             }
             if (memory != VK_NULL_HANDLE) {
                 vkFreeMemory(device, memory, nullptr);
-                memory = VK_NULL_HANDLE;
             }
         }
     } stagingGuard{m_device, stagingBuffer, stagingMemory};

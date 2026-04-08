@@ -3,19 +3,18 @@
  * @brief Unit tests for InputScriptExecutor using a mock ScriptEnvironment.
  */
 
-#include <gtest/gtest.h>
+#include <vde/api/InputHandler.h>
+#include <vde/api/InputScriptExecutor.h>
+#include <vde/api/KeyCodes.h>
+#include <vde/api/SceneGroup.h>
+#include <vde/api/ScriptEnvironment.h>
 
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <vde/api/InputHandler.h>
-#include <vde/api/InputScriptExecutor.h>
-#include <vde/api/ScriptEnvironment.h>
-
-#include <vde/api/KeyCodes.h>
-#include <vde/api/SceneGroup.h>
+#include <gtest/gtest.h>
 
 namespace vde::test {
 
