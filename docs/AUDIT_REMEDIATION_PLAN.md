@@ -201,7 +201,7 @@ game.addScene("main", std::make_unique<MainScene>());
 
 ---
 
-## Phase 6 — Test Coverage Expansion
+## Phase 6 — Test Coverage Expansion ✅ COMPLETE
 
 Add missing tests for core API classes.
 

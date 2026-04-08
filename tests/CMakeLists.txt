@@ -74,6 +74,10 @@ set(VDE_TEST_SOURCES
     # Emoji / UTF-8 tests
     Utf8_test.cpp
     EmojiFont_test.cpp
+    # Phase 6 — Audit coverage expansion
+    Game_test.cpp
+    AudioManager_test.cpp
+    BitmapFont_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
