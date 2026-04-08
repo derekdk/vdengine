@@ -8,6 +8,7 @@
  * can be tested with a lightweight mock instead of a full engine instance.
  */
 
+#include <cstdint>
 #include <string>
 #include <utility>
 
