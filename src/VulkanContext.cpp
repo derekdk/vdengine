@@ -800,27 +800,17 @@ void VulkanContext::createOffscreenRenderPass() {
     offscreenSubpass.pColorAttachments = &offscreenColorRef;
     offscreenSubpass.pDepthStencilAttachment = &offscreenDepthRef;
 
-    // Dependency: fragment shader reads happen after color output
-    std::array<VkSubpassDependency, 2> offscreenDeps{};
-    // External → subpass 0: wait for nothing, produce color+depth
-    offscreenDeps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    offscreenDeps[0].dstSubpass = 0;
-    offscreenDeps[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    offscreenDeps[0].dstStageMask =
+    // Dependency: external → subpass 0 (matches main render pass for pipeline compatibility)
+    VkSubpassDependency offscreenDep{};
+    offscreenDep.srcSubpass = VK_SUBPASS_EXTERNAL;
+    offscreenDep.dstSubpass = 0;
+    offscreenDep.srcStageMask =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    offscreenDeps[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    offscreenDeps[0].dstAccessMask =
+    offscreenDep.srcAccessMask = 0;
+    offscreenDep.dstStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    offscreenDep.dstAccessMask =
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    offscreenDeps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-    // Subpass 0 → external: color writes complete before fragment shader reads
-    offscreenDeps[1].srcSubpass = 0;
-    offscreenDeps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    offscreenDeps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    offscreenDeps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    offscreenDeps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    offscreenDeps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    offscreenDeps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
     std::array<VkAttachmentDescription, 2> offscreenAttachments = {offscreenColor, offscreenDepth};
 
@@ -830,8 +820,8 @@ void VulkanContext::createOffscreenRenderPass() {
     offscreenRPInfo.pAttachments = offscreenAttachments.data();
     offscreenRPInfo.subpassCount = 1;
     offscreenRPInfo.pSubpasses = &offscreenSubpass;
-    offscreenRPInfo.dependencyCount = static_cast<uint32_t>(offscreenDeps.size());
-    offscreenRPInfo.pDependencies = offscreenDeps.data();
+    offscreenRPInfo.dependencyCount = 1;
+    offscreenRPInfo.pDependencies = &offscreenDep;
 
     if (vkCreateRenderPass(m_device, &offscreenRPInfo, nullptr, &m_offscreenRenderPass) !=
         VK_SUCCESS) {

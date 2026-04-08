@@ -333,8 +333,8 @@ struct PhysicsScene::Impl {
                 body.accumulatedForce * (body.def.mass > 0.0f ? 1.0f / body.def.mass : 0.0f);
             body.state.velocity += acceleration * dt;
 
-            // Apply damping
-            body.state.velocity *= (1.0f - body.def.linearDamping);
+            // Apply damping (timestep-scaled; unconditionally stable)
+            body.state.velocity *= 1.0f / (1.0f + body.def.linearDamping * dt);
 
             // Integrate position
             body.state.position += body.state.velocity * dt;
