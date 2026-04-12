@@ -1338,7 +1338,7 @@ struct PhysicsBodyDef {
     float rotation;
     glm::vec2 extents;       // Half-extents (box) or {radius, 0} (circle)
     float mass, friction, restitution;
-    float linearDamping;     // Decay rate in 1/s (v *= 1/(1+d*dt) per step); must be >= 0
+    float linearDamping;     // Decay rate in 1/s (v *= 1/(1+d*dt) per step); negative values are clamped to 0
     bool isSensor;           // Triggers callbacks but no collision response
 };
 ```
