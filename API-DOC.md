@@ -1056,7 +1056,7 @@ def.extents = {0.5f, 0.5f};                // Half-extents (box) or {radius, 0} 
 def.mass = 1.0f;                           // Mass in kg (ignored for Static/Kinematic)
 def.friction = 0.3f;                       // Surface friction coefficient
 def.restitution = 0.2f;                    // Bounciness (0 = inelastic, 1 = perfectly elastic)
-def.linearDamping = 0.01f;                 // Linear velocity damping
+def.linearDamping = 1.0f;                 // Linear velocity decay rate (1/s); ~37% retained/s
 def.isSensor = false;                      // If true, triggers callbacks but no collision response
 ```
 

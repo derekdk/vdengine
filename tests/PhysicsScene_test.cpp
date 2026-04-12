@@ -700,7 +700,7 @@ TEST_F(PhysicsSceneTest, CollisionEndNotFiredWhenStillOverlapping) {
     defA.position = {0.0f, 0.0f};
     defA.extents = {1.0f, 1.0f};
     defA.mass = 1.0f;
-    defA.linearDamping = 1.0f;  // Heavy damping to keep them overlapping
+    defA.linearDamping = 1.0f;  // Damping to slow body (37% velocity retained/s)
     defA.restitution = 0.0f;
 
     PhysicsBodyDef defB;
@@ -1106,7 +1106,7 @@ TEST_F(PhysicsSceneTest, LinearDampingReducesVelocityWithoutReversal) {
     def.position = {0.0f, 0.0f};
     def.extents = {0.5f, 0.5f};
     def.mass = 1.0f;
-    def.linearDamping = 8.0f;  // High damping that previously caused sign-flip
+    def.linearDamping = 8.0f;  // High decay rate (8/s) — ~0.03% velocity retained/s
     def.friction = 0.0f;
 
     PhysicsBodyId id = phys.createBody(def);
