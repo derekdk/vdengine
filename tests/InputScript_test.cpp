@@ -1257,5 +1257,149 @@ TEST_F(InputScriptFileTest, ParsesFullValidationScript) {
     EXPECT_EQ(commands.size(), 11u);
 }
 
+// ============================================================================
+// New diagnostics field parsing tests
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesAssertSceneEntityCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"main\" entity_count == 5", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "main");
+    EXPECT_EQ(cmd.assertField, "entity_count");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Eq);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 5.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneMeshEntityCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"level\" mesh_entity_count >= 2", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.assertField, "mesh_entity_count");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Ge);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 2.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneSpriteEntityCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"hud\" sprite_entity_count > 0", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.assertField, "sprite_entity_count");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Gt);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneTextEntityCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"ui\" text_entity_count == 3", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.assertField, "text_entity_count");
+}
+
+TEST(InputScriptParseLine, ParsesAssertScenePhysicsEntityCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"world\" physics_entity_count <= 10", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.assertField, "physics_entity_count");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Le);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneEnterCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"menu\" enter_count == 1", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.assertField, "enter_count");
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneExitCount) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"old\" exit_count >= 1", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.assertField, "exit_count");
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneIsFocused) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"game\" is_focused == 1", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.assertField, "is_focused");
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 1.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneEntitiesCreated) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"level\" entities_created >= 10", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.assertField, "entities_created");
+}
+
+TEST(InputScriptParseLine, ParsesAssertSceneEntitiesRemoved) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"level\" entities_removed == 0", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.assertField, "entities_removed");
+}
+
+// ============================================================================
+// Global assert fields: scenes_created, scenes_removed
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesAssertScenesCreated) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scenes_created == 3", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertField, "scenes_created");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Eq);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 3.0);
+}
+
+TEST(InputScriptParseLine, ParsesAssertScenesRemoved) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scenes_removed >= 1", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertField, "scenes_removed");
+}
+
+// ============================================================================
+// Variable reference ($VAR_NAME) in assert RHS
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesAssertSceneWithVariableReference) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"main\" entity_count == $EXPECTED", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertField, "entity_count");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Eq);
+    EXPECT_EQ(cmd.assertVarRef, "EXPECTED");
+}
+
+TEST(InputScriptParseLine, ParsesAssertGlobalWithVariableReference) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert rendered_scene_count == $SCENE_COUNT", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertVarRef, "SCENE_COUNT");
+}
+
+TEST(InputScriptParseLine, ParsesAssertScenesCreatedWithVariableReference) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scenes_created == $TOTAL", 1, cmd, error)) << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertSceneCount);
+    EXPECT_EQ(cmd.assertField, "scenes_created");
+    EXPECT_EQ(cmd.assertVarRef, "TOTAL");
+}
+
 }  // namespace test
 }  // namespace vde

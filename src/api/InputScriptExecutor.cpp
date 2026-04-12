@@ -59,9 +59,9 @@ bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, S
         return true;
     }
 
-    if (cmd.assertField == "entities_drawn") {
-        if (targetScene && inActiveGroup) {
-            fieldValue = static_cast<double>(targetScene->getEntities().size());
+    if (cmd.assertField == "entities_drawn" || cmd.assertField == "entity_count") {
+        if (targetScene) {
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().totalEntityCount);
         }
         return true;
     }
@@ -76,6 +76,67 @@ bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, S
         fieldValue = cmd.assertField == "viewport_width"
                          ? static_cast<double>(viewport.width * swapExtent.first)
                          : static_cast<double>(viewport.height * swapExtent.second);
+        return true;
+    }
+
+    // SceneDiagnostics entity type counts
+    if (cmd.assertField == "mesh_entity_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().meshEntityCount);
+        return true;
+    }
+    if (cmd.assertField == "sprite_entity_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().spriteEntityCount);
+        return true;
+    }
+    if (cmd.assertField == "text_entity_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().textEntityCount);
+        return true;
+    }
+    if (cmd.assertField == "physics_entity_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().physicsEntityCount);
+        return true;
+    }
+
+    // SceneDiagnostics entity lifecycle counters
+    if (cmd.assertField == "entities_created") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().entitiesCreated);
+        return true;
+    }
+    if (cmd.assertField == "entities_removed") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().entitiesRemoved);
+        return true;
+    }
+
+    // SceneDiagnostics lifecycle counters
+    if (cmd.assertField == "enter_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().enterCount);
+        return true;
+    }
+    if (cmd.assertField == "exit_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().exitCount);
+        return true;
+    }
+    if (cmd.assertField == "pause_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().pauseCount);
+        return true;
+    }
+    if (cmd.assertField == "resume_count") {
+        if (targetScene)
+            fieldValue = static_cast<double>(targetScene->getDiagnostics().resumeCount);
+        return true;
+    }
+    if (cmd.assertField == "is_focused") {
+        if (targetScene)
+            fieldValue = targetScene->getDiagnostics().isFocused ? 1.0 : 0.0;
         return true;
     }
 
@@ -384,11 +445,38 @@ bool InputScriptExecutor::handleWaitFrames(InputScriptState& state, const Script
 
 bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
                                                  const ScriptCommand& cmd) {
-    const double count = static_cast<double>(m_env.getActiveSceneGroup().sceneNames.size());
-    if (!evaluateComparison(count, cmd.assertOp, cmd.assertValue)) {
-        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
-                  << ": rendered_scene_count (" << static_cast<int>(count) << ") "
-                  << compareOpToString(cmd.assertOp) << " " << static_cast<int>(cmd.assertValue)
+    // Resolve assert value (may be a variable reference)
+    double assertValue = cmd.assertValue;
+    if (!cmd.assertVarRef.empty()) {
+        auto varIt = state.variables.find(cmd.assertVarRef);
+        if (varIt == state.variables.end()) {
+            std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                      << ": undefined variable '$" << cmd.assertVarRef << "'" << std::endl;
+            state.assertionFailed = true;
+            state.currentCommand++;
+            return true;
+        }
+        assertValue = varIt->second;
+    }
+
+    double count = 0.0;
+    std::string fieldLabel;
+
+    if (cmd.assertField.empty() || cmd.assertField == "rendered_scene_count") {
+        count = static_cast<double>(m_env.getActiveSceneGroup().sceneNames.size());
+        fieldLabel = "rendered_scene_count";
+    } else if (cmd.assertField == "scenes_created") {
+        count = static_cast<double>(m_env.getScenesCreated());
+        fieldLabel = "scenes_created";
+    } else if (cmd.assertField == "scenes_removed") {
+        count = static_cast<double>(m_env.getScenesRemoved());
+        fieldLabel = "scenes_removed";
+    }
+
+    if (!evaluateComparison(count, cmd.assertOp, assertValue)) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber << ": "
+                  << fieldLabel << " (" << static_cast<int>(count) << ") "
+                  << compareOpToString(cmd.assertOp) << " " << static_cast<int>(assertValue)
                   << std::endl;
         state.assertionFailed = true;
     }
@@ -403,15 +491,29 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
     const bool inActiveGroup = isSceneInActiveGroup(activeGroup, cmd.assertSceneName);
     double fieldValue = 0.0;
 
+    // Resolve assert value (may be a variable reference)
+    double assertValue = cmd.assertValue;
+    if (!cmd.assertVarRef.empty()) {
+        auto varIt = state.variables.find(cmd.assertVarRef);
+        if (varIt == state.variables.end()) {
+            std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                      << ": undefined variable '$" << cmd.assertVarRef << "'" << std::endl;
+            state.assertionFailed = true;
+            state.currentCommand++;
+            return true;
+        }
+        assertValue = varIt->second;
+    }
+
     if (!tryResolveAssertSceneFieldValue(m_env.getSwapChainExtent(), targetScene, inActiveGroup,
                                          cmd, fieldValue)) {
         std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
                   << ": unknown field '" << cmd.assertField << "'" << std::endl;
         state.assertionFailed = true;
-    } else if (!evaluateComparison(fieldValue, cmd.assertOp, cmd.assertValue)) {
+    } else if (!evaluateComparison(fieldValue, cmd.assertOp, assertValue)) {
         std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber << ": scene \""
                   << cmd.assertSceneName << "\" " << cmd.assertField << " (" << fieldValue << ") "
-                  << compareOpToString(cmd.assertOp) << " " << cmd.assertValue << std::endl;
+                  << compareOpToString(cmd.assertOp) << " " << assertValue << std::endl;
         state.assertionFailed = true;
     }
 

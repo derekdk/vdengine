@@ -4,6 +4,7 @@
  */
 
 #include <vde/api/AudioManager.h>
+#include <vde/api/Entity.h>
 #include <vde/api/Game.h>
 #include <vde/api/GameCamera.h>
 #include <vde/api/LightBox.h>
@@ -11,6 +12,7 @@
 #include <vde/api/PhysicsScene.h>
 #include <vde/api/PhysicsTypes.h>
 #include <vde/api/Scene.h>
+#include <vde/api/TextEntity.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -146,6 +148,9 @@ EntityId Scene::addEntity(Entity::Ref entity) {
     m_entityIndex[id] = m_entities.size();
     m_entities.push_back(entity);
 
+    // Track entity type diagnostics
+    classifyAndIncrementEntity(entity.get());
+
     // Notify entity it's been added
     entity->onAttach(this);
 
@@ -180,6 +185,11 @@ void Scene::removeEntity(EntityId id) {
         return;
     }
 
+    // Track entity type diagnostics before removal
+    if (m_entities[index]) {
+        classifyAndDecrementEntity(m_entities[index].get());
+    }
+
     // Notify entity before removal
     if (m_entities[index]) {
         m_entities[index]->onDetach();
@@ -198,6 +208,14 @@ void Scene::removeEntity(EntityId id) {
 }
 
 void Scene::clearEntities() {
+    // Track diagnostics
+    m_diagnostics.entitiesRemoved += m_entities.size();
+    m_diagnostics.totalEntityCount = 0;
+    m_diagnostics.meshEntityCount = 0;
+    m_diagnostics.spriteEntityCount = 0;
+    m_diagnostics.textEntityCount = 0;
+    m_diagnostics.physicsEntityCount = 0;
+
     // Notify all entities
     for (auto& entity : m_entities) {
         if (entity) {
@@ -234,6 +252,36 @@ void Scene::setCamera(GameCamera* camera) {
 
 void Scene::removeResource(ResourceId id) {
     m_resources.erase(id);
+}
+
+// ============================================================================
+// Entity Type Classification (Diagnostics)
+// ============================================================================
+
+void Scene::classifyAndIncrementEntity(Entity* e) {
+    m_diagnostics.totalEntityCount = m_entities.size();
+    m_diagnostics.entitiesCreated++;
+    if (dynamic_cast<TextEntity*>(e))
+        m_diagnostics.textEntityCount++;
+    if (dynamic_cast<PhysicsEntity*>(e))
+        m_diagnostics.physicsEntityCount++;
+    if (dynamic_cast<MeshEntity*>(e))
+        m_diagnostics.meshEntityCount++;
+    if (dynamic_cast<SpriteEntity*>(e))
+        m_diagnostics.spriteEntityCount++;
+}
+
+void Scene::classifyAndDecrementEntity(Entity* e) {
+    m_diagnostics.totalEntityCount = m_entities.size() - 1;  // size before pop
+    m_diagnostics.entitiesRemoved++;
+    if (dynamic_cast<TextEntity*>(e))
+        m_diagnostics.textEntityCount--;
+    if (dynamic_cast<PhysicsEntity*>(e))
+        m_diagnostics.physicsEntityCount--;
+    if (dynamic_cast<MeshEntity*>(e))
+        m_diagnostics.meshEntityCount--;
+    if (dynamic_cast<SpriteEntity*>(e))
+        m_diagnostics.spriteEntityCount--;
 }
 
 // ============================================================================

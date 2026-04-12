@@ -1,7 +1,11 @@
 # Smoke test for multi-scene demo
-# Tests scene switching
+# Tests scene switching and new diagnostics
 wait startup
 wait 1000
+
+# Verify initial state
+assert rendered_scene_count >= 1
+assert scenes_created >= 1
 
 # Cycle through scenes (if keys are bound)
 press 1

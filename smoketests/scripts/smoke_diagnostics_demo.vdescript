@@ -1,0 +1,70 @@
+# smoke_diagnostics_demo.vdescript
+# Smoke test for the diagnostics demo - exercises all new assertion fields
+# Tests: entity type classification, lifecycle counters, variable references,
+#         global assert fields (scenes_created), dynamic entity management
+
+wait startup
+wait 500
+
+# ---- Initial state: PrimaryScene has 1 Mesh + 1 Sprite + 1 Text ----
+# Total: 3 entities, mesh=1, sprite=2 (Sprite + Text IS-A Sprite), text=1
+assert rendered_scene_count == 1
+assert scene "main" entity_count == 3
+assert scene "main" mesh_entity_count == 1
+assert scene "main" sprite_entity_count == 2
+assert scene "main" text_entity_count == 1
+assert scene "main" physics_entity_count == 0
+assert scene "main" entities_created == 3
+assert scene "main" entities_removed == 0
+assert scene "main" enter_count == 1
+assert scene "main" is_focused == 1
+
+# Global: 2 scenes were added (primary + secondary)
+assert scenes_created >= 2
+
+# ---- Add entities via key presses ----
+press 1
+wait 200
+# Added 1 MeshEntity -> mesh=2, total=4
+assert scene "main" entity_count == 4
+assert scene "main" mesh_entity_count == 2
+
+press 2
+wait 200
+# Added 1 SpriteEntity -> sprite=3, total=5
+assert scene "main" entity_count == 5
+assert scene "main" sprite_entity_count == 3
+
+press 3
+wait 200
+# Added 1 TextEntity -> text=2, sprite=4 (Text IS-A Sprite), total=6
+assert scene "main" entity_count == 6
+assert scene "main" text_entity_count == 2
+assert scene "main" sprite_entity_count == 4
+
+# ---- Use variable reference ----
+set EXPECTED_CREATED 6
+assert scene "main" entities_created == $EXPECTED_CREATED
+
+# ---- Remove last entity ----
+press R
+wait 200
+assert scene "main" entity_count == 5
+assert scene "main" entities_removed == 1
+
+# ---- Clear all entities ----
+press C
+wait 200
+assert scene "main" entity_count == 0
+assert scene "main" mesh_entity_count == 0
+assert scene "main" sprite_entity_count == 0
+assert scene "main" text_entity_count == 0
+assert scene "main" entities_removed >= 6
+
+# ---- Lifecycle: primary scene should only have entered once so far ----
+assert scene "main" enter_count == 1
+assert scene "main" exit_count == 0
+
+print PASS: all diagnostics assertions passed
+wait 500
+exit

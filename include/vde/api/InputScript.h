@@ -103,6 +103,9 @@ struct ScriptCommand {
     // A5: set fields
     std::string setVarName;    ///< Variable name for Set command
     double setVarValue = 0.0;  ///< Variable value for Set command
+
+    // Variable reference for assert RHS (e.g., "$EXPECTED")
+    std::string assertVarRef;  ///< If non-empty, resolve assertValue from this variable at runtime
 };
 
 /**

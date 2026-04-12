@@ -156,6 +156,7 @@ void Game::shutdown() {
     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
         auto it = m_scenes.find(sceneName);
         if (it != m_scenes.end()) {
+            it->second->m_diagnostics.exitCount++;
             it->second->onExit();
         }
     }
@@ -219,6 +220,8 @@ void Game::run() {
                 }
             }
         }
+        m_activeScene->m_diagnostics.enterCount++;
+        m_activeScene->m_diagnostics.isFocused = true;
         m_activeScene->onEnter();
     }
 
@@ -361,6 +364,7 @@ void Game::addScene(const std::string& name, std::unique_ptr<Scene> scene) {
     scene->m_name = name;
     scene->m_game = this;
     m_scenes[name] = std::move(scene);
+    m_scenesCreated++;
 }
 
 void Game::removeScene(const std::string& name) {
@@ -371,6 +375,7 @@ void Game::removeScene(const std::string& name) {
 
     // If this is the active scene, deactivate it
     if (m_activeScene == it->second.get()) {
+        m_activeScene->m_diagnostics.exitCount++;
         m_activeScene->onExit();
         m_activeScene = nullptr;
     }
@@ -380,6 +385,7 @@ void Game::removeScene(const std::string& name) {
                        m_sceneStack.end());
 
     m_scenes.erase(it);
+    m_scenesRemoved++;
 }
 
 Scene* Game::getScene(const std::string& name) {
@@ -419,6 +425,8 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         if (!isInList(group.sceneNames, sceneName)) {
             auto it = m_scenes.find(sceneName);
             if (it != m_scenes.end()) {
+                it->second->m_diagnostics.isFocused = false;
+                it->second->m_diagnostics.exitCount++;
                 it->second->onExit();
             }
         }
@@ -448,9 +456,15 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         if (!isInList(oldGroup.sceneNames, sceneName)) {
             auto it = m_scenes.find(sceneName);
             if (it != m_scenes.end()) {
+                it->second->m_diagnostics.enterCount++;
                 it->second->onEnter();
             }
         }
+    }
+
+    // Set isFocused on the primary scene (first in group)
+    if (m_activeScene) {
+        m_activeScene->m_diagnostics.isFocused = true;
     }
 
     // Apply per-scene viewport rects from group entries (if present)
@@ -475,6 +489,8 @@ void Game::pushScene(const std::string& name) {
 
     // Pause current scene
     if (m_activeScene) {
+        m_activeScene->m_diagnostics.isFocused = false;
+        m_activeScene->m_diagnostics.pauseCount++;
         m_activeScene->onPause();
         // Find current scene name and push to stack
         for (auto& pair : m_scenes) {
@@ -487,6 +503,8 @@ void Game::pushScene(const std::string& name) {
 
     // Activate new scene
     m_activeScene = it->second.get();
+    m_activeScene->m_diagnostics.isFocused = true;
+    m_activeScene->m_diagnostics.enterCount++;
     m_activeScene->onEnter();
 }
 
@@ -497,6 +515,8 @@ void Game::popScene() {
 
     // Exit current scene
     if (m_activeScene) {
+        m_activeScene->m_diagnostics.isFocused = false;
+        m_activeScene->m_diagnostics.exitCount++;
         m_activeScene->onExit();
     }
 
@@ -507,6 +527,8 @@ void Game::popScene() {
     auto it = m_scenes.find(prevName);
     if (it != m_scenes.end()) {
         m_activeScene = it->second.get();
+        m_activeScene->m_diagnostics.isFocused = true;
+        m_activeScene->m_diagnostics.resumeCount++;
         m_activeScene->onResume();
     } else {
         m_activeScene = nullptr;
@@ -562,6 +584,7 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
         }
     }
     if (!alreadyInGroup) {
+        destScene->m_diagnostics.enterCount++;
         destScene->onEnter();
     }
 
@@ -573,6 +596,8 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
         if (!m_transitionSourceScene.empty() && m_transitionSourceScene != m_transitionDestScene) {
             auto srcIt = m_scenes.find(m_transitionSourceScene);
             if (srcIt != m_scenes.end()) {
+                srcIt->second->m_diagnostics.isFocused = false;
+                srcIt->second->m_diagnostics.exitCount++;
                 srcIt->second->onExit();
             }
         }
@@ -581,6 +606,7 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
         auto destIt = m_scenes.find(m_transitionDestScene);
         if (destIt != m_scenes.end()) {
             m_activeScene = destIt->second.get();
+            m_activeScene->m_diagnostics.isFocused = true;
         }
         m_activeSceneGroup = SceneGroup::create(m_transitionDestScene, {m_transitionDestScene});
         m_sceneStack.clear();
@@ -628,6 +654,7 @@ void Game::cancelTransition() {
     if (!m_transitionDestScene.empty() && m_transitionDestScene != m_transitionSourceScene) {
         auto it = m_scenes.find(m_transitionDestScene);
         if (it != m_scenes.end()) {
+            it->second->m_diagnostics.exitCount++;
             it->second->onExit();
         }
     }
@@ -858,6 +885,8 @@ void Game::processPendingSceneChange() {
             continue;  // Will stay active — don't exit
         auto sceneIt = m_scenes.find(sceneName);
         if (sceneIt != m_scenes.end()) {
+            sceneIt->second->m_diagnostics.isFocused = false;
+            sceneIt->second->m_diagnostics.exitCount++;
             sceneIt->second->onExit();
         }
     }
@@ -880,8 +909,12 @@ void Game::processPendingSceneChange() {
     // Enter new scene only if it wasn't already in the group
     m_activeScene = it->second.get();
     if (!wasAlreadyActive) {
+        m_activeScene->m_diagnostics.enterCount++;
         m_activeScene->onEnter();
     }
+
+    // Update focus tracking
+    m_activeScene->m_diagnostics.isFocused = true;
 
     // Rebuild the scheduler graph for the new scene
     rebuildSchedulerGraph();
@@ -1996,7 +2029,27 @@ void Game::updateLightingUBO(const Scene* scene) {
 }
 
 void Game::setFocusedScene(const std::string& sceneName) {
+    // Clear isFocused on the previously focused scene
+    if (!m_focusedSceneName.empty()) {
+        auto prevIt = m_scenes.find(m_focusedSceneName);
+        if (prevIt != m_scenes.end()) {
+            prevIt->second->m_diagnostics.isFocused = false;
+        }
+    } else if (m_activeScene) {
+        m_activeScene->m_diagnostics.isFocused = false;
+    }
+
     m_focusedSceneName = sceneName;
+
+    // Set isFocused on the new focused scene
+    if (!sceneName.empty()) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end()) {
+            it->second->m_diagnostics.isFocused = true;
+        }
+    } else if (m_activeScene) {
+        m_activeScene->m_diagnostics.isFocused = true;
+    }
 }
 
 Scene* Game::getFocusedScene() {

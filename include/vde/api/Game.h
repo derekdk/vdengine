@@ -655,6 +655,10 @@ class Game : private ScriptEnvironment {
     // Input focus for split-screen
     std::string m_focusedSceneName;
 
+    // Scene creation/removal counters (for ScriptEnvironment)
+    size_t m_scenesCreated = 0;
+    size_t m_scenesRemoved = 0;
+
     // Lighting infrastructure (Phase 4)
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool m_lightingDescriptorPool = VK_NULL_HANDLE;
@@ -714,6 +718,8 @@ class Game : private ScriptEnvironment {
     // ScriptEnvironment overrides (private, no public declaration)
     InputHandler* resolveInputHandler() override;
     std::pair<uint32_t, uint32_t> getSwapChainExtent() const override;
+    size_t getScenesCreated() const override { return m_scenesCreated; }
+    size_t getScenesRemoved() const override { return m_scenesRemoved; }
 
     // Internal methods
     void processInput();

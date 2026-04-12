@@ -48,6 +48,12 @@ class ScriptEnvironment {
 
     /// Request engine shutdown.
     virtual void quit() = 0;
+
+    /// Get total number of scenes added to the game via addScene().
+    virtual size_t getScenesCreated() const = 0;
+
+    /// Get total number of scenes removed via removeScene().
+    virtual size_t getScenesRemoved() const = 0;
 };
 
 }  // namespace vde

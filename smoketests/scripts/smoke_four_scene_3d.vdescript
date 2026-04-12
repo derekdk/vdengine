@@ -37,6 +37,18 @@ assert scene "metropolis" not_blank
 assert scene "nature" not_blank
 assert scene "cosmos" not_blank
 
+# Diagnostics: verify entity counts and lifecycle state
+assert scene "crystal" entity_count > 0
+assert scene "crystal" enter_count >= 1
+assert scene "crystal" is_focused == 0
+
+assert scene "metropolis" entity_count > 0
+assert scene "nature" entity_count > 0
+assert scene "cosmos" entity_count > 0
+
+# Global: at least 4 scenes were created
+assert scenes_created >= 4
+
 # A5: Set comparison threshold variable
 set THRESHOLD 0.02
 
