@@ -800,7 +800,8 @@ void VulkanContext::createOffscreenRenderPass() {
     offscreenSubpass.pColorAttachments = &offscreenColorRef;
     offscreenSubpass.pDepthStencilAttachment = &offscreenDepthRef;
 
-    // Dependency 0: external → subpass 0 (matches main render pass for pipeline compatibility)
+    // Dependency 0: external → subpass 0 (matches the main render pass synchronization setup
+    // and stage/access masks for color/depth attachment writes at subpass start)
     VkSubpassDependency offscreenDeps[2]{};
     offscreenDeps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     offscreenDeps[0].dstSubpass = 0;
