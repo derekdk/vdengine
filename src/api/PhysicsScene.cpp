@@ -333,8 +333,11 @@ struct PhysicsScene::Impl {
                 body.accumulatedForce * (body.def.mass > 0.0f ? 1.0f / body.def.mass : 0.0f);
             body.state.velocity += acceleration * dt;
 
-            // Apply damping
-            body.state.velocity *= (1.0f - body.def.linearDamping);
+            // Apply damping: decay rate (1/s) via implicit Euler.
+            // Clamp to >= 0 to prevent energy injection or division-by-zero
+            // when linearDamping is negative (1 + d*dt could reach 0 or go negative).
+            float damping = std::max(0.0f, body.def.linearDamping);
+            body.state.velocity *= 1.0f / (1.0f + damping * dt);
 
             // Integrate position
             body.state.position += body.state.velocity * dt;

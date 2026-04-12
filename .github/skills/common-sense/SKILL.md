@@ -17,6 +17,9 @@ This skill encodes the decision-making standards the AI agent must apply when pl
 
 ## Rules
 
+### Rule 0: Never Guess
+When working in a dynamic system. Always calculate a value instead of guessing it. For example, in a game, never assume you know the window size and aspect ratio. Always query the system for the current values. This ensures that your code will work correctly regardless of the environment it is running in, and prevents bugs that can arise from incorrect assumptions.
+
 ### Rule 1: All decisions have consequences
 
 Every design choice constrains future options. Before committing to an approach:

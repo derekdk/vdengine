@@ -94,8 +94,13 @@ struct PhysicsBodyDef {
     float mass = 1.0f;                 ///< Mass (kg); ignored for Static/Kinematic
     float friction = 0.3f;             ///< Surface friction coefficient
     float restitution = 0.2f;          ///< Bounciness (0 = no bounce, 1 = perfect)
-    float linearDamping = 0.01f;       ///< Linear velocity damping
-    bool isSensor = false;             ///< If true, triggers callbacks but no response
+    float linearDamping = 1.0f;  ///< Linear velocity decay rate (1/s). Each physics step applies
+                                 ///< v *= 1/(1 + linearDamping * dt), giving exponential decay of
+                                 ///< approximately e^(-linearDamping) per second (approximately
+                                 ///< timestep-independent at typical fixed timesteps). A value of
+                                 ///< 1.0 retains ~37% of velocity per second; 0 = no damping.
+                                 ///< Must be >= 0 (negative values are clamped to 0).
+    bool isSensor = false;       ///< If true, triggers callbacks but no response
 
     // -----------------------------------------------------------------
     // Factory methods — named constructors for common body configurations
@@ -108,6 +113,8 @@ struct PhysicsBodyDef {
      * @param mass      Mass in kg (default 1.0)
      * @param restitution Bounciness 0–1 (default 0.2)
      * @param friction  Surface friction (default 0.3)
+     * @note linearDamping defaults to 1.0 (decay rate 1/s). Override on the
+     *       returned def if you need a different value (e.g. 0.0 for space).
      */
     static PhysicsBodyDef dynamicBox(glm::vec2 pos, glm::vec2 halfExt, float mass = 1.0f,
                                      float restitution = 0.2f, float friction = 0.3f) {
@@ -129,6 +136,8 @@ struct PhysicsBodyDef {
      * @param mass      Mass in kg (default 1.0)
      * @param restitution Bounciness 0–1 (default 0.2)
      * @param friction  Surface friction (default 0.1)
+     * @note linearDamping defaults to 1.0 (decay rate 1/s). Override on the
+     *       returned def if you need a different value (e.g. 0.0 for space).
      */
     static PhysicsBodyDef dynamicCircle(glm::vec2 pos, float radius, float mass = 1.0f,
                                         float restitution = 0.2f, float friction = 0.1f) {

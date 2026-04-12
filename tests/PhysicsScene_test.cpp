@@ -700,7 +700,7 @@ TEST_F(PhysicsSceneTest, CollisionEndNotFiredWhenStillOverlapping) {
     defA.position = {0.0f, 0.0f};
     defA.extents = {1.0f, 1.0f};
     defA.mass = 1.0f;
-    defA.linearDamping = 1.0f;  // Heavy damping to keep them overlapping
+    defA.linearDamping = 1.0f;  // Damping to slow body (37% velocity retained/s)
     defA.restitution = 0.0f;
 
     PhysicsBodyDef defB;
@@ -1093,6 +1093,34 @@ TEST(PhysicsBodyDefFactoryTest, KinematicBox) {
     EXPECT_FLOAT_EQ(def.extents.x, 1.0f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.25f);
     EXPECT_FLOAT_EQ(def.mass, 0.0f);
+}
+
+TEST_F(PhysicsSceneTest, LinearDampingReducesVelocityWithoutReversal) {
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    PhysicsScene phys(cfg);
+
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.position = {0.0f, 0.0f};
+    def.extents = {0.5f, 0.5f};
+    def.mass = 1.0f;
+    def.linearDamping = 8.0f;  // High decay rate (8/s) — ~0.03% velocity retained/s
+    def.friction = 0.0f;
+
+    PhysicsBodyId id = phys.createBody(def);
+    phys.applyImpulse(id, {10.0f, 0.0f});
+
+    // Step several times — velocity must always remain positive and decrease
+    float prevVelX = 10.0f;
+    for (int i = 0; i < 10; ++i) {
+        phys.step(cfg.fixedTimestep);
+        glm::vec2 vel = phys.getBodyState(id).velocity;
+        EXPECT_GT(vel.x, 0.0f) << "Velocity reversed sign at step " << i;
+        EXPECT_LT(vel.x, prevVelX) << "Velocity did not decrease at step " << i;
+        prevVelX = vel.x;
+    }
 }
 
 }  // namespace vde::test
