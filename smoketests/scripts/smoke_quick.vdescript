@@ -1,5 +1,5 @@
 # Quick smoke test — shorter for fast CI validation
 # Verifies example launches and exits cleanly
 wait startup
-wait 1000
+wait 3000
 exit

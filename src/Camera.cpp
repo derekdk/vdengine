@@ -1,5 +1,7 @@
 #include <vde/Camera.h>
 
+#include <glm/ext/matrix_clip_space.hpp>
+
 #include <algorithm>
 #include <cmath>
 
@@ -120,8 +122,8 @@ glm::mat4 Camera::getProjectionMatrix() const {
     glm::mat4 proj;
 
     if (m_orthographic) {
-        proj = glm::ortho(m_orthoLeft, m_orthoRight, m_orthoBottom, m_orthoTop, m_nearPlane,
-                          m_farPlane);
+        proj = glm::orthoZO(m_orthoLeft, m_orthoRight, m_orthoBottom, m_orthoTop, m_nearPlane,
+                            m_farPlane);
     } else {
         proj = glm::perspective(glm::radians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
     }

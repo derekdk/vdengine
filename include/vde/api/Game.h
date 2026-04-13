@@ -17,6 +17,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -651,6 +652,8 @@ class Game : private ScriptEnvironment {
     std::string m_pendingScene;
     bool m_sceneSwitchPending = false;
     SceneGroup m_activeSceneGroup;
+    std::unordered_set<std::string>
+        m_activeSceneNames;  ///< Scenes that have been entered and not exited
 
     // Input focus for split-screen
     std::string m_focusedSceneName;

@@ -92,6 +92,7 @@ class PhysicsEntity {
     void applyForce(const glm::vec2& force);
     void applyImpulse(const glm::vec2& impulse);
     void setLinearVelocity(const glm::vec2& velocity);
+    void setDesiredVelocity(const glm::vec2& targetVelocity, float acceleration);
 
     // -----------------------------------------------------------------
     // Synchronisation

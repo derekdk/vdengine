@@ -3,12 +3,11 @@
  * @brief Implementation of the TextEntity class.
  */
 
-#include <vde/api/TextEntity.h>
-
 #include <vde/Texture.h>
 #include <vde/VulkanContext.h>
 #include <vde/api/Game.h>
 #include <vde/api/Scene.h>
+#include <vde/api/TextEntity.h>
 
 namespace vde {
 
@@ -87,11 +86,20 @@ void TextEntity::update(float deltaTime) {
     }
 }
 
+void TextEntity::render() {
+    // Note: rebuildTexture() must NOT be called here — it creates Vulkan
+    // resources which is illegal during an active render pass.  The dirty
+    // flag is handled by update() which runs before the render pass.
+    SpriteEntity::render();
+}
+
 // ============================================================================
 // Internal
 // ============================================================================
 
-void TextEntity::markDirty() { m_dirty = true; }
+void TextEntity::markDirty() {
+    m_dirty = true;
+}
 
 void TextEntity::rebuildTexture() {
     VulkanContext* ctx = nullptr;

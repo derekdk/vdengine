@@ -77,7 +77,7 @@ struct PhysicsScene::Impl {
         PhysicsBody body;
         body.id = id;
         body.def = def;
-        body.state.position = def.position;
+        body.state.position = def.position.value_or(glm::vec2{0.0f, 0.0f});
         body.state.rotation = def.rotation;
         body.state.velocity = {0.0f, 0.0f};
         body.state.isAwake = (def.type == PhysicsBodyType::Dynamic);
@@ -505,6 +505,29 @@ void PhysicsScene::applyImpulse(PhysicsBodyId id, const glm::vec2& impulse) {
 void PhysicsScene::setLinearVelocity(PhysicsBodyId id, const glm::vec2& velocity) {
     auto& body = m_impl->getBody(id);
     body.state.velocity = velocity;
+}
+
+void PhysicsScene::setDesiredVelocity(PhysicsBodyId id, const glm::vec2& targetVelocity,
+                                      float acceleration) {
+    auto& body = m_impl->getBody(id);
+    if (body.def.type != PhysicsBodyType::Dynamic || body.def.mass <= 0.0f) {
+        return;
+    }
+
+    glm::vec2 diff = targetVelocity - body.state.velocity;
+    float diffLen = glm::length(diff);
+    if (diffLen < 1e-6f) {
+        return;  // Already at target
+    }
+
+    // Compute the force needed to achieve the desired acceleration in the diff direction
+    glm::vec2 direction = diff / diffLen;
+    float maxDeltaV = acceleration * m_impl->config.fixedTimestep;
+    float deltaV = std::min(diffLen, maxDeltaV);
+
+    // Apply as a force: F = m * a, where a = deltaV / dt
+    glm::vec2 force = direction * (deltaV / m_impl->config.fixedTimestep) * body.def.mass;
+    body.accumulatedForce += force;
 }
 
 void PhysicsScene::setBodyPosition(PhysicsBodyId id, const glm::vec2& position) {

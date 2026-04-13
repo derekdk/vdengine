@@ -366,4 +366,30 @@ TEST_F(PhysicsEntityTest, RecreateBodyReplacesExisting) {
     EXPECT_EQ(entity->getPhysicsBodyId(), id2);
 }
 
+// ============================================================================
+// Position inheritance from entity (R4 fix)
+// ============================================================================
+
+TEST_F(PhysicsEntityTest, NulloptPositionInheritsEntityPosition) {
+    auto entity = scene->addEntity<PhysicsSpriteEntity>();
+
+    // Place entity at a non-origin position first
+    entity->setPosition(Position(5.0f, 3.0f, 0.0f));
+
+    // Create physics body with no explicit position (nullopt)
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.shape = PhysicsShape::Box;
+    def.extents = {0.5f, 0.5f};
+    def.mass = 1.0f;
+    // def.position is nullopt by default
+
+    PhysicsBodyId id = entity->createPhysicsBody(def);
+
+    // Body should inherit the entity's XY position
+    PhysicsBodyState state = scene->getPhysicsScene()->getBodyState(id);
+    EXPECT_FLOAT_EQ(state.position.x, 5.0f);
+    EXPECT_FLOAT_EQ(state.position.y, 3.0f);
+}
+
 }  // namespace vde::test

@@ -222,6 +222,11 @@ void Game::run() {
         }
         m_activeScene->m_diagnostics.enterCount++;
 
+        // Track all scenes in the initial group as active
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            m_activeSceneNames.insert(sceneName);
+        }
+
         // Set isFocused based on getFocusedScene() to match actual input routing
         for (auto& [name, scenePtr] : m_scenes) {
             if (scenePtr) {
@@ -425,32 +430,25 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         }
     }
 
-    // Build sets for old and new groups to diff them
-    auto isInList = [](const std::vector<std::string>& list, const std::string& name) {
-        for (const auto& n : list) {
-            if (n == name)
-                return true;
-        }
-        return false;
-    };
+    // Build set for new group for fast lookup
+    std::unordered_set<std::string> newGroupSet(group.sceneNames.begin(), group.sceneNames.end());
 
-    // Exit scenes that are in the OLD group but NOT in the NEW group
+    // Exit scenes that are currently active but NOT in the NEW group
     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        if (!isInList(group.sceneNames, sceneName)) {
+        if (newGroupSet.find(sceneName) == newGroupSet.end() &&
+            m_activeSceneNames.count(sceneName) > 0) {
             auto it = m_scenes.find(sceneName);
             if (it != m_scenes.end()) {
                 it->second->m_diagnostics.isFocused = false;
                 it->second->m_diagnostics.exitCount++;
                 it->second->onExit();
+                m_activeSceneNames.erase(sceneName);
             }
         }
     }
 
     // Clear scene stack (group switch resets the stack)
     m_sceneStack.clear();
-
-    // Remember old group for enter logic
-    SceneGroup oldGroup = m_activeSceneGroup;
 
     // Set new group
     m_activeSceneGroup = group;
@@ -465,13 +463,14 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         m_activeScene = nullptr;
     }
 
-    // Enter scenes that are in the NEW group but NOT in the OLD group
+    // Enter scenes that are in the NEW group but NOT currently active
     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        if (!isInList(oldGroup.sceneNames, sceneName)) {
+        if (m_activeSceneNames.count(sceneName) == 0) {
             auto it = m_scenes.find(sceneName);
             if (it != m_scenes.end()) {
                 it->second->m_diagnostics.enterCount++;
                 it->second->onEnter();
+                m_activeSceneNames.insert(sceneName);
             }
         }
     }
@@ -479,7 +478,7 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
     // Refresh focus diagnostics: exactly one scene in the group is focused —
     // the explicitly focused scene if it is in the group, otherwise the primary scene.
     Scene* focusedScene = nullptr;
-    if (!m_focusedSceneName.empty() && isInList(m_activeSceneGroup.sceneNames, m_focusedSceneName)) {
+    if (!m_focusedSceneName.empty() && newGroupSet.count(m_focusedSceneName) > 0) {
         auto focusedIt = m_scenes.find(m_focusedSceneName);
         if (focusedIt != m_scenes.end()) {
             focusedScene = focusedIt->second.get();
@@ -912,34 +911,32 @@ void Game::processPendingSceneChange() {
     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
         if (sceneName == m_pendingScene)
             continue;  // Will stay active — don't exit
-        auto sceneIt = m_scenes.find(sceneName);
-        if (sceneIt != m_scenes.end()) {
-            sceneIt->second->m_diagnostics.isFocused = false;
-            sceneIt->second->m_diagnostics.exitCount++;
-            sceneIt->second->onExit();
+        if (m_activeSceneNames.count(sceneName) > 0) {
+            auto sceneIt = m_scenes.find(sceneName);
+            if (sceneIt != m_scenes.end()) {
+                sceneIt->second->m_diagnostics.isFocused = false;
+                sceneIt->second->m_diagnostics.exitCount++;
+                sceneIt->second->onExit();
+                m_activeSceneNames.erase(sceneName);
+            }
         }
     }
 
     // Clear scene stack (setActiveScene resets the stack)
     m_sceneStack.clear();
 
-    // Check if the pending scene was already in the old group
-    bool wasAlreadyActive = false;
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        if (sceneName == m_pendingScene) {
-            wasAlreadyActive = true;
-            break;
-        }
-    }
+    // Check if the pending scene is already active (tracked by m_activeSceneNames)
+    bool wasAlreadyActive = m_activeSceneNames.count(m_pendingScene) > 0;
 
     // Create a single-scene group
     m_activeSceneGroup = SceneGroup::create(m_pendingScene, {m_pendingScene});
 
-    // Enter new scene only if it wasn't already in the group
+    // Enter new scene only if it wasn't already active
     m_activeScene = it->second.get();
     if (!wasAlreadyActive) {
         m_activeScene->m_diagnostics.enterCount++;
         m_activeScene->onEnter();
+        m_activeSceneNames.insert(m_pendingScene);
     }
 
     // Update focus tracking
@@ -2168,8 +2165,17 @@ void Game::renderMultiViewport() {
         VulkanContext::SceneRenderInfo info{};
         info.clearPass = (i == 0);
 
+        // Compute viewport and scissor from the scene's ViewportRect
+        const ViewportRect& vpRect = scene->getViewportRect();
+        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
+        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
+
         // Get the scene's camera matrices
         if (scene->getCamera()) {
+            // Set aspect ratio BEFORE applying camera so projection is correct
+            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
+            scene->getCamera()->setAspectRatio(vpAspect);
+
             // Apply camera to get internal state updated (positions etc.)
             scene->getCamera()->applyTo(*m_vulkanContext);
             info.viewMatrix = m_vulkanContext->getCamera().getViewMatrix();
@@ -2177,17 +2183,6 @@ void Game::renderMultiViewport() {
         } else {
             info.viewMatrix = glm::mat4(1.0f);
             info.projMatrix = glm::mat4(1.0f);
-        }
-
-        // Compute viewport and scissor from the scene's ViewportRect
-        const ViewportRect& vpRect = scene->getViewportRect();
-        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
-        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
-
-        // Update camera aspect ratio based on viewport dimensions
-        if (scene->getCamera()) {
-            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
-            scene->getCamera()->setAspectRatio(vpAspect);
         }
 
         // Update lighting for this scene
