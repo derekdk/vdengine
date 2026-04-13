@@ -221,7 +221,21 @@ void Game::run() {
             }
         }
         m_activeScene->m_diagnostics.enterCount++;
-        m_activeScene->m_diagnostics.isFocused = true;
+
+        // Set isFocused based on getFocusedScene() to match actual input routing
+        for (auto& [name, scenePtr] : m_scenes) {
+            if (scenePtr) {
+                scenePtr->m_diagnostics.isFocused = false;
+            }
+        }
+        Scene* focusedScene = getFocusedScene();
+        if (!focusedScene) {
+            focusedScene = m_activeScene;
+        }
+        if (focusedScene) {
+            focusedScene->m_diagnostics.isFocused = true;
+        }
+
         m_activeScene->onEnter();
     }
 
@@ -462,9 +476,24 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         }
     }
 
-    // Set isFocused on the primary scene (first in group)
-    if (m_activeScene) {
-        m_activeScene->m_diagnostics.isFocused = true;
+    // Refresh focus diagnostics: exactly one scene in the group is focused —
+    // the explicitly focused scene if it is in the group, otherwise the primary scene.
+    Scene* focusedScene = nullptr;
+    if (!m_focusedSceneName.empty() && isInList(m_activeSceneGroup.sceneNames, m_focusedSceneName)) {
+        auto focusedIt = m_scenes.find(m_focusedSceneName);
+        if (focusedIt != m_scenes.end()) {
+            focusedScene = focusedIt->second.get();
+        }
+    }
+    if (focusedScene == nullptr) {
+        focusedScene = m_activeScene;
+    }
+
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end()) {
+            it->second->m_diagnostics.isFocused = (it->second.get() == focusedScene);
+        }
     }
 
     // Apply per-scene viewport rects from group entries (if present)

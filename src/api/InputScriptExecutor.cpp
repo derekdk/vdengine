@@ -471,6 +471,12 @@ bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
     } else if (cmd.assertField == "scenes_removed") {
         count = static_cast<double>(m_env.getScenesRemoved());
         fieldLabel = "scenes_removed";
+    } else {
+        std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                  << ": unknown scene count field '" << cmd.assertField << "'" << std::endl;
+        state.assertionFailed = true;
+        state.currentCommand++;
+        return true;
     }
 
     if (!evaluateComparison(count, cmd.assertOp, assertValue)) {
