@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_diagnostics_demo.vdescript"]
+priority = 2
+sections = ["entity", "multi_scene"]

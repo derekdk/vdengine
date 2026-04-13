@@ -38,6 +38,33 @@ class PhysicsScene;
 class Texture;
 
 /**
+ * @brief Lightweight per-scene diagnostics counters.
+ *
+ * Maintained incrementally by Scene on entity add/remove and lifecycle
+ * transitions.  Always-on — the cost is a handful of integer increments
+ * per entity mutation.
+ */
+struct SceneDiagnostics {
+    // Entity type counts (maintained incrementally via dynamic_cast)
+    size_t totalEntityCount = 0;    ///< m_entities.size()
+    size_t meshEntityCount = 0;     ///< MeshEntity + PhysicsMeshEntity
+    size_t spriteEntityCount = 0;   ///< SpriteEntity + PhysicsSpriteEntity + TextEntity
+    size_t textEntityCount = 0;     ///< TextEntity only
+    size_t physicsEntityCount = 0;  ///< PhysicsMeshEntity + PhysicsSpriteEntity
+
+    // Entity lifecycle counters (cumulative since scene creation)
+    size_t entitiesCreated = 0;  ///< Incremented on every addEntity call
+    size_t entitiesRemoved = 0;  ///< Incremented on every removeEntity/clear call
+
+    // Scene lifecycle state
+    size_t enterCount = 0;   ///< Number of times onEnter() was called
+    size_t exitCount = 0;    ///< Number of times onExit() was called
+    size_t pauseCount = 0;   ///< Number of times onPause() was called
+    size_t resumeCount = 0;  ///< Number of times onResume() was called
+    bool isFocused = false;  ///< Currently the keyboard-focused scene
+};
+
+/**
  * @brief Represents a game scene/state.
  *
  * A Scene manages a collection of entities, resources, and rendering
@@ -348,6 +375,11 @@ class Scene {
      * @brief Get all entities.
      */
     const std::vector<Entity::Ref>& getEntities() const { return m_entities; }
+
+    /**
+     * @brief Get the scene's diagnostics counters.
+     */
+    const SceneDiagnostics& getDiagnostics() const { return m_diagnostics; }
 
     // Lighting
 
@@ -679,6 +711,15 @@ class Scene {
     // Physics
     std::unique_ptr<PhysicsScene> m_physicsScene;
 
+    // Diagnostics (always-on, negligible overhead)
+    SceneDiagnostics m_diagnostics;
+
+    /// Classify an entity and increment type counters (called from addEntity).
+    void classifyAndIncrementEntity(Entity* e);
+
+    /// Classify an entity and decrement type counters (called from removeEntity).
+    void classifyAndDecrementEntity(Entity* e);
+
     friend class Game;
 };
 
@@ -730,9 +771,7 @@ std::shared_ptr<T> Scene::addEntity(Args&&... args) {
     static_assert(std::is_base_of<Entity, T>::value, "T must derive from Entity");
 
     auto entity = std::make_shared<T>(std::forward<Args>(args)...);
-    m_entityIndex[entity->getId()] = m_entities.size();
-    m_entities.push_back(entity);
-    entity->onAttach(this);
+    addEntity(std::static_pointer_cast<Entity>(entity));
     return entity;
 }
 

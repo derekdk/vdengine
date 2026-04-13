@@ -12,6 +12,7 @@
 #include <vde/api/LightBox.h>
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/Scene.h>
+#include <vde/api/TextEntity.h>
 #include <vde/api/ViewportRect.h>
 #include <vde/api/WorldBounds.h>
 
@@ -636,4 +637,129 @@ TEST_F(SceneTest, CreatePhysicsWallsRequiresPhysics) {
     scene->enablePhysics();
     scene->createPhysicsWalls(10.0f, 8.0f);
     EXPECT_EQ(scene->getEntities().size(), 4u);
+}
+
+// ============================================================================
+// SceneDiagnostics Tests
+// ============================================================================
+
+TEST_F(SceneTest, DiagnosticsDefaultZero) {
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 0u);
+    EXPECT_EQ(d.meshEntityCount, 0u);
+    EXPECT_EQ(d.spriteEntityCount, 0u);
+    EXPECT_EQ(d.textEntityCount, 0u);
+    EXPECT_EQ(d.physicsEntityCount, 0u);
+    EXPECT_EQ(d.entitiesCreated, 0u);
+    EXPECT_EQ(d.entitiesRemoved, 0u);
+    EXPECT_EQ(d.enterCount, 0u);
+    EXPECT_EQ(d.exitCount, 0u);
+    EXPECT_EQ(d.pauseCount, 0u);
+    EXPECT_EQ(d.resumeCount, 0u);
+    EXPECT_FALSE(d.isFocused);
+}
+
+TEST_F(SceneTest, DiagnosticsMeshEntityCounts) {
+    scene->addEntity<MeshEntity>();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.meshEntityCount, 1u);
+    EXPECT_EQ(d.spriteEntityCount, 0u);
+    EXPECT_EQ(d.physicsEntityCount, 0u);
+    EXPECT_EQ(d.entitiesCreated, 1u);
+}
+
+TEST_F(SceneTest, DiagnosticsSpriteEntityCounts) {
+    scene->addEntity<SpriteEntity>();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.meshEntityCount, 0u);
+    EXPECT_EQ(d.spriteEntityCount, 1u);
+    EXPECT_EQ(d.textEntityCount, 0u);
+    EXPECT_EQ(d.physicsEntityCount, 0u);
+}
+
+TEST_F(SceneTest, DiagnosticsTextEntityCountsBothTextAndSprite) {
+    scene->addEntity<TextEntity>();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.spriteEntityCount, 1u);
+    EXPECT_EQ(d.textEntityCount, 1u);
+    EXPECT_EQ(d.meshEntityCount, 0u);
+}
+
+TEST_F(SceneTest, DiagnosticsPhysicsSpriteEntityCounts) {
+    scene->enablePhysics();
+    scene->addEntity<PhysicsSpriteEntity>();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.spriteEntityCount, 1u);
+    EXPECT_EQ(d.physicsEntityCount, 1u);
+    EXPECT_EQ(d.textEntityCount, 0u);
+    EXPECT_EQ(d.meshEntityCount, 0u);
+}
+
+TEST_F(SceneTest, DiagnosticsPhysicsMeshEntityCounts) {
+    scene->enablePhysics();
+    scene->addEntity<PhysicsMeshEntity>();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.meshEntityCount, 1u);
+    EXPECT_EQ(d.physicsEntityCount, 1u);
+    EXPECT_EQ(d.spriteEntityCount, 0u);
+}
+
+TEST_F(SceneTest, DiagnosticsMixedEntityCounts) {
+    scene->enablePhysics();
+    scene->addEntity<MeshEntity>();
+    scene->addEntity<SpriteEntity>();
+    scene->addEntity<TextEntity>();
+    scene->addEntity<PhysicsSpriteEntity>();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 4u);
+    EXPECT_EQ(d.meshEntityCount, 1u);
+    EXPECT_EQ(d.spriteEntityCount, 3u);  // Sprite + Text + PhysicsSprite
+    EXPECT_EQ(d.textEntityCount, 1u);
+    EXPECT_EQ(d.physicsEntityCount, 1u);  // PhysicsSprite
+    EXPECT_EQ(d.entitiesCreated, 4u);
+}
+
+TEST_F(SceneTest, DiagnosticsRemoveEntityDecrementsCounts) {
+    scene->enablePhysics();
+    auto mesh = scene->addEntity<MeshEntity>();
+    auto sprite = scene->addEntity<SpriteEntity>();
+    EntityId meshId = mesh->getId();
+
+    scene->removeEntity(meshId);
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.meshEntityCount, 0u);
+    EXPECT_EQ(d.spriteEntityCount, 1u);
+    EXPECT_EQ(d.entitiesCreated, 2u);
+    EXPECT_EQ(d.entitiesRemoved, 1u);
+}
+
+TEST_F(SceneTest, DiagnosticsClearEntitiesResetsTypeCounts) {
+    scene->addEntity<MeshEntity>();
+    scene->addEntity<SpriteEntity>();
+    scene->addEntity<MeshEntity>();
+
+    scene->clearEntities();
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 0u);
+    EXPECT_EQ(d.meshEntityCount, 0u);
+    EXPECT_EQ(d.spriteEntityCount, 0u);
+    EXPECT_EQ(d.textEntityCount, 0u);
+    EXPECT_EQ(d.physicsEntityCount, 0u);
+    EXPECT_EQ(d.entitiesCreated, 3u);
+    EXPECT_EQ(d.entitiesRemoved, 3u);
+}
+
+TEST_F(SceneTest, DiagnosticsAddEntityRefBySharedPtr) {
+    auto entity = std::make_shared<MeshEntity>();
+    scene->addEntity(entity);
+    const auto& d = scene->getDiagnostics();
+    EXPECT_EQ(d.totalEntityCount, 1u);
+    EXPECT_EQ(d.meshEntityCount, 1u);
+    EXPECT_EQ(d.entitiesCreated, 1u);
 }

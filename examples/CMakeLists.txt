@@ -269,3 +269,6 @@ add_custom_target(vde_emoji_font_sync ALL
 )
 
 add_dependencies(vde_emoji_demo vde_emoji_font_sync)
+
+# Diagnostics demo - showcases SceneDiagnostics and smoke test assertion features
+add_vde_example(vde_diagnostics_demo "diagnostics_demo/main.cpp")

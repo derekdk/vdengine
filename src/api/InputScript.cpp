@@ -529,24 +529,31 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
         }
         std::string subVerb = toLower(tokens[1]);
 
-        if (subVerb == "rendered_scene_count") {
-            // assert rendered_scene_count <op> <value>
+        if (subVerb == "rendered_scene_count" || subVerb == "scenes_created" ||
+            subVerb == "scenes_removed") {
+            // assert rendered_scene_count|scenes_created|scenes_removed <op> <value>
             if (tokens.size() < 4) {
-                errorMsg = "at line " + std::to_string(lineNumber) +
-                           ": 'assert rendered_scene_count' requires <op> <value>";
+                errorMsg = "at line " + std::to_string(lineNumber) + ": 'assert " + subVerb +
+                           "' requires <op> <value>";
                 return false;
             }
             cmd.type = InputCommandType::AssertSceneCount;
+            cmd.assertField = subVerb;
             if (!parseCompareOp(tokens[2], cmd.assertOp, errorMsg)) {
                 errorMsg = "at line " + std::to_string(lineNumber) + ": " + errorMsg;
                 return false;
             }
-            try {
-                cmd.assertValue = std::stod(tokens[3]);
-            } catch (...) {
-                errorMsg = "at line " + std::to_string(lineNumber) + ": invalid assert value '" +
-                           tokens[3] + "'";
-                return false;
+            // Handle $VAR_NAME references
+            if (!tokens[3].empty() && tokens[3][0] == '$') {
+                cmd.assertVarRef = tokens[3].substr(1);
+            } else {
+                try {
+                    cmd.assertValue = std::stod(tokens[3]);
+                } catch (...) {
+                    errorMsg = "at line " + std::to_string(lineNumber) +
+                               ": invalid assert value '" + tokens[3] + "'";
+                    return false;
+                }
             }
         } else if (subVerb == "scene") {
             // assert scene "name" <field> <op> <value>
@@ -579,8 +586,12 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
 
             // Validate known field names
             static const std::vector<std::string> knownFields = {
-                "was_rendered",   "draw_calls",      "entities_drawn",
-                "viewport_width", "viewport_height", "not_blank"};
+                "was_rendered",      "draw_calls",           "entities_drawn",
+                "viewport_width",    "viewport_height",      "not_blank",
+                "entity_count",      "mesh_entity_count",    "sprite_entity_count",
+                "text_entity_count", "physics_entity_count", "entities_created",
+                "entities_removed",  "enter_count",          "exit_count",
+                "pause_count",       "resume_count",         "is_focused"};
             bool validField = false;
             for (const auto& f : knownFields) {
                 if (cmd.assertField == f) {
@@ -609,12 +620,14 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
                     errorMsg = "at line " + std::to_string(lineNumber) + ": " + errorMsg;
                     return false;
                 }
-                // Handle "true"/"false" as 1.0/0.0
+                // Handle "true"/"false" as 1.0/0.0, or $VAR_NAME references
                 std::string valStr = toLower(remTokens[2]);
                 if (valStr == "true") {
                     cmd.assertValue = 1.0;
                 } else if (valStr == "false") {
                     cmd.assertValue = 0.0;
+                } else if (!remTokens[2].empty() && remTokens[2][0] == '$') {
+                    cmd.assertVarRef = remTokens[2].substr(1);
                 } else {
                     try {
                         cmd.assertValue = std::stod(remTokens[2]);
@@ -627,7 +640,9 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
             }
         } else {
             errorMsg = "at line " + std::to_string(lineNumber) + ": unknown assert type '" +
-                       tokens[1] + "' (expected 'rendered_scene_count' or 'scene')";
+                       tokens[1] +
+                       "' (expected 'rendered_scene_count', 'scenes_created', 'scenes_removed', "
+                       "or 'scene')";
             return false;
         }
     }

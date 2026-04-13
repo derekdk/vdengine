@@ -45,9 +45,13 @@ class MockScriptEnv : public ScriptEnvironment {
     std::pair<uint32_t, uint32_t> getSwapChainExtent() const override { return {1280, 720}; }
     void setExitCode(int code) override { exitCode = code; }
     void quit() override { quitCalled = true; }
+    size_t getScenesCreated() const override { return scenesCreated; }
+    size_t getScenesRemoved() const override { return scenesRemoved; }
 
     int exitCode = 0;
     bool quitCalled = false;
+    size_t scenesCreated = 0;
+    size_t scenesRemoved = 0;
 };
 
 ScriptCommand makeCommand(InputCommandType type) {
@@ -155,6 +159,124 @@ TEST(InputScriptExecutor, AssertSceneCountFailureSetsExitCode) {
     auto* s = executor.getState();
     ASSERT_NE(s, nullptr);
     EXPECT_TRUE(s->finished);
+    EXPECT_TRUE(s->assertionFailed);
+    EXPECT_EQ(env.exitCode, 1);
+}
+
+// ============================================================================
+// Global assert fields: scenes_created, scenes_removed
+// ============================================================================
+
+TEST(InputScriptExecutor, AssertScenesCreatedResolvesFromEnvironment) {
+    MockScriptEnv env;
+    env.scenesCreated = 5;
+
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand cmd = makeCommand(InputCommandType::AssertSceneCount);
+    cmd.assertField = "scenes_created";
+    cmd.assertOp = CompareOp::Eq;
+    cmd.assertValue = 5.0;
+    state->commands = {cmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    auto* s = executor.getState();
+    EXPECT_TRUE(s->finished);
+    EXPECT_FALSE(s->assertionFailed);
+}
+
+TEST(InputScriptExecutor, AssertScenesRemovedResolvesFromEnvironment) {
+    MockScriptEnv env;
+    env.scenesRemoved = 2;
+
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand cmd = makeCommand(InputCommandType::AssertSceneCount);
+    cmd.assertField = "scenes_removed";
+    cmd.assertOp = CompareOp::Ge;
+    cmd.assertValue = 1.0;
+    state->commands = {cmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    auto* s = executor.getState();
+    EXPECT_TRUE(s->finished);
+    EXPECT_FALSE(s->assertionFailed);
+}
+
+TEST(InputScriptExecutor, AssertScenesCreatedFailsOnMismatch) {
+    MockScriptEnv env;
+    env.scenesCreated = 1;
+
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand cmd = makeCommand(InputCommandType::AssertSceneCount);
+    cmd.assertField = "scenes_created";
+    cmd.assertOp = CompareOp::Ge;
+    cmd.assertValue = 5.0;
+    state->commands = {cmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    auto* s = executor.getState();
+    EXPECT_TRUE(s->assertionFailed);
+    EXPECT_EQ(env.exitCode, 1);
+}
+
+// ============================================================================
+// Variable references ($VAR_NAME) in assert RHS
+// ============================================================================
+
+TEST(InputScriptExecutor, AssertGlobalWithVariableReference) {
+    MockScriptEnv env;
+    env.activeGroup.sceneNames = {"a", "b", "c"};
+
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    // set EXPECTED 3
+    ScriptCommand setCmd = makeCommand(InputCommandType::Set);
+    setCmd.setVarName = "EXPECTED";
+    setCmd.setVarValue = 3.0;
+    // assert rendered_scene_count == $EXPECTED
+    ScriptCommand assertCmd = makeCommand(InputCommandType::AssertSceneCount);
+    assertCmd.assertField = "rendered_scene_count";
+    assertCmd.assertOp = CompareOp::Eq;
+    assertCmd.assertVarRef = "EXPECTED";
+    state->commands = {setCmd, assertCmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    auto* s = executor.getState();
+    EXPECT_TRUE(s->finished);
+    EXPECT_FALSE(s->assertionFailed);
+}
+
+TEST(InputScriptExecutor, AssertWithUndefinedVariableReferenceFailsGracefully) {
+    MockScriptEnv env;
+    env.activeGroup.sceneNames = {"a"};
+
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand assertCmd = makeCommand(InputCommandType::AssertSceneCount);
+    assertCmd.assertField = "rendered_scene_count";
+    assertCmd.assertOp = CompareOp::Eq;
+    assertCmd.assertVarRef = "UNDEFINED_VAR";
+    state->commands = {assertCmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    auto* s = executor.getState();
     EXPECT_TRUE(s->assertionFailed);
     EXPECT_EQ(env.exitCode, 1);
 }
