@@ -1002,6 +1002,7 @@ int main(int argc, char** argv) {
     FourScene3DDemo demo;
 
     // Configure input script and timeout from CLI args if provided
+    // (resolve paths from user's CWD before changing working directory)
     if (argc > 0 && argv != nullptr) {
         vde::configureInputScriptFromArgs(demo, argc, argv);
         float timeout = vde::examples::parseTimeoutArg(argc, argv);
@@ -1010,6 +1011,8 @@ int main(int argc, char** argv) {
             vde::examples::detail::cliTimeoutOverride() = timeout;
         }
     }
+
+    vde::examples::setWorkingDirectoryToExecutablePath();
 
     vde::GameSettings settings;
     settings.gameName = "VDE Four Scene 3D Demo";

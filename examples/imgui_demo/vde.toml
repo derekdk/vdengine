@@ -2,3 +2,10 @@
 scripts = ["smoke_imgui.vdescript"]
 priority = 1
 sections = ["ui", "entity", "lighting"]
+
+[render_verify]
+scripts = ["verify_imgui_demo.vdescript"]
+capture_script = "capture_imgui_demo.vdescript"
+priority = 1
+golden = "imgui_demo.png"
+threshold = 0.06

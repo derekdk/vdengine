@@ -1,0 +1,9 @@
+# Golden image capture: breakout demo
+# Captures initial game state (paddle, ball, bricks)
+wait startup
+wait_frames 20
+
+screenshot render_verify_output/breakout_demo.png
+wait 100
+
+exit

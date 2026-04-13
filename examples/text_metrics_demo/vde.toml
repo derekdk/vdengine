@@ -2,3 +2,10 @@
 scripts = ["smoke_text_metrics_demo.vdescript"]
 priority = 1
 sections = ["text", "ui"]
+
+[render_verify]
+scripts = ["verify_text_metrics_demo.vdescript"]
+capture_script = "capture_text_metrics_demo.vdescript"
+priority = 1
+golden = "text_metrics_demo.png"
+threshold = 0.03

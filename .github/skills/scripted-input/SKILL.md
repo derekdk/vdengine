@@ -108,15 +108,28 @@ exit                  # Quit the application
 | `loop <label> <count>` | Jump back to label N times | `loop loop_start 5` |
 | `exit` (or `quit`) | Quit the application | `exit` |
 
-### Screenshot (Experimental)
+### Screenshot and Image Comparison
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `screenshot <path>` | Capture frame to PNG (with frame number) | `screenshot output.png` |
+| `screenshot <path>` | Capture current frame to a PNG file | `screenshot render_verify_output/frame.png` |
+| `compare <actual> <golden> <threshold>` | Compare two PNG files using FLIP perceptual metric | `compare render_verify_output/frame.png ../../smoketests/golden/frame.png 0.05` |
 
-**Note:** Screenshot automatically injects frame number: `output.png` → `output_frame_0042.png`
+**screenshot** saves the path exactly as given, resolved relative to the exe's working directory (which is the exe's own directory after `setWorkingDirectoryToExecutablePath()` runs). Create the output directory before calling screenshot; VDE will not create it.
 
-**Current Status:** Filename handling implemented; pixel capture requires Vulkan readback (see TODO in `Game.cpp`).
+**compare** loads two PNG images and computes the [NVIDIA FLIP](https://github.com/NVlabs/flip) mean error (perceptual quality metric). If the error exceeds `<threshold>`, the script fails with a non-zero exit code. FLIP is display-referred and sRGB-aware, so it catches meaningful visual differences while tolerating minor GPU-to-GPU variation.
+
+**Path guidance for verify scripts** — because examples change cwd to their exe directory:
+- Screenshots: `render_verify_output/<name>.png` (relative to exe dir)
+- Golden images: `../../smoketests/golden/<name>.png` (relative to exe dir, resolves to repo root)
+
+**Threshold guidance:**
+
+| Scene type | Recommended threshold |
+|------------|-----------------------|
+| Static geometry / text | 0.03 |
+| Standard 3D / sprites | 0.05 |
+| UI overlays (ImGui) | 0.06 |
 
 ## Comments and Formatting
 
@@ -256,13 +269,13 @@ int main(int argc, char** argv) {
 
 ### Batch Smoke Testing
 
-Use the smoke test runner (if available):
+Use the smoke test runner:
 
 ```powershell
-.\scripts\tmp_run_examples_check.ps1
+.\scripts\smoke-test.ps1
 ```
 
-This script runs all examples with their smoke scripts and reports results.
+This script runs all examples with their smoke scripts and reports results. See the **smoke-testing** skill for the full reference.
 
 ## Best Practices
 

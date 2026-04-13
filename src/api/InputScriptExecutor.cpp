@@ -13,7 +13,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <vector>
 
+#include "FLIP.h"
 #include "stb_image.h"
 
 namespace vde {
@@ -28,14 +30,13 @@ void emitScriptCharInput(InputHandler& handler, int keyCode) {
     }
 }
 
-std::string makeScreenshotFramePath(const std::string& basePath, uint64_t frameNumber) {
-    const size_t dotPos = basePath.find_last_of('.');
-    if (dotPos == std::string::npos) {
-        return basePath + "_frame_" + std::to_string(frameNumber) + ".png";
+std::string makeScreenshotFramePath(const std::string& basePath, uint64_t /*frameNumber*/) {
+    // Return the path as-is so screenshot/compare can use matching paths.
+    // The frame number was historically appended but no scripts depend on it.
+    if (basePath.find_last_of('.') == std::string::npos) {
+        return basePath + ".png";
     }
-
-    return basePath.substr(0, dotPos) + "_frame_" + std::to_string(frameNumber) +
-           basePath.substr(dotPos);
+    return basePath;
 }
 
 bool isSceneInActiveGroup(const SceneGroup& group, const std::string& sceneName) {
@@ -143,16 +144,34 @@ bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, S
     return false;
 }
 
-double computeImageRmse(const unsigned char* imageA, const unsigned char* imageB,
-                        size_t sampleCount) {
-    double sumSqErr = 0.0;
-    for (size_t i = 0; i < sampleCount; ++i) {
-        const double diff =
-            (static_cast<double>(imageA[i]) - static_cast<double>(imageB[i])) / 255.0;
-        sumSqErr += diff * diff;
+double computeFlipMeanError(const unsigned char* imageA, const unsigned char* imageB, int width,
+                            int height) {
+    const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+    std::vector<float> refLinear(pixelCount * 3);
+    std::vector<float> testLinear(pixelCount * 3);
+
+    for (size_t i = 0; i < pixelCount; ++i) {
+        for (int c = 0; c < 3; ++c) {
+            float srgb = static_cast<float>(imageA[i * 4 + c]) / 255.0f;
+            refLinear[i * 3 + c] = FLIP::color3::sRGBToLinearRGB(srgb);
+
+            srgb = static_cast<float>(imageB[i * 4 + c]) / 255.0f;
+            testLinear[i * 3 + c] = FLIP::color3::sRGBToLinearRGB(srgb);
+        }
     }
 
-    return std::sqrt(sumSqErr / static_cast<double>(sampleCount));
+    FLIP::Parameters params;
+    params.PPD = FLIP::calculatePPD(0.7f, static_cast<float>(width), 0.4f);
+
+    float meanError = 0.0f;
+    float* errorMap = nullptr;
+
+    FLIP::evaluate(refLinear.data(), testLinear.data(), width, height, false, params, false, true,
+                   meanError, &errorMap);
+
+    // FLIP::evaluate() allocates errorMap with new[]; caller owns it
+    delete[] errorMap;
+    return static_cast<double>(meanError);
 }
 
 }  // namespace
@@ -552,15 +571,15 @@ bool InputScriptExecutor::handleCompare(InputScriptState& state, const ScriptCom
                   << ") vs golden (" << goldenWidth << "x" << goldenHeight << ")" << std::endl;
         state.assertionFailed = true;
     } else {
-        const size_t sampleCount = static_cast<size_t>(actualWidth) * actualHeight * 4;
-        const double rmse = computeImageRmse(actualImage, goldenImage, sampleCount);
-        if (rmse > cmd.compareThreshold) {
+        const double error =
+            computeFlipMeanError(actualImage, goldenImage, actualWidth, actualHeight);
+        if (error > cmd.compareThreshold) {
             std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
-                      << ": image mismatch — RMSE " << rmse << " > threshold "
+                      << ": image mismatch — FLIP " << error << " > threshold "
                       << cmd.compareThreshold << std::endl;
             state.assertionFailed = true;
         } else {
-            std::cout << "[VDE:InputScript] compare PASSED (RMSE " << rmse
+            std::cout << "[VDE:InputScript] compare PASSED (FLIP " << error
                       << " <= " << cmd.compareThreshold << ")" << std::endl;
         }
     }

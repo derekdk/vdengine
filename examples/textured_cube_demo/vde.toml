@@ -2,3 +2,10 @@
 scripts = ["smoke_textured_cube.vdescript"]
 priority = 2
 sections = ["entity", "resource"]
+
+[render_verify]
+scripts = ["verify_textured_cube.vdescript"]
+capture_script = "capture_textured_cube.vdescript"
+priority = 1
+golden = "textured_cube.png"
+threshold = 0.05

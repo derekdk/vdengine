@@ -2,3 +2,10 @@
 scripts = ["smoke_sprite.vdescript"]
 priority = 1
 sections = ["entity", "resource"]
+
+[render_verify]
+scripts = ["verify_sprite_demo.vdescript"]
+capture_script = "capture_sprite_demo.vdescript"
+priority = 1
+golden = "sprite_demo.png"
+threshold = 0.05

@@ -2,3 +2,10 @@
 scripts = ["smoke_breakout.vdescript"]
 priority = 1
 sections = ["physics", "input", "entity"]
+
+[render_verify]
+scripts = ["verify_breakout_demo.vdescript"]
+capture_script = "capture_breakout_demo.vdescript"
+priority = 1
+golden = "breakout_demo.png"
+threshold = 0.05

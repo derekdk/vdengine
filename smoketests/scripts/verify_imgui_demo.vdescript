@@ -1,0 +1,10 @@
+# Render verification: ImGui demo
+# Captures default ImGui layout at startup
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/imgui_demo.png
+wait 100
+compare render_verify_output/imgui_demo.png ../../smoketests/golden/imgui_demo.png 0.06
+
+exit

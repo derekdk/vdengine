@@ -26,6 +26,7 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Deferred Commands & Thread Safety](#deferred-commands--thread-safety)
 - [Common Types](#common-types)
 - [World Coordinates & Bounds](#world-coordinates--bounds)
+- [Scripted Input & Render Verification](#scripted-input--render-verification)
 - [Examples](#examples)
 
 ---
@@ -1795,6 +1796,127 @@ vde::Direction::right();     // (1, 0, 0)
 
 ```cpp
 vde::Rotation rot(45.0f, 90.0f, 0.0f);  // pitch, yaw, roll (degrees)
+
+---
+
+## Scripted Input & Render Verification
+
+VDE's scripted input system drives automation, smoke testing, and render verification. Scripts use a plain-text `.vdescript` format and are supplied via CLI argument, environment variable, or API call.
+
+### Providing a Script
+
+| Method | Example |
+|--------|--------|
+| CLI argument (highest priority) | `vde_my_demo.exe --input-script smoketests/scripts/smoke_my_demo.vdescript` |
+| Environment variable | `$env:VDE_INPUT_SCRIPT = 'path/to/script.vdescript'` |
+| API call | `game.setInputScriptFile("path/to/script.vdescript")` |
+
+**Important:** call `configureInputScriptFromArgs(game, argc, argv)` **before** `setWorkingDirectoryToExecutablePath()` so CLI-supplied paths resolve from the user's launch directory.
+
+### Command Reference
+
+#### Timing
+
+| Command | Description |
+|---------|-------------|
+| `wait startup` | Wait for first frame to render |
+| `wait <ms>` | Wait N milliseconds |
+| `wait <N>s` | Wait N seconds |
+| `wait_frames <N>` | Wait N rendered frames |
+
+#### Keyboard
+
+| Command | Description |
+|---------|-------------|
+| `press <key>` | Keydown + keyup |
+| `press <mod>+<key>` | With modifier (`ctrl`, `shift`, `alt`) |
+| `keydown <key>` | Hold key down |
+| `keyup <key>` | Release key |
+
+#### Mouse
+
+| Command | Description |
+|---------|-------------|
+| `click <x> <y>` | Left-click at pixel position |
+| `click right <x> <y>` | Right-click |
+| `mousedown / mouseup <x> <y>` | Press / release left button |
+| `mousemove <x> <y>` | Move cursor |
+| `scroll <x> <y> <delta>` | Scroll wheel |
+
+#### Assertions
+
+| Command | Description |
+|---------|-------------|
+| `assert rendered_scene_count == N` | Verify number of active scenes |
+| `assert scene "name" was_rendered == true` | Verify a named scene rendered |
+| `assert scene "name" not_blank` | Verify scene is not a blank frame |
+
+#### Screenshot and Image Comparison
+
+| Command | Description |
+|---------|-------------|
+| `screenshot <path>` | Save current frame to a PNG file |
+| `compare <actual> <golden> <threshold>` | Compare two PNGs using NVIDIA FLIP |
+
+**`screenshot <path>`** — saves the file at the given path, resolved relative to the exe's working directory (the exe's own directory after `setWorkingDirectoryToExecutablePath()` runs). The subdirectory must already exist.
+
+**`compare <actual> <golden> <threshold>`** — loads both PNGs and computes the [NVIDIA FLIP](https://github.com/NVlabs/flip) perceptual mean error. If the error exceeds `<threshold>`, the script exits with a non-zero code. FLIP is display-referred and sRGB-aware.
+
+Path guidance (paths are relative to the exe directory):
+
+```vdescript
+# Screenshot goes to build_ninja/examples/render_verify_output/
+screenshot render_verify_output/my_demo.png
+
+# Golden image path uses ../.. to reach repo root's smoketests/golden/
+compare render_verify_output/my_demo.png ../../smoketests/golden/my_demo.png 0.05
+```
+
+**FLIP threshold guidance:**
+
+| Scene type | Threshold |
+|------------|-----------|
+| Static geometry / text | 0.03 |
+| Standard 3D / sprites | 0.05 |
+| UI overlays (ImGui) | 0.06 |
+
+#### Control Flow
+
+| Command | Description |
+|---------|-------------|
+| `label <name>` | Define a jump target |
+| `loop <label> <count>` | Jump back N times (0 = infinite) |
+| `set VAR <value>` | Define a script variable |
+| `print <message>` | Print to console |
+| `exit` / `quit` | Quit the application |
+
+### Render Verification Workflow
+
+Render verification compares screenshots against committed golden images. It runs as Stage 4 in `verify.ps1`.
+
+```powershell
+# Capture golden images
+.\scripts\render-verify.ps1 -UpdateGolden -Extended
+
+# Verify against golden images
+.\scripts\render-verify.ps1
+
+# Full verification pipeline (build + tests + smoke + render verify)
+.\scripts\verify.ps1
+```
+
+Each example opts into render verification via its `vde.toml`:
+
+```toml
+[render_verify]
+scripts = ["verify_my_demo.vdescript"]
+capture_script = "capture_my_demo.vdescript"
+priority = 1
+golden = "my_demo.png"
+threshold = 0.05
+```
+
+See the **render-verify** skill for the full step-by-step guide.
 ```
 
 ### Scale

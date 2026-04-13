@@ -356,4 +356,52 @@ Validation layer warnings appear in key output lines. These may not cause a non-
 ### Environment contamination
 
 The script clears `VDE_INPUT_SCRIPT` to prevent stale environment variable contamination. If you set this variable manually in your shell, it will be cleared for the duration of the smoke test run.
+
+## Render Verification
+
+Beyond smoke tests (which verify launch/exit), VDE has a separate **render verification** system that compares screenshots against golden images using the [NVIDIA FLIP](https://github.com/NVlabs/flip) perceptual metric. See the **render-verify** skill for the full guide.
+
+### vde.toml: adding render_verify metadata
+
+To opt an example into render verification, add a `[render_verify]` section to its `vde.toml`:
+
+```toml
+[render_verify]
+scripts = ["verify_my_demo.vdescript"]
+capture_script = "capture_my_demo.vdescript"
+priority = 1
+golden = "my_demo.png"
+threshold = 0.05
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `scripts` | yes | Array with the verify script filename (uses FLIP compare) |
+| `capture_script` | yes | Script filename used only with `-UpdateGolden` (no compare step) |
+| `golden` | yes | Golden image filename (stored in `smoketests/golden/`) |
+| `threshold` | yes | FLIP mean error threshold (0.03 text, 0.05 normal, 0.06 UI) |
+| `priority` | no | `1` (default) runs in normal mode; `2` requires `-Extended` |
+
+### Creating verify and capture scripts
+
+**Verify script** (`smoketests/scripts/verify_<name>.vdescript`):
+```vdescript
+wait startup
+wait_frames 30
+screenshot render_verify_output/<name>.png
+wait 100
+compare render_verify_output/<name>.png ../../smoketests/golden/<name>.png 0.05
+exit
+```
+
+**Capture script** (`smoketests/scripts/capture_<name>.vdescript`) — identical but no `compare`:
+```vdescript
+wait startup
+wait_frames 30
+screenshot render_verify_output/<name>.png
+wait 100
+exit
+```
+
+Both paths are relative to the exe's working directory (the exe's own directory after `setWorkingDirectoryToExecutablePath()`). Use `../../smoketests/golden/` to reach the repo root's golden directory.
 ```

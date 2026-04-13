@@ -1,0 +1,9 @@
+# Golden image capture: ImGui demo
+# Captures default ImGui layout at startup
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/imgui_demo.png
+wait 100
+
+exit

@@ -1,0 +1,13 @@
+# Render verification: textured cube demo
+# Captures frame after cube rotation stabilizes, compares against golden image
+wait startup
+wait_frames 30
+
+# Capture deterministic frame
+screenshot render_verify_output/textured_cube.png
+wait 100
+
+# Compare against golden reference using FLIP
+compare render_verify_output/textured_cube.png ../../smoketests/golden/textured_cube.png 0.05
+
+exit

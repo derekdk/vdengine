@@ -1,0 +1,9 @@
+# Golden image capture: text metrics demo
+# Captures text rendering output
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/text_metrics_demo.png
+wait 100
+
+exit

@@ -2,3 +2,10 @@
 scripts = ["smoke_materials.vdescript"]
 priority = 1
 sections = ["lighting", "entity"]
+
+[render_verify]
+scripts = ["verify_materials_lighting.vdescript"]
+capture_script = "capture_materials_lighting.vdescript"
+priority = 1
+golden = "materials_lighting.png"
+threshold = 0.05

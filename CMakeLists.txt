@@ -297,6 +297,7 @@ target_include_directories(vde PUBLIC
 target_include_directories(vde PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/flip
     ${miniaudio_SOURCE_DIR}
 )
 

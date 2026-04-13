@@ -1,0 +1,10 @@
+# Render verification: materials and lighting demo
+# Tests default material rendering at startup (before any user input)
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/materials_lighting.png
+wait 100
+compare render_verify_output/materials_lighting.png ../../smoketests/golden/materials_lighting.png 0.05
+
+exit
