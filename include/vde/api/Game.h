@@ -743,6 +743,13 @@ class Game : private ScriptEnvironment {
     void renderSingleViewport();
     void renderMultiViewport();
     void renderTransition();
+
+    // Centralized scene lifecycle helpers.
+    // Always update diagnostics + m_activeSceneNames + call the scene callback.
+    // Idempotent: activateScene is a no-op if already active, deactivateScene
+    // is a no-op if not active.  This prevents double-enter / double-exit bugs.
+    void activateScene(const std::string& name);
+    void deactivateScene(const std::string& name);
 };
 
 }  // namespace vde
