@@ -131,8 +131,8 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         // Create sprites demonstrating resource sharing
         createSpriteGrid();
 
-        // Set up 2D camera
-        auto camera = std::make_unique<vde::Camera2D>();
+        // Set up 2D camera sized to fit the sprite grid
+        auto camera = std::make_unique<vde::Camera2D>(12.0f, 9.0f);
         camera->setPosition(0.0f, 0.0f);
         setCamera(std::move(camera));
 

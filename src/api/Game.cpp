@@ -152,16 +152,14 @@ void Game::shutdown() {
     // Call shutdown hook
     onShutdown();
 
-    // Deactivate all scenes in the active group
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        auto it = m_scenes.find(sceneName);
-        if (it != m_scenes.end()) {
-            it->second->m_diagnostics.exitCount++;
-            it->second->onExit();
-        }
+    // Deactivate all currently active scenes
+    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
+    for (const auto& sceneName : activeScenes) {
+        deactivateScene(sceneName);
     }
     m_activeScene = nullptr;
     m_activeSceneGroup = SceneGroup{};
+    m_activeSceneNames.clear();  // Defensive: ensure clean state on shutdown
 
     // Clear all scenes
     m_scenes.clear();
@@ -220,7 +218,10 @@ void Game::run() {
                 }
             }
         }
-        m_activeScene->m_diagnostics.enterCount++;
+        // Enter all scenes in the initial group
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            activateScene(sceneName);
+        }
 
         // Set isFocused based on getFocusedScene() to match actual input routing
         for (auto& [name, scenePtr] : m_scenes) {
@@ -235,8 +236,6 @@ void Game::run() {
         if (focusedScene) {
             focusedScene->m_diagnostics.isFocused = true;
         }
-
-        m_activeScene->onEnter();
     }
 
     // Build the initial scheduler task graph
@@ -387,10 +386,10 @@ void Game::removeScene(const std::string& name) {
         return;
     }
 
-    // If this is the active scene, deactivate it
-    if (m_activeScene == it->second.get()) {
-        m_activeScene->m_diagnostics.exitCount++;
-        m_activeScene->onExit();
+    // If this scene is active, deactivate it
+    bool wasActiveScene = (m_activeScene == it->second.get());
+    deactivateScene(name);
+    if (wasActiveScene) {
         m_activeScene = nullptr;
     }
 
@@ -425,32 +424,19 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         }
     }
 
-    // Build sets for old and new groups to diff them
-    auto isInList = [](const std::vector<std::string>& list, const std::string& name) {
-        for (const auto& n : list) {
-            if (n == name)
-                return true;
-        }
-        return false;
-    };
+    // Build set for new group for fast lookup
+    std::unordered_set<std::string> newGroupSet(group.sceneNames.begin(), group.sceneNames.end());
 
-    // Exit scenes that are in the OLD group but NOT in the NEW group
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        if (!isInList(group.sceneNames, sceneName)) {
-            auto it = m_scenes.find(sceneName);
-            if (it != m_scenes.end()) {
-                it->second->m_diagnostics.isFocused = false;
-                it->second->m_diagnostics.exitCount++;
-                it->second->onExit();
-            }
+    // Exit scenes that are currently active but NOT in the NEW group
+    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
+    for (const auto& sceneName : activeScenes) {
+        if (newGroupSet.find(sceneName) == newGroupSet.end()) {
+            deactivateScene(sceneName);
         }
     }
 
     // Clear scene stack (group switch resets the stack)
     m_sceneStack.clear();
-
-    // Remember old group for enter logic
-    SceneGroup oldGroup = m_activeSceneGroup;
 
     // Set new group
     m_activeSceneGroup = group;
@@ -465,21 +451,15 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
         m_activeScene = nullptr;
     }
 
-    // Enter scenes that are in the NEW group but NOT in the OLD group
+    // Enter scenes that are in the NEW group but NOT currently active
     for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        if (!isInList(oldGroup.sceneNames, sceneName)) {
-            auto it = m_scenes.find(sceneName);
-            if (it != m_scenes.end()) {
-                it->second->m_diagnostics.enterCount++;
-                it->second->onEnter();
-            }
-        }
+        activateScene(sceneName);
     }
 
     // Refresh focus diagnostics: exactly one scene in the group is focused —
     // the explicitly focused scene if it is in the group, otherwise the primary scene.
     Scene* focusedScene = nullptr;
-    if (!m_focusedSceneName.empty() && isInList(m_activeSceneGroup.sceneNames, m_focusedSceneName)) {
+    if (!m_focusedSceneName.empty() && newGroupSet.count(m_focusedSceneName) > 0) {
         auto focusedIt = m_scenes.find(m_focusedSceneName);
         if (focusedIt != m_scenes.end()) {
             focusedScene = focusedIt->second.get();
@@ -532,9 +512,8 @@ void Game::pushScene(const std::string& name) {
 
     // Activate new scene
     m_activeScene = it->second.get();
+    activateScene(name);
     m_activeScene->m_diagnostics.isFocused = true;
-    m_activeScene->m_diagnostics.enterCount++;
-    m_activeScene->onEnter();
 }
 
 void Game::popScene() {
@@ -544,9 +523,7 @@ void Game::popScene() {
 
     // Exit current scene
     if (m_activeScene) {
-        m_activeScene->m_diagnostics.isFocused = false;
-        m_activeScene->m_diagnostics.exitCount++;
-        m_activeScene->onExit();
+        deactivateScene(m_activeScene->getName());
     }
 
     // Resume previous scene
@@ -604,31 +581,16 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
     m_transitionDestScene = name;
 
     // Enter the destination scene (so it starts receiving updates)
-    Scene* destScene = it->second.get();
-    bool alreadyInGroup = false;
-    for (const auto& gn : m_activeSceneGroup.sceneNames) {
-        if (gn == name) {
-            alreadyInGroup = true;
-            break;
-        }
-    }
-    if (!alreadyInGroup) {
-        destScene->m_diagnostics.enterCount++;
-        destScene->onEnter();
-    }
+    // activateScene is idempotent — no-op if already active
+    activateScene(name);
 
     // Start the transition
     m_transitionManager->start(std::move(transition), duration, [this]() {
         // Transition complete callback
 
-        // Exit the source scene
+        // Deactivate the source scene
         if (!m_transitionSourceScene.empty() && m_transitionSourceScene != m_transitionDestScene) {
-            auto srcIt = m_scenes.find(m_transitionSourceScene);
-            if (srcIt != m_scenes.end()) {
-                srcIt->second->m_diagnostics.isFocused = false;
-                srcIt->second->m_diagnostics.exitCount++;
-                srcIt->second->onExit();
-            }
+            deactivateScene(m_transitionSourceScene);
         }
 
         // Set active scene to the destination
@@ -639,6 +601,10 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
         }
         m_activeSceneGroup = SceneGroup::create(m_transitionDestScene, {m_transitionDestScene});
         m_sceneStack.clear();
+
+        // Rebuild m_activeSceneNames to match the new single-scene group
+        m_activeSceneNames.clear();
+        m_activeSceneNames.insert(m_transitionDestScene);
 
         // Clear transition state
         m_transitionSourceScene.clear();
@@ -681,11 +647,7 @@ void Game::cancelTransition() {
 
     // Exit the destination scene since we're reverting to source
     if (!m_transitionDestScene.empty() && m_transitionDestScene != m_transitionSourceScene) {
-        auto it = m_scenes.find(m_transitionDestScene);
-        if (it != m_scenes.end()) {
-            it->second->m_diagnostics.exitCount++;
-            it->second->onExit();
-        }
+        deactivateScene(m_transitionDestScene);
     }
 
     m_transitionManager->cancel();
@@ -908,39 +870,23 @@ void Game::processPendingSceneChange() {
         return;
     }
 
-    // Exit scenes in the current group that are NOT the pending scene
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+    // Exit currently active scenes that are NOT the pending scene
+    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
+    for (const auto& sceneName : activeScenes) {
         if (sceneName == m_pendingScene)
             continue;  // Will stay active — don't exit
-        auto sceneIt = m_scenes.find(sceneName);
-        if (sceneIt != m_scenes.end()) {
-            sceneIt->second->m_diagnostics.isFocused = false;
-            sceneIt->second->m_diagnostics.exitCount++;
-            sceneIt->second->onExit();
-        }
+        deactivateScene(sceneName);
     }
 
     // Clear scene stack (setActiveScene resets the stack)
     m_sceneStack.clear();
 
-    // Check if the pending scene was already in the old group
-    bool wasAlreadyActive = false;
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        if (sceneName == m_pendingScene) {
-            wasAlreadyActive = true;
-            break;
-        }
-    }
-
     // Create a single-scene group
     m_activeSceneGroup = SceneGroup::create(m_pendingScene, {m_pendingScene});
 
-    // Enter new scene only if it wasn't already in the group
+    // Enter new scene (activateScene is a no-op if already active)
     m_activeScene = it->second.get();
-    if (!wasAlreadyActive) {
-        m_activeScene->m_diagnostics.enterCount++;
-        m_activeScene->onEnter();
-    }
+    activateScene(m_pendingScene);
 
     // Update focus tracking
     m_activeScene->m_diagnostics.isFocused = true;
@@ -2168,8 +2114,17 @@ void Game::renderMultiViewport() {
         VulkanContext::SceneRenderInfo info{};
         info.clearPass = (i == 0);
 
+        // Compute viewport and scissor from the scene's ViewportRect
+        const ViewportRect& vpRect = scene->getViewportRect();
+        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
+        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
+
         // Get the scene's camera matrices
         if (scene->getCamera()) {
+            // Set aspect ratio BEFORE applying camera so projection is correct
+            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
+            scene->getCamera()->setAspectRatio(vpAspect);
+
             // Apply camera to get internal state updated (positions etc.)
             scene->getCamera()->applyTo(*m_vulkanContext);
             info.viewMatrix = m_vulkanContext->getCamera().getViewMatrix();
@@ -2177,17 +2132,6 @@ void Game::renderMultiViewport() {
         } else {
             info.viewMatrix = glm::mat4(1.0f);
             info.projMatrix = glm::mat4(1.0f);
-        }
-
-        // Compute viewport and scissor from the scene's ViewportRect
-        const ViewportRect& vpRect = scene->getViewportRect();
-        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
-        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
-
-        // Update camera aspect ratio based on viewport dimensions
-        if (scene->getCamera()) {
-            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
-            scene->getCamera()->setAspectRatio(vpAspect);
         }
 
         // Update lighting for this scene
@@ -2415,6 +2359,34 @@ void Game::renderTransition() {
                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
                              &presentBarrier);
     });
+}
+
+void Game::activateScene(const std::string& name) {
+    if (m_activeSceneNames.count(name) > 0) {
+        return;  // Already active — prevent double-enter
+    }
+    auto it = m_scenes.find(name);
+    if (it == m_scenes.end()) {
+        return;
+    }
+    it->second->m_diagnostics.enterCount++;
+    m_activeSceneNames.insert(name);
+    it->second->onEnter();
+}
+
+void Game::deactivateScene(const std::string& name) {
+    if (m_activeSceneNames.count(name) == 0) {
+        return;  // Not active — prevent double-exit
+    }
+    auto it = m_scenes.find(name);
+    if (it == m_scenes.end()) {
+        m_activeSceneNames.erase(name);  // Clean up stale entry
+        return;
+    }
+    it->second->m_diagnostics.isFocused = false;
+    it->second->m_diagnostics.exitCount++;
+    m_activeSceneNames.erase(name);
+    it->second->onExit();
 }
 
 void Game::rebuildSchedulerGraph() {

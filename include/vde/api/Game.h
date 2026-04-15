@@ -17,6 +17,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -651,6 +652,8 @@ class Game : private ScriptEnvironment {
     std::string m_pendingScene;
     bool m_sceneSwitchPending = false;
     SceneGroup m_activeSceneGroup;
+    std::unordered_set<std::string>
+        m_activeSceneNames;  ///< Scenes that have been entered and not exited
 
     // Input focus for split-screen
     std::string m_focusedSceneName;
@@ -740,6 +743,13 @@ class Game : private ScriptEnvironment {
     void renderSingleViewport();
     void renderMultiViewport();
     void renderTransition();
+
+    // Centralized scene lifecycle helpers.
+    // Always update diagnostics + m_activeSceneNames + call the scene callback.
+    // Idempotent: activateScene is a no-op if already active, deactivateScene
+    // is a no-op if not active.  This prevents double-enter / double-exit bugs.
+    void activateScene(const std::string& name);
+    void deactivateScene(const std::string& name);
 };
 
 }  // namespace vde

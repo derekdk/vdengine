@@ -43,15 +43,23 @@ PhysicsBodyId PhysicsEntity::createPhysicsBody(const PhysicsBodyDef& def) {
         m_physicsScene->destroyBody(m_physicsBodyId);
     }
 
-    m_physicsBodyId = m_physicsScene->createBody(def);
+    // If position is not explicitly set, inherit from the entity's current XY position
+    PhysicsBodyDef resolvedDef = def;
+    if (!resolvedDef.position.has_value() && m_owner) {
+        Position ownerPos = m_owner->getPosition();
+        resolvedDef.position = glm::vec2(ownerPos.x, ownerPos.y);
+    }
+
+    m_physicsBodyId = m_physicsScene->createBody(resolvedDef);
 
     // Initialise interpolation state
-    m_prevPosition = def.position;
-    m_prevRotation = def.rotation;
+    glm::vec2 bodyPos = resolvedDef.position.value_or(glm::vec2{0.0f, 0.0f});
+    m_prevPosition = bodyPos;
+    m_prevRotation = resolvedDef.rotation;
 
     // Place the visual entity at the initial position
     if (m_owner) {
-        m_owner->setPosition(Position(def.position.x, def.position.y, 0.0f));
+        m_owner->setPosition(Position(bodyPos.x, bodyPos.y, 0.0f));
     }
 
     return m_physicsBodyId;
@@ -83,6 +91,12 @@ void PhysicsEntity::applyImpulse(const glm::vec2& impulse) {
 void PhysicsEntity::setLinearVelocity(const glm::vec2& velocity) {
     if (m_physicsScene && m_physicsBodyId != INVALID_PHYSICS_BODY_ID) {
         m_physicsScene->setLinearVelocity(m_physicsBodyId, velocity);
+    }
+}
+
+void PhysicsEntity::setDesiredVelocity(const glm::vec2& targetVelocity, float acceleration) {
+    if (m_physicsScene && m_physicsBodyId != INVALID_PHYSICS_BODY_ID) {
+        m_physicsScene->setDesiredVelocity(m_physicsBodyId, targetVelocity, acceleration);
     }
 }
 

@@ -323,9 +323,37 @@ void Camera2D::updateCamera() {
                              halfWidth,    // right
                              -halfHeight,  // bottom
                              halfHeight,   // top
-                             0.1f,         // near
-                             100.0f        // far
+                             m_nearPlane,  // near
+                             m_farPlane    // far
     );
+}
+
+void Camera2D::applyTo(VulkanContext& context) {
+    // Ensure internal camera state is fresh before copying to context
+    updateCamera();
+
+    Camera& cam = context.getCamera();
+
+    float halfWidth = (m_viewportWidth * 0.5f) / m_zoom;
+    float halfHeight = (m_viewportHeight * 0.5f) / m_zoom;
+
+    cam.setOrthographic(-halfWidth, halfWidth, -halfHeight, halfHeight, m_nearPlane, m_farPlane);
+
+    cam.setPosition(m_camera.getPosition());
+    cam.setTarget(m_camera.getTarget());
+    cam.setUp(m_camera.getUp());
+}
+
+Rect2D Camera2D::getVisibleRect() const {
+    float halfWidth = (m_viewportWidth * 0.5f) / m_zoom;
+    float halfHeight = (m_viewportHeight * 0.5f) / m_zoom;
+
+    return Rect2D{
+        m_position.x - halfWidth,   // left
+        m_position.x + halfWidth,   // right
+        m_position.y - halfHeight,  // bottom
+        m_position.y + halfHeight   // top
+    };
 }
 
 }  // namespace vde

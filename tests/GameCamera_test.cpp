@@ -411,3 +411,73 @@ TEST_F(ScreenToWorldRayTest, SimpleCameraScreenToWorldRay) {
     // Center ray should hit a sphere at origin
     EXPECT_TRUE(ray.hitsSphere(glm::vec3(0.0f), 1.0f));
 }
+
+// ============================================================================
+// Camera2D projection regression tests (R1 fix)
+// ============================================================================
+
+TEST_F(Camera2DTest, ProjectionMatrixIsOrthographic) {
+    // Camera2D(16, 9) at origin with zoom = 1 should produce an orthographic
+    // projection matrix where proj[3][3] == 1.
+    glm::mat4 proj = camera->getProjectionMatrix();
+    EXPECT_FLOAT_EQ(proj[3][3], 1.0f);
+
+    // proj[2][3] should be 0 for orthographic (perspective would have -1)
+    EXPECT_FLOAT_EQ(proj[2][3], 0.0f);
+}
+
+TEST_F(Camera2DTest, ViewportEdgesProjectWithinNDC) {
+    // Camera2D(16, 9) at origin: points at ±8, ±4.5 should project to NDC ±1.
+    Camera2D cam(16.0f, 9.0f);
+    glm::mat4 vp = cam.getViewProjectionMatrix();
+
+    // Right edge (+8, 0, 0) should project to NDC x ~ +1
+    glm::vec4 rightEdge = vp * glm::vec4(8.0f, 0.0f, 0.0f, 1.0f);
+    float ndcX = rightEdge.x / rightEdge.w;
+    EXPECT_NEAR(ndcX, 1.0f, 0.01f);
+
+    // Left edge (-8, 0, 0) should project to NDC x ~ -1
+    glm::vec4 leftEdge = vp * glm::vec4(-8.0f, 0.0f, 0.0f, 1.0f);
+    ndcX = leftEdge.x / leftEdge.w;
+    EXPECT_NEAR(ndcX, -1.0f, 0.01f);
+
+    // Top edge (0, +4.5, 0) — note: Vulkan Y-flip means top maps to NDC -1
+    glm::vec4 topEdge = vp * glm::vec4(0.0f, 4.5f, 0.0f, 1.0f);
+    float ndcY = topEdge.y / topEdge.w;
+    EXPECT_NEAR(std::fabs(ndcY), 1.0f, 0.01f);
+}
+
+// ============================================================================
+// Camera2D::getVisibleRect Tests (R6 fix)
+// ============================================================================
+
+TEST_F(Camera2DTest, GetVisibleRectDefaultAtOrigin) {
+    // Camera2D(16, 9) at origin, zoom=1 → rect = (-8, 8, -4.5, 4.5)
+    Camera2D cam(20.0f, 15.0f);
+    Rect2D rect = cam.getVisibleRect();
+    EXPECT_FLOAT_EQ(rect.left, -10.0f);
+    EXPECT_FLOAT_EQ(rect.right, 10.0f);
+    EXPECT_FLOAT_EQ(rect.bottom, -7.5f);
+    EXPECT_FLOAT_EQ(rect.top, 7.5f);
+}
+
+TEST_F(Camera2DTest, GetVisibleRectShiftedPosition) {
+    Camera2D cam(20.0f, 15.0f);
+    cam.setPosition(5.0f, 3.0f);
+    Rect2D rect = cam.getVisibleRect();
+    EXPECT_FLOAT_EQ(rect.left, -5.0f);
+    EXPECT_FLOAT_EQ(rect.right, 15.0f);
+    EXPECT_FLOAT_EQ(rect.bottom, -4.5f);
+    EXPECT_FLOAT_EQ(rect.top, 10.5f);
+}
+
+TEST_F(Camera2DTest, GetVisibleRectWithZoom) {
+    Camera2D cam(20.0f, 15.0f);
+    cam.setZoom(2.0f);
+    Rect2D rect = cam.getVisibleRect();
+    // Zoomed 2x → visible area is half-size
+    EXPECT_FLOAT_EQ(rect.left, -5.0f);
+    EXPECT_FLOAT_EQ(rect.right, 5.0f);
+    EXPECT_FLOAT_EQ(rect.bottom, -3.75f);
+    EXPECT_FLOAT_EQ(rect.top, 3.75f);
+}

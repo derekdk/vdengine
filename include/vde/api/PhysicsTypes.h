@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <optional>
 
 namespace vde {
 
@@ -88,12 +89,15 @@ struct PhysicsConfig {
 struct PhysicsBodyDef {
     PhysicsBodyType type = PhysicsBodyType::Dynamic;  ///< Body type
     PhysicsShape shape = PhysicsShape::Box;           ///< Collision shape
-    glm::vec2 position = {0.0f, 0.0f};                ///< Initial position
-    float rotation = 0.0f;                            ///< Initial rotation (radians)
-    glm::vec2 extents = {0.5f, 0.5f};  ///< Half-extents (box) or {radius, 0} (circle)
-    float mass = 1.0f;                 ///< Mass (kg); ignored for Static/Kinematic
-    float friction = 0.3f;             ///< Surface friction coefficient
-    float restitution = 0.2f;          ///< Bounciness (0 = no bounce, 1 = perfect)
+    std::optional<glm::vec2> position;  ///< Initial position (nullopt = inherit from entity when
+                                        ///< created via PhysicsEntity; otherwise defaults to
+                                        ///< origin {0, 0} when passed directly to
+                                        ///< PhysicsScene::createBody())
+    float rotation = 0.0f;              ///< Initial rotation (radians)
+    glm::vec2 extents = {0.5f, 0.5f};   ///< Half-extents (box) or {radius, 0} (circle)
+    float mass = 1.0f;                  ///< Mass (kg); ignored for Static/Kinematic
+    float friction = 0.3f;              ///< Surface friction coefficient
+    float restitution = 0.2f;           ///< Bounciness (0 = no bounce, 1 = perfect)
     float linearDamping = 1.0f;  ///< Linear velocity decay rate (1/s). Each physics step applies
                                  ///< v *= 1/(1 + linearDamping * dt), giving exponential decay of
                                  ///< approximately e^(-linearDamping) per second (approximately

@@ -133,6 +133,19 @@ class PhysicsScene {
     void setLinearVelocity(PhysicsBodyId id, const glm::vec2& velocity);
 
     /**
+     * @brief Smoothly accelerate a body toward a target velocity.
+     *
+     * Computes and applies a force to move the body toward the desired
+     * velocity at the given acceleration rate. Useful for responsive
+     * player movement without manual force tuning.
+     *
+     * @param id Body to modify (must be Dynamic)
+     * @param targetVelocity The desired velocity to move toward
+     * @param acceleration Rate of velocity change (units/s²)
+     */
+    void setDesiredVelocity(PhysicsBodyId id, const glm::vec2& targetVelocity, float acceleration);
+
+    /**
      * @brief Set the position of a body directly.
      * @param id Body to modify
      * @param position New position

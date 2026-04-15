@@ -118,7 +118,7 @@ class GameCamera {
      *
      * @param context The VulkanContext to apply to
      */
-    void applyTo(VulkanContext& context);
+    virtual void applyTo(VulkanContext& context);
 
     /**
      * @brief Unproject a screen-space point into a world-space ray.
@@ -322,6 +322,18 @@ class OrbitCamera : public GameCamera {
 };
 
 /**
+ * @brief 2D axis-aligned rectangle in world space.
+ *
+ * Used by Camera2D::getVisibleRect() to describe the visible area.
+ */
+struct Rect2D {
+    float left = 0.0f;    ///< Left edge (minimum X)
+    float right = 0.0f;   ///< Right edge (maximum X)
+    float bottom = 0.0f;  ///< Bottom edge (minimum Y)
+    float top = 0.0f;     ///< Top edge (maximum Y)
+};
+
+/**
  * @brief 2D orthographic camera.
  *
  * Use this for 2D games, UI rendering, or top-down views.
@@ -377,6 +389,26 @@ class Camera2D : public GameCamera {
      * @brief Move the camera by a delta.
      */
     void move(float deltaX, float deltaY);
+
+    /**
+     * @brief Get the world-space rectangle currently visible on screen.
+     *
+     * Computes the axis-aligned bounding box of the visible area based on
+     * viewport dimensions, zoom level, and camera position.
+     *
+     * @return Rect2D with left, right, bottom, top edges in world units
+     */
+    Rect2D getVisibleRect() const;
+
+    /**
+     * @brief Apply this camera to a VulkanContext using orthographic projection.
+     *
+     * Overrides the base class to use orthographic projection instead of
+     * perspective, ensuring 2D scenes render correctly.
+     *
+     * @param context The VulkanContext to apply to
+     */
+    void applyTo(VulkanContext& context) override;
 
   protected:
     void updateProjection() override;

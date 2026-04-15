@@ -1034,8 +1034,8 @@ TEST(PhysicsBodyDefFactoryTest, DynamicBoxDefaults) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Dynamic);
     EXPECT_EQ(def.shape, PhysicsShape::Box);
-    EXPECT_FLOAT_EQ(def.position.x, 1.0f);
-    EXPECT_FLOAT_EQ(def.position.y, 2.0f);
+    EXPECT_FLOAT_EQ(def.position->x, 1.0f);
+    EXPECT_FLOAT_EQ(def.position->y, 2.0f);
     EXPECT_FLOAT_EQ(def.extents.x, 0.5f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.3f);
     EXPECT_FLOAT_EQ(def.mass, 1.0f);
@@ -1056,8 +1056,8 @@ TEST(PhysicsBodyDefFactoryTest, DynamicCircleDefaults) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Dynamic);
     EXPECT_EQ(def.shape, PhysicsShape::Circle);
-    EXPECT_FLOAT_EQ(def.position.x, 3.0f);
-    EXPECT_FLOAT_EQ(def.position.y, 4.0f);
+    EXPECT_FLOAT_EQ(def.position->x, 3.0f);
+    EXPECT_FLOAT_EQ(def.position->y, 4.0f);
     EXPECT_FLOAT_EQ(def.extents.x, 0.75f);  // radius stored in extents.x
     EXPECT_FLOAT_EQ(def.mass, 1.0f);
     EXPECT_FLOAT_EQ(def.restitution, 0.2f);
@@ -1077,7 +1077,7 @@ TEST(PhysicsBodyDefFactoryTest, StaticBox) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Static);
     EXPECT_EQ(def.shape, PhysicsShape::Box);
-    EXPECT_FLOAT_EQ(def.position.x, -5.0f);
+    EXPECT_FLOAT_EQ(def.position->x, -5.0f);
     EXPECT_FLOAT_EQ(def.extents.x, 3.0f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.5f);
     EXPECT_FLOAT_EQ(def.mass, 0.0f);
@@ -1088,8 +1088,8 @@ TEST(PhysicsBodyDefFactoryTest, KinematicBox) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Kinematic);
     EXPECT_EQ(def.shape, PhysicsShape::Box);
-    EXPECT_FLOAT_EQ(def.position.x, 2.0f);
-    EXPECT_FLOAT_EQ(def.position.y, 1.0f);
+    EXPECT_FLOAT_EQ(def.position->x, 2.0f);
+    EXPECT_FLOAT_EQ(def.position->y, 1.0f);
     EXPECT_FLOAT_EQ(def.extents.x, 1.0f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.25f);
     EXPECT_FLOAT_EQ(def.mass, 0.0f);
@@ -1121,6 +1121,115 @@ TEST_F(PhysicsSceneTest, LinearDampingReducesVelocityWithoutReversal) {
         EXPECT_LT(vel.x, prevVelX) << "Velocity did not decrease at step " << i;
         prevVelX = vel.x;
     }
+}
+
+// ============================================================================
+// PhysicsBodyDef optional position Tests (R4 fix)
+// ============================================================================
+
+TEST_F(PhysicsSceneTest, DefaultPositionIsNullopt) {
+    PhysicsBodyDef def;
+    EXPECT_FALSE(def.position.has_value());
+}
+
+TEST_F(PhysicsSceneTest, NulloptPositionDefaultsToOriginInCreateBody) {
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.mass = 1.0f;
+    // position is nullopt → should resolve to (0, 0) in createBody
+    PhysicsBodyId id = physics->createBody(def);
+    PhysicsBodyState state = physics->getBodyState(id);
+    EXPECT_FLOAT_EQ(state.position.x, 0.0f);
+    EXPECT_FLOAT_EQ(state.position.y, 0.0f);
+}
+
+TEST_F(PhysicsSceneTest, ExplicitPositionUsedInCreateBody) {
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.position = {7.0f, 2.0f};
+    def.mass = 1.0f;
+    PhysicsBodyId id = physics->createBody(def);
+    PhysicsBodyState state = physics->getBodyState(id);
+    EXPECT_FLOAT_EQ(state.position.x, 7.0f);
+    EXPECT_FLOAT_EQ(state.position.y, 2.0f);
+}
+
+// ============================================================================
+// setDesiredVelocity Tests (R7 fix)
+// ============================================================================
+
+TEST_F(PhysicsSceneTest, SetDesiredVelocityConvergesToTarget) {
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    PhysicsScene phys(cfg);
+
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.position = {0.0f, 0.0f};
+    def.mass = 1.0f;
+    def.linearDamping = 0.0f;
+
+    PhysicsBodyId id = phys.createBody(def);
+
+    // Apply desired velocity for several steps
+    for (int i = 0; i < 60; ++i) {
+        phys.setDesiredVelocity(id, {5.0f, 0.0f}, 10.0f);
+        phys.step(cfg.fixedTimestep);
+    }
+
+    PhysicsBodyState state = phys.getBodyState(id);
+    EXPECT_NEAR(state.velocity.x, 5.0f, 0.5f);
+}
+
+TEST_F(PhysicsSceneTest, SetDesiredVelocityDeceleratesToRest) {
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    PhysicsScene phys(cfg);
+
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.position = {0.0f, 0.0f};
+    def.mass = 1.0f;
+    def.linearDamping = 0.0f;
+
+    PhysicsBodyId id = phys.createBody(def);
+    phys.setLinearVelocity(id, {10.0f, 0.0f});
+
+    // Apply desired velocity of zero for several steps
+    for (int i = 0; i < 60; ++i) {
+        phys.setDesiredVelocity(id, {0.0f, 0.0f}, 10.0f);
+        phys.step(cfg.fixedTimestep);
+    }
+
+    PhysicsBodyState state = phys.getBodyState(id);
+    EXPECT_NEAR(state.velocity.x, 0.0f, 0.5f);
+}
+
+TEST_F(PhysicsSceneTest, SetDesiredVelocitySingleStepRespectsAcceleration) {
+    // Verify that a single step changes velocity by at most acceleration * dt
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    PhysicsScene phys(cfg);
+
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.position = {0.0f, 0.0f};
+    def.mass = 1.0f;
+    def.linearDamping = 0.0f;
+
+    PhysicsBodyId id = phys.createBody(def);
+
+    float acceleration = 5.0f;
+    phys.setDesiredVelocity(id, {100.0f, 0.0f}, acceleration);
+    phys.step(cfg.fixedTimestep);
+
+    PhysicsBodyState state = phys.getBodyState(id);
+    // Velocity change should be acceleration * dt = 5 * (1/60) ≈ 0.0833
+    float expectedDeltaV = acceleration * cfg.fixedTimestep;
+    EXPECT_NEAR(state.velocity.x, expectedDeltaV, 1e-4f);
 }
 
 }  // namespace vde::test
