@@ -8,11 +8,11 @@ A brutally honest assessment of every issue encountered while building the Cosmi
 
 These are defects in the VDE engine itself — not user error, not API design opinions. Broken code.
 
-### 1.1 Camera2D Orthographic Projection Is Silently Ignored
+### 1.1 Camera2D Orthographic Projection Was Silently Ignored (Fixed)
 
 **File:** `src/api/GameCamera.cpp:27`
 
-`GameCamera::applyTo()` unconditionally calls `cam.setPerspective(60.0f, ...)` on the VulkanContext camera. This overwrites Camera2D's carefully computed orthographic projection with a perspective projection. Every 2D scene in the engine is actually rendering through a perspective frustum (FOV=60°, camera at z=10). The Camera2D viewport dimensions are cosmetic — the actual visible area is `tan(30°) × 10 ≈ 5.77` in half-height, regardless of what you pass to `Camera2D(viewWidth, viewHeight)`.
+Before this fix, `GameCamera::applyTo()` unconditionally called `cam.setPerspective(60.0f, ...)` on the VulkanContext camera. That overwrote Camera2D's orthographic projection with a perspective projection. 2D scenes were effectively rendering through a perspective frustum (FOV=60°, camera at z=10), and the Camera2D viewport dimensions were cosmetic — the visible half-height was `tan(30°) × 10 ≈ 5.77`, regardless of what was passed to `Camera2D(viewWidth, viewHeight)`.
 
 **Impact:** `Camera2D(20, 15)` claims the visible Y range is ±7.5, but only ±5.77 is visible. Every existing 2D demo that "works" only works because developers positioned things in the center and never tested the edges. This cost **5+ debugging rounds** of trial-and-error repositioning before the root cause was identified.
 

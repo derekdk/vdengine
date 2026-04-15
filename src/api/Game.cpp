@@ -152,8 +152,9 @@ void Game::shutdown() {
     // Call shutdown hook
     onShutdown();
 
-    // Deactivate all scenes in the active group
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+    // Deactivate all currently active scenes
+    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
+    for (const auto& sceneName : activeScenes) {
         deactivateScene(sceneName);
     }
     m_activeScene = nullptr;
@@ -427,7 +428,8 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
     std::unordered_set<std::string> newGroupSet(group.sceneNames.begin(), group.sceneNames.end());
 
     // Exit scenes that are currently active but NOT in the NEW group
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
+    for (const auto& sceneName : activeScenes) {
         if (newGroupSet.find(sceneName) == newGroupSet.end()) {
             deactivateScene(sceneName);
         }
@@ -868,8 +870,9 @@ void Game::processPendingSceneChange() {
         return;
     }
 
-    // Exit scenes in the current group that are NOT the pending scene
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+    // Exit currently active scenes that are NOT the pending scene
+    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
+    for (const auto& sceneName : activeScenes) {
         if (sceneName == m_pendingScene)
             continue;  // Will stay active — don't exit
         deactivateScene(sceneName);

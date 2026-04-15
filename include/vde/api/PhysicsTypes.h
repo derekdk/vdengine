@@ -89,7 +89,10 @@ struct PhysicsConfig {
 struct PhysicsBodyDef {
     PhysicsBodyType type = PhysicsBodyType::Dynamic;  ///< Body type
     PhysicsShape shape = PhysicsShape::Box;           ///< Collision shape
-    std::optional<glm::vec2> position;  ///< Initial position (nullopt = inherit from entity)
+    std::optional<glm::vec2> position;  ///< Initial position (nullopt = inherit from entity when
+                                        ///< created via PhysicsEntity; otherwise defaults to
+                                        ///< origin {0, 0} when passed directly to
+                                        ///< PhysicsScene::createBody())
     float rotation = 0.0f;              ///< Initial rotation (radians)
     glm::vec2 extents = {0.5f, 0.5f};   ///< Half-extents (box) or {radius, 0} (circle)
     float mass = 1.0f;                  ///< Mass (kg); ignored for Static/Kinematic

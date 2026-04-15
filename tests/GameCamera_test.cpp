@@ -413,12 +413,12 @@ TEST_F(ScreenToWorldRayTest, SimpleCameraScreenToWorldRay) {
 }
 
 // ============================================================================
-// Camera2D::applyTo Tests (R1 fix)
+// Camera2D projection regression tests (R1 fix)
 // ============================================================================
 
-TEST_F(Camera2DTest, ApplyToProducesOrthographicProjection) {
+TEST_F(Camera2DTest, ProjectionMatrixIsOrthographic) {
     // Camera2D(16, 9) at origin with zoom = 1 should produce an orthographic
-    // projection where proj[3][3] == 1 (orthographic marker).
+    // projection matrix where proj[3][3] == 1.
     glm::mat4 proj = camera->getProjectionMatrix();
     EXPECT_FLOAT_EQ(proj[3][3], 1.0f);
 

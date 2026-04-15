@@ -513,6 +513,12 @@ void PhysicsScene::setDesiredVelocity(PhysicsBodyId id, const glm::vec2& targetV
     if (body.def.type != PhysicsBodyType::Dynamic || body.def.mass <= 0.0f) {
         return;
     }
+    if (acceleration <= 0.0f) {
+        return;
+    }
+    if (m_impl->config.fixedTimestep <= 0.0f) {
+        return;
+    }
 
     glm::vec2 diff = targetVelocity - body.state.velocity;
     float diffLen = glm::length(diff);
@@ -523,6 +529,9 @@ void PhysicsScene::setDesiredVelocity(PhysicsBodyId id, const glm::vec2& targetV
     // Compute the force needed to achieve the desired acceleration in the diff direction
     glm::vec2 direction = diff / diffLen;
     float maxDeltaV = acceleration * m_impl->config.fixedTimestep;
+    if (maxDeltaV <= 0.0f) {
+        return;
+    }
     float deltaV = std::min(diffLen, maxDeltaV);
 
     // Apply as a force: F = m * a, where a = deltaV / dt

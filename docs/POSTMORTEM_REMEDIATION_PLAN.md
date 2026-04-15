@@ -2,29 +2,20 @@
 
 Remediation plan for all open issues from [SHOWCASE_DEMO_POSTMORTEM.md](SHOWCASE_DEMO_POSTMORTEM.md).
 
-## Triage: What's Already Fixed
+## Issue Status Summary
 
-| Postmortem Item | Status | Evidence |
-|---|---|---|
-| 1.2 Physics damping reverses velocity | **Fixed** | Timestep-scaled formula + regression test at damping=8.0 |
-| 1.3 Offscreen render pass incompatible | **Fixed** | Both passes now have 1 subpass dependency |
-| 4.1 Smoke test ENTER key doesn't work | **Fixed** | ENTER and RETURN both mapped in InputScript |
-| 4.2 No validation layer gate in smoke tests | **Fixed** | smoke-test.ps1 checks `validation` pattern |
-| 4.4 No physics tests with high damping | **Fixed** | `LinearDampingReducesVelocityWithoutReversal` tests damping=8.0 |
-| 4.3 Existing 2D demos mask camera bug | **Partially addressed** | CameraBounds2D has edge/corner tests, but the GameCamera rendering path is untested |
+This table reflects the current repository status after the fixes implemented in this PR. The phase-by-phase sections below remain as remediation notes/history.
 
-## Remaining Open Issues
-
-| # | Postmortem Ref | Issue | Severity |
-|---|---|---|---|
-| R1 | 1.1 | Camera2D orthographic projection silently overridden by `GameCamera::applyTo()` | Critical |
-| R2 | 1.4 | `setAspectRatio()` called after projection matrix captured in `renderMultiViewport()` | Medium |
-| R3 | 2.3 | SceneGroup re-enters already-active scenes due to stale group state | High |
-| R4 | 2.1 | `PhysicsBodyDef.position` silently overrides entity position | High |
-| R5 | 2.2 | TextEntity requires non-obvious `update(0)` call before text is visible | Medium |
-| R6 | 2.4 | No `Camera2D::getVisibleRect()` API to query actual visible bounds | Medium |
-| R7 | 2.5 | No velocity-based movement helper; `applyForce()` hard to tune | Medium |
-| R8 | 5 | Showcase demo: SceneGroup disabled, workarounds in place, vestigial constants | Medium |
+| # | Postmortem Ref | Issue | Current Status | Severity |
+|---|---|---|---|---|
+| R1 | 1.1 | Camera2D orthographic projection silently overridden by `GameCamera::applyTo()` | **Fixed in codebase** | Critical |
+| R2 | 1.4 | `setAspectRatio()` called after projection matrix captured in `renderMultiViewport()` | **Fixed in codebase** | Medium |
+| R3 | 2.3 | SceneGroup re-enters already-active scenes due to stale group state | **Fixed in codebase** | High |
+| R4 | 2.1 | `PhysicsBodyDef.position` silently overrides entity position | **Fixed in codebase** | High |
+| R5 | 2.2 | TextEntity requires non-obvious `update(0)` call before text is visible | **Open** | Medium |
+| R6 | 2.4 | No `Camera2D::getVisibleRect()` API to query actual visible bounds | **Fixed in codebase** | Medium |
+| R7 | 2.5 | No velocity-based movement helper; `applyForce()` hard to tune | **Fixed in codebase** | Medium |
+| R8 | 5 | Showcase demo: SceneGroup disabled, workarounds in place, vestigial constants | **Open** | Medium |
 
 ---
 
