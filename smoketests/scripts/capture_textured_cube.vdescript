@@ -1,0 +1,9 @@
+# Golden image capture: textured cube demo
+# Captures frame after cube rotation stabilizes
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/textured_cube.png
+wait 100
+
+exit

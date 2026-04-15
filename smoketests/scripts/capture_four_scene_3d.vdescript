@@ -1,0 +1,20 @@
+# Golden image capture: four-scene 3D demo
+# Captures all 4 viewports with structural assertions
+wait startup
+wait_frames 30
+
+# Structural assertions (these don't need golden images)
+assert rendered_scene_count == 4
+assert scene "crystal" was_rendered == true
+assert scene "metropolis" was_rendered == true
+assert scene "nature" was_rendered == true
+assert scene "cosmos" was_rendered == true
+assert scene "crystal" not_blank
+assert scene "metropolis" not_blank
+assert scene "nature" not_blank
+assert scene "cosmos" not_blank
+
+screenshot render_verify_output/four_scene_3d.png
+wait 100
+
+exit

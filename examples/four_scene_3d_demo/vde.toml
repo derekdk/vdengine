@@ -2,3 +2,10 @@
 scripts = ["smoke_four_scene_3d.vdescript"]
 priority = 2
 sections = ["multi_scene", "camera", "entity"]
+
+[render_verify]
+scripts = ["verify_four_scene_3d.vdescript"]
+capture_script = "capture_four_scene_3d.vdescript"
+priority = 1
+golden = "four_scene_3d.png"
+threshold = 0.05

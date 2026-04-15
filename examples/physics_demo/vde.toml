@@ -2,3 +2,10 @@
 scripts = ["smoke_physics_demo.vdescript"]
 priority = 1
 sections = ["physics", "input", "entity"]
+
+[render_verify]
+scripts = ["verify_physics_demo.vdescript"]
+capture_script = "capture_physics_demo.vdescript"
+priority = 1
+golden = "physics_demo.png"
+threshold = 0.05

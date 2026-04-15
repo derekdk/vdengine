@@ -1,0 +1,10 @@
+# Render verification: text metrics demo
+# Text rendering must be pixel-accurate for readability
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/text_metrics_demo.png
+wait 100
+compare render_verify_output/text_metrics_demo.png ../../smoketests/golden/text_metrics_demo.png 0.03
+
+exit

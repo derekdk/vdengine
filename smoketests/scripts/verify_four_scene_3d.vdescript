@@ -1,0 +1,22 @@
+# Render verification: four-scene 3D demo
+# Validates all 4 viewports render correctly, then captures screenshot
+wait startup
+wait_frames 30
+
+# Structural assertions first (fast fail before expensive screenshot)
+assert rendered_scene_count == 4
+assert scene "crystal" was_rendered == true
+assert scene "metropolis" was_rendered == true
+assert scene "nature" was_rendered == true
+assert scene "cosmos" was_rendered == true
+assert scene "crystal" not_blank
+assert scene "metropolis" not_blank
+assert scene "nature" not_blank
+assert scene "cosmos" not_blank
+
+# Golden image comparison
+screenshot render_verify_output/four_scene_3d.png
+wait 100
+compare render_verify_output/four_scene_3d.png ../../smoketests/golden/four_scene_3d.png 0.05
+
+exit

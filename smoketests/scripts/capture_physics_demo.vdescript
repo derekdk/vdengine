@@ -1,0 +1,9 @@
+# Golden image capture: physics demo
+# Captures initial physics scene before simulation progresses
+wait startup
+wait_frames 10
+
+screenshot render_verify_output/physics_demo.png
+wait 100
+
+exit

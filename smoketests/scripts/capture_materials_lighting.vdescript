@@ -1,0 +1,9 @@
+# Golden image capture: materials and lighting demo
+# Captures default material rendering at startup
+wait startup
+wait_frames 30
+
+screenshot render_verify_output/materials_lighting.png
+wait 100
+
+exit

@@ -14,6 +14,7 @@
 #   .\scripts\verify.ps1 -Filter "Suite.*"                        # Targeted unit tests
 #   .\scripts\verify.ps1 -SmokeFilter "*emoji*"                   # Targeted smoke test
 #   .\scripts\verify.ps1 -SkipBuild -SkipSmoke -Filter "Suite.*"  # Fast inner loop
+#   .\scripts\verify.ps1 -SkipRenderVerify                        # Skip render verification
 #
 # Key output files (always overwritten):
 #   logs/verify-latest.log    -- full output of the latest run (read with read_file)
@@ -23,6 +24,8 @@ param(
     [switch]$SkipBuild,
 
     [switch]$SkipSmoke,
+
+    [switch]$SkipRenderVerify,
 
     # GoogleTest filter pattern (passed to test.ps1 -Filter)
     [string]$Filter = "",
@@ -170,6 +173,16 @@ if (-not $SkipSmoke) {
     $smokePass = Invoke-Stage "SMOKE TESTS" "smoke-test.ps1" $smokeArgs
     $stageResults["SMOKE TESTS"] = $smokePass
     if (-not $smokePass) { $overallPass = $false }
+}
+
+# Stage 4: Render Verification
+if (-not $SkipRenderVerify) {
+    $renderArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
+    if ($SmokeFilter) { $renderArgs += "-Filter", $SmokeFilter }
+    if ($SmokeExtended) { $renderArgs += "-Extended" }
+    $renderPass = Invoke-Stage "RENDER VERIFY" "render-verify.ps1" $renderArgs
+    $stageResults["RENDER VERIFY"] = $renderPass
+    if (-not $renderPass) { $overallPass = $false }
 }
 
 # --- Summary ----------------------------------------------------------------

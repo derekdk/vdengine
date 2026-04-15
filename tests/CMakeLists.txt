@@ -78,6 +78,8 @@ set(VDE_TEST_SOURCES
     Game_test.cpp
     AudioManager_test.cpp
     BitmapFont_test.cpp
+    # FLIP image comparison tests
+    FlipCompare_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
@@ -99,10 +101,12 @@ target_link_libraries(vde_tests PRIVATE
 target_include_directories(vde_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/flip
 )
 
 target_compile_definitions(vde_tests PRIVATE
     VDE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
+    VDE_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
 )
 
 # Register tests with CTest

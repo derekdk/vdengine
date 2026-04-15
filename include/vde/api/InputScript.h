@@ -98,7 +98,7 @@ struct ScriptCommand {
 
     // A4: compare fields
     std::string comparePath;        ///< Golden reference image path
-    double compareThreshold = 0.0;  ///< RMSE threshold for Compare
+    double compareThreshold = 0.0;  ///< FLIP error threshold for Compare
 
     // A5: set fields
     std::string setVarName;    ///< Variable name for Set command

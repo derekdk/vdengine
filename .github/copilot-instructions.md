@@ -102,6 +102,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Skip when:** Only running unit tests or the change doesn't affect any runnable executable.  
 **Location:** `.github/skills/smoke-testing/SKILL.md`
 
+### render-verify
+**Purpose:** Guide for VDE's render verification system — golden-image comparison using NVIDIA FLIP.  
+**Use when:** Adding render verification to an example, running `render-verify.ps1`, capturing or updating golden images, or debugging a FLIP comparison failure.  
+**Location:** `.github/skills/render-verify/SKILL.md`
+
 ### test-fix-loop
 **Purpose:** Guide for reproducing failures and iterating quickly with VDE's build and test scripts.  
 **Use when:** Running a tight test-fix-build-test loop for a failing test before widening back to full verification.  
@@ -136,4 +141,6 @@ The following skills provide domain-specific knowledge for working with VDE:
 | Fix a failing test | `test-fix-loop` |
 | Write a new unit test | `create-tests` |
 | Write a smoke test | `scripted-input` + `smoke-testing` |
+| Add render verification to an example | `render-verify` |
+| Capture or update golden images | `render-verify` |
 | Verify before declaring done | `completing-work` + `ai-verification` |
