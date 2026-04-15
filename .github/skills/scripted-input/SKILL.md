@@ -115,7 +115,7 @@ exit                  # Quit the application
 | `screenshot <path>` | Capture current frame to a PNG file | `screenshot render_verify_output/frame.png` |
 | `compare <actual> <golden> <threshold>` | Compare two PNG files using FLIP perceptual metric | `compare render_verify_output/frame.png ../../smoketests/golden/frame.png 0.05` |
 
-**screenshot** saves the path exactly as given, resolved relative to the exe's working directory (which is the exe's own directory after `setWorkingDirectoryToExecutablePath()` runs). Create the output directory before calling screenshot; VDE will not create it.
+**screenshot** saves the path exactly as given, resolved relative to the exe's working directory (which is the exe's own directory after `setWorkingDirectoryToExecutablePath()` runs). VDE attempts to create the screenshot file's parent directory automatically; if directory creation fails, it only warns, so screenshot failures can still indicate an invalid path or filesystem/permission problem.
 
 **compare** loads two PNG images and computes the [NVIDIA FLIP](https://github.com/NVlabs/flip) mean error (perceptual quality metric). If the error exceeds `<threshold>`, the script fails with a non-zero exit code. FLIP is display-referred and sRGB-aware, so it catches meaningful visual differences while tolerating minor GPU-to-GPU variation.
 

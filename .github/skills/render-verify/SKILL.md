@@ -222,9 +222,10 @@ Capture the golden first: `.\scripts\render-verify.ps1 -UpdateGolden -Filter "*m
   Screenshot not found at expected path: C:\...\build_ninja\examples\render_verify_output\my_demo.png
 ```
 
-The capture script ran but the PNG was not created. Possible causes:
-- The `render_verify_output/` directory doesn't exist in the exe dir — VDE does not auto-create it; the first run should create it, but check if there was a cwd mismatch.
+The capture script ran but the PNG was not created at the expected location. Possible causes:
 - The exe exited before the screenshot command executed (script bug or timeout).
+- The screenshot command executed with a cwd/path mismatch, so the PNG was written somewhere else than `build_ninja/examples/render_verify_output/`.
+- Screenshot capture failed earlier in execution. `Game::captureScreenshot()` creates parent directories automatically, so a missing `render_verify_output/` directory usually means the capture step never ran or wrote to a different location.
 
 Run the exe manually to diagnose:
 ```powershell

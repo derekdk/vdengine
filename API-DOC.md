@@ -1858,7 +1858,7 @@ VDE's scripted input system drives automation, smoke testing, and render verific
 | `screenshot <path>` | Save current frame to a PNG file |
 | `compare <actual> <golden> <threshold>` | Compare two PNGs using NVIDIA FLIP |
 
-**`screenshot <path>`** — saves the file at the given path, resolved relative to the exe's working directory (the exe's own directory after `setWorkingDirectoryToExecutablePath()` runs). The subdirectory must already exist.
+**`screenshot <path>`** — saves the file at the given path, resolved relative to the exe's working directory (the exe's own directory after `setWorkingDirectoryToExecutablePath()` runs). Parent directories are created automatically as needed; if directory creation fails, a warning is logged.
 
 **`compare <actual> <golden> <threshold>`** — loads both PNGs and computes the [NVIDIA FLIP](https://github.com/NVlabs/flip) perceptual mean error. If the error exceeds `<threshold>`, the script exits with a non-zero code. FLIP is display-referred and sRGB-aware.
 
