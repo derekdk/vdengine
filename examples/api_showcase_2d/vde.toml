@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_api_showcase_2d.vdescript"]
+priority = 1
+sections = ["entity", "text", "input", "camera", "physics"]

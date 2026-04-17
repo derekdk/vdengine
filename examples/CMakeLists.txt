@@ -272,3 +272,6 @@ add_dependencies(vde_emoji_demo vde_emoji_font_sync)
 
 # Diagnostics demo - showcases SceneDiagnostics and smoke test assertion features
 add_vde_example(vde_diagnostics_demo "diagnostics_demo/main.cpp")
+
+# 2D API Showcase - demonstrates all major 2D features: sprites, text, scrolling, gamepad, physics
+add_vde_example(vde_api_showcase_2d "api_showcase_2d/main.cpp")

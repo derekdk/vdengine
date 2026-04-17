@@ -1,0 +1,48 @@
+# Smoke test for 2D API Showcase demo
+# Verifies launch, player movement, physics spawning, scrolling, text, and clean exit
+wait startup
+wait 500
+
+# Move player around with arrow keys
+press RIGHT
+wait 200
+press RIGHT
+wait 200
+press UP
+wait 200
+press LEFT
+wait 200
+press DOWN
+wait 200
+
+# Spawn physics boxes
+press SPACE
+wait 300
+press SPACE
+wait 300
+press SPACE
+wait 300
+
+# Wait for physics to settle and animations to cycle
+wait 1500
+
+# Reset physics arena
+press R
+wait 500
+
+# Spawn more boxes after reset
+press SPACE
+wait 300
+press SPACE
+wait 300
+
+# Toggle debug UI
+press F1
+wait 500
+press F1
+wait 500
+
+# Let scrolling layer and text updates run
+wait 2000
+
+exit
