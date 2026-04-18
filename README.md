@@ -343,8 +343,10 @@ VDE follows semantic versioning. Current version: **0.1.0**
 
 ## License
 
-This project does not currently include a `LICENSE` file and is presently **unlicensed**.
-Until an official license is added, no permission is granted to use, modify, or redistribute this code beyond what is otherwise allowed by law.
+Copyright (c) 2026 Derek Kowaluk
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+You are free to use, modify, and distribute this software, provided the copyright notice and attribution to Derek Kowaluk are preserved in all copies or substantial portions of the Software.
 
 ## Acknowledgments
 
