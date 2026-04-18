@@ -31,7 +31,7 @@ VDE provides a clean abstraction over Vulkan's verbose API while maintaining fle
 ### Prerequisites
 
 - **CMake 3.20+**
-- **Vulkan SDK 1.3+** ([Download](https://vulkan.lunarg.com/)) — must be installed system-wide; the `VULKAN_SDK` environment variable must be set
+- **Vulkan SDK 1.3+ or Vulkan development packages** — Vulkan must be installed and discoverable by CMake; on Windows, the LunarG SDK is the typical option and usually sets `VULKAN_SDK` ([Download](https://vulkan.lunarg.com/))
 - **C++20 compatible compiler**: Visual Studio 2022 (Windows), GCC 11+, or Clang 14+
 - **Git** (for dependency fetching via CMake FetchContent)
 - **Git LFS** (for asset files) — [Installation Guide](docs/GIT_LFS_SETUP.md)
@@ -84,10 +84,10 @@ For complete documentation see:
 ### Building Manually
 
 ```powershell
-# Ninja (default) — requires a Developer PowerShell for VS 2022
+# Ninja (Debug, default) — requires a Developer PowerShell for VS 2022
 mkdir build_ninja
 cd build_ninja
-cmake .. -G Ninja
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build .
 
 # Run tests
@@ -245,7 +245,7 @@ VDE uses CMake FetchContent for most dependencies. Only the Vulkan SDK requires 
 | **miniaudio** | 0.11.21 | Cross-platform audio |
 | **SQLite3** | 3.49.1 | Persistent key-value storage |
 | **toml++** | v3.4.0 | TOML configuration parsing |
-| **Dear ImGui** | latest | Debug UI (examples and tools only) |
+| **Dear ImGui** | v1.91.8-docking | Debug UI (examples and tools only) |
 | **Google Test** | 1.14.0 | Unit testing |
 
 ## Configuration Options
@@ -340,6 +340,11 @@ Notable examples:
 ## Versioning
 
 VDE follows semantic versioning. Current version: **0.1.0**
+
+## License
+
+This project does not currently include a `LICENSE` file and is presently **unlicensed**.
+Until an official license is added, no permission is granted to use, modify, or redistribute this code beyond what is otherwise allowed by law.
 
 ## Acknowledgments
 
