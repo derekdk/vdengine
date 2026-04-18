@@ -5,8 +5,4 @@ press right
 wait 500
 press left
 wait 500
-press space
-wait 500
-press space
-wait 500
 exit
