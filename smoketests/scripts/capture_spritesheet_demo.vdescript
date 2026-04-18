@@ -1,0 +1,6 @@
+# Golden image capture: spritesheet_demo
+wait startup
+wait_frames 30
+screenshot render_verify_output/spritesheet_demo.png
+wait 100
+exit

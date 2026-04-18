@@ -1,0 +1,11 @@
+[smoke]
+scripts = ["smoke_spritesheet_demo.vdescript"]
+priority = 1
+sections = ["entity", "resource"]
+
+[render_verify]
+scripts = ["verify_spritesheet_demo.vdescript"]
+capture_script = "capture_spritesheet_demo.vdescript"
+priority = 1
+golden = "spritesheet_demo.png"
+threshold = 0.05

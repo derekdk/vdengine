@@ -272,3 +272,6 @@ add_dependencies(vde_emoji_demo vde_emoji_font_sync)
 
 # Diagnostics demo - showcases SceneDiagnostics and smoke test assertion features
 add_vde_example(vde_diagnostics_demo "diagnostics_demo/main.cpp")
+
+# SpriteSheet demo - demonstrates SpriteSheet atlas management and sprite flipping
+add_vde_example(vde_spritesheet_demo "spritesheet_demo/main.cpp")

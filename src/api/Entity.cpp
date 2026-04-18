@@ -326,12 +326,13 @@ void MeshEntity::render() {
 
 SpriteEntity::SpriteEntity()
     : Entity(), m_texture(nullptr), m_textureId(INVALID_RESOURCE_ID), m_color(Color::white()),
-      m_uvX(0.0f), m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f),
-      m_anchorY(0.5f) {}
+      m_uvX(0.0f), m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f), m_anchorY(0.5f),
+      m_flipX(false), m_flipY(false) {}
 
 SpriteEntity::SpriteEntity(ResourceId textureId)
     : Entity(), m_texture(nullptr), m_textureId(textureId), m_color(Color::white()), m_uvX(0.0f),
-      m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f), m_anchorY(0.5f) {}
+      m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f), m_anchorY(0.5f),
+      m_flipX(false), m_flipY(false) {}
 
 void SpriteEntity::setTexture(std::shared_ptr<Texture> texture) {
     if (m_texture && m_texture != texture) {
@@ -467,7 +468,21 @@ void SpriteEntity::render() {
         glm::translate(glm::mat4(1.0f), glm::vec3(0.5f - m_anchorX, 0.5f - m_anchorY, 0.0f));
     pushData.model = getModelMatrix() * anchorOffset;
     pushData.tint = glm::vec4(m_color.r, m_color.g, m_color.b, m_color.a);
-    pushData.uvRect = glm::vec4(m_uvX, m_uvY, m_uvWidth, m_uvHeight);
+
+    // Apply flip by adjusting UV rect: negate width/height and offset origin
+    float uvX = m_uvX;
+    float uvY = m_uvY;
+    float uvW = m_uvWidth;
+    float uvH = m_uvHeight;
+    if (m_flipX) {
+        uvX = uvX + uvW;
+        uvW = -uvW;
+    }
+    if (m_flipY) {
+        uvY = uvY + uvH;
+        uvH = -uvH;
+    }
+    pushData.uvRect = glm::vec4(uvX, uvY, uvW, uvH);
 
     vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(SpritePushConstants), &pushData);

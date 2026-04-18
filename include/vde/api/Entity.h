@@ -186,13 +186,13 @@ class MeshEntity : public Entity {
 
     /**
      * @brief Set the texture directly (takes shared ownership).
-      *
-      * Automatically retires the old texture when this entity is attached to
-      * a scene so in-flight command buffers can finish safely.
-      *
+     *
+     * Automatically retires the old texture when this entity is attached to
+     * a scene so in-flight command buffers can finish safely.
+     *
      * @param texture The texture to use
      */
-     void setTexture(std::shared_ptr<Texture> texture);
+    void setTexture(std::shared_ptr<Texture> texture);
 
     /**
      * @brief Get the texture.
@@ -265,8 +265,8 @@ class SpriteEntity : public Entity {
     /**
      * @brief Set the sprite texture directly (takes shared ownership).
      *
-      * Automatically retires the old texture when this entity is attached to
-      * a scene so in-flight command buffers can finish safely.
+     * Automatically retires the old texture when this entity is attached to
+     * a scene so in-flight command buffers can finish safely.
      *
      * @param texture The texture to render
      */
@@ -325,6 +325,31 @@ class SpriteEntity : public Entity {
      */
     float getAnchorY() const { return m_anchorY; }
 
+    /**
+     * @brief Set horizontal flip state.
+     *
+     * Flipping mirrors the sprite's UVs without affecting the entity's
+     * world-space extents or anchor behavior.
+     * @param flip true to mirror horizontally.
+     */
+    void setFlipX(bool flip) { m_flipX = flip; }
+
+    /**
+     * @brief Set vertical flip state.
+     * @param flip true to mirror vertically.
+     */
+    void setFlipY(bool flip) { m_flipY = flip; }
+
+    /**
+     * @brief Check if the sprite is horizontally flipped.
+     */
+    bool isFlippedX() const { return m_flipX; }
+
+    /**
+     * @brief Check if the sprite is vertically flipped.
+     */
+    bool isFlippedY() const { return m_flipY; }
+
     void render() override;
 
   protected:
@@ -338,6 +363,8 @@ class SpriteEntity : public Entity {
     float m_uvX = 0.0f, m_uvY = 0.0f;
     float m_uvWidth = 1.0f, m_uvHeight = 1.0f;
     float m_anchorX = 0.5f, m_anchorY = 0.5f;
+    bool m_flipX = false;
+    bool m_flipY = false;
 };
 
 }  // namespace vde
