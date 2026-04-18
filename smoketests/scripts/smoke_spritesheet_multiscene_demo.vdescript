@@ -1,0 +1,23 @@
+# Smoke test: spritesheet_multiscene_demo
+# Exercises both scenes and cross-scene SpriteSheet sharing
+wait startup
+wait 500
+# Scene 1: watch characters move on playfield
+wait 1s
+# Switch to detail scene
+press 2
+wait 1s
+# Navigate characters
+press right
+wait 500
+press right
+wait 500
+press left
+wait 500
+# Switch back to playfield
+press 1
+wait 500
+# Return to detail to verify resource still works
+press 2
+wait 500
+exit

@@ -661,7 +661,7 @@ class Scene {
     // Resources
     struct ResourceEntry {
         std::shared_ptr<Resource> resource;
-        std::type_index type;
+        std::type_index type = typeid(void);
     };
     std::unordered_map<ResourceId, ResourceEntry> m_resources;
     ResourceId m_nextResourceId = 1;

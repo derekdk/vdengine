@@ -275,3 +275,6 @@ add_vde_example(vde_diagnostics_demo "diagnostics_demo/main.cpp")
 
 # SpriteSheet demo - demonstrates SpriteSheet atlas management and sprite flipping
 add_vde_example(vde_spritesheet_demo "spritesheet_demo/main.cpp")
+
+# SpriteSheet multi-scene demo - cross-scene resource sharing with SpriteSheet
+add_vde_example(vde_spritesheet_multiscene_demo "spritesheet_multiscene_demo/main.cpp")

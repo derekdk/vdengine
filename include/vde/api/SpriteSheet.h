@@ -4,12 +4,16 @@
  * @file SpriteSheet.h
  * @brief Sprite sheet / atlas management for VDE.
  *
- * Provides a SpriteSheet resource class that maps named or indexed sub-regions
+ * Provides a SpriteSheet resource that maps named or indexed sub-regions
  * of a texture atlas to UV rectangles, eliminating manual UV math for frame
  * animation and atlas-based sprite rendering.
+ *
+ * SpriteSheet is a Resource, so it can be managed by Scene::addResource()
+ * and shared across scenes via ResourceManager.
  */
 
 #include <vde/Texture.h>
+#include <vde/api/Resource.h>
 
 #include <memory>
 #include <string>
@@ -25,10 +29,15 @@ namespace vde {
  * - **Grid:** Uniform columns × rows layout with optional pixel spacing.
  * - **Manual:** Call addSprite() to define each named region individually.
  *
+ * Created programmatically (not loaded from a file), then registered with
+ * a Scene via addResource() or cached in ResourceManager for cross-scene
+ * sharing.
+ *
  * Usage:
  * @code
  * // Grid-based spritesheet (4 columns, 2 rows)
  * auto sheet = SpriteSheet::createGrid(texture, 4, 2);
+ * scene->addResource<SpriteSheet>(sheet);
  * auto uv = sheet->getUVRect(0); // first frame
  *
  * // Manual named regions
@@ -38,7 +47,7 @@ namespace vde {
  * auto uv2 = atlas->getUVRect("idle");
  * @endcode
  */
-class SpriteSheet {
+class SpriteSheet : public Resource {
   public:
     using Ref = std::shared_ptr<SpriteSheet>;
 
@@ -57,9 +66,10 @@ class SpriteSheet {
      * @param texture The source texture atlas.
      * @param columns Number of columns in the grid.
      * @param rows Number of rows in the grid.
-     * @param spacingPx Optional pixel spacing between cells.
+     * @param spacingPx Optional pixel spacing between cells (must be >= 0).
      * @return Shared pointer to the new SpriteSheet.
-     * @throws std::invalid_argument if texture is null or columns/rows <= 0.
+     * @throws std::invalid_argument if texture is null, columns/rows <= 0,
+     *         spacingPx < 0, or spacing produces non-positive cell dimensions.
      */
     static Ref createGrid(std::shared_ptr<Texture> texture, int columns, int rows,
                           int spacingPx = 0);
@@ -75,11 +85,13 @@ class SpriteSheet {
     /**
      * @brief Add a named sprite region (pixel coordinates).
      * @param name Unique name for this region.
-     * @param x Left edge in pixels.
-     * @param y Top edge in pixels.
-     * @param w Width in pixels.
-     * @param h Height in pixels.
-     * @throws std::invalid_argument if name is empty or already exists.
+     * @param x Left edge in pixels (must be >= 0).
+     * @param y Top edge in pixels (must be >= 0).
+     * @param w Width in pixels (must be > 0).
+     * @param h Height in pixels (must be > 0).
+     * @throws std::invalid_argument if name is empty, already exists, or
+     *         w/h <= 0.
+     * @throws std::out_of_range if region extends beyond texture bounds.
      */
     void addSprite(const std::string& name, int x, int y, int w, int h);
 
@@ -108,6 +120,10 @@ class SpriteSheet {
      * @brief Get the total number of sprite regions.
      */
     int getSpriteCount() const { return static_cast<int>(m_rects.size()); }
+
+    // -- Resource interface --------------------------------------------------
+
+    const char* getTypeName() const override { return "SpriteSheet"; }
 
   private:
     SpriteSheet() = default;

@@ -554,6 +554,7 @@ class SheetScene : public vde::examples::BaseExampleScene {
         m_sheet->addSprite("gem", 72, 12, 8, 8);
         m_sheet->addSprite("tower", 0, 32, 16, 32);
         m_sheet->addSprite("banner", 16, 32, 48, 16);
+        addResource<vde::SpriteSheet>(m_sheet);
 
         // Helper to create a sprite from a named region
         auto makeSprite = [&](const char* name, float x, float y) {

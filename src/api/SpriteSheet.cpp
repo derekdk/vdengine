@@ -12,6 +12,9 @@ SpriteSheet::Ref SpriteSheet::createGrid(std::shared_ptr<Texture> texture, int c
     if (columns <= 0 || rows <= 0) {
         throw std::invalid_argument("SpriteSheet::createGrid: columns and rows must be > 0");
     }
+    if (spacingPx < 0) {
+        throw std::invalid_argument("SpriteSheet::createGrid: spacingPx must be >= 0");
+    }
 
     auto sheet = Ref(new SpriteSheet());
     sheet->m_texture = std::move(texture);
@@ -19,11 +22,20 @@ SpriteSheet::Ref SpriteSheet::createGrid(std::shared_ptr<Texture> texture, int c
     int texW = static_cast<int>(sheet->m_texture->getWidth());
     int texH = static_cast<int>(sheet->m_texture->getHeight());
 
+    if (texW <= 0 || texH <= 0) {
+        throw std::invalid_argument("SpriteSheet::createGrid: texture dimensions must be > 0");
+    }
+
     // Compute cell size in pixels (account for spacing between cells)
     int totalSpacingX = spacingPx * (columns - 1);
     int totalSpacingY = spacingPx * (rows - 1);
     int cellW = (texW - totalSpacingX) / columns;
     int cellH = (texH - totalSpacingY) / rows;
+
+    if (cellW <= 0 || cellH <= 0) {
+        throw std::invalid_argument(
+            "SpriteSheet::createGrid: spacing too large — computed cell size is non-positive");
+    }
 
     float invW = (texW > 0) ? 1.0f / static_cast<float>(texW) : 0.0f;
     float invH = (texH > 0) ? 1.0f / static_cast<float>(texH) : 0.0f;
@@ -45,6 +57,7 @@ SpriteSheet::Ref SpriteSheet::createGrid(std::shared_ptr<Texture> texture, int c
         }
     }
 
+    sheet->m_loaded = true;
     return sheet;
 }
 
@@ -55,6 +68,7 @@ SpriteSheet::Ref SpriteSheet::create(std::shared_ptr<Texture> texture) {
 
     auto sheet = Ref(new SpriteSheet());
     sheet->m_texture = std::move(texture);
+    sheet->m_loaded = true;
     return sheet;
 }
 
@@ -65,9 +79,22 @@ void SpriteSheet::addSprite(const std::string& name, int x, int y, int w, int h)
     if (m_nameIndex.count(name)) {
         throw std::invalid_argument("SpriteSheet::addSprite: duplicate name '" + name + "'");
     }
+    if (w <= 0 || h <= 0) {
+        throw std::invalid_argument("SpriteSheet::addSprite: width and height must be > 0");
+    }
+    if (x < 0 || y < 0) {
+        throw std::invalid_argument("SpriteSheet::addSprite: x and y must be >= 0");
+    }
 
     int texW = static_cast<int>(m_texture->getWidth());
     int texH = static_cast<int>(m_texture->getHeight());
+
+    if (x + w > texW || y + h > texH) {
+        throw std::out_of_range("SpriteSheet::addSprite: region (" + std::to_string(x) + "," +
+                                std::to_string(y) + "," + std::to_string(w) + "," +
+                                std::to_string(h) + ") exceeds texture bounds (" +
+                                std::to_string(texW) + "x" + std::to_string(texH) + ")");
+    }
 
     float invW = (texW > 0) ? 1.0f / static_cast<float>(texW) : 0.0f;
     float invH = (texH > 0) ? 1.0f / static_cast<float>(texH) : 0.0f;

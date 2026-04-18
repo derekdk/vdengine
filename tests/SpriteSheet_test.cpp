@@ -4,6 +4,7 @@
  */
 
 #include <vde/api/Entity.h>
+#include <vde/api/Resource.h>
 #include <vde/api/SpriteSheet.h>
 
 #include <cmath>
@@ -74,6 +75,35 @@ TEST_F(SpriteSheetGridTest, LastFrameUV) {
 TEST_F(SpriteSheetGridTest, OutOfBoundsIndexThrows) {
     EXPECT_THROW(sheet->getUVRect(-1), std::out_of_range);
     EXPECT_THROW(sheet->getUVRect(8), std::out_of_range);
+}
+
+// ============================================================================
+// SpriteSheet — Resource interface
+// ============================================================================
+
+TEST_F(SpriteSheetGridTest, IsAResource) {
+    Resource* base = sheet.get();
+    EXPECT_NE(base, nullptr);
+}
+
+TEST_F(SpriteSheetGridTest, TypeNameIsSpriteSheet) {
+    EXPECT_STREQ(sheet->getTypeName(), "SpriteSheet");
+}
+
+TEST_F(SpriteSheetGridTest, GridIsLoadedAfterCreation) {
+    EXPECT_TRUE(sheet->isLoaded());
+}
+
+TEST(SpriteSheetTest, ManualSheetIsLoadedAfterCreation) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_TRUE(sheet->isLoaded());
+}
+
+TEST(SpriteSheetTest, DefaultResourceIdIsInvalid) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_EQ(sheet->getId(), INVALID_RESOURCE_ID);
 }
 
 // ============================================================================
@@ -166,6 +196,73 @@ TEST(SpriteSheetTest, CreateGridZeroColumnsThrows) {
 
 TEST(SpriteSheetTest, CreateManualNullTextureThrows) {
     EXPECT_THROW(SpriteSheet::create(nullptr), std::invalid_argument);
+}
+
+// ============================================================================
+// SpriteSheet — addSprite() bounds & dimension validation
+// ============================================================================
+
+TEST(SpriteSheetTest, AddSpriteZeroWidthThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", 0, 0, 0, 32), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, AddSpriteNegativeWidthThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", 0, 0, -1, 32), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, AddSpriteZeroHeightThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", 0, 0, 32, 0), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, AddSpriteNegativeXThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", -1, 0, 32, 32), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, AddSpriteNegativeYThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", 0, -1, 32, 32), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, AddSpriteExceedsTextureWidthThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", 48, 0, 32, 32), std::out_of_range);
+}
+
+TEST(SpriteSheetTest, AddSpriteExceedsTextureHeightThrows) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_THROW(sheet->addSprite("a", 0, 48, 32, 32), std::out_of_range);
+}
+
+TEST(SpriteSheetTest, AddSpriteExactBoundsOk) {
+    auto tex = makeTestTexture(64, 64);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_NO_THROW(sheet->addSprite("full", 0, 0, 64, 64));
+}
+
+// ============================================================================
+// SpriteSheet — createGrid() spacing validation
+// ============================================================================
+
+TEST(SpriteSheetTest, CreateGridNegativeSpacingThrows) {
+    auto tex = makeTestTexture(64, 64);
+    EXPECT_THROW(SpriteSheet::createGrid(tex, 2, 2, -1), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, CreateGridExcessiveSpacingThrows) {
+    auto tex = makeTestTexture(64, 64);
+    // 2 cols, spacing of 100 → totalSpacingX = 100, (64 - 100)/2 = negative
+    EXPECT_THROW(SpriteSheet::createGrid(tex, 2, 2, 100), std::invalid_argument);
 }
 
 // ============================================================================
