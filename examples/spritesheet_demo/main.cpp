@@ -416,7 +416,7 @@ class SheetScene : public vde::examples::BaseExampleScene {
         // =================================================================
         constexpr uint32_t kTexW = 96;
         constexpr uint32_t kTexH = 64;
-        constexpr RGBA kBg{20, 20, 40, 255};
+        constexpr RGBA kBg{0, 0, 0, 0};  // Transparent — checkerboard shows through
         constexpr RGBA kEye{255, 255, 255, 255};
 
         std::vector<uint8_t> atlasPixels(kTexW * kTexH * 4, 0);
@@ -477,6 +477,46 @@ class SheetScene : public vde::examples::BaseExampleScene {
         atlasTex->loadFromData(atlasPixels.data(), kTexW, kTexH);
         if (auto* ctx = getGame()->getVulkanContext()) {
             atlasTex->uploadToGPU(ctx);
+        }
+
+        // =================================================================
+        // Checkerboard texture — placed behind sprites to prove the alpha
+        // mask is correct: transparent atlas pixels let the pattern show
+        // through while opaque sprite pixels occlude it.
+        // =================================================================
+        {
+            constexpr uint32_t kChkW = 32;
+            constexpr uint32_t kChkH = 32;
+            constexpr uint32_t kChkCell = 4;  // 8×8 grid of checks
+            constexpr RGBA kChkLight{200, 200, 200, 255};
+            constexpr RGBA kChkDark{100, 100, 100, 255};
+
+            std::vector<uint8_t> chkPixels(kChkW * kChkH * 4);
+            for (uint32_t y = 0; y < kChkH; ++y)
+                for (uint32_t x = 0; x < kChkW; ++x) {
+                    bool light = ((x / kChkCell) + (y / kChkCell)) % 2 == 0;
+                    putPixel(chkPixels, kChkW, x, y, light ? kChkLight : kChkDark);
+                }
+
+            auto chkTex = std::make_shared<vde::Texture>();
+            chkTex->loadFromData(chkPixels.data(), kChkW, kChkH);
+            if (auto* ctx = getGame()->getVulkanContext()) {
+                chkTex->uploadToGPU(ctx);
+            }
+
+            // Behind right-side extracted sprites
+            auto chkRight = addEntity<vde::SpriteEntity>();
+            chkRight->setTexture(chkTex);
+            chkRight->setPosition(3.5f, 1.5f, -0.1f);
+            chkRight->setScale(10.0f, 8.0f, 1.0f);
+            chkRight->setAnchor(0.5f, 0.5f);
+
+            // Behind bottom interactive player strip
+            auto chkBottom = addEntity<vde::SpriteEntity>();
+            chkBottom->setTexture(chkTex);
+            chkBottom->setPosition(0.0f, -3.8f, -0.1f);
+            chkBottom->setScale(16.0f, 2.5f, 1.0f);
+            chkBottom->setAnchor(0.5f, 0.5f);
         }
 
         // =================================================================
@@ -625,22 +665,22 @@ class SheetScene : public vde::examples::BaseExampleScene {
     std::vector<std::string> getFeatures() const override {
         return {
             "Single atlas with mixed-size sprites: 32x32, 16x16, 32x12, 48x16, 16x32, 8x8",
-            "Full atlas displayed on the left with region outlines",
+            "Transparent atlas background — checkerboard proves alpha mask is correct",
             "Named-region extraction via addSprite() with pixel coordinates",
             "Proportional display — each sprite rendered at its true aspect ratio",
             "Original vs. flipped big creature side by side",
-            "Interactive player character with auto-flip on direction change",
+            "Interactive player moves over checkerboard to show transparency",
         };
     }
 
     std::vector<std::string> getExpectedVisuals() const override {
         return {
-            "Left: full atlas image with outlined regions of varying sizes",
-            "Right-top: large creature (32x32) and tall tower (16x32)",
+            "Left: full atlas image with transparent backgrounds on dark scene",
+            "Right: sprites on gray checkerboard — opaque shapes, transparent bg",
             "Right-mid: heart, bolt, shield (16x16) + tiny coin & gem (8x8)",
             "Right: wide sword (32x12) and banner (48x16)",
             "Right-top: original + flipped big creature side by side",
-            "Bottom: green character moves LEFT/RIGHT and flips; static reference on left",
+            "Bottom: checkerboard strip; green character moves and flips over it",
         };
     }
 
