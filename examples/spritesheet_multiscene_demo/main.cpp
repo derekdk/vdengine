@@ -117,6 +117,18 @@ static void drawStar(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, ui
 }
 
 // ============================================================================
+// Text sizing helper — call after update(0) to match world height
+// ============================================================================
+
+static void sizeToFit(TextEntity& te, float worldHeight) {
+    auto tex = te.getTexture();
+    if (!tex || tex->getWidth() < 2)
+        return;
+    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
+    te.setScale(worldHeight * aspect, worldHeight, 1.0f);
+}
+
+// ============================================================================
 // Input handler
 // ============================================================================
 
@@ -250,8 +262,10 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
             auto label = addEntity<TextEntity>();
             label->setText(roster[i].name);
             label->setFont(BitmapFont::small());
-            label->setStyle({.color = roster[i].tint, .pixelScale = 2});
+            label->setStyle({.color = roster[i].tint, .pixelScale = 1});
             label->setAnchor(0.5f, 0.0f);
+            label->update(0.0f);
+            sizeToFit(*label, 0.30f);
             m_nameLabels.push_back(label);
         }
 
@@ -259,9 +273,11 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
         auto title = addEntity<TextEntity>();
         title->setText("PLAYFIELD  [1] Here  [2] Details");
         title->setFont(BitmapFont::small());
-        title->setStyle({.color = Color::white(), .pixelScale = 2});
+        title->setStyle({.color = Color::white(), .pixelScale = 1});
         title->setPosition(0.0f, 4.5f, 0.0f);
         title->setAnchor(0.5f, 0.5f);
+        title->update(0.0f);
+        sizeToFit(*title, 0.30f);
     }
 
     void update(float dt) override {
@@ -381,7 +397,20 @@ class DetailScene : public vde::examples::BaseExampleScene {
         auto texture = m_sheet->getTexture();
         const auto& roster = getCharacterRoster();
 
-        // Create a large sprite for the focused character
+        // Background panels FIRST (draw-order: back to front)
+        auto charPanel = addEntity<SpriteEntity>();
+        charPanel->setColor(Color(0.12f, 0.12f, 0.2f, 1.0f));
+        charPanel->setPosition(-4.0f, 0.0f, -0.1f);
+        charPanel->setScale(5.5f, 5.5f, 1.0f);
+        charPanel->setAnchor(0.5f, 0.5f);
+
+        auto statsPanel = addEntity<SpriteEntity>();
+        statsPanel->setColor(Color(0.12f, 0.12f, 0.2f, 1.0f));
+        statsPanel->setPosition(3.5f, 0.0f, -0.1f);
+        statsPanel->setScale(7.0f, 5.5f, 1.0f);
+        statsPanel->setAnchor(0.5f, 0.5f);
+
+        // Character sprite (after panels so it draws on top)
         auto uv = m_sheet->getUVRect(roster[0].spriteName);
         m_characterSprite = addEntity<SpriteEntity>();
         m_characterSprite->setTexture(texture);
@@ -390,72 +419,64 @@ class DetailScene : public vde::examples::BaseExampleScene {
         m_characterSprite->setPosition(-4.0f, 0.0f, 0.0f);
         m_characterSprite->setAnchor(0.5f, 0.5f);
 
-        // Background panel behind character
-        auto panel = addEntity<SpriteEntity>();
-        panel->setColor(Color(0.12f, 0.12f, 0.2f, 1.0f));
-        panel->setPosition(-4.0f, 0.0f, -0.1f);
-        panel->setScale(5.5f, 5.5f, 1.0f);
-        panel->setAnchor(0.5f, 0.5f);
-
-        // Background panel behind stats
-        auto statsPanel = addEntity<SpriteEntity>();
-        statsPanel->setColor(Color(0.12f, 0.12f, 0.2f, 1.0f));
-        statsPanel->setPosition(3.0f, 0.0f, -0.1f);
-        statsPanel->setScale(7.0f, 5.5f, 1.0f);
-        statsPanel->setAnchor(0.5f, 0.5f);
-
-        // Title
+        // Title — character name
         m_titleLabel = addEntity<TextEntity>();
         m_titleLabel->setFont(BitmapFont::large());
-        m_titleLabel->setStyle({.color = Color::white(), .pixelScale = 3});
+        m_titleLabel->setStyle({.color = Color::white(), .pixelScale = 2});
         m_titleLabel->setPosition(0.0f, 4.2f, 0.0f);
         m_titleLabel->setAnchor(0.5f, 0.5f);
 
-        // Stat labels (positioned to the right of the character)
+        // Stat layout
         constexpr float kStatX = 1.5f;
-        constexpr float kStatStartY = 2.0f;
-        constexpr float kStatSpacing = 1.0f;
+        constexpr float kStatStartY = 1.8f;
+        constexpr float kStatSpacing = 1.2f;
 
-        const char* statNames[] = {"HP", "ATK", "DEF", "SPD"};
-        for (int i = 0; i < 4; ++i) {
-            auto nameLabel = addEntity<TextEntity>();
-            nameLabel->setText(statNames[i]);
-            nameLabel->setFont(BitmapFont::small());
-            nameLabel->setStyle({.color = Color(0.6f, 0.6f, 0.7f, 1.0f), .pixelScale = 2});
-            nameLabel->setPosition(kStatX, kStatStartY - static_cast<float>(i) * kStatSpacing,
-                                   0.0f);
-            nameLabel->setAnchor(0.0f, 0.5f);
-        }
-
-        for (int i = 0; i < 4; ++i) {
-            auto valLabel = addEntity<TextEntity>();
-            valLabel->setFont(BitmapFont::small());
-            valLabel->setStyle({.color = Color::white(), .pixelScale = 2});
-            valLabel->setPosition(kStatX + 2.5f, kStatStartY - static_cast<float>(i) * kStatSpacing,
-                                  0.0f);
-            valLabel->setAnchor(0.0f, 0.5f);
-            m_statValues.push_back(valLabel);
-        }
-
-        // Navigation hint
-        auto nav = addEntity<TextEntity>();
-        nav->setText("< LEFT  RIGHT >  [1] Playfield  [2] Here");
-        nav->setFont(BitmapFont::small());
-        nav->setStyle({.color = Color(0.5f, 0.5f, 0.6f, 1.0f), .pixelScale = 2});
-        nav->setPosition(0.0f, -4.2f, 0.0f);
-        nav->setAnchor(0.5f, 0.5f);
-
-        // Star decoration for stat display
+        // Star icons for each stat row
         auto starUV = m_sheet->getUVRect("star");
         for (int i = 0; i < 4; ++i) {
             auto star = addEntity<SpriteEntity>();
             star->setTexture(texture);
             star->setUVRect(starUV.u, starUV.v, starUV.width, starUV.height);
             star->setScale(0.6f, 0.6f, 1.0f);
-            star->setPosition(kStatX - 0.5f, kStatStartY - static_cast<float>(i) * kStatSpacing,
+            star->setPosition(kStatX - 0.3f, kStatStartY - static_cast<float>(i) * kStatSpacing,
                               0.0f);
             star->setAnchor(0.5f, 0.5f);
         }
+
+        // Stat name labels
+        const char* statNames[] = {"HP", "ATK", "DEF", "SPD"};
+        for (int i = 0; i < 4; ++i) {
+            auto nameLabel = addEntity<TextEntity>();
+            nameLabel->setText(statNames[i]);
+            nameLabel->setFont(BitmapFont::small());
+            nameLabel->setStyle({.color = Color(0.7f, 0.7f, 0.8f, 1.0f), .pixelScale = 1});
+            nameLabel->setPosition(kStatX + 0.2f,
+                                   kStatStartY - static_cast<float>(i) * kStatSpacing, 0.0f);
+            nameLabel->setAnchor(0.0f, 0.5f);
+            nameLabel->update(0.0f);
+            sizeToFit(*nameLabel, 0.35f);
+        }
+
+        // Stat value labels
+        for (int i = 0; i < 4; ++i) {
+            auto valLabel = addEntity<TextEntity>();
+            valLabel->setFont(BitmapFont::small());
+            valLabel->setStyle({.color = Color::white(), .pixelScale = 1});
+            valLabel->setPosition(kStatX + 2.8f, kStatStartY - static_cast<float>(i) * kStatSpacing,
+                                  0.0f);
+            valLabel->setAnchor(0.0f, 0.5f);
+            m_statValues.push_back(valLabel);
+        }
+
+        // Navigation hint at bottom
+        auto nav = addEntity<TextEntity>();
+        nav->setText("< LEFT  RIGHT >  [1] Playfield  [2] Here");
+        nav->setFont(BitmapFont::small());
+        nav->setStyle({.color = Color(0.5f, 0.5f, 0.6f, 1.0f), .pixelScale = 1});
+        nav->setPosition(0.0f, -4.2f, 0.0f);
+        nav->setAnchor(0.5f, 0.5f);
+        nav->update(0.0f);
+        sizeToFit(*nav, 0.25f);
 
         // Set initial character
         showCharacter(0);
@@ -538,7 +559,9 @@ class DetailScene : public vde::examples::BaseExampleScene {
 
         // Update title
         m_titleLabel->setText(info.name);
-        m_titleLabel->setStyle({.color = info.tint, .pixelScale = 3});
+        m_titleLabel->setStyle({.color = info.tint, .pixelScale = 2});
+        m_titleLabel->update(0.0f);
+        sizeToFit(*m_titleLabel, 0.55f);
 
         // Update stat values
         if (m_statValues.size() >= 4) {
@@ -546,6 +569,10 @@ class DetailScene : public vde::examples::BaseExampleScene {
             m_statValues[1]->setText(std::to_string(info.attack));
             m_statValues[2]->setText(std::to_string(info.defense));
             m_statValues[3]->setText(std::to_string(info.speed));
+            for (auto& sv : m_statValues) {
+                sv->update(0.0f);
+                sizeToFit(*sv, 0.35f);
+            }
         }
     }
 
