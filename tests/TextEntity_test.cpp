@@ -3,13 +3,13 @@
  * @brief Unit tests for TextEntity class.
  */
 
-#include <gtest/gtest.h>
-
 #include <vde/Texture.h>
 #include <vde/api/BitmapFont.h>
 #include <vde/api/TextEntity.h>
 #include <vde/api/TextRenderer.h>
 #include <vde/api/TrueTypeFont.h>
+
+#include <gtest/gtest.h>
 
 namespace vde {
 namespace test {
@@ -23,7 +23,9 @@ class TextEntityTest : public ::testing::Test {
     TextEntity entity;
 };
 
-TEST_F(TextEntityTest, DefaultTextIsEmpty) { EXPECT_TRUE(entity.getText().empty()); }
+TEST_F(TextEntityTest, DefaultTextIsEmpty) {
+    EXPECT_TRUE(entity.getText().empty());
+}
 
 TEST_F(TextEntityTest, SetTextUpdatesText) {
     entity.setText("HELLO");
@@ -143,6 +145,100 @@ TEST_F(TextEntityTest, InheritsFromSpriteEntity) {
     entity.setAnchor(0.0f, 1.0f);
     EXPECT_FLOAT_EQ(entity.getAnchorX(), 0.0f);
     EXPECT_FLOAT_EQ(entity.getAnchorY(), 1.0f);
+}
+
+// ============================================================================
+// Auto-sizing tests
+// ============================================================================
+
+TEST_F(TextEntityTest, DefaultWorldHeightIsZero) {
+    EXPECT_FLOAT_EQ(entity.getWorldHeight(), 0.0f);
+    EXPECT_FLOAT_EQ(entity.getMaxWidth(), 0.0f);
+}
+
+TEST_F(TextEntityTest, SetWorldHeightStoresValue) {
+    entity.setWorldHeight(0.5f);
+    EXPECT_FLOAT_EQ(entity.getWorldHeight(), 0.5f);
+}
+
+TEST_F(TextEntityTest, SetMaxWidthStoresValue) {
+    entity.setMaxWidth(3.0f);
+    EXPECT_FLOAT_EQ(entity.getMaxWidth(), 3.0f);
+}
+
+TEST_F(TextEntityTest, AutoSizingAppliesAfterUpdate) {
+    entity.setText("HELLO");
+    entity.setFont(BitmapFont::small());
+    entity.setStyle({.color = Color::white(), .pixelScale = 1, .letterSpacing = 1});
+    entity.setWorldHeight(0.5f);
+    entity.update(0.0f);
+
+    auto tex = entity.getTexture();
+    ASSERT_NE(tex, nullptr);
+    ASSERT_GE(tex->getWidth(), 2u);
+
+    // Scale should match the auto-sized dimensions
+    float expectedAspect =
+        static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
+    EXPECT_FLOAT_EQ(entity.getScale().y, 0.5f);
+    EXPECT_NEAR(entity.getScale().x, 0.5f * expectedAspect, 0.001f);
+}
+
+TEST_F(TextEntityTest, AutoSizingReappliesOnTextChange) {
+    entity.setText("A");
+    entity.setFont(BitmapFont::small());
+    entity.setStyle({.color = Color::white(), .pixelScale = 1, .letterSpacing = 1});
+    entity.setWorldHeight(0.5f);
+    entity.update(0.0f);
+
+    float widthA = entity.getScale().x;
+
+    entity.setText("ABCDEF");
+    entity.update(0.0f);
+
+    // Longer text should produce a wider scale
+    EXPECT_GT(entity.getScale().x, widthA);
+    EXPECT_FLOAT_EQ(entity.getScale().y, 0.5f);
+}
+
+TEST_F(TextEntityTest, AutoSizingDisabledByDefault) {
+    entity.setText("HELLO");
+    entity.update(0.0f);
+
+    // Without setWorldHeight, scale should remain the default 1,1,1
+    EXPECT_FLOAT_EQ(entity.getScale().x, 1.0f);
+    EXPECT_FLOAT_EQ(entity.getScale().y, 1.0f);
+}
+
+TEST_F(TextEntityTest, AutoSizingWithMaxWidth) {
+    entity.setText("THIS IS A LONG STRING THAT SHOULD BE CLAMPED");
+    entity.setFont(BitmapFont::small());
+    entity.setStyle({.color = Color::white(), .pixelScale = 1, .letterSpacing = 1});
+    entity.setWorldHeight(0.5f);
+    entity.setMaxWidth(2.0f);
+    entity.update(0.0f);
+
+    // Width should not exceed maxWidth
+    EXPECT_LE(entity.getScale().x, 2.0f + 0.001f);
+    // Height should be reduced proportionally
+    EXPECT_LE(entity.getScale().y, 0.5f + 0.001f);
+}
+
+TEST_F(TextEntityTest, ManualSizeToFitWorksOnTextEntity) {
+    entity.setText("HI");
+    entity.setFont(BitmapFont::small());
+    entity.setStyle({.color = Color::white(), .pixelScale = 1, .letterSpacing = 1});
+    entity.update(0.0f);
+
+    // Manual sizeToFit (inherited from SpriteEntity)
+    entity.sizeToFit(0.35f);
+
+    auto tex = entity.getTexture();
+    ASSERT_NE(tex, nullptr);
+    float expectedAspect =
+        static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
+    EXPECT_FLOAT_EQ(entity.getScale().y, 0.35f);
+    EXPECT_NEAR(entity.getScale().x, 0.35f * expectedAspect, 0.001f);
 }
 
 }  // namespace test

@@ -260,24 +260,6 @@ class AdventureInputHandler : public vde::examples::BaseExampleInputHandler {
 };
 
 // ============================================================================
-// Helper: size a TextEntity to world-space height, capped at a max width
-// ============================================================================
-
-static void sizeToFit(TextEntity& te, float worldHeight, float maxWidth = 0.0f) {
-    auto tex = te.getTexture();
-    if (!tex || tex->getWidth() < 2)
-        return;
-    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
-    float w = worldHeight * aspect;
-    float h = worldHeight;
-    if (maxWidth > 0.0f && w > maxWidth) {
-        w = maxWidth;
-        h = maxWidth / aspect;
-    }
-    te.setScale(w, h, 1.0f);
-}
-
-// ============================================================================
 // Scene
 // ============================================================================
 
@@ -331,8 +313,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         m_miniMapLabel->setAnchor(1.0f, 0.5f);
         m_miniMapLabel->setPosition(RIGHT, TOP - 0.3f, 0.1f);
         m_miniMapLabel->setText("MAP");
-        m_miniMapLabel->update(0.0f);
-        sizeToFit(*m_miniMapLabel, 0.25f);
+        m_miniMapLabel->setWorldHeight(0.25f);
 
         m_miniMap = addEntity<TextEntity>();
         m_miniMap->setFont(BitmapFont::small());
@@ -354,8 +335,8 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             float y = NARR_TOP - i * NARR_SPACING;
             m_narrativeEntities[i]->setPosition(LEFT, y, 0.0f);
             m_narrativeEntities[i]->setText(" ");
-            m_narrativeEntities[i]->update(0.0f);
-            sizeToFit(*m_narrativeEntities[i], NARR_HEIGHT, MAX_TEXT_W);
+            m_narrativeEntities[i]->setWorldHeight(NARR_HEIGHT);
+            m_narrativeEntities[i]->setMaxWidth(MAX_TEXT_W);
         }
 
         // ---- Command prompt (below narrative) ----
@@ -367,8 +348,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         m_promptLabel->setAnchor(0.0f, 0.5f);
         m_promptLabel->setPosition(LEFT, PROMPT_Y, 0.0f);
         m_promptLabel->setText("> ");
-        m_promptLabel->update(0.0f);
-        sizeToFit(*m_promptLabel, 0.30f);
+        m_promptLabel->setWorldHeight(0.30f);
 
         m_promptText = addEntity<TextEntity>();
         m_promptText->setFont(BitmapFont::small());
@@ -376,8 +356,8 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         m_promptText->setAnchor(0.0f, 0.5f);
         m_promptText->setPosition(LEFT + 0.7f, PROMPT_Y, 0.0f);
         m_promptText->setText("_");
-        m_promptText->update(0.0f);
-        sizeToFit(*m_promptText, 0.30f, MAX_TEXT_W);
+        m_promptText->setWorldHeight(0.30f);
+        m_promptText->setMaxWidth(MAX_TEXT_W);
 
         // ---- Status bar (bottom row) ----
         const float STATUS_Y = BOT + 0.5f;  // -4.0
@@ -388,12 +368,15 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             {.color = Color::yellow(), .pixelScale = 1, .letterSpacing = 1});
         m_statusInventory->setAnchor(0.0f, 0.5f);
         m_statusInventory->setPosition(LEFT, STATUS_Y, 0.0f);
+        m_statusInventory->setWorldHeight(0.25f);
+        m_statusInventory->setMaxWidth(8.0f);
 
         m_statusHp = addEntity<TextEntity>();
         m_statusHp->setFont(BitmapFont::small());
         m_statusHp->setStyle({.color = Color::green(), .pixelScale = 1, .letterSpacing = 1});
         m_statusHp->setAnchor(1.0f, 0.5f);
         m_statusHp->setPosition(RIGHT, STATUS_Y, 0.0f);
+        m_statusHp->setWorldHeight(0.25f);
 
         // Initial room display
         enterRoom();
@@ -449,8 +432,6 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             if (display.empty())
                 display = " ";
             m_promptText->setText(display);
-            m_promptText->update(0.0f);
-            sizeToFit(*m_promptText, 0.30f, MAX_TEXT_W);
         }
     }
 
@@ -511,14 +492,14 @@ class AdventureScene : public vde::examples::BaseExampleScene {
 
         // Update title
         m_roomTitle->setText(room.name);
-        m_roomTitle->update(0.0f);
-        sizeToFit(*m_roomTitle, 0.50f, 8.0f);
+        m_roomTitle->setWorldHeight(0.50f);
+        m_roomTitle->setMaxWidth(8.0f);
 
         // Update mini-map
         std::string mapStr = buildMiniMap(m_world);
         m_miniMap->setText(mapStr);
-        m_miniMap->update(0.0f);
-        sizeToFit(*m_miniMap, 0.35f, 3.0f);
+        m_miniMap->setWorldHeight(0.35f);
+        m_miniMap->setMaxWidth(3.0f);
 
         // Show room description with word-wrap
         addNarrative("");
@@ -560,8 +541,6 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         for (int i = 0; i < NARRATIVE_LINES; ++i) {
             if (i < static_cast<int>(m_narrativeLines.size())) {
                 m_narrativeEntities[i]->setText(m_narrativeLines[i]);
-                m_narrativeEntities[i]->update(0.0f);
-                sizeToFit(*m_narrativeEntities[i], 0.30f, MAX_TEXT_W);
             }
         }
     }
@@ -578,8 +557,6 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             inv.pop_back();
         }
         m_statusInventory->setText(inv);
-        m_statusInventory->update(0.0f);
-        sizeToFit(*m_statusInventory, 0.25f, 8.0f);
 
         // HP
         std::string hpStr =
@@ -591,8 +568,6 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             hpColor = Color::yellow();
         m_statusHp->setText(hpStr);
         m_statusHp->setStyle({.color = hpColor, .pixelScale = 1, .letterSpacing = 1});
-        m_statusHp->update(0.0f);
-        sizeToFit(*m_statusHp, 0.25f);
     }
 
     // ---- Command processing ----

@@ -39,18 +39,6 @@ static constexpr int LOG_LINES = 6;
 class MissionInputHandler : public vde::examples::BaseExampleInputHandler {};
 
 // ============================================================================
-// Helper: format a TextEntity with a world-space height and auto-computed width
-// ============================================================================
-
-static void sizeToFit(TextEntity& te, float worldHeight) {
-    auto tex = te.getTexture();
-    if (!tex || tex->getWidth() < 2)
-        return;
-    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
-    te.setScale(worldHeight * aspect, worldHeight, 1.0f);
-}
-
-// ============================================================================
 // Scene
 // ============================================================================
 
@@ -75,8 +63,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
         m_clockLabel->setStyle({.color = Color::cyan(), .pixelScale = 1, .letterSpacing = 1});
         m_clockLabel->setAnchor(0.0f, 0.5f);
         m_clockLabel->setPosition(-VIEW_W * 0.5f + 0.3f, VIEW_H * 0.5f - 0.4f, 0.0f);
-        m_clockLabel->update(0.0f);
-        sizeToFit(*m_clockLabel, 0.35f);
+        m_clockLabel->setWorldHeight(0.35f);
 
         m_clockValue = addEntity<TextEntity>();
         m_clockValue->setText("00:00:00.00");
@@ -84,15 +71,14 @@ class MissionScene : public vde::examples::BaseExampleScene {
         m_clockValue->setStyle({.color = Color::green(), .pixelScale = 2, .letterSpacing = 1});
         m_clockValue->setAnchor(0.0f, 0.5f);
         m_clockValue->setPosition(-VIEW_W * 0.5f + 0.3f, VIEW_H * 0.5f - 1.0f, 0.0f);
-        m_clockValue->update(0.0f);
-        sizeToFit(*m_clockValue, 0.55f);
+        m_clockValue->setWorldHeight(0.55f);
 
         // ---- Telemetry Grid (left column) ----
         const char* labels[TELEMETRY_ROWS] = {"ALTITUDE", "VELOCITY", "FUEL PCT", "TEMP INT",
-                                               "PRESSURE", "PITCH   ", "YAW     ", "ROLL    ",
-                                               "O2 LEVEL", "CO2 LEVL", "POWER   ", "SIGNAL  "};
-        float baseValues[TELEMETRY_ROWS] = {408.2f,  7820.f, 87.3f, 22.1f, 1013.f, 0.5f,
-                                             -0.2f,   0.1f,   21.0f, 0.04f, 98.5f,  -42.0f};
+                                              "PRESSURE", "PITCH   ", "YAW     ", "ROLL    ",
+                                              "O2 LEVEL", "CO2 LEVL", "POWER   ", "SIGNAL  "};
+        float baseValues[TELEMETRY_ROWS] = {408.2f, 7820.f, 87.3f, 22.1f, 1013.f, 0.5f,
+                                            -0.2f,  0.1f,   21.0f, 0.04f, 98.5f,  -42.0f};
 
         for (int i = 0; i < TELEMETRY_ROWS; ++i) {
             m_telemetryLabels[i] = std::string(labels[i]);
@@ -106,8 +92,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
             float y = VIEW_H * 0.5f - 1.8f - i * 0.55f;
             m_telemetryEntities[i]->setPosition(-VIEW_W * 0.5f + 0.3f, y, 0.0f);
             m_telemetryEntities[i]->setText(m_telemetryLabels[i] + "  " + formatValue(i, 0.0f));
-            m_telemetryEntities[i]->update(0.0f);
-            sizeToFit(*m_telemetryEntities[i], 0.35f);
+            m_telemetryEntities[i]->setWorldHeight(0.35f);
         }
 
         // ---- Alert Banner (top-right) ----
@@ -117,8 +102,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
         m_alertLabel->setStyle({.color = Color::cyan(), .pixelScale = 1, .letterSpacing = 1});
         m_alertLabel->setAnchor(1.0f, 0.5f);
         m_alertLabel->setPosition(VIEW_W * 0.5f - 0.3f, VIEW_H * 0.5f - 0.4f, 0.0f);
-        m_alertLabel->update(0.0f);
-        sizeToFit(*m_alertLabel, 0.35f);
+        m_alertLabel->setWorldHeight(0.35f);
 
         m_alertBanner = addEntity<TextEntity>();
         m_alertBanner->setText("NOMINAL");
@@ -126,8 +110,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
         m_alertBanner->setStyle({.color = Color::green(), .pixelScale = 3, .letterSpacing = 1});
         m_alertBanner->setAnchor(1.0f, 0.5f);
         m_alertBanner->setPosition(VIEW_W * 0.5f - 0.3f, VIEW_H * 0.5f - 1.0f, 0.0f);
-        m_alertBanner->update(0.0f);
-        sizeToFit(*m_alertBanner, 0.65f);
+        m_alertBanner->setWorldHeight(0.65f);
 
         // ---- Event Log (right column, lower half) ----
         m_logTitle = addEntity<TextEntity>();
@@ -136,8 +119,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
         m_logTitle->setStyle({.color = Color::cyan(), .pixelScale = 1, .letterSpacing = 1});
         m_logTitle->setAnchor(1.0f, 0.5f);
         m_logTitle->setPosition(VIEW_W * 0.5f - 0.3f, VIEW_H * 0.5f - 2.0f, 0.0f);
-        m_logTitle->update(0.0f);
-        sizeToFit(*m_logTitle, 0.35f);
+        m_logTitle->setWorldHeight(0.35f);
 
         for (int i = 0; i < LOG_LINES; ++i) {
             m_logEntities[i] = addEntity<TextEntity>();
@@ -148,8 +130,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
             float y = VIEW_H * 0.5f - 2.6f - i * 0.5f;
             m_logEntities[i]->setPosition(VIEW_W * 0.5f - 0.3f, y, 0.0f);
             m_logEntities[i]->setText("---");
-            m_logEntities[i]->update(0.0f);
-            sizeToFit(*m_logEntities[i], 0.30f);
+            m_logEntities[i]->setWorldHeight(0.30f);
         }
 
         // Seed the log
@@ -197,8 +178,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
         return {"Green mission clock counting up at top-left",
                 "12 green telemetry readouts down the left side",
                 "NOMINAL/CAUTION/WARNING banner at top-right",
-                "Scrolling event log messages on the right side",
-                "Dark blue background"};
+                "Scrolling event log messages on the right side", "Dark blue background"};
     }
 
   private:
@@ -309,12 +289,10 @@ class MissionScene : public vde::examples::BaseExampleScene {
 
     void generateLogEvent() {
         static const char* events[] = {
-            "TELEMETRY SYNC OK",       "ATTITUDE CORRECTION +0.1",
-            "SOLAR PANEL ROTATION OK", "GROUND STATION HANDOFF",
-            "TEMPERATURE NOMINAL",     "FUEL PRESSURE STABLE",
-            "ORBIT ADJUST COMPLETE",   "COMMS LINK VERIFIED",
-            "BATTERY CHARGE 94 PCT",   "SENSOR CALIBRATION OK",
-            "GYROSCOPE RECALIBRATED",  "THERMAL SHIELD NOMINAL",
+            "TELEMETRY SYNC OK",      "ATTITUDE CORRECTION +0.1", "SOLAR PANEL ROTATION OK",
+            "GROUND STATION HANDOFF", "TEMPERATURE NOMINAL",      "FUEL PRESSURE STABLE",
+            "ORBIT ADJUST COMPLETE",  "COMMS LINK VERIFIED",      "BATTERY CHARGE 94 PCT",
+            "SENSOR CALIBRATION OK",  "GYROSCOPE RECALIBRATED",   "THERMAL SHIELD NOMINAL",
         };
         int idx = static_cast<int>(m_time * 7.3f) % 12;
         appendLog(events[idx]);

@@ -53,6 +53,22 @@ void TextEntity::setStyle(const TextStyle& style) {
     }
 }
 
+void TextEntity::setWorldHeight(float height) {
+    m_worldHeight = height;
+    // Apply immediately if a valid texture already exists
+    if (m_worldHeight > 0.0f) {
+        sizeToFit(m_worldHeight, m_maxWidth);
+    }
+}
+
+void TextEntity::setMaxWidth(float width) {
+    m_maxWidth = width;
+    // Re-apply if auto-sizing is active and a valid texture exists
+    if (m_worldHeight > 0.0f) {
+        sizeToFit(m_worldHeight, m_maxWidth);
+    }
+}
+
 // ============================================================================
 // Lifecycle
 // ============================================================================
@@ -83,6 +99,11 @@ void TextEntity::update(float deltaTime) {
     if (m_dirty) {
         rebuildTexture();
         m_dirty = false;
+
+        // Auto-size after texture rebuild when worldHeight is configured
+        if (m_worldHeight > 0.0f) {
+            sizeToFit(m_worldHeight, m_maxWidth);
+        }
     }
 }
 

@@ -349,6 +349,21 @@ void SpriteEntity::setUVRect(float u, float v, float width, float height) {
     m_uvHeight = height;
 }
 
+void SpriteEntity::sizeToFit(float worldHeight, float maxWidth) {
+    auto tex = getTexture();
+    if (!tex || tex->getWidth() < 2) {
+        return;
+    }
+    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
+    float w = worldHeight * aspect;
+    float h = worldHeight;
+    if (maxWidth > 0.0f && w > maxWidth) {
+        w = maxWidth;
+        h = maxWidth / aspect;
+    }
+    setScale(w, h, 1.0f);
+}
+
 void SpriteEntity::render() {
     // Get the texture (either direct or via resource ID)
     std::shared_ptr<Texture> textureOwner = m_texture;

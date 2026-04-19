@@ -1,11 +1,11 @@
 ---
 name: text-rendering
-description: Guide for adding and sizing text in VDE scenes using TextEntity, BitmapFont, and sizeToFit. Use this when creating or updating text labels, titles, HUD elements, or any on-screen text.
+description: Guide for adding and sizing text in VDE scenes using TextEntity, BitmapFont, setWorldHeight, and sizeToFit. Use this when creating or updating text labels, titles, HUD elements, or any on-screen text.
 ---
 
 # Text Rendering in VDE
 
-TextEntity renders bitmap-font text as a textured sprite. Because the engine has **no auto-sizing**, you must explicitly size every text entity after creating it. Skipping this step produces garbled 1×1 world-unit squares. This skill documents the required workflow, sizing patterns, and common pitfalls.
+TextEntity renders bitmap-font text as a textured sprite. The engine provides **automatic sizing** via `setWorldHeight()` — configure a desired height and the entity recalculates its scale after every texture rebuild. This skill documents the recommended workflow, sizing patterns, and common pitfalls.
 
 ## When to use this skill
 
@@ -16,45 +16,9 @@ TextEntity renders bitmap-font text as a textured sprite. Because the engine has
 
 ---
 
-## Required: The sizeToFit helper
+## Recommended: Automatic sizing with setWorldHeight
 
-The engine does not provide auto-sizing. Every example that renders readable text defines this file-local helper:
-
-```cpp
-static void sizeToFit(TextEntity& te, float worldHeight) {
-    auto tex = te.getTexture();
-    if (!tex || tex->getWidth() < 2)
-        return;
-    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
-    te.setScale(worldHeight * aspect, worldHeight, 1.0f);
-}
-```
-
-For text that might overflow horizontally, add a max-width clamp:
-
-```cpp
-static void sizeToFit(TextEntity& te, float worldHeight, float maxWidth = 0.0f) {
-    auto tex = te.getTexture();
-    if (!tex || tex->getWidth() < 2)
-        return;
-    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
-    float w = worldHeight * aspect;
-    float h = worldHeight;
-    if (maxWidth > 0.0f && w > maxWidth) {
-        w = maxWidth;
-        h = maxWidth / aspect;
-    }
-    te.setScale(w, h, 1.0f);
-}
-```
-
-**Place this helper at file scope** before any scene class that uses it.
-
----
-
-## Required: Creating a text entity
-
-Every TextEntity must follow this sequence: **create → configure → update(0) → sizeToFit**.
+The easiest way to size text is to configure it once and let the engine handle the rest:
 
 ```cpp
 auto label = addEntity<TextEntity>();
@@ -63,21 +27,64 @@ label->setFont(BitmapFont::small());
 label->setStyle({.color = Color::white(), .pixelScale = 1});
 label->setPosition(0.0f, 4.0f, 0.0f);
 label->setAnchor(0.5f, 0.5f);
-label->update(0.0f);              // Forces texture rebuild — REQUIRED
-sizeToFit(*label, 0.35f);         // Size to 0.35 world units tall
+label->setWorldHeight(0.35f);     // Auto-size to 0.35 world units tall
 ```
 
-### Why update(0.0f) is mandatory before sizeToFit
+When `setWorldHeight()` is configured, `update()` automatically calls `sizeToFit()` after every texture rebuild. No manual `update(0.0f)` + `sizeToFit()` dance is needed.
 
-`sizeToFit` reads the texture dimensions to compute aspect ratio. The texture is only created when `update()` triggers `rebuildTexture()`. Without this call the texture is either null or stale, and `sizeToFit` bails out via the `getWidth() < 2` guard — leaving the text at the default 1×1 scale.
+For text that might overflow horizontally, add a max-width constraint:
+
+```cpp
+label->setWorldHeight(0.35f);
+label->setMaxWidth(8.0f);         // Clamp width, reduce height proportionally
+```
+
+### How it works
+
+When `worldHeight > 0`, the entity reads the texture dimensions after each rebuild, computes the aspect ratio, and sets the scale so the text is exactly `worldHeight` tall. If `maxWidth` is set and the computed width would exceed it, the width is clamped and the height is reduced proportionally.
 
 ---
 
-## Required: Updating text dynamically
+## Alternative: Manual sizeToFit
 
-When text content changes at runtime, you must rebuild the texture and re-size:
+`SpriteEntity::sizeToFit()` is available as a one-shot method on any sprite-based entity. Use this when you need precise manual control or when working with non-text sprites:
 
 ```cpp
+auto label = addEntity<TextEntity>();
+label->setText("HELLO WORLD");
+label->setFont(BitmapFont::small());
+label->setStyle({.color = Color::white(), .pixelScale = 1});
+label->setPosition(0.0f, 4.0f, 0.0f);
+label->setAnchor(0.5f, 0.5f);
+label->update(0.0f);              // Forces texture rebuild — REQUIRED before manual sizeToFit
+label->sizeToFit(0.35f);          // Size to 0.35 world units tall
+```
+
+With max-width clamping:
+
+```cpp
+label->update(0.0f);
+label->sizeToFit(0.35f, 8.0f);   // 0.35 tall, max 8.0 wide
+```
+
+### Why update(0.0f) is mandatory before manual sizeToFit
+
+`sizeToFit` reads the texture dimensions to compute aspect ratio. The texture is only created when `update()` triggers `rebuildTexture()`. Without this call the texture is either null or stale, and `sizeToFit` bails out via the `getWidth() < 2` guard — leaving the text at the default 1×1 scale.
+
+**Note:** When using `setWorldHeight()`, the `update(0.0f)` call is not needed — the engine handles everything automatically.
+
+---
+
+## Updating text dynamically
+
+With `setWorldHeight()` configured, just call `setText()` — the next frame's `update()` automatically rebuilds the texture and re-sizes:
+
+```cpp
+m_label->setText("NEW VALUE");
+// That's it — auto-sizing handles the rest
+```
+
+For manual sizing, you must rebuild the texture and re-size:
 m_label->setText("NEW VALUE");
 m_label->update(0.0f);
 sizeToFit(*m_label, 0.35f);
@@ -162,11 +169,11 @@ label->setColor(Color::fromHex(0xFF4444));
 
 | Mistake | Symptom | Fix |
 |---------|---------|-----|
-| No `sizeToFit` call | Text renders as a tiny/garbled 1×1 square | Add `update(0.0f)` + `sizeToFit()` after setting text |
-| `sizeToFit` before `update(0.0f)` | Text invisible (guard bails out on null texture) | Always `update(0.0f)` first |
-| High `pixelScale` without `sizeToFit` | Oversized blurry text | `pixelScale` only affects texture res — size with `sizeToFit` |
+| No sizing configured | Text renders as a tiny/garbled 1×1 square | Add `setWorldHeight()` or call `update(0.0f)` + `sizeToFit()` |
+| Manual `sizeToFit` before `update(0.0f)` | Text invisible (guard bails out on null texture) | Always `update(0.0f)` first, or use `setWorldHeight()` instead |
+| High `pixelScale` without sizing | Oversized blurry text | `pixelScale` only affects texture res — size with `setWorldHeight()` |
 | Using `setColor()` for text color | Color multiplied with baked color, wrong result | Use `setStyle({.color = ...})` |
-| Dynamic `setText()` without re-sizing | Text squished/stretched as content length changes | Call `update(0.0f)` + `sizeToFit()` after `setText()` |
+| Dynamic `setText()` without re-sizing | Text squished/stretched as content length changes | Use `setWorldHeight()` for automatic re-sizing, or call `update(0.0f)` + `sizeToFit()` |
 | Text positioned at world edge | Clipped or partially off-screen | Inset by ≥ 0.3 world units from edges |
 | Empty string "" | 1×1 transparent texture, invisible | Use `" "` (space) as placeholder if needed |
 
@@ -188,8 +195,7 @@ for (int i = 0; i < 4; ++i) {
     nameLabel->setStyle({.color = Color(0.7f, 0.7f, 0.8f, 1.0f), .pixelScale = 1});
     nameLabel->setPosition(kStatX, kStartY - static_cast<float>(i) * kSpacing, 0.0f);
     nameLabel->setAnchor(0.0f, 0.5f);
-    nameLabel->update(0.0f);
-    sizeToFit(*nameLabel, 0.35f);
+    nameLabel->setWorldHeight(0.35f);
 }
 
 // Value labels (updated dynamically later)
@@ -199,19 +205,35 @@ for (int i = 0; i < 4; ++i) {
     val->setStyle({.color = Color::white(), .pixelScale = 1});
     val->setPosition(kStatX + 2.8f, kStartY - static_cast<float>(i) * kSpacing, 0.0f);
     val->setAnchor(0.0f, 0.5f);
+    val->setWorldHeight(0.35f);   // Auto-sizes on every text change
     m_statValues.push_back(val);
 }
 
-// Later, when updating values:
+// Later, when updating values — just setText(), auto-sizing handles the rest:
 void showStats(int hp, int atk, int def, int spd) {
     int values[] = {hp, atk, def, spd};
     for (int i = 0; i < 4; ++i) {
         m_statValues[i]->setText(std::to_string(values[i]));
-        m_statValues[i]->update(0.0f);
-        sizeToFit(*m_statValues[i], 0.35f);
     }
 }
 ```
+
+## API Reference
+
+### TextEntity auto-sizing
+
+| Method | Description |
+|--------|-------------|
+| `setWorldHeight(float h)` | Set desired world-space height; 0 disables auto-sizing |
+| `getWorldHeight()` | Get configured world height |
+| `setMaxWidth(float w)` | Set max width constraint; 0 = unconstrained |
+| `getMaxWidth()` | Get configured max width |
+
+### SpriteEntity::sizeToFit (inherited by TextEntity)
+
+| Method | Description |
+|--------|-------------|
+| `sizeToFit(float worldHeight, float maxWidth = 0)` | One-shot scale based on current texture aspect ratio |
 
 ## References
 
