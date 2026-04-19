@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_text_rendering_demo.vdescript"]
+priority = 1
+sections = ["text"]
