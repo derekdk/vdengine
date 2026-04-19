@@ -117,6 +117,12 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Running long-running commands (smoke tests, full builds), handling terminal output or truncation, writing or editing PowerShell scripts, or diagnosing terminal session issues.  
 **Location:** `.github/skills/terminal-management/SKILL.md`
 
+### text-rendering
+**Purpose:** Guide for adding and sizing text in VDE scenes using TextEntity, BitmapFont, and sizeToFit.  
+**Use when:** Creating or updating text labels, titles, HUD elements, or any on-screen text in a scene.  
+**Skip when:** Editing existing text where sizeToFit is already established.  
+**Location:** `.github/skills/text-rendering/SKILL.md`
+
 ### 2d-games
 **Purpose:** Guide for creating 2D games, demos, and examples with the VDE API.  
 **Use when:** Building 2D physics, sprite-based, or side-view applications. Setting up Camera2D, physics arenas, or choosing between manual and engine-powered collision detection.  

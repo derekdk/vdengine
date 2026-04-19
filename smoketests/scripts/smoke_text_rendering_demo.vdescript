@@ -1,0 +1,10 @@
+# Smoke test for text rendering showcase demo
+# Verifies TextEntity auto-sizing, scrolling log, and dynamic resize features
+wait startup
+wait 500
+# Add a manual log message
+press SPACE
+wait 500
+press SPACE
+wait 3s
+exit

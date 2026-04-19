@@ -1,0 +1,11 @@
+[smoke]
+scripts = ["smoke_text_rendering_demo.vdescript"]
+priority = 1
+sections = ["text"]
+
+[render_verify]
+scripts = ["verify_text_rendering_demo.vdescript"]
+capture_script = "capture_text_rendering_demo.vdescript"
+priority = 1
+golden = "text_rendering_demo.png"
+threshold = 0.03

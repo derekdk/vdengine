@@ -272,3 +272,6 @@ add_dependencies(vde_emoji_demo vde_emoji_font_sync)
 
 # Diagnostics demo - showcases SceneDiagnostics and smoke test assertion features
 add_vde_example(vde_diagnostics_demo "diagnostics_demo/main.cpp")
+
+# Text Rendering Showcase - canonical reference for TextEntity auto-sizing, scrolling, dynamic resize
+add_vde_example(vde_text_rendering_demo "text_rendering_demo/main.cpp")
