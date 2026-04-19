@@ -3,6 +3,7 @@
  * @brief Unit tests for SpriteEntity class
  */
 
+#include <vde/Texture.h>
 #include <vde/api/Entity.h>
 #include <vde/api/GameTypes.h>
 
@@ -200,6 +201,73 @@ TEST_F(SpriteEntityTest, HasUniqueId) {
 TEST_F(SpriteEntityTest, NameWorks) {
     sprite->setName("MySprite");
     EXPECT_EQ(sprite->getName(), "MySprite");
+}
+
+// ============================================================================
+// sizeToFit Tests
+// ============================================================================
+
+TEST_F(SpriteEntityTest, SizeToFitNoTextureDoesNothing) {
+    sprite->setScale(2.0f, 3.0f, 1.0f);
+    sprite->sizeToFit(0.5f);
+    // Scale should be unchanged — no texture to compute aspect from
+    EXPECT_FLOAT_EQ(sprite->getScale().x, 2.0f);
+    EXPECT_FLOAT_EQ(sprite->getScale().y, 3.0f);
+}
+
+TEST_F(SpriteEntityTest, SizeToFitPlaceholderTextureDoesNothing) {
+    // 1x1 placeholder texture (width < 2 guard)
+    auto placeholder = std::make_shared<Texture>();
+    std::vector<uint8_t> pixel(4, 255);
+    placeholder->loadFromData(pixel.data(), 1, 1);
+    sprite->setTexture(placeholder);
+
+    sprite->setScale(2.0f, 3.0f, 1.0f);
+    sprite->sizeToFit(0.5f);
+    // Scale should be unchanged
+    EXPECT_FLOAT_EQ(sprite->getScale().x, 2.0f);
+    EXPECT_FLOAT_EQ(sprite->getScale().y, 3.0f);
+}
+
+TEST_F(SpriteEntityTest, SizeToFitSetsCorrectAspectRatio) {
+    // Create a 200x100 texture (aspect 2:1)
+    auto tex = std::make_shared<Texture>();
+    std::vector<uint8_t> pixels(200 * 100 * 4, 255);
+    tex->loadFromData(pixels.data(), 200, 100);
+    sprite->setTexture(tex);
+
+    sprite->sizeToFit(0.5f);
+    EXPECT_FLOAT_EQ(sprite->getScale().y, 0.5f);
+    EXPECT_FLOAT_EQ(sprite->getScale().x, 1.0f);  // 0.5 * (200/100) = 1.0
+    EXPECT_FLOAT_EQ(sprite->getScale().z, 1.0f);
+}
+
+TEST_F(SpriteEntityTest, SizeToFitWithMaxWidthClamps) {
+    // Create a 200x100 texture (aspect 2:1)
+    auto tex = std::make_shared<Texture>();
+    std::vector<uint8_t> pixels(200 * 100 * 4, 255);
+    tex->loadFromData(pixels.data(), 200, 100);
+    sprite->setTexture(tex);
+
+    // Without maxWidth: height 0.5 → width 1.0
+    // With maxWidth 0.6: width clamped to 0.6, height = 0.6 / 2.0 = 0.3
+    sprite->sizeToFit(0.5f, 0.6f);
+    EXPECT_FLOAT_EQ(sprite->getScale().x, 0.6f);
+    EXPECT_FLOAT_EQ(sprite->getScale().y, 0.3f);
+    EXPECT_FLOAT_EQ(sprite->getScale().z, 1.0f);
+}
+
+TEST_F(SpriteEntityTest, SizeToFitMaxWidthNotExceeded) {
+    // Create a 100x100 texture (aspect 1:1)
+    auto tex = std::make_shared<Texture>();
+    std::vector<uint8_t> pixels(100 * 100 * 4, 255);
+    tex->loadFromData(pixels.data(), 100, 100);
+    sprite->setTexture(tex);
+
+    // height 0.5, maxWidth 2.0 → width would be 0.5, which is < 2.0, so no clamping
+    sprite->sizeToFit(0.5f, 2.0f);
+    EXPECT_FLOAT_EQ(sprite->getScale().x, 0.5f);
+    EXPECT_FLOAT_EQ(sprite->getScale().y, 0.5f);
 }
 
 }  // namespace test

@@ -350,6 +350,22 @@ class SpriteEntity : public Entity {
      */
     bool isFlippedY() const { return m_flipY; }
 
+    /**
+     * @brief Size the sprite to a given world-space height, preserving aspect ratio.
+     *
+     * Reads the current texture dimensions to compute the aspect ratio and
+     * sets the entity scale so the sprite is exactly @p worldHeight tall.
+     * If @p maxWidth is positive and the computed width would exceed it,
+     * the width is clamped and the height is reduced proportionally.
+     *
+     * Does nothing when no texture is set or the texture is smaller than 2 px wide
+     * (e.g. a 1×1 placeholder).
+     *
+     * @param worldHeight Desired height in world units
+     * @param maxWidth    Maximum width in world units (0 = no limit)
+     */
+    void sizeToFit(float worldHeight, float maxWidth = 0.0f);
+
     void render() override;
 
   protected:

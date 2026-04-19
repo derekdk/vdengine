@@ -1,11 +1,23 @@
 # VDE - Vulkan Display Engine
 
-A lightweight, reusable Vulkan-based 3D rendering engine designed for rapid prototyping and game development.
+A lightweight, reusable Vulkan-based rendering engine designed for rapid prototyping and game development.
 
 ## Overview
 
-VDE provides a clean abstraction over Vulkan's verbose API while maintaining flexibility for advanced use cases. The engine handles:
+VDE provides a clean abstraction over Vulkan's verbose API while maintaining flexibility for advanced use cases. The engine is organized in two layers:
 
+**Game API (high-level)** — the recommended way to build applications:
+- **Scene System**: `Game`, `Scene`, `SceneGroup` with per-scene cameras, viewports, and lifecycle
+- **Entity System**: `MeshEntity`, `SpriteEntity`, `PhysicsEntity`, `TextEntity`, and more
+- **Physics**: 2D rigid-body simulation with collision detection
+- **Audio**: Cross-platform audio playback via miniaudio (`AudioManager`, `AudioSource`)
+- **Text Rendering**: TrueType and bitmap font rendering
+- **Resource Manager**: Centralized asset caching and reference counting
+- **Storage**: Persistent key-value store backed by SQLite
+- **Transitions**: Fade, wipe, block-fall, and circle-reveal scene transitions
+- **Input Scripting**: Automated input replay for smoke testing
+
+**Low-Level Rendering Layer** — for direct Vulkan control:
 - **Window Management**: Cross-platform window creation via GLFW
 - **Vulkan Context**: Instance, device, swapchain, and synchronization setup
 - **Shader System**: Runtime GLSL compilation with caching
@@ -19,18 +31,71 @@ VDE provides a clean abstraction over Vulkan's verbose API while maintaining fle
 ### Prerequisites
 
 - **CMake 3.20+**
-- **Vulkan SDK 1.3+** ([Download](https://vulkan.lunarg.com/))
-- **C++20 compatible compiler** (MSVC 2022, GCC 11+, Clang 14+)
-- **Git** (for dependency fetching)
-- **Git LFS** (for asset files) - [Installation Guide](docs/GIT_LFS_SETUP.md)
+- **Vulkan SDK 1.3+ or Vulkan development packages** — Vulkan must be installed and discoverable by CMake; on Windows, the LunarG SDK is the typical option and usually sets `VULKAN_SDK` ([Download](https://vulkan.lunarg.com/))
+- **C++20 compatible compiler**: Visual Studio 2022 (Windows), GCC 11+, or Clang 14+
+- **Git** (for dependency fetching via CMake FetchContent)
+- **Git LFS** (for asset files) — [Installation Guide](docs/GIT_LFS_SETUP.md)
 
-### Building
+> **Windows note:** The default build generator is **Ninja**, which requires the Visual Studio Developer environment to be active. Open a *Developer PowerShell for VS 2022* (or run `scripts/build.ps1`, which loads it automatically). Alternatively, use `-Generator MSBuild` with any PowerShell terminal.
+
+### Building with the Scripts (Recommended)
+
+VDE provides PowerShell scripts that handle all environment setup automatically:
 
 ```powershell
-# Clone or navigate to vdengine directory
-cd vdengine
+# Build (Ninja, Debug — default)
+.\scripts\build.ps1
 
-# Configure and build
+# Build with MSBuild (no special shell required)
+.\scripts\build.ps1 -Generator MSBuild
+
+# Release build
+.\scripts\build.ps1 -Config Release
+
+# Run unit tests (assumes a prior build)
+.\scripts\test.ps1
+
+# Build and run tests in one step
+.\scripts\test.ps1 -Build
+
+# Run specific tests
+.\scripts\test.ps1 -Filter "CameraTest.*"
+
+# Run smoke tests against all examples
+.\scripts\smoke-test.ps1
+
+# Clean rebuild
+.\scripts\rebuild.ps1
+
+# Format C++ code
+.\scripts\format.ps1
+
+# Launch VLauncher (interactive example browser)
+.\run-vlauncher.ps1
+
+# Enable local protection: block direct commits to main
+.\scripts\install-hooks.ps1
+```
+
+For complete documentation see:
+- `scripts/README.md` — Detailed script reference
+- `.github/skills/build-tool-workflows/SKILL.md` — Complete build guide
+
+### Building Manually
+
+```powershell
+# Ninja (Debug, default) — requires a Developer PowerShell for VS 2022
+mkdir build_ninja
+cd build_ninja
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build .
+
+# Run tests
+.\tests\vde_tests.exe
+```
+
+```powershell
+# MSBuild — works from any PowerShell terminal
 mkdir build
 cd build
 cmake ..
@@ -38,50 +103,7 @@ cmake --build . --config Debug
 
 # Run tests
 .\tests\Debug\vde_tests.exe
-
-# Run example
-.\examples\Debug\triangle_example.exe
 ```
-
-### Using the Build Scripts (Recommended)
-
-VDE provides convenient PowerShell scripts for all build operations:
-
-```powershell
-# Quick build with MSBuild (default)
-.\scripts\build.ps1
-
-# Fast build with Ninja
-.\scripts\build.ps1 -Generator Ninja
-
-# Run all tests
-.\scripts\test.ps1
-
-# Build and test together
-.\scripts\test.ps1 -Build
-
-# Clean rebuild
-.\scripts\rebuild.ps1
-
-# Run specific tests
-.\scripts\test.ps1 -Filter "CameraTest.*"
-
-# Release build
-.\scripts\build.ps1 -Config Release
-
-# Show all available commands
-.\scripts\help.ps1
-
-# Format C++ code
-.\scripts\format.ps1
-
-# Enable local protection: block direct commits to main
-.\scripts\install-hooks.ps1
-```
-
-For complete documentation, see:
-- `scripts/README.md` - Detailed script usage
-- `.github/skills/build-tool-workflows/SKILL.md` - Complete build guide
 
 ## Code Formatting
 
@@ -102,30 +124,70 @@ VDE uses clang-format to maintain consistent code style. The configuration is de
 
 ## Usage Example
 
+### Game API (Recommended)
+
+```cpp
+#include <vde/api/GameAPI.h>
+
+class MyScene : public vde::Scene {
+public:
+    void onEnter() override {
+        setBackgroundColor(vde::Color(0.1f, 0.1f, 0.2f));
+
+        auto cube = addEntity<vde::MeshEntity>();
+        cube->setMesh(vde::Mesh::createCube());
+        cube->setMaterial(vde::Material::createColored(vde::Color::red()));
+        cube->setName("cube");
+    }
+
+    void update(float deltaTime) override {
+        auto* cube = getEntityByName("cube");
+        if (cube) {
+            auto rot = cube->getRotation();
+            cube->setRotation(rot.pitch, rot.yaw + 45.0f * deltaTime, rot.roll);
+        }
+        vde::Scene::update(deltaTime);
+    }
+};
+
+int main() {
+    vde::Game game;
+    vde::GameSettings settings;
+    settings.gameName = "My First VDE Game";
+    settings.setWindowSize(1280, 720);
+
+    game.initialize(settings);
+    game.addScene("main", new MyScene());
+    game.setActiveScene("main");
+    game.run();
+    return 0;
+}
+```
+
+### Low-Level API
+
+For direct Vulkan control without the Game API:
+
 ```cpp
 #include <vde/Core.h>
 
 int main() {
-    // Create window
     vde::Window window(1280, 720, "My VDE Application");
-    
-    // Initialize Vulkan context
+
     vde::VulkanContext context;
     if (!context.initialize(&window)) {
         return 1;
     }
-    
-    // Set up rendering callback
+
     context.setRenderCallback([&](VkCommandBuffer cmd) {
         // Your rendering code here
     });
-    
-    // Main loop
+
     while (!window.shouldClose()) {
         window.pollEvents();
         context.drawFrame();
     }
-    
+
     context.waitIdle();
     return 0;
 }
@@ -136,7 +198,7 @@ int main() {
 ```
 vdengine/
 ├── include/vde/           # Public headers
-│   ├── Core.h             # Umbrella header (include this)
+│   ├── Core.h             # Umbrella header (low-level API)
 │   ├── Window.h           # Window management
 │   ├── VulkanContext.h    # Core Vulkan setup
 │   ├── Camera.h           # Camera controls
@@ -147,102 +209,46 @@ vdengine/
 │   ├── DescriptorManager.h # Descriptor set management
 │   ├── HexGeometry.h      # Hex grid generation
 │   ├── HexPrismMesh.h     # 3D hex prism meshes
-│   └── Types.h            # Common types (Vertex, UBO)
+│   ├── Types.h            # Common types (Vertex, UBO)
+│   └── api/               # Game API (high-level)
+│       ├── GameAPI.h      # Convenience umbrella header
+│       ├── Game.h         # Main game loop manager
+│       ├── Scene.h        # Scene base class
+│       ├── SceneGroup.h   # Multi-viewport scene groups
+│       ├── Entity.h       # Entity base class
+│       ├── PhysicsScene.h # 2D physics integration
+│       ├── AudioManager.h # Audio playback
+│       ├── TextRenderer.h # Font/text rendering
+│       ├── ResourceManager.h # Asset caching
+│       ├── StorageManager.h  # Persistent key-value store
+│       └── ...            # Input, transitions, world units, …
 ├── src/                   # Implementation files
 ├── shaders/               # GLSL shader sources
 ├── tests/                 # Unit tests (Google Test)
-├── examples/              # Example applications
-├── scripts/               # Build/test scripts
-└── third_party/           # Vendored dependencies
-```
-
-## Core Components
-
-### Window
-Cross-platform window creation and event handling.
-
-```cpp
-vde::Window window(1920, 1080, "Game Window");
-while (!window.shouldClose()) {
-    window.pollEvents();
-    // ...
-}
-```
-
-### VulkanContext
-Manages all Vulkan resources: instance, device, swapchain, render pass, command buffers.
-
-```cpp
-vde::VulkanContext context;
-context.initialize(&window);
-context.setRenderCallback([](VkCommandBuffer cmd) {
-    // Bind pipeline, draw commands
-});
-context.drawFrame();
-```
-
-### Camera
-Orbital camera with zoom and pan controls.
-
-```cpp
-vde::Camera camera;
-camera.setPosition(glm::vec3(0, 10, 20));
-camera.setTarget(glm::vec3(0, 0, 0));
-camera.orbit(deltaYaw, deltaPitch);
-camera.zoom(scrollDelta);
-glm::mat4 viewProj = camera.getViewProjectionMatrix();
-```
-
-### ShaderCache
-Compile GLSL shaders at runtime with automatic caching.
-
-```cpp
-vde::ShaderCache cache(device, "cache/");
-auto vertModule = cache.getOrCompile("shaders/triangle.vert", vde::ShaderStage::Vertex);
-auto fragModule = cache.getOrCompile("shaders/triangle.frag", vde::ShaderStage::Fragment);
-```
-
-### Texture
-Load images and create Vulkan textures.
-
-```cpp
-vde::Texture texture;
-texture.loadFromFile(context, "textures/sprite.png");
-VkDescriptorImageInfo imageInfo = texture.getDescriptorInfo();
-```
-
-### HexGeometry
-Generate hexagonal grid meshes for strategy games.
-
-```cpp
-auto hexMesh = vde::HexGeometry::generateFlatTop(1.0f);
-// Use hexMesh.vertices and hexMesh.indices to create buffers
-```
-
-### HexPrismMesh
-Generate 3D hexagonal prism meshes for terrain.
-
-```cpp
-auto prism = vde::HexPrismMeshGenerator::generate(1.0f, 0.5f, vde::HexOrientation::FlatTop);
-// Creates top face, bottom face, and 6 side quads
+├── examples/              # Example applications (30+)
+├── tools/                 # Asset creation tools (VLauncher, geometry REPL, resource editor)
+├── scripts/               # Build/test/format PowerShell scripts
+└── third_party/           # Vendored dependencies (if present)
 ```
 
 ## Dependencies
 
-VDE uses CMake FetchContent for most dependencies:
+VDE uses CMake FetchContent for most dependencies. Only the Vulkan SDK requires a manual system-wide install.
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| **Vulkan SDK** | 1.3+ | Graphics API (system install required) |
-| **GLFW** | 3.x | Window/input management |
-| **GLM** | 1.0+ | Mathematics library |
-| **glslang** | 14.3.0 | Runtime shader compilation |
-| **stb_image** | 2.30 | Image loading |
+| **Vulkan SDK** | 1.3+ | Graphics API — **system install required** |
+| **GLFW** | 3.4 | Window/input management |
+| **GLM** | 1.0.1 | Mathematics library |
+| **glslang** | 14.3.0 | Runtime GLSL → SPIR-V compilation |
+| **stb_image** | v2.30 | Image loading |
+| **miniaudio** | 0.11.21 | Cross-platform audio |
+| **SQLite3** | 3.49.1 | Persistent key-value storage |
+| **toml++** | v3.4.0 | TOML configuration parsing |
+| **Dear ImGui** | v1.91.8-docking | Debug UI (examples and tools only) |
 | **Google Test** | 1.14.0 | Unit testing |
 
 ## Configuration Options
-
-CMake options for customization:
 
 ```cmake
 # Build shared library instead of static
@@ -251,8 +257,11 @@ cmake .. -DVDE_SHARED_LIBS=ON
 # Disable building tests
 cmake .. -DVDE_BUILD_TESTS=OFF
 
-# Disable building examples  
+# Disable building examples
 cmake .. -DVDE_BUILD_EXAMPLES=OFF
+
+# Disable building tools
+cmake .. -DVDE_BUILD_TOOLS=OFF
 ```
 
 ## Integration
@@ -260,31 +269,31 @@ cmake .. -DVDE_BUILD_EXAMPLES=OFF
 ### As a Subdirectory
 
 ```cmake
-add_subdirectory(vdengine)
-target_link_libraries(your_project PRIVATE vde)
+cmake_minimum_required(VERSION 3.20)
+project(MyGame)
+
+add_subdirectory(path/to/vdengine)
+
+add_executable(MyGame main.cpp)
+target_link_libraries(MyGame PRIVATE vde)
 ```
 
-### As an Installed Package
-
-```cmake
-find_package(vde REQUIRED)
-target_link_libraries(your_project PRIVATE vde::vde)
-```
+> **Note:** `find_package(vde)` is not currently supported. Use `add_subdirectory` as shown above.
 
 ## Testing
 
-Unit tests use Google Test framework:
+Unit tests use Google Test:
 
 ```powershell
 # Build and run all tests
-cd build
-ctest -C Debug --output-on-failure
+.\scripts\test.ps1 -Build
 
-# Run specific test suite
-.\tests\Debug\vde_tests.exe --gtest_filter=CameraTest.*
+# Run a specific test suite
+.\scripts\test.ps1 -Filter "CameraTest.*"
 
-# Run with verbose output
-.\tests\Debug\vde_tests.exe --gtest_list_tests
+# Using ctest directly (Ninja build)
+cd build_ninja
+ctest --output-on-failure
 ```
 
 ### Test Coverage
@@ -299,45 +308,52 @@ ctest -C Debug --output-on-failure
 
 ## Examples
 
-### Triangle Example
-
-Basic Vulkan triangle rendering demonstrating:
-- Window creation
-- Vulkan context initialization
-- Shader loading
-- Render loop
+VDE ships with 34 example applications. Launch them interactively via VLauncher:
 
 ```powershell
-.\examples\Debug\triangle_example.exe
+.\run-vlauncher.ps1
 ```
+
+Or run smoke tests across all examples to verify they start successfully:
+
+```powershell
+.\scripts\smoke-test.ps1
+```
+
+Notable examples:
+
+| Example | Description |
+|---------|-------------|
+| `triangle` | Basic Vulkan triangle (low-level API) |
+| `simple_game` | Minimal Game API usage |
+| `physics_demo` | 2D rigid-body physics |
+| `sprite_demo` | Sprite rendering |
+| `audio_demo` | Audio playback |
+| `imgui_demo` | Dear ImGui integration |
+| `text_adventure_demo` | Text rendering |
+| `multi_scene_demo` | Multiple scenes with scene groups |
+| `quad_viewport_demo` | Split-screen viewports |
+| `transition_demo` | Scene transitions |
+| `asteroids_demo` | Complete Asteroids game |
+| `breakout_demo` | Complete Breakout game |
 
 ## Versioning
 
 VDE follows semantic versioning. Current version: **0.1.0**
 
-```cpp
-#include <vde/Core.h>
-std::cout << "VDE v" << vde::Version::major << "." 
-          << vde::Version::minor << "." 
-          << vde::Version::patch << std::endl;
-```
-
-## Roadmap
-
-- [ ] ImGui integration for debug UI
-- [ ] Basic 2D sprite renderer
-- [ ] Texture atlasing
-- [ ] Audio system (OpenAL)
-- [ ] Scene graph
-
 ## License
 
-[Your License Here]
+Copyright (c) 2026 Derek Kowaluk
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+You are free to use, modify, and distribute this software, provided the copyright notice and attribution to Derek Kowaluk are preserved in all copies or substantial portions of the Software.
 
 ## Acknowledgments
 
-- [Vulkan Tutorial](https://vulkan-tutorial.com/) - Excellent Vulkan learning resource
-- [GLFW](https://www.glfw.org/) - Cross-platform windowing
-- [GLM](https://github.com/g-truc/glm) - OpenGL Mathematics
-- [Dear ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI (future integration)
-- [Red Blob Games](https://www.redblobgames.com/grids/hexagons/) - Hexagonal grid reference
+- [Vulkan Tutorial](https://vulkan-tutorial.com/) — Excellent Vulkan learning resource
+- [GLFW](https://www.glfw.org/) — Cross-platform windowing
+- [GLM](https://github.com/g-truc/glm) — OpenGL Mathematics
+- [glslang](https://github.com/KhronosGroup/glslang) — Runtime shader compilation
+- [miniaudio](https://miniaud.io/) — Cross-platform audio
+- [Dear ImGui](https://github.com/ocornut/imgui) — Immediate mode GUI
+- [Red Blob Games](https://www.redblobgames.com/grids/hexagons/) — Hexagonal grid reference

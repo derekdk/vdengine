@@ -278,3 +278,6 @@ add_vde_example(vde_spritesheet_demo "spritesheet_demo/main.cpp")
 
 # SpriteSheet multi-scene demo - cross-scene resource sharing with SpriteSheet
 add_vde_example(vde_spritesheet_multiscene_demo "spritesheet_multiscene_demo/main.cpp")
+
+# Text Rendering Showcase - canonical reference for TextEntity auto-sizing, scrolling, dynamic resize
+add_vde_example(vde_text_rendering_demo "text_rendering_demo/main.cpp")
