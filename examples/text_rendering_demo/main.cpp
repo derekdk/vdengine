@@ -89,7 +89,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto subtitle = addEntity<TextEntity>();
         subtitle->setText("Automatic sizing with setWorldHeight()");
         subtitle->setFont(BitmapFont::small());
-        subtitle->setStyle({.color = Color(0.6f, 0.6f, 0.7f, 1.0f), .pixelScale = 1});
+        subtitle->setStyle({.color = Color(0.6f, 0.6f, 0.7f, 1.0f), .pixelScale = 2});
         subtitle->setAnchor(0.5f, 0.5f);
         subtitle->setPosition(0.0f, y, 0.0f);
         subtitle->setWorldHeight(0.25f);
@@ -157,7 +157,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto e = addEntity<TextEntity>();
         e->setText(text);
         e->setFont(BitmapFont::small());
-        e->setStyle({.color = Color::cyan(), .pixelScale = 1, .letterSpacing = 2});
+        e->setStyle({.color = Color::cyan(), .pixelScale = 2, .letterSpacing = 2});
         e->setAnchor(0.0f, 0.5f);
         e->setPosition(x, y, 0.1f);
         e->setWorldHeight(0.28f);
@@ -178,7 +178,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto left = addEntity<TextEntity>();
         left->setText("Left-aligned");
         left->setFont(BitmapFont::small());
-        left->setStyle({.color = Color::green(), .pixelScale = 1});
+        left->setStyle({.color = Color::green(), .pixelScale = 2});
         left->setAnchor(0.0f, 0.5f);
         left->setPosition(COL_L, y, 0.0f);
         left->setWorldHeight(0.28f);
@@ -187,7 +187,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto center = addEntity<TextEntity>();
         center->setText("Center-aligned");
         center->setFont(BitmapFont::small());
-        center->setStyle({.color = Color::yellow(), .pixelScale = 1});
+        center->setStyle({.color = Color::yellow(), .pixelScale = 2});
         center->setAnchor(0.5f, 0.5f);
         center->setPosition(COL_MID, y, 0.0f);
         center->setWorldHeight(0.28f);
@@ -196,7 +196,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto right = addEntity<TextEntity>();
         right->setText("Right-aligned");
         right->setFont(BitmapFont::small());
-        right->setStyle({.color = Color(1.0f, 0.5f, 0.3f, 1.0f), .pixelScale = 1});
+        right->setStyle({.color = Color(1.0f, 0.5f, 0.3f, 1.0f), .pixelScale = 2});
         right->setAnchor(1.0f, 0.5f);
         right->setPosition(COL_R, y, 0.0f);
         right->setWorldHeight(0.28f);
@@ -242,7 +242,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         m_frameCounter = addEntity<TextEntity>();
         m_frameCounter->setText("Frame: 0");
         m_frameCounter->setFont(BitmapFont::small());
-        m_frameCounter->setStyle({.color = Color::green(), .pixelScale = 1});
+        m_frameCounter->setStyle({.color = Color::green(), .pixelScale = 2});
         m_frameCounter->setAnchor(0.0f, 0.5f);
         m_frameCounter->setPosition(COL_L, y, 0.0f);
         m_frameCounter->setWorldHeight(0.28f);
@@ -251,7 +251,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         m_timerLabel = addEntity<TextEntity>();
         m_timerLabel->setText("Time: 0.00s");
         m_timerLabel->setFont(BitmapFont::small());
-        m_timerLabel->setStyle({.color = Color::green(), .pixelScale = 1});
+        m_timerLabel->setStyle({.color = Color::green(), .pixelScale = 2});
         m_timerLabel->setAnchor(0.0f, 0.5f);
         m_timerLabel->setPosition(COL_L, y, 0.0f);
         m_timerLabel->setWorldHeight(0.28f);
@@ -260,7 +260,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         m_fpsLabel = addEntity<TextEntity>();
         m_fpsLabel->setText("FPS: 0.0");
         m_fpsLabel->setFont(BitmapFont::small());
-        m_fpsLabel->setStyle({.color = Color::green(), .pixelScale = 1});
+        m_fpsLabel->setStyle({.color = Color::green(), .pixelScale = 2});
         m_fpsLabel->setAnchor(0.0f, 0.5f);
         m_fpsLabel->setPosition(COL_L, y, 0.0f);
         m_fpsLabel->setWorldHeight(0.28f);
@@ -274,7 +274,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto singleChar = addEntity<TextEntity>();
         singleChar->setText("X");
         singleChar->setFont(BitmapFont::small());
-        singleChar->setStyle({.color = Color::yellow(), .pixelScale = 1});
+        singleChar->setStyle({.color = Color::yellow(), .pixelScale = 2});
         singleChar->setAnchor(0.0f, 0.5f);
         singleChar->setPosition(COL_L, y, 0.0f);
         singleChar->setWorldHeight(0.25f);
@@ -283,7 +283,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto overflow = addEntity<TextEntity>();
         overflow->setText("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
         overflow->setFont(BitmapFont::small());
-        overflow->setStyle({.color = Color(1.0f, 0.4f, 0.4f, 1.0f), .pixelScale = 1});
+        overflow->setStyle({.color = Color(1.0f, 0.4f, 0.4f, 1.0f), .pixelScale = 2});
         overflow->setAnchor(0.0f, 0.5f);
         overflow->setPosition(COL_L, y, 0.0f);
         overflow->setWorldHeight(0.25f);
@@ -302,7 +302,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
             m_logEntities[i] = addEntity<TextEntity>();
             m_logEntities[i]->setText("---");
             m_logEntities[i]->setFont(BitmapFont::small());
-            m_logEntities[i]->setStyle({.color = Color(0.8f, 0.8f, 0.8f, 1.0f), .pixelScale = 1});
+            m_logEntities[i]->setStyle({.color = Color(0.8f, 0.8f, 0.8f, 1.0f), .pixelScale = 2});
             m_logEntities[i]->setAnchor(0.0f, 0.5f);
             m_logEntities[i]->setPosition(COL, y, 0.0f);
             m_logEntities[i]->setWorldHeight(0.25f);
@@ -319,7 +319,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         m_resizeLabel->setText(
             "This long text demonstrates dynamic max-width clamping as it oscillates");
         m_resizeLabel->setFont(BitmapFont::small());
-        m_resizeLabel->setStyle({.color = Color(1.0f, 0.8f, 0.2f, 1.0f), .pixelScale = 1});
+        m_resizeLabel->setStyle({.color = Color(1.0f, 0.8f, 0.2f, 1.0f), .pixelScale = 2});
         m_resizeLabel->setAnchor(0.0f, 0.5f);
         m_resizeLabel->setPosition(COL, y, 0.0f);
         m_resizeLabel->setWorldHeight(0.28f);
@@ -329,7 +329,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         m_resizeInfo = addEntity<TextEntity>();
         m_resizeInfo->setText("maxWidth: 7.0");
         m_resizeInfo->setFont(BitmapFont::small());
-        m_resizeInfo->setStyle({.color = Color(0.5f, 0.5f, 0.6f, 1.0f), .pixelScale = 1});
+        m_resizeInfo->setStyle({.color = Color(0.5f, 0.5f, 0.6f, 1.0f), .pixelScale = 2});
         m_resizeInfo->setAnchor(0.0f, 0.5f);
         m_resizeInfo->setPosition(COL, y, 0.0f);
         m_resizeInfo->setWorldHeight(0.22f);
@@ -343,7 +343,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto s1 = addEntity<TextEntity>();
         s1->setText("worldHeight = 0.20");
         s1->setFont(BitmapFont::small());
-        s1->setStyle({.color = Color(0.7f, 0.9f, 1.0f, 1.0f), .pixelScale = 1});
+        s1->setStyle({.color = Color(0.7f, 0.9f, 1.0f, 1.0f), .pixelScale = 2});
         s1->setAnchor(0.0f, 0.5f);
         s1->setPosition(COL, y, 0.0f);
         s1->setWorldHeight(0.20f);
@@ -352,7 +352,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         auto s2 = addEntity<TextEntity>();
         s2->setText("worldHeight = 0.35");
         s2->setFont(BitmapFont::small());
-        s2->setStyle({.color = Color(0.7f, 0.9f, 1.0f, 1.0f), .pixelScale = 1});
+        s2->setStyle({.color = Color(0.7f, 0.9f, 1.0f, 1.0f), .pixelScale = 2});
         s2->setAnchor(0.0f, 0.5f);
         s2->setPosition(COL, y, 0.0f);
         s2->setWorldHeight(0.35f);
@@ -374,7 +374,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         m_statusLabel = addEntity<TextEntity>();
         m_statusLabel->setText(" ");
         m_statusLabel->setFont(BitmapFont::small());
-        m_statusLabel->setStyle({.color = Color(0.4f, 0.4f, 0.5f, 1.0f), .pixelScale = 1});
+        m_statusLabel->setStyle({.color = Color(0.4f, 0.4f, 0.5f, 1.0f), .pixelScale = 2});
         m_statusLabel->setAnchor(0.0f, 0.5f);
         m_statusLabel->setPosition(-VIEW_W * 0.5f + 0.3f, y, 0.0f);
         m_statusLabel->setWorldHeight(0.20f);

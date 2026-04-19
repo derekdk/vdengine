@@ -1,0 +1,6 @@
+# Golden image capture: text_rendering_demo
+wait startup
+wait_frames 30
+screenshot render_verify_output/text_rendering_demo.png
+wait 100
+exit
