@@ -190,6 +190,8 @@ set(VDE_SOURCES
     src/api/InputScriptExecutor.cpp
     # Storage
     src/api/StorageManager.cpp
+    # SpriteSheet
+    src/api/SpriteSheet.cpp
     # Text rendering
     src/api/BitmapFont.cpp
     src/api/TextRenderer.cpp
@@ -260,6 +262,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/ScriptEnvironment.h
     # Storage
     include/vde/api/StorageManager.h
+    # SpriteSheet
+    include/vde/api/SpriteSheet.h
     # Default constants
     include/vde/api/Defaults.h
     # Gameplay utility headers

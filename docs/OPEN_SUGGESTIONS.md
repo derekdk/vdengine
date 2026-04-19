@@ -48,7 +48,7 @@ public:
 
     /// Create from texture with uniform grid layout.
     static Ref createGrid(std::shared_ptr<Texture> texture,
-                          int columns, int rows, int spacing = 0);
+                          int columns, int rows, int spacingPx = 0);
 
     /// Create from texture with manually defined regions.
     static Ref create(std::shared_ptr<Texture> texture);
@@ -58,6 +58,7 @@ public:
     UVRect getUVRect(const std::string& name) const;
     std::shared_ptr<Texture> getTexture() const;
     int getSpriteCount() const;
+    const char* getTypeName() const override;
 };
 ```
 

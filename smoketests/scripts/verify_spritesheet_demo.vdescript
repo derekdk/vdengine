@@ -1,0 +1,7 @@
+# Render verification: spritesheet_demo
+wait startup
+wait_frames 30
+screenshot render_verify_output/spritesheet_demo.png
+wait 100
+compare render_verify_output/spritesheet_demo.png ../../smoketests/golden/spritesheet_demo.png 0.05
+exit

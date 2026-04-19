@@ -38,6 +38,7 @@
 #include "Resource.h"
 #include "Scene.h"
 #include "SceneGroup.h"
+#include "SpriteSheet.h"
 #include "ViewportRect.h"
 
 // Input handling

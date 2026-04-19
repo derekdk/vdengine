@@ -74,6 +74,8 @@ set(VDE_TEST_SOURCES
     # Emoji / UTF-8 tests
     Utf8_test.cpp
     EmojiFont_test.cpp
+    # SpriteSheet tests
+    SpriteSheet_test.cpp
     # Phase 6 — Audit coverage expansion
     Game_test.cpp
     AudioManager_test.cpp

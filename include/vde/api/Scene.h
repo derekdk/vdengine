@@ -661,7 +661,7 @@ class Scene {
     // Resources
     struct ResourceEntry {
         std::shared_ptr<Resource> resource;
-        std::type_index type;
+        std::type_index type = typeid(void);
     };
     std::unordered_map<ResourceId, ResourceEntry> m_resources;
     ResourceId m_nextResourceId = 1;
@@ -751,6 +751,9 @@ ResourceId Scene::addResource(ResourcePtr<T> resource) {
 
     if (resource->m_id == INVALID_RESOURCE_ID) {
         resource->m_id = m_nextResourceId++;
+    } else if (resource->m_id >= m_nextResourceId) {
+        // Advance past reused IDs so the next scene-local allocation won't collide
+        m_nextResourceId = resource->m_id + 1;
     }
 
     m_resources[resource->m_id] = {resource, typeid(T)};

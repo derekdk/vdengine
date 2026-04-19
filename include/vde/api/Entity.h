@@ -326,6 +326,31 @@ class SpriteEntity : public Entity {
     float getAnchorY() const { return m_anchorY; }
 
     /**
+     * @brief Set horizontal flip state.
+     *
+     * Flipping mirrors the sprite's UVs without affecting the entity's
+     * world-space extents or anchor behavior.
+     * @param flip true to mirror horizontally.
+     */
+    void setFlipX(bool flip) { m_flipX = flip; }
+
+    /**
+     * @brief Set vertical flip state.
+     * @param flip true to mirror vertically.
+     */
+    void setFlipY(bool flip) { m_flipY = flip; }
+
+    /**
+     * @brief Check if the sprite is horizontally flipped.
+     */
+    bool isFlippedX() const { return m_flipX; }
+
+    /**
+     * @brief Check if the sprite is vertically flipped.
+     */
+    bool isFlippedY() const { return m_flipY; }
+
+    /**
      * @brief Size the sprite to a given world-space height, preserving aspect ratio.
      *
      * Reads the current texture dimensions to compute the aspect ratio and
@@ -354,6 +379,8 @@ class SpriteEntity : public Entity {
     float m_uvX = 0.0f, m_uvY = 0.0f;
     float m_uvWidth = 1.0f, m_uvHeight = 1.0f;
     float m_anchorX = 0.5f, m_anchorY = 0.5f;
+    bool m_flipX = false;
+    bool m_flipY = false;
 };
 
 }  // namespace vde
