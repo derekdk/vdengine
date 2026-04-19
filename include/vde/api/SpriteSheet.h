@@ -67,9 +67,13 @@ class SpriteSheet : public Resource {
      * @param columns Number of columns in the grid.
      * @param rows Number of rows in the grid.
      * @param spacingPx Optional pixel spacing between cells (must be >= 0).
+     *        After accounting for spacing, the remaining texture width/height
+     *        must divide evenly by columns/rows so no remainder pixels are dropped.
      * @return Shared pointer to the new SpriteSheet.
      * @throws std::invalid_argument if texture is null, columns/rows <= 0,
-     *         spacingPx < 0, or spacing produces non-positive cell dimensions.
+     *         spacingPx < 0, spacing produces non-positive cell dimensions,
+     *         or the texture dimensions after subtracting spacing are not
+     *         evenly divisible by columns/rows.
      */
     static Ref createGrid(std::shared_ptr<Texture> texture, int columns, int rows,
                           int spacingPx = 0);

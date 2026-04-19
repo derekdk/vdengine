@@ -99,7 +99,7 @@ Implementation: flip by negating UV width/height in the vertex data or via a pus
 flag in the sprite shader. Must not change the entity's world-space extents or anchor
 behavior.
 
-#### Unit Tests (`tests/test_SpriteSheet.cpp`)
+#### Unit Tests (`tests/SpriteSheet_test.cpp`)
 
 - Grid creation with correct UV rects for first, last, and middle frames
 - Named sprite lookup

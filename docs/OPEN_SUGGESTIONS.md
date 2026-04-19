@@ -59,7 +59,6 @@ public:
     std::shared_ptr<Texture> getTexture() const;
     int getSpriteCount() const;
     const char* getTypeName() const override;
-    bool isLoaded() const override;
 };
 ```
 
