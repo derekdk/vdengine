@@ -350,7 +350,11 @@ void SpriteEntity::setUVRect(float u, float v, float width, float height) {
 }
 
 void SpriteEntity::sizeToFit(float worldHeight, float maxWidth) {
-    auto tex = getTexture();
+    std::shared_ptr<Texture> textureOwner = m_texture;
+    Texture* tex = textureOwner.get();
+    if (!tex && m_scene && m_textureId != INVALID_RESOURCE_ID) {
+        tex = m_scene->getResource<Texture>(m_textureId);
+    }
     if (!tex || tex->getWidth() < 2) {
         return;
     }
@@ -361,7 +365,8 @@ void SpriteEntity::sizeToFit(float worldHeight, float maxWidth) {
         w = maxWidth;
         h = maxWidth / aspect;
     }
-    setScale(w, h, 1.0f);
+    const auto currentScale = getScale();
+    setScale(w, h, currentScale.z);
 }
 
 void SpriteEntity::render() {

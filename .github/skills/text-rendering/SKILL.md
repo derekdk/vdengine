@@ -85,6 +85,8 @@ m_label->setText("NEW VALUE");
 ```
 
 For manual sizing, you must rebuild the texture and re-size:
+
+```cpp
 m_label->setText("NEW VALUE");
 m_label->update(0.0f);
 sizeToFit(*m_label, 0.35f);
