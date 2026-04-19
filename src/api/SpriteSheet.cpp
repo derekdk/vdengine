@@ -29,12 +29,20 @@ SpriteSheet::Ref SpriteSheet::createGrid(std::shared_ptr<Texture> texture, int c
     // Compute cell size in pixels (account for spacing between cells)
     int totalSpacingX = spacingPx * (columns - 1);
     int totalSpacingY = spacingPx * (rows - 1);
-    int cellW = (texW - totalSpacingX) / columns;
-    int cellH = (texH - totalSpacingY) / rows;
+    int usableW = texW - totalSpacingX;
+    int usableH = texH - totalSpacingY;
+    int cellW = usableW / columns;
+    int cellH = usableH / rows;
 
     if (cellW <= 0 || cellH <= 0) {
         throw std::invalid_argument(
             "SpriteSheet::createGrid: spacing too large — computed cell size is non-positive");
+    }
+
+    if (usableW % columns != 0 || usableH % rows != 0) {
+        throw std::invalid_argument(
+            "SpriteSheet::createGrid: texture dimensions (minus spacing) are not evenly "
+            "divisible by the grid size — remainder pixels would be silently dropped");
     }
 
     float invW = (texW > 0) ? 1.0f / static_cast<float>(texW) : 0.0f;

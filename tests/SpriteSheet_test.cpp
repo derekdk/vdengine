@@ -266,6 +266,23 @@ TEST(SpriteSheetTest, CreateGridExcessiveSpacingThrows) {
     EXPECT_THROW(SpriteSheet::createGrid(tex, 2, 2, 100), std::invalid_argument);
 }
 
+TEST(SpriteSheetTest, CreateGridUnevenDimensionsThrows) {
+    // 65 wide / 3 cols = 21 remainder 2 → remainder pixels would be silently dropped
+    auto tex = makeTestTexture(65, 64);
+    EXPECT_THROW(SpriteSheet::createGrid(tex, 3, 2), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, CreateGridUnevenHeightThrows) {
+    auto tex = makeTestTexture(64, 65);
+    EXPECT_THROW(SpriteSheet::createGrid(tex, 2, 3), std::invalid_argument);
+}
+
+TEST(SpriteSheetTest, CreateGridUnevenWithSpacingThrows) {
+    // 70 wide, 2 cols, 5px spacing → usable = 70 - 5 = 65, 65 / 2 = 32 remainder 1
+    auto tex = makeTestTexture(70, 64);
+    EXPECT_THROW(SpriteSheet::createGrid(tex, 2, 2, 5), std::invalid_argument);
+}
+
 // ============================================================================
 // SpriteEntity — Flip flags
 // ============================================================================

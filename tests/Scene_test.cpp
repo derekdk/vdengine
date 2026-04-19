@@ -12,6 +12,7 @@
 #include <vde/api/LightBox.h>
 #include <vde/api/PhysicsEntity.h>
 #include <vde/api/Scene.h>
+#include <vde/api/SpriteSheet.h>
 #include <vde/api/TextEntity.h>
 #include <vde/api/ViewportRect.h>
 #include <vde/api/WorldBounds.h>
@@ -612,6 +613,85 @@ TEST_F(SceneTest, Setup2DSetsBackgroundColor) {
     EXPECT_FLOAT_EQ(scene->getBackgroundColor().r, 0.1f);
     EXPECT_FLOAT_EQ(scene->getBackgroundColor().g, 0.2f);
     EXPECT_FLOAT_EQ(scene->getBackgroundColor().b, 0.3f);
+}
+
+// ============================================================================
+// addResource — cross-scene ID collision prevention
+// ============================================================================
+
+static std::shared_ptr<Texture> makeSceneTestTexture(uint32_t w, uint32_t h) {
+    auto tex = std::make_shared<Texture>();
+    std::vector<uint8_t> pixels(w * h * 4, 255);
+    tex->loadFromData(pixels.data(), w, h);
+    return tex;
+}
+
+TEST_F(SceneTest, AddResourceAssignsNewId) {
+    auto tex = makeSceneTestTexture(32, 32);
+    auto sheet = SpriteSheet::create(tex);
+    EXPECT_EQ(sheet->getId(), INVALID_RESOURCE_ID);
+
+    auto id = scene->addResource<SpriteSheet>(sheet);
+    EXPECT_NE(id, INVALID_RESOURCE_ID);
+    EXPECT_EQ(sheet->getId(), id);
+}
+
+TEST_F(SceneTest, AddSharedResourcePreservesId) {
+    // Simulate cross-scene sharing: resource already has an ID from scene A
+    auto tex = makeSceneTestTexture(32, 32);
+    auto sheet = SpriteSheet::create(tex);
+
+    auto sceneA = std::make_unique<Scene>();
+    auto idA = sceneA->addResource<SpriteSheet>(sheet);
+    EXPECT_NE(idA, INVALID_RESOURCE_ID);
+
+    // Add the same resource (with existing ID) to scene B
+    auto id = scene->addResource<SpriteSheet>(sheet);
+    EXPECT_EQ(id, idA);  // ID preserved, not reassigned
+}
+
+TEST_F(SceneTest, AddSharedResourceAdvancesNextId) {
+    // After inserting a shared resource with an existing high ID,
+    // subsequent local resources must not collide with it.
+    auto tex = makeSceneTestTexture(32, 32);
+    auto sheet = SpriteSheet::create(tex);
+
+    auto sceneA = std::make_unique<Scene>();
+    auto idA = sceneA->addResource<SpriteSheet>(sheet);
+
+    // Insert shared resource into scene B (this scene)
+    scene->addResource<SpriteSheet>(sheet);
+
+    // Add a new local resource — its ID must not collide
+    auto tex2 = makeSceneTestTexture(16, 16);
+    auto localSheet = SpriteSheet::create(tex2);
+    auto localId = scene->addResource<SpriteSheet>(localSheet);
+    EXPECT_NE(localId, idA);
+    EXPECT_NE(localId, INVALID_RESOURCE_ID);
+}
+
+TEST_F(SceneTest, AddMultipleSharedResourcesNoCollision) {
+    auto tex1 = makeSceneTestTexture(32, 32);
+    auto tex2 = makeSceneTestTexture(16, 16);
+    auto sheet1 = SpriteSheet::create(tex1);
+    auto sheet2 = SpriteSheet::create(tex2);
+
+    auto sceneA = std::make_unique<Scene>();
+    auto id1 = sceneA->addResource<SpriteSheet>(sheet1);
+    auto id2 = sceneA->addResource<SpriteSheet>(sheet2);
+    EXPECT_NE(id1, id2);
+
+    // Insert both shared resources into scene B
+    scene->addResource<SpriteSheet>(sheet1);
+    scene->addResource<SpriteSheet>(sheet2);
+
+    // New local resource must not collide with either
+    auto tex3 = makeSceneTestTexture(8, 8);
+    auto localSheet = SpriteSheet::create(tex3);
+    auto localId = scene->addResource<SpriteSheet>(localSheet);
+    EXPECT_NE(localId, id1);
+    EXPECT_NE(localId, id2);
+    EXPECT_NE(localId, INVALID_RESOURCE_ID);
 }
 
 TEST_F(SceneTest, Setup2DDefaultBackgroundIsBlack) {

@@ -12,7 +12,6 @@
 
 #include <vde/Texture.h>
 #include <vde/api/GameAPI.h>
-#include <vde/api/SpriteSheet.h>
 
 #include <algorithm>
 #include <array>
@@ -192,6 +191,11 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
     PlayfieldScene() : BaseExampleScene() {}
 
     void onEnter() override {
+        // Clear previous state so re-entry is safe (scene transitions call onEnter again)
+        clearEntities();
+        m_characters.clear();
+        m_nameLabels.clear();
+
         printExampleHeader();
         setup2D(16.0f, 10.0f, Color(0.08f, 0.08f, 0.12f, 1.0f));
 
@@ -383,6 +387,14 @@ class DetailScene : public vde::examples::BaseExampleScene {
     DetailScene() : BaseExampleScene() {}
 
     void onEnter() override {
+        // Clear previous state so re-entry is safe (scene transitions call onEnter again)
+        clearEntities();
+        m_statValues.clear();
+        m_characterSprite.reset();
+        m_titleLabel.reset();
+        m_currentIndex = 0;
+        m_autoCycleTimer = 0.0f;
+
         setup2D(16.0f, 10.0f, Color(0.05f, 0.06f, 0.1f, 1.0f));
 
         // Retrieve the shared SpriteSheet from ResourceManager

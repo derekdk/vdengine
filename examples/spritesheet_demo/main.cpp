@@ -11,7 +11,6 @@
 
 #include <vde/Texture.h>
 #include <vde/api/GameAPI.h>
-#include <vde/api/SpriteSheet.h>
 
 #include <cmath>
 #include <iostream>
