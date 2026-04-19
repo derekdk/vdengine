@@ -51,9 +51,9 @@ which interacts poorly with anchor points and physics extents.
 
 | File | Purpose |
 |------|---------|
-| `include/vde/SpriteSheet.h` | Public header |
-| `src/SpriteSheet.cpp` | Implementation |
-| `tests/test_SpriteSheet.cpp` | Unit tests |
+| `include/vde/api/SpriteSheet.h` | Public header |
+| `src/api/SpriteSheet.cpp` | Implementation |
+| `tests/SpriteSheet_test.cpp` | Unit tests |
 
 #### `SpriteSheet` API
 
@@ -124,14 +124,12 @@ behavior.
 | Key | Action |
 |-----|--------|
 | LEFT/RIGHT | Move character (demonstrates flip on direction change) |
-| SPACE | Toggle through spritesheet frames manually |
 | ESC | Exit |
 
 **Console output:**
 ```
 SpriteSheet Demo
 - LEFT/RIGHT arrows: move character (auto-flips sprite)
-- SPACE: step through spritesheet frames
 - ESC: exit
 Expected: 8 sprites in a row (top), named icons (middle), flip demo (bottom)
 ```
@@ -147,10 +145,6 @@ wait 500
 press right
 wait 500
 press left
-wait 500
-press space
-wait 500
-press space
 wait 500
 exit
 ```

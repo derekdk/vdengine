@@ -30,8 +30,6 @@ class SheetInputHandler : public vde::examples::BaseExampleInputHandler {
             m_left = true;
         if (key == vde::KEY_RIGHT)
             m_right = true;
-        if (key == vde::KEY_SPACE)
-            m_spacePressed = true;
     }
 
     void onKeyRelease(int key) override {
@@ -44,16 +42,9 @@ class SheetInputHandler : public vde::examples::BaseExampleInputHandler {
     bool isLeft() const { return m_left; }
     bool isRight() const { return m_right; }
 
-    bool consumeSpace() {
-        bool v = m_spacePressed;
-        m_spacePressed = false;
-        return v;
-    }
-
   private:
     bool m_left = false;
     bool m_right = false;
-    bool m_spacePressed = false;
 };
 
 // ============================================================================
