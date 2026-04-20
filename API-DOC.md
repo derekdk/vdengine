@@ -780,32 +780,38 @@ scene->setInputHandler(&inputHandler);
 `KeyStateTracker` eliminates the per-key boolean flags that most examples need. Bind named actions to keys, then query by name in `update()`:
 
 ```cpp
-class GameScene : public vde::Scene {
-    vde::KeyStateTracker m_keys;
+class GameInputHandler : public vde::InputHandler {
+public:
+    vde::KeyStateTracker keys;
 
-    void onEnter() override {
+    GameInputHandler() {
         // Held actions — true every frame the key is down
-        m_keys.bindHeld("left",  vde::KEY_LEFT);
-        m_keys.bindHeld("left",  vde::KEY_A);     // multiple keys → same action
-        m_keys.bindHeld("right", vde::KEY_RIGHT);
-        m_keys.bindHeld("right", vde::KEY_D);
+        keys.bindHeld(vde::KEY_LEFT,  "left");
+        keys.bindHeld(vde::KEY_A,     "left");   // multiple keys → same action
+        keys.bindHeld(vde::KEY_RIGHT, "right");
+        keys.bindHeld(vde::KEY_D,     "right");
 
         // One-shot actions — true once per press, must release and re-press
-        m_keys.bindOneShot("jump",  vde::KEY_SPACE);
-        m_keys.bindOneShot("shoot", vde::KEY_F);
-
-        setInputHandler(this);
+        keys.bindOneShot(vde::KEY_SPACE, "jump");
+        keys.bindOneShot(vde::KEY_F,     "shoot");
     }
 
-    // Wire press/release into the tracker
-    void onKeyPress(int key) override   { m_keys.handlePress(key); }
-    void onKeyRelease(int key) override { m_keys.handleRelease(key); }
+    void onKeyPress(int key) override   { keys.handlePress(key); }
+    void onKeyRelease(int key) override { keys.handleRelease(key); }
+};
+
+class GameScene : public vde::Scene {
+    GameInputHandler m_input;
+
+    void onEnter() override {
+        setInputHandler(&m_input);
+    }
 
     void update(float dt) override {
-        if (m_keys.isHeld("left"))  moveLeft(dt);
-        if (m_keys.isHeld("right")) moveRight(dt);
-        if (m_keys.consume("jump")) startJump();
-        if (m_keys.consume("shoot")) fireProjectile();
+        if (m_input.keys.isHeld("left"))    moveLeft(dt);
+        if (m_input.keys.isHeld("right"))   moveRight(dt);
+        if (m_input.keys.consume("jump"))   startJump();
+        if (m_input.keys.consume("shoot"))  fireProjectile();
 
         vde::Scene::update(dt);
     }
@@ -814,8 +820,8 @@ class GameScene : public vde::Scene {
 
 | Method | Description |
 |--------|-------------|
-| `bindHeld(name, key)` | Register a key for a held (continuous) action |
-| `bindOneShot(name, key)` | Register a key for a one-shot (consume-once) action |
+| `bindHeld(key, name)` | Register a key for a held (continuous) action |
+| `bindOneShot(key, name)` | Register a key for a one-shot (consume-once) action |
 | `handlePress(key)` | Call from `onKeyPress` |
 | `handleRelease(key)` | Call from `onKeyRelease` |
 | `isHeld(name)` | Returns `true` every frame the key is down |

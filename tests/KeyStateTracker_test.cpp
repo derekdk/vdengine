@@ -3,6 +3,7 @@
  * @brief Unit tests for KeyStateTracker
  */
 
+#include <vde/api/KeyCodes.h>
 #include <vde/api/KeyStateTracker.h>
 
 #include <gtest/gtest.h>
@@ -145,6 +146,63 @@ TEST_F(KeyStateTrackerTest, UnboundKeyPressAndReleaseIgnored) {
     tracker.handlePress(999);    // unbound
     tracker.handleRelease(999);  // unbound
     EXPECT_FALSE(tracker.isHeld("left"));
+}
+
+// ---------------------------------------------------------------------------
+// Documented API patterns — mirror examples from API-DOC.md and docs/API.md
+// ---------------------------------------------------------------------------
+
+// Mirrors the GameInputHandler constructor example in API-DOC.md:
+// keys.bindHeld(vde::KEY_LEFT, "left"); keys.bindHeld(vde::KEY_A, "left"); ...
+TEST_F(KeyStateTrackerTest, DocumentedPattern_TwoKeysOneHeldAction) {
+    tracker.bindHeld(vde::KEY_LEFT, "left");
+    tracker.bindHeld(vde::KEY_A, "left");
+    tracker.bindHeld(vde::KEY_RIGHT, "right");
+    tracker.bindHeld(vde::KEY_D, "right");
+
+    // Arrow key triggers "left"
+    tracker.handlePress(vde::KEY_LEFT);
+    EXPECT_TRUE(tracker.isHeld("left"));
+    EXPECT_FALSE(tracker.isHeld("right"));
+
+    // A key also triggers "left"; both currently pressed
+    tracker.handlePress(vde::KEY_A);
+    EXPECT_TRUE(tracker.isHeld("left"));
+
+    // Release arrow — A still holds "left"
+    tracker.handleRelease(vde::KEY_LEFT);
+    EXPECT_TRUE(tracker.isHeld("left"));
+
+    // Release A — action drops
+    tracker.handleRelease(vde::KEY_A);
+    EXPECT_FALSE(tracker.isHeld("left"));
+}
+
+// Mirrors the one-shot bindings from API-DOC.md:
+// keys.bindOneShot(vde::KEY_SPACE, "jump"); keys.bindOneShot(vde::KEY_F, "shoot");
+TEST_F(KeyStateTrackerTest, DocumentedPattern_OneShotActions) {
+    tracker.bindOneShot(vde::KEY_SPACE, "jump");
+    tracker.bindOneShot(vde::KEY_F, "shoot");
+
+    // Neither fires before any press
+    EXPECT_FALSE(tracker.consume("jump"));
+    EXPECT_FALSE(tracker.consume("shoot"));
+
+    // SPACE fires "jump" once
+    tracker.handlePress(vde::KEY_SPACE);
+    EXPECT_TRUE(tracker.consume("jump"));
+    EXPECT_FALSE(tracker.consume("jump"));   // consumed — won't fire again
+    EXPECT_FALSE(tracker.consume("shoot"));  // unrelated action unaffected
+
+    // F fires "shoot" once
+    tracker.handlePress(vde::KEY_F);
+    EXPECT_TRUE(tracker.consume("shoot"));
+    EXPECT_FALSE(tracker.consume("shoot"));
+
+    // Re-press fires again
+    tracker.handleRelease(vde::KEY_SPACE);
+    tracker.handlePress(vde::KEY_SPACE);
+    EXPECT_TRUE(tracker.consume("jump"));
 }
 
 }  // namespace vde::test

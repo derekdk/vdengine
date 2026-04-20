@@ -122,33 +122,38 @@ Do not declare a new or modified example complete after only building it or manu
 
 ### 2. Input (KeyStateTracker — preferred for keyboard actions)
 
-For most examples that only need keyboard input, use `KeyStateTracker` directly inside the scene — no separate `InputHandler` subclass required:
+`KeyStateTracker` replaces per-key boolean flags with named action bindings. Embed it in your `InputHandler` subclass and forward key events to it:
 
 ```cpp
-class DemoScene : public vde::examples::BaseExampleScene {
-    vde::KeyStateTracker m_keys;
+class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
+public:
+    vde::KeyStateTracker keys;
 
-    void onEnter() override {
-        m_keys.bindOneShot("action", vde::KEY_SPACE);
-        m_keys.bindHeld("left",   vde::KEY_LEFT);
-        setInputHandler(this);  // Scene IS the input handler
+    DemoInputHandler() {
+        keys.bindHeld(vde::KEY_LEFT,  "left");
+        keys.bindHeld(vde::KEY_RIGHT, "right");
+        keys.bindOneShot(vde::KEY_SPACE, "action");
     }
 
     void onKeyPress(int key) override {
-        BaseExampleScene::onKeyPress(key);  // ESC / F pass-through
-        m_keys.handlePress(key);
+        BaseExampleInputHandler::onKeyPress(key);  // ESC / F pass-through
+        keys.handlePress(key);
     }
-    void onKeyRelease(int key) override { m_keys.handleRelease(key); }
-
-    void update(float dt) override {
-        BaseExampleScene::update(dt);
-        if (m_keys.consume("action")) { /* ... */ }
-        if (m_keys.isHeld("left"))    { /* ... */ }
-    }
+    void onKeyRelease(int key) override { keys.handleRelease(key); }
 };
 ```
 
-If you need mouse or gamepad event callbacks, inherit from `BaseExampleInputHandler` and set it as a separate handler as before.
+Then query the tracker from the scene's `update()` via the usual `dynamic_cast` pattern:
+
+```cpp
+void update(float dt) override {
+    BaseExampleScene::update(dt);
+    auto* input = dynamic_cast<DemoInputHandler*>(getInputHandler());
+    if (!input) return;
+    if (input->keys.consume("action")) { /* ... */ }
+    if (input->keys.isHeld("left"))    { /* ... */ }
+}
+```
 
 ### 3. Scene (Inherit from BaseExampleScene)
 
@@ -193,11 +198,11 @@ protected:
 ### 4. Game Class (Use BaseExampleGame Template)
 
 ```cpp
-// When using KeyStateTracker (scene handles its own input), use the base handler:
-class DemoGame : public vde::examples::BaseExampleGame<vde::examples::BaseExampleInputHandler, DemoScene> {};
-
-// When using a separate DemoInputHandler subclass (mouse/gamepad callbacks):
+// Custom keyboard bindings via KeyStateTracker or manual flags:
 class DemoGame : public vde::examples::BaseExampleGame<DemoInputHandler, DemoScene> {};
+
+// No custom keyboard input needed (ESC/F/F11 only):
+class DemoGame : public vde::examples::BaseExampleGame<vde::examples::BaseExampleInputHandler, DemoScene> {};
 ```
 
 ### 5. Main Function (Use runExample Helper)

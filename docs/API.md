@@ -977,8 +977,8 @@ Utility class that maps key codes to named actions, eliminating per-key boolean 
 
 | Method | Description |
 |--------|-------------|
-| `void bindHeld(const std::string& name, int key)` | Bind key to a held (continuous) action |
-| `void bindOneShot(const std::string& name, int key)` | Bind key to a one-shot (consume-once) action |
+| `void bindHeld(int keyCode, const std::string& name)` | Bind key to a held (continuous) action |
+| `void bindOneShot(int keyCode, const std::string& name)` | Bind key to a one-shot (consume-once) action |
 
 ### Event Forwarding
 
