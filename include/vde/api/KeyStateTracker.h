@@ -126,6 +126,9 @@ class KeyStateTracker {
 
     /// Tracks which key codes are currently in the pressed-down state
     std::unordered_set<int> m_pressedKeys;
+
+    /// Reverse map: one-shot action name -> key codes bound to it
+    std::unordered_map<std::string, std::vector<int>> m_oneShotKeysByName;
 };
 
 }  // namespace vde
