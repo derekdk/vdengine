@@ -499,14 +499,12 @@ class SheetScene : public vde::examples::BaseExampleScene {
             chkRight->setTexture(chkTex);
             chkRight->setPosition(3.5f, 1.5f, -0.1f);
             chkRight->setScale(10.0f, 8.0f, 1.0f);
-            chkRight->setAnchor(0.5f, 0.5f);
 
             // Behind bottom interactive player strip
             auto chkBottom = addEntity<vde::SpriteEntity>();
             chkBottom->setTexture(chkTex);
             chkBottom->setPosition(0.0f, -3.8f, -0.1f);
             chkBottom->setScale(16.0f, 2.5f, 1.0f);
-            chkBottom->setAnchor(0.5f, 0.5f);
         }
 
         // =================================================================
@@ -522,7 +520,6 @@ class SheetScene : public vde::examples::BaseExampleScene {
             fullAtlas->setTexture(atlasTex);
             fullAtlas->setPosition(-5.0f, 0.8f, 0.0f);
             fullAtlas->setScale(kAtlasDisplayW, kAtlasDisplayH, 1.0f);
-            fullAtlas->setAnchor(0.5f, 0.5f);
         }
 
         // =================================================================
@@ -557,7 +554,6 @@ class SheetScene : public vde::examples::BaseExampleScene {
             float ph = uv.height * static_cast<float>(kTexH) * kPxToWorld;
             sprite->setScale(pw, ph, 1.0f);
             sprite->setPosition(x, y, 0.0f);
-            sprite->setAnchor(0.5f, 0.5f);
             return sprite;
         };
 
@@ -587,7 +583,6 @@ class SheetScene : public vde::examples::BaseExampleScene {
             orig->setUVRect(uv.u, uv.v, uv.width, uv.height);
             orig->setScale(pw, ph, 1.0f);
             orig->setPosition(5.5f, 3.2f, 0.0f);
-            orig->setAnchor(0.5f, 0.5f);
 
             auto flip = addEntity<vde::SpriteEntity>();
             flip->setTexture(atlasTex);
@@ -595,7 +590,6 @@ class SheetScene : public vde::examples::BaseExampleScene {
             flip->setFlipX(true);
             flip->setScale(pw, ph, 1.0f);
             flip->setPosition(7.5f, 3.2f, 0.0f);
-            flip->setAnchor(0.5f, 0.5f);
         }
 
         // =================================================================
@@ -610,7 +604,6 @@ class SheetScene : public vde::examples::BaseExampleScene {
         ref->setUVRect(playerUV.u, playerUV.v, playerUV.width, playerUV.height);
         ref->setPosition(-3.0f, -3.8f, 0.0f);
         ref->setScale(1.2f, 1.2f, 1.0f);
-        ref->setAnchor(0.5f, 0.5f);
 
         // Movable character
         m_character = addEntity<vde::SpriteEntity>();
@@ -618,7 +611,6 @@ class SheetScene : public vde::examples::BaseExampleScene {
         m_character->setUVRect(playerUV.u, playerUV.v, playerUV.width, playerUV.height);
         m_character->setPosition(0.0f, -3.8f, 0.0f);
         m_character->setScale(1.2f, 1.2f, 1.0f);
-        m_character->setAnchor(0.5f, 0.5f);
         m_facingRight = true;
     }
 

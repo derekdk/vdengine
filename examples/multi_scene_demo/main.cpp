@@ -170,8 +170,7 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
  */
 class DemoScene : public vde::examples::BaseExampleScene {
   public:
-    explicit DemoScene(const std::string& label)
-        : BaseExampleScene(), m_label(label) {}
+    explicit DemoScene(const std::string& label) : BaseExampleScene(), m_label(label) {}
 
     // ------ Background simulation toggle ------
 
@@ -419,12 +418,7 @@ class ForestScene : public DemoScene {
         setWorldBounds(
             WorldBounds::flat(50_m, WorldBounds::south(50_m), WorldBounds::west(50_m), 50_m));
 
-        setBackgroundColor(Color::fromHex(0x1a3a1a));
-
-        auto* cam = new Camera2D(30.0f, 17.0f);
-        cam->setPosition(0.0f, 0.0f);
-        setCamera(cam);
-
+        setup2D(30.0f, 17.0f, Color::fromHex(0x1a3a1a));
         setLightBox(new SimpleColorLightBox(Color(0.8f, 1.0f, 0.7f)));
 
         // Create "trees" as colored sprites at various positions
@@ -646,12 +640,7 @@ class OceanScene : public DemoScene {
         setWorldBounds(
             WorldBounds::flat(100_m, WorldBounds::south(100_m), WorldBounds::west(100_m), 100_m));
 
-        setBackgroundColor(Color::fromHex(0x0a1628));
-
-        auto* cam = new Camera2D(40.0f, 22.5f);
-        cam->setPosition(0.0f, 0.0f);
-        setCamera(cam);
-
+        setup2D(40.0f, 22.5f, Color::fromHex(0x0a1628));
         setLightBox(new SimpleColorLightBox(Color(0.5f, 0.6f, 0.9f)));
 
         // Create wave rows

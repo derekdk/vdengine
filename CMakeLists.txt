@@ -185,6 +185,8 @@ set(VDE_SOURCES
     src/api/AudioClip.cpp
     src/api/AudioManager.cpp
     src/api/AudioSource.cpp
+    # Input
+    src/api/KeyStateTracker.cpp
     # Input script
     src/api/InputScript.cpp
     src/api/InputScriptExecutor.cpp
@@ -256,6 +258,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/AudioEvent.h
     include/vde/api/AudioManager.h
     include/vde/api/AudioSource.h
+    # Input
+    include/vde/api/KeyStateTracker.h
     # Input script
     include/vde/api/InputScript.h
     include/vde/api/InputScriptExecutor.h

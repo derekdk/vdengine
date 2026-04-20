@@ -182,7 +182,6 @@ class SpriteScene : public vde::examples::BaseExampleScene {
         m_player->setPosition(0.0f, 0.0f, 0.0f);
         m_player->setColor(vde::Color::fromHex(0x00b894));  // Green
         m_player->setScale(0.5f, 0.5f, 1.0f);
-        m_player->setAnchor(0.5f, 0.5f);  // Center anchor
 
         // Create an animated rainbow sprite
         m_animated = addEntity<AnimatedSprite>();

@@ -157,12 +157,7 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
         // Use a 2D camera for rendering
         // =========================================================
 
-        auto* camera = new Camera2D(40.0f, 22.5f);
-        camera->setPosition(0.0f, 0.0f);
-        setCamera(camera);
-
-        // Background color
-        setBackgroundColor(Color::fromHex(0x1a1a2e));
+        setup2D(40.0f, 22.5f, Color::fromHex(0x1a1a2e));
 
         // =========================================================
         // Create markers at cardinal positions

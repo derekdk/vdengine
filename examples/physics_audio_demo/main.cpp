@@ -256,12 +256,7 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
         m_ground->setColor(vde::Color(0.2f, 0.7f, 0.3f, 1.0f));
         m_ground->setScale(vde::Scale(12.0f, 0.5f, 1.0f));
 
-        vde::PhysicsBodyDef groundDef;
-        groundDef.type = vde::PhysicsBodyType::Static;
-        groundDef.shape = vde::PhysicsShape::Box;
-        groundDef.position = {0.0f, -2.0f};
-        groundDef.extents = {6.0f, 0.25f};
-        m_ground->createPhysicsBody(groundDef);
+        m_ground->createPhysicsBody(vde::PhysicsBodyDef::staticBox({0.0f, -2.0f}, {6.0f, 0.25f}));
 
         // Per-body callback on the ground
         getPhysicsScene()->setBodyOnCollisionBegin(
@@ -304,14 +299,8 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
         sprite->setScale(vde::Scale(halfSize * 2.0f, halfSize * 2.0f, 1.0f));
         sprite->setName("Box_" + std::to_string(m_boxes.size()));
 
-        vde::PhysicsBodyDef boxDef;
-        boxDef.type = vde::PhysicsBodyType::Dynamic;
-        boxDef.shape = vde::PhysicsShape::Box;
-        boxDef.position = {x, y};
-        boxDef.extents = {halfSize, halfSize};
-        boxDef.mass = 1.0f;
-        boxDef.restitution = 0.3f;
-        boxDef.friction = 0.4f;
+        auto boxDef =
+            vde::PhysicsBodyDef::dynamicBox({x, y}, {halfSize, halfSize}, 1.0f, 0.3f, 0.4f);
         boxDef.linearDamping = 0.02f;
         sprite->createPhysicsBody(boxDef);
 

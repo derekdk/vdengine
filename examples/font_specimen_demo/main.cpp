@@ -88,7 +88,6 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
             sprite->setTexture(tex);
             sprite->setScale(h * aspect, h, 1.0f);
             sprite->setPosition(0.0f, -5.5f, 0.0f);
-            sprite->setAnchor(0.5f, 0.5f);
         }
     }
 
@@ -296,7 +295,6 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
         sprite->setTexture(tex);
         sprite->setScale(w, h, 1.0f);
         sprite->setPosition(0.0f, -4.5f, 0.0f);
-        sprite->setAnchor(0.5f, 0.5f);
         m_posterVariants[variantIdx] = sprite;
     }
 

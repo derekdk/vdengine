@@ -270,12 +270,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
     void onEnter() override {
         printExampleHeader();
 
-        auto* camera = new Camera2D(VIEW_W, VIEW_H);
-        camera->setPosition(0.0f, 0.0f);
-        camera->setZoom(1.0f);
-        setCamera(camera);
-        setBackgroundColor(Color(0.02f, 0.02f, 0.06f, 1.0f));
-        setLightBox(std::make_unique<SimpleColorLightBox>(Color::white()));
+        setup2D(VIEW_W, VIEW_H, Color(0.02f, 0.02f, 0.06f, 1.0f));
 
         m_world.init();
 
@@ -303,7 +298,6 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             m_roomTitle->setFont(BitmapFont::large());
         }
         m_roomTitle->setStyle({.color = Color::yellow(), .pixelScale = 2, .letterSpacing = 1});
-        m_roomTitle->setAnchor(0.5f, 0.5f);
         m_roomTitle->setPosition(0.0f, TOP - 0.5f, 0.1f);
 
         // ---- Mini-map (top-right corner) ----

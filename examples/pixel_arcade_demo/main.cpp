@@ -61,7 +61,6 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
             sprite->setTexture(tex);
             sprite->setScale(h * aspect, h, 1.0f);
             sprite->setPosition(0.0f, 4.8f, 0.0f);
-            sprite->setAnchor(0.5f, 0.5f);
             m_insertCoinSprite = sprite;
         }
 
@@ -76,7 +75,6 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
             sprite->setTexture(tex);
             sprite->setScale(h * aspect, h, 1.0f);
             sprite->setPosition(0.0f, 3.4f, 0.0f);
-            sprite->setAnchor(0.5f, 0.5f);
         }
 
         // ---- 10 high-score entries (small font, 2× scale, alternating colors) ----
@@ -104,7 +102,6 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
                 sprite->setScale(h * aspect, h, 1.0f);
                 float y = 2.6f - i * 0.50f;
                 sprite->setPosition(0.0f, y, 0.0f);
-                sprite->setAnchor(0.5f, 0.5f);
                 m_scoreSprites.push_back(sprite);
             }
         }
@@ -151,7 +148,6 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
                 sprite->setTexture(letters[i].tex);
                 sprite->setScale(letters[i].w, letters[i].h, 1.0f);
                 sprite->setPosition(x + letters[i].w / 2.0f, -2.8f, 0.0f);
-                sprite->setAnchor(0.5f, 0.5f);
                 m_playerReadySprites.push_back(sprite);
                 x += letters[i].w + gap;
             }

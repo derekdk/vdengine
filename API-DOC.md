@@ -546,9 +546,30 @@ if (auto* context = getGame()->getVulkanContext()) {
 auto sprite = scene->addEntity<vde::SpriteEntity>();
 sprite->setTexture(spriteTexture);
 sprite->setColor(vde::Color::white());
-sprite->setAnchor(0.5f, 0.5f);  // center
-sprite->setUVRect(0.0f, 0.0f, 0.25f, 0.25f);  // sprite sheet
+sprite->setUVRect(0.0f, 0.0f, 0.25f, 0.25f);  // sprite sheet region
 ```
+
+> **Note:** Entity anchor defaults to `(0.5, 0.5)` (center). You only need `setAnchor()` when
+> you want a different origin (e.g., `(0, 0)` for top-left or `(0.5, 1.0)` for bottom-center).
+
+#### TextEntity
+
+For on-screen text labels, titles, and HUD elements:
+
+```cpp
+auto font = std::make_shared<vde::BitmapFont>("assets/fonts/default.fnt");
+
+auto label = scene->addEntity<vde::TextEntity>();
+label->setFont(font);
+label->setText("Score: 0");
+label->setWorldHeight(0.5f);   // desired height in world units
+label->setPosition(-3.0f, 2.0f, 0.0f);
+label->setColor(vde::Color::white());
+```
+
+**Sizing methods:**
+- `setWorldHeight(float)` — Sets the desired height in world units. The entity auto-sizes on the next `update()` to match this height while preserving aspect ratio. This is the recommended approach.
+- `setMaxWidth(float)` — Optional width constraint for text wrapping or clamping.
 
 #### Custom Entities
 
@@ -615,6 +636,27 @@ auto texture2 = resources.load<vde::Texture>("textures/ship.png");
 > Note: `ResourceManager::load()` performs CPU-side loading. Meshes are uploaded
 > on first render, but textures must be uploaded explicitly with
 > `Texture::uploadToGPU()` before use in sprites.
+
+#### Manual Resource Caching
+
+For resources created in code (not loaded from files), use `add()` or `addPersistent()`:
+
+```cpp
+auto& resources = game.getResourceManager();
+
+// add() — weak cache: resource expires when all external shared_ptrs are dropped
+auto spriteSheet = std::make_shared<vde::SpriteSheet>(texture, 4, 4);
+resources.add<vde::SpriteSheet>("sprites/tileset", spriteSheet);
+// spriteSheet goes out of scope → resource expires, get() returns nullptr
+
+// addPersistent() — strong cache: resource stays alive until explicitly removed
+resources.addPersistent<vde::SpriteSheet>("sprites/tileset", spriteSheet);
+// Resource survives even after all external refs are dropped
+auto cached = resources.get<vde::SpriteSheet>("sprites/tileset");  // always valid
+```
+
+> **Tip:** Use `addPersistent()` for resources shared across scenes (e.g., a `SpriteSheet` used
+> by multiple scenes). Use `add()` when you want automatic cleanup after the owning code is done.
 
 ---
 
@@ -733,6 +775,54 @@ game.setInputHandler(&inputHandler);
 scene->setInputHandler(&inputHandler);
 ```
 
+### KeyStateTracker
+
+`KeyStateTracker` eliminates the per-key boolean flags that most examples need. Bind named actions to keys, then query by name in `update()`:
+
+```cpp
+class GameScene : public vde::Scene {
+    vde::KeyStateTracker m_keys;
+
+    void onEnter() override {
+        // Held actions — true every frame the key is down
+        m_keys.bindHeld("left",  vde::KEY_LEFT);
+        m_keys.bindHeld("left",  vde::KEY_A);     // multiple keys → same action
+        m_keys.bindHeld("right", vde::KEY_RIGHT);
+        m_keys.bindHeld("right", vde::KEY_D);
+
+        // One-shot actions — true once per press, must release and re-press
+        m_keys.bindOneShot("jump",  vde::KEY_SPACE);
+        m_keys.bindOneShot("shoot", vde::KEY_F);
+
+        setInputHandler(this);
+    }
+
+    // Wire press/release into the tracker
+    void onKeyPress(int key) override   { m_keys.handlePress(key); }
+    void onKeyRelease(int key) override { m_keys.handleRelease(key); }
+
+    void update(float dt) override {
+        if (m_keys.isHeld("left"))  moveLeft(dt);
+        if (m_keys.isHeld("right")) moveRight(dt);
+        if (m_keys.consume("jump")) startJump();
+        if (m_keys.consume("shoot")) fireProjectile();
+
+        vde::Scene::update(dt);
+    }
+};
+```
+
+| Method | Description |
+|--------|-------------|
+| `bindHeld(name, key)` | Register a key for a held (continuous) action |
+| `bindOneShot(name, key)` | Register a key for a one-shot (consume-once) action |
+| `handlePress(key)` | Call from `onKeyPress` |
+| `handleRelease(key)` | Call from `onKeyRelease` |
+| `isHeld(name)` | Returns `true` every frame the key is down |
+| `consume(name)` | Returns `true` once per press, then `false` until released and re-pressed |
+
+> **Tip:** `KeyStateTracker` is included via `GameAPI.h` — no extra `#include` needed.
+
 ### Key Codes
 
 Common key codes from `KeyCodes.h`:
@@ -842,6 +932,30 @@ camera.setRotation(45.0f); // rotate 45 degrees
 
 scene->setCamera(new vde::Camera2D(camera));
 ```
+
+### setup2D() — Quick 2D Scene Setup
+
+For most 2D scenes, `setup2D()` replaces the manual camera + background + lighting boilerplate with a single call:
+
+```cpp
+void onEnter() override {
+    // Sets Camera2D (1920×1080), white SimpleColorLightBox, and black background
+    setup2D();
+
+    // Optionally override individual settings afterward
+    setBackgroundColor(vde::Color(0.1f, 0.1f, 0.2f));
+}
+```
+
+`setup2D()` is equivalent to:
+```cpp
+setCamera(new vde::Camera2D(1920, 1080));
+setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
+setBackgroundColor(vde::Color::black());
+```
+
+> **When to use manual setup:** If you need a non-white `LightBox`, a transparent background
+> (for overlay scenes), or a non-default viewport size, set up the camera manually.
 
 ---
 
@@ -1059,6 +1173,33 @@ def.friction = 0.3f;                       // Surface friction coefficient
 def.restitution = 0.2f;                    // Bounciness (0 = inelastic, 1 = perfectly elastic)
 def.linearDamping = 1.0f;                 // Linear velocity decay rate (1/s); ~37% retained/s
 def.isSensor = false;                      // If true, triggers callbacks but no collision response
+```
+
+### PhysicsBodyDef Factory Methods
+
+Static factory methods reduce the boilerplate for common body types:
+
+```cpp
+// Dynamic box (e.g., a falling crate)
+auto crate = vde::PhysicsBodyDef::dynamicBox({0.0f, 5.0f}, {0.5f, 0.5f}, 1.0f);
+
+// Dynamic circle (e.g., a ball)
+auto ball = vde::PhysicsBodyDef::dynamicCircle({2.0f, 8.0f}, 0.3f, 0.5f);
+
+// Static box (e.g., a platform)
+auto platform = vde::PhysicsBodyDef::staticBox({0.0f, -2.0f}, {5.0f, 0.5f});
+
+// Kinematic box (e.g., a moving platform)
+auto elevator = vde::PhysicsBodyDef::kinematicBox({3.0f, 0.0f}, {2.0f, 0.25f});
+```
+
+Each factory sets `type`, `shape`, `position`, `extents`, and `mass` with sensible defaults for `friction` (0.3), `restitution` (0.2), and `linearDamping` (1.0). You can override any property after creation:
+
+```cpp
+auto def = vde::PhysicsBodyDef::dynamicBox({0, 5}, {0.5f, 0.5f}, 1.0f);
+def.restitution = 0.8f;  // make it bouncy
+def.friction = 0.0f;     // ice-like surface
+entity->createPhysicsBody(def);
 ```
 
 ### Collision Detection & Callbacks

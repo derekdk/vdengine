@@ -16,18 +16,18 @@ Analysis of the 12 most recently created examples reveals that **~55–60%** of 
 | # | Finding | Status | Notes |
 |---|---------|--------|-------|
 | 1 | TextEntity auto-sizing | **DONE** | Implemented as `setWorldHeight()` + `sizeToFit()` |
-| 2 | KeyStateTracker utility | **Not started** | Highest-impact remaining gap |
+| 2 | KeyStateTracker utility | **DONE** | Header, impl, 13 unit tests; documented in API-DOC.md |
 | 3 | Scene::addTextLabel convenience | **Not started** | Lower priority now that `setWorldHeight()` exists |
-| 4 | PhysicsBodyDef factory methods | **API done, migration pending** | 4 factories in `PhysicsTypes.h`; 0 examples use them |
-| 5 | ResourceManager::addPersistent | **Not started** | Still weak_ptr only |
-| 6 | Migrate old examples to `setup2D()` | **Partial** | ~7 scenes migrated, ~10 remain |
+| 4 | PhysicsBodyDef factory methods | **DONE** | 4 factories in `PhysicsTypes.h`; all physics examples migrated |
+| 5 | ResourceManager::addPersistent | **DONE** | Strong-ref cache mode; 7 unit tests; `spritesheet_multiscene_demo` migrated |
+| 6 | Migrate old examples to `setup2D()` | **DONE** | 12 scenes migrated across 10 examples |
 | 7 | Entity collision helpers | **Not started** | 2–4 examples affected |
 
 ### New Findings (April 20, 2026)
 
 | # | Finding | Impact | Effort |
 |---|---------|--------|--------|
-| 8 | Redundant `setAnchor(0.5f, 0.5f)` calls | Low (cleanup) | Trivial |
+| 8 | Redundant `setAnchor(0.5f, 0.5f)` calls | **DONE** | ~50 calls removed across 14 example files |
 | 9 | `TextRenderer::createTexture` sites that can migrate to `TextEntity` | Medium (20 sites) | Small |
 
 ---
@@ -38,7 +38,7 @@ New engine code that must be written, tested, and documented before examples can
 
 ### 1A. KeyStateTracker Utility (Finding 2) — P1
 
-**Status:** Not started  
+**Status:** DONE  
 **Impact:** High — 8+ examples, 30–50 lines of boilerplate each  
 **Effort:** Small
 
@@ -75,7 +75,7 @@ if (keys.consume("fire")) { /* shoot */ }
 
 ### 1B. ResourceManager::addPersistent (Finding 5) — P2
 
-**Status:** Not started  
+**Status:** DONE  
 **Impact:** Medium — affects multi-scene resource sharing  
 **Effort:** Small
 
@@ -151,7 +151,7 @@ Adopt existing API features that examples haven't migrated to yet. No engine cha
 
 ### 2A. PhysicsBodyDef Factory Adoption (Finding 4)
 
-**Status:** API done, 0 examples migrated  
+**Status:** DONE — all 4 physics examples migrated (11 verbose blocks replaced)  
 **Impact:** Medium — ~70 verbose definitions across 6 examples  
 **Effort:** Small per example
 
@@ -180,7 +180,7 @@ entity->createPhysicsBody(def);
 
 ### 2B. setup2D() Migration (Finding 6)
 
-**Status:** ~7 scenes migrated, ~10 remain  
+**Status:** DONE — 12 scenes migrated across 10 examples  
 **Impact:** Low — pure cleanup  
 **Effort:** Trivial per example
 
@@ -214,7 +214,7 @@ Three examples still create text sprites manually via `TextRenderer::createTextu
 
 ### 2D. Remove Redundant setAnchor(0.5, 0.5) Calls (Finding 8)
 
-**Status:** Not started  
+**Status:** DONE — ~50 redundant calls removed across 14 example files  
 **Impact:** Low — pure cleanup  
 **Effort:** Trivial
 
@@ -224,7 +224,7 @@ Three examples still create text sprites manually via `TextRenderer::createTextu
 
 ### 2E. Remove Legacy sizeToFit Free Function (Finding 1 cleanup)
 
-**Status:** 1 file remaining  
+**Status:** DONE — free function removed, 7 call sites migrated to `setWorldHeight()`  
 **Impact:** Low — cleanup  
 **Effort:** Trivial
 
@@ -240,10 +240,10 @@ Update `API-DOC.md` to cover gaps identified during the analysis.
 |-------|---------------|--------|
 | SpriteSheet API | Not documented | Add full section with usage examples |
 | TextEntity + `setWorldHeight()` | Minimal | Expand with sizing patterns and examples |
-| ResourceManager weak_ptr semantics | Undocumented trap | Document `add()` vs `addPersistent()` (after 1B) |
-| Input handler consume pattern | Not covered | Document `KeyStateTracker` usage (after 1A) |
-| PhysicsBodyDef factory methods | Not documented | Add factory examples alongside existing manual docs |
-| `setup2D()` | Exists but not prominent | Add to "Quick Start" section |
+| ResourceManager weak_ptr semantics | **Documented** | `add()` vs `addPersistent()` documented in API-DOC.md |
+| Input handler consume pattern | **Documented** | `KeyStateTracker` usage documented in API-DOC.md |
+| PhysicsBodyDef factory methods | **Documented** | Factory examples added to Physics System section |
+| `setup2D()` | **Documented** | Added to Scene section in API-DOC.md |
 
 ---
 
@@ -256,9 +256,19 @@ Implemented as `TextEntity::setWorldHeight(float)` + `Entity::sizeToFit(float, f
 - `setWorldHeight()` makes sizing declarative — `update()` automatically calls `sizeToFit()` after every texture rebuild
 - `setMaxWidth()` available for width-constrained text
 - 20+ call sites in newer examples already use the new API
-- Legacy free function survives in 1 file (see Phase 2E)
+- Legacy free function removed from `spritesheet_multiscene_demo` (Phase 2E)
 
-### ~~Finding 4: PhysicsBodyDef Factory Methods~~ — API DONE
+### ~~Finding 2: KeyStateTracker~~ — DONE
+
+Implemented as `KeyStateTracker` utility class in `include/vde/api/KeyStateTracker.h`.
+
+- `bindHeld()` / `bindOneShot()` for registering key bindings
+- `isHeld()` / `consume()` for querying state in `update()`
+- `handlePress()` / `handleRelease()` wired from `InputHandler` callbacks
+- 13 unit tests covering held, one-shot, mixed bindings, multi-key actions, edge cases
+- Included via `GameAPI.h`
+
+### ~~Finding 4: PhysicsBodyDef Factory Methods~~ — DONE
 
 Four static factories implemented in `PhysicsTypes.h`:
 - `PhysicsBodyDef::dynamicBox(pos, extents, mass)`
@@ -266,7 +276,24 @@ Four static factories implemented in `PhysicsTypes.h`:
 - `PhysicsBodyDef::staticBox(pos, extents)`
 - `PhysicsBodyDef::kinematicBox(pos, extents)` (bonus — not in original plan)
 
-Example migration tracked in Phase 2A.
+All 4 physics examples migrated (11 verbose blocks replaced).
+
+### ~~Finding 5: ResourceManager::addPersistent~~ — DONE
+
+Added `addPersistent<T>(key, resource)` to `ResourceManager`.
+
+- Stores a strong `shared_ptr` alongside the weak cache entry
+- Resource survives after all external refs dropped; `get<T>()` returns valid ptr
+- Cleared by `remove()`, `clear()`, or manager destruction
+- 7 unit tests; `spritesheet_multiscene_demo` migrated (removed manual strong-ref workaround)
+
+### ~~Finding 6: setup2D() Migration~~ — DONE
+
+12 scenes across 10 examples migrated from manual `Camera2D` + `setBackgroundColor` to `setup2D()`.
+
+### ~~Finding 8: Redundant setAnchor Removal~~ — DONE
+
+~50 redundant `setAnchor(0.5f, 0.5f)` calls removed across 14 example files. Only intentional anchor resets preserved (e.g., `sprite_demo` key-1 interactive reset).
 
 ---
 

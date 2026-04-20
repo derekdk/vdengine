@@ -108,11 +108,7 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         printExampleHeader();
 
         // Camera
-        auto* cam = new Camera2D(WORLD_W, WORLD_H);
-        cam->setPosition(0.0f, 0.0f);
-        cam->setZoom(1.0f);
-        setCamera(cam);
-        setBackgroundColor(Color::fromHex(0x0a0a2e));
+        setup2D(WORLD_W, WORLD_H, Color::fromHex(0x0a0a2e));
 
         // Play area
         m_playArea = WorldBounds2D::fromCenter(0_m, 0_m, Meters(WORLD_W), Meters(WORLD_H));
@@ -179,14 +175,12 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         m_titleBanner = addEntity<SpriteEntity>();
         m_titleBanner->setScale(4.0f, 1.0f, 1.0f);
         m_titleBanner->setPosition(0.0f, 2.0f, 0.0f);
-        m_titleBanner->setAnchor(0.5f, 0.5f);
         m_titleBanner->setColor(Color::fromHex(0x00e5ff));
 
         // "Press SPACE" prompt
         m_promptSprite = addEntity<SpriteEntity>();
         m_promptSprite->setScale(2.5f, 0.4f, 1.0f);
         m_promptSprite->setPosition(0.0f, -1.5f, 0.0f);
-        m_promptSprite->setAnchor(0.5f, 0.5f);
         m_promptSprite->setColor(Color::fromHex(0xffffff));
 
         std::cout << "=== VERTICAL SHOOTER ===" << std::endl;
@@ -224,7 +218,6 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         m_player = addEntity<SpriteEntity>();
         m_player->setScale(0.6f, 0.8f, 1.0f);
         m_player->setPosition(0.0f, -HALF_H + 2.0f, 0.0f);
-        m_player->setAnchor(0.5f, 0.5f);
         m_player->setColor(Color::fromHex(0x00e5ff));
 
         std::cout << "Score: 0" << std::endl;
@@ -344,7 +337,6 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         auto bullet = addEntity<SpriteEntity>();
         bullet->setScale(0.15f, 0.4f, 1.0f);
         bullet->setPosition(pos.x, pos.y + 0.5f, 0.0f);
-        bullet->setAnchor(0.5f, 0.5f);
         bullet->setColor(Color::white());
 
         m_bullets.push_back({bullet});
@@ -357,7 +349,6 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         auto enemy = addEntity<SpriteEntity>();
         enemy->setScale(0.7f, 0.7f, 1.0f);
         enemy->setPosition(x, HALF_H + 0.5f, 0.0f);
-        enemy->setAnchor(0.5f, 0.5f);
 
         // Random color per enemy
         auto color =

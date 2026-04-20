@@ -66,12 +66,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
     void onEnter() override {
         printExampleHeader();
 
-        auto* camera = new Camera2D(VIEW_W, VIEW_H);
-        camera->setPosition(0.0f, 0.0f);
-        camera->setZoom(1.0f);
-        setCamera(camera);
-        setBackgroundColor(Color(0.05f, 0.05f, 0.12f, 1.0f));
-        setLightBox(std::make_unique<SimpleColorLightBox>(Color::white()));
+        setup2D(VIEW_W, VIEW_H, Color(0.05f, 0.05f, 0.12f, 1.0f));
 
         // ── Title ───────────────────────────────────────────────
         float y = VIEW_H * 0.5f - 0.45f;
@@ -80,7 +75,6 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         title->setText("TEXT RENDERING SHOWCASE");
         title->setFont(BitmapFont::large());
         title->setStyle({.color = Color::white(), .pixelScale = 2});
-        title->setAnchor(0.5f, 0.5f);
         title->setPosition(0.0f, y, 0.0f);
         title->setWorldHeight(0.50f);
 
@@ -90,7 +84,6 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         subtitle->setText("Automatic sizing with setWorldHeight()");
         subtitle->setFont(BitmapFont::small());
         subtitle->setStyle({.color = Color(0.6f, 0.6f, 0.7f, 1.0f), .pixelScale = 2});
-        subtitle->setAnchor(0.5f, 0.5f);
         subtitle->setPosition(0.0f, y, 0.0f);
         subtitle->setWorldHeight(0.25f);
 
@@ -188,7 +181,6 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         center->setText("Center-aligned");
         center->setFont(BitmapFont::small());
         center->setStyle({.color = Color::yellow(), .pixelScale = 2});
-        center->setAnchor(0.5f, 0.5f);
         center->setPosition(COL_MID, y, 0.0f);
         center->setWorldHeight(0.28f);
         y -= 0.38f;

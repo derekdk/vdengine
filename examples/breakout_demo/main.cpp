@@ -80,18 +80,12 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
         printExampleHeader();
 
         // Camera: 10x7.5 world units
-        auto* camera = new Camera2D(10.0f, 7.5f);
-        camera->setPosition(0.0f, 0.0f);
-        camera->setZoom(1.0f);
-        setCamera(camera);
-
-        setBackgroundColor(Color::fromHex(0x2c3e50));
+        setup2D(10.0f, 7.5f, Color::fromHex(0x2c3e50));
 
         // Paddle
         m_paddle = addEntity<SpriteEntity>();
         m_paddle->setName("Paddle");
         m_paddle->setScale(1.6f, 0.25f, 1.0f);
-        m_paddle->setAnchor(0.5f, 0.5f);
         m_paddle->setPosition(0.0f, -3.0f, 0.0f);
         m_paddle->setColor(Color::fromHex(0x00b894));
 
@@ -99,7 +93,6 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
         m_ball = addEntity<SpriteEntity>();
         m_ball->setName("Ball");
         m_ball->setScale(0.18f, 0.18f, 1.0f);
-        m_ball->setAnchor(0.5f, 0.5f);
         resetBallToPaddle();
         m_ball->setColor(Color::fromHex(0xffffff));
 
@@ -323,7 +316,6 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
                 auto brick = addEntity<SpriteEntity>();
                 brick->setName("Brick");
                 brick->setScale(brickW, brickH, 1.0f);
-                brick->setAnchor(0.5f, 0.5f);
                 brick->setPosition(x, y, 0.0f);
                 brick->setColor(Color::fromHex(colors[r % static_cast<int>(colors.size())]));
 

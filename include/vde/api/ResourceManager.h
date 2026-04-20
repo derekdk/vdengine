@@ -90,6 +90,22 @@ class ResourceManager {
     ResourcePtr<T> add(const std::string& key, ResourcePtr<T> resource);
 
     /**
+     * @brief Add a pre-created resource to the cache with a strong reference.
+     *
+     * Unlike add(), which stores a weak_ptr that expires when external
+     * references are dropped, addPersistent() keeps the resource alive
+     * until it is explicitly removed, clear() is called, or the manager
+     * is destroyed.
+     *
+     * @tparam T Resource type
+     * @param key Unique key for the resource
+     * @param resource The resource to cache persistently
+     * @return Shared pointer to the resource
+     */
+    template <typename T>
+    ResourcePtr<T> addPersistent(const std::string& key, ResourcePtr<T> resource);
+
+    /**
      * @brief Get a cached resource by path.
      *
      * @tparam T Resource type
@@ -155,6 +171,7 @@ class ResourceManager {
   private:
     struct CacheEntry {
         std::weak_ptr<Resource> resource;
+        std::shared_ptr<Resource> strongRef;  ///< Non-null for persistent entries
         std::type_index type;
         size_t lastAccessTime;
         size_t estimatedSize;  // Approximate memory usage in bytes
@@ -162,8 +179,10 @@ class ResourceManager {
         // Default constructor for std::unordered_map
         CacheEntry() : type(typeid(void)), lastAccessTime(0), estimatedSize(0) {}
 
-        CacheEntry(std::weak_ptr<Resource> res, std::type_index t, size_t time = 0, size_t size = 0)
-            : resource(res), type(t), lastAccessTime(time), estimatedSize(size) {}
+        CacheEntry(std::weak_ptr<Resource> res, std::type_index t, size_t time = 0, size_t size = 0,
+                   std::shared_ptr<Resource> strong = nullptr)
+            : resource(res), strongRef(std::move(strong)), type(t), lastAccessTime(time),
+              estimatedSize(size) {}
     };
 
     std::unordered_map<std::string, CacheEntry> m_cache;
@@ -214,6 +233,20 @@ ResourcePtr<T> ResourceManager::add(const std::string& key, ResourcePtr<T> resou
 
     m_cache[key] =
         CacheEntry(resource, typeid(T), m_accessCounter++, estimateResourceSize(resource));
+
+    return resource;
+}
+
+template <typename T>
+ResourcePtr<T> ResourceManager::addPersistent(const std::string& key, ResourcePtr<T> resource) {
+    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+
+    if (!resource) {
+        return nullptr;
+    }
+
+    m_cache[key] = CacheEntry(resource, typeid(T), m_accessCounter++,
+                              estimateResourceSize(resource), resource);
 
     return resource;
 }

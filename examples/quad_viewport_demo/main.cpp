@@ -109,11 +109,7 @@ class QuadViewportInputHandler : public vde::examples::BaseExampleInputHandler {
 class SpaceScene : public Scene {
   public:
     void onEnter() override {
-        auto* cam = new Camera2D(kSceneW, kSceneH);
-        cam->setPosition(0.0f, 0.0f);
-        setCamera(cam);
-        setLightBox(new SimpleColorLightBox(Color::white()));
-        setBackgroundColor(Color::fromHex(0x050510));
+        setup2D(kSceneW, kSceneH, Color::fromHex(0x050510));
 
         // Sun
         auto sun = addEntity<SpriteEntity>();
@@ -196,11 +192,7 @@ class SpaceScene : public Scene {
 class ForestScene : public Scene {
   public:
     void onEnter() override {
-        auto* cam = new Camera2D(kSceneW, kSceneH);
-        cam->setPosition(0.0f, 0.0f);
-        setCamera(cam);
-        setLightBox(new SimpleColorLightBox(Color::white()));
-        setBackgroundColor(Color::fromHex(0x1a3a1a));
+        setup2D(kSceneW, kSceneH, Color::fromHex(0x1a3a1a));
 
         const Color treeColors[] = {
             Color::fromHex(0x228b22), Color::fromHex(0x2e8b57), Color::fromHex(0x006400),
@@ -283,11 +275,7 @@ class ForestScene : public Scene {
 class CityScene : public Scene {
   public:
     void onEnter() override {
-        auto* cam = new Camera2D(kSceneW, kSceneH);
-        cam->setPosition(0.0f, 0.0f);
-        setCamera(cam);
-        setLightBox(new SimpleColorLightBox(Color::white()));
-        setBackgroundColor(Color::fromHex(0x252530));
+        setup2D(kSceneW, kSceneH, Color::fromHex(0x252530));
 
         const Color buildingColors[] = {
             Color::fromHex(0x555566), Color::fromHex(0x666677), Color::fromHex(0x444455),
@@ -392,11 +380,7 @@ class CityScene : public Scene {
 class OceanScene : public Scene {
   public:
     void onEnter() override {
-        auto* cam = new Camera2D(kSceneW, kSceneH);
-        cam->setPosition(0.0f, 0.0f);
-        setCamera(cam);
-        setLightBox(new SimpleColorLightBox(Color::white()));
-        setBackgroundColor(Color::fromHex(0x0a1628));
+        setup2D(kSceneW, kSceneH, Color::fromHex(0x0a1628));
 
         for (int row = -3; row <= 3; ++row) {
             for (int col = -5; col <= 5; ++col) {
