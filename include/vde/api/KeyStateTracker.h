@@ -10,6 +10,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace vde {
@@ -122,6 +123,9 @@ class KeyStateTracker {
 
     /// One-shot state: whether the action has been triggered but not consumed
     std::unordered_map<std::string, bool> m_oneShotTriggered;
+
+    /// Tracks which key codes are currently in the pressed-down state
+    std::unordered_set<int> m_pressedKeys;
 };
 
 }  // namespace vde

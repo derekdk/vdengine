@@ -645,14 +645,22 @@ For resources created in code (not loaded from files), use `add()` or `addPersis
 auto& resources = game.getResourceManager();
 
 // add() — weak cache: resource expires when all external shared_ptrs are dropped
-auto spriteSheet = std::make_shared<vde::SpriteSheet>(texture, 4, 4);
-resources.add<vde::SpriteSheet>("sprites/tileset", spriteSheet);
-// spriteSheet goes out of scope → resource expires, get() returns nullptr
+{
+    auto spriteSheet = std::make_shared<vde::SpriteSheet>(texture, 4, 4);
+    resources.add<vde::SpriteSheet>("sprites/tileset-weak", spriteSheet);
+} // spriteSheet goes out of scope here
+
+auto weakCached = resources.get<vde::SpriteSheet>("sprites/tileset-weak");
+// weakCached is nullptr once no external shared_ptrs remain
 
 // addPersistent() — strong cache: resource stays alive until explicitly removed
-resources.addPersistent<vde::SpriteSheet>("sprites/tileset", spriteSheet);
-// Resource survives even after all external refs are dropped
-auto cached = resources.get<vde::SpriteSheet>("sprites/tileset");  // always valid
+{
+    auto persistentSpriteSheet = std::make_shared<vde::SpriteSheet>(texture, 4, 4);
+    resources.addPersistent<vde::SpriteSheet>("sprites/tileset-persistent", persistentSpriteSheet);
+} // persistentSpriteSheet goes out of scope here
+
+auto cached = resources.get<vde::SpriteSheet>("sprites/tileset-persistent");
+// cached remains valid until the resource is explicitly removed
 ```
 
 > **Tip:** Use `addPersistent()` for resources shared across scenes (e.g., a `SpriteSheet` used

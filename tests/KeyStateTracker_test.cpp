@@ -24,53 +24,53 @@ TEST_F(KeyStateTrackerTest, HeldReturnsFalseForUnknownName) {
 }
 
 TEST_F(KeyStateTrackerTest, HeldReturnsFalseBeforePress) {
-    tracker.bindHeld(65 /* A */, "left");
+    tracker.bindHeld(vde::KEY_A, "left");
     EXPECT_FALSE(tracker.isHeld("left"));
 }
 
 TEST_F(KeyStateTrackerTest, HeldReturnsTrueWhilePressed) {
-    tracker.bindHeld(65, "left");
-    tracker.handlePress(65);
+    tracker.bindHeld(vde::KEY_A, "left");
+    tracker.handlePress(vde::KEY_A);
     EXPECT_TRUE(tracker.isHeld("left"));
 }
 
 TEST_F(KeyStateTrackerTest, HeldReturnsFalseAfterRelease) {
-    tracker.bindHeld(65, "left");
-    tracker.handlePress(65);
-    tracker.handleRelease(65);
+    tracker.bindHeld(vde::KEY_A, "left");
+    tracker.handlePress(vde::KEY_A);
+    tracker.handleRelease(vde::KEY_A);
     EXPECT_FALSE(tracker.isHeld("left"));
 }
 
 TEST_F(KeyStateTrackerTest, MultipleKeysSameHeldAction) {
-    tracker.bindHeld(65 /* A */, "left");
-    tracker.bindHeld(263 /* LEFT */, "left");
+    tracker.bindHeld(vde::KEY_A, "left");
+    tracker.bindHeld(vde::KEY_LEFT, "left");
 
-    tracker.handlePress(65);
+    tracker.handlePress(vde::KEY_A);
     EXPECT_TRUE(tracker.isHeld("left"));
 
     // Release A, but LEFT is not pressed — held should be false
-    tracker.handleRelease(65);
+    tracker.handleRelease(vde::KEY_A);
     EXPECT_FALSE(tracker.isHeld("left"));
 
     // Press both, release one — still held
-    tracker.handlePress(65);
-    tracker.handlePress(263);
+    tracker.handlePress(vde::KEY_A);
+    tracker.handlePress(vde::KEY_LEFT);
     EXPECT_TRUE(tracker.isHeld("left"));
-    tracker.handleRelease(65);
+    tracker.handleRelease(vde::KEY_A);
     EXPECT_TRUE(tracker.isHeld("left"));
-    tracker.handleRelease(263);
+    tracker.handleRelease(vde::KEY_LEFT);
     EXPECT_FALSE(tracker.isHeld("left"));
 }
 
 TEST_F(KeyStateTrackerTest, ReleaseWithoutPressSafelyIgnored) {
-    tracker.bindHeld(65, "left");
-    tracker.handleRelease(65);  // should not go negative
+    tracker.bindHeld(vde::KEY_A, "left");
+    tracker.handleRelease(vde::KEY_A);  // should not go negative
     EXPECT_FALSE(tracker.isHeld("left"));
 
     // Press/release still works normally after spurious release
-    tracker.handlePress(65);
+    tracker.handlePress(vde::KEY_A);
     EXPECT_TRUE(tracker.isHeld("left"));
-    tracker.handleRelease(65);
+    tracker.handleRelease(vde::KEY_A);
     EXPECT_FALSE(tracker.isHeld("left"));
 }
 
@@ -83,37 +83,37 @@ TEST_F(KeyStateTrackerTest, ConsumeReturnsFalseForUnknownName) {
 }
 
 TEST_F(KeyStateTrackerTest, ConsumeReturnsFalseBeforePress) {
-    tracker.bindOneShot(32 /* SPACE */, "fire");
+    tracker.bindOneShot(vde::KEY_SPACE, "fire");
     EXPECT_FALSE(tracker.consume("fire"));
 }
 
 TEST_F(KeyStateTrackerTest, ConsumeReturnsTrueOnceAfterPress) {
-    tracker.bindOneShot(32, "fire");
-    tracker.handlePress(32);
+    tracker.bindOneShot(vde::KEY_SPACE, "fire");
+    tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("fire"));
     EXPECT_FALSE(tracker.consume("fire"));
 }
 
 TEST_F(KeyStateTrackerTest, OneShotResetsAfterConsume) {
-    tracker.bindOneShot(32, "fire");
-    tracker.handlePress(32);
+    tracker.bindOneShot(vde::KEY_SPACE, "fire");
+    tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("fire"));
 
     // Press again
-    tracker.handlePress(32);
+    tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("fire"));
     EXPECT_FALSE(tracker.consume("fire"));
 }
 
 TEST_F(KeyStateTrackerTest, MultipleKeysSameOneShotAction) {
-    tracker.bindOneShot(32, "fire");
-    tracker.bindOneShot(0 /* GAMEPAD_BUTTON_A */, "fire");
+    tracker.bindOneShot(vde::KEY_SPACE, "fire");
+    tracker.bindOneShot(vde::GAMEPAD_BUTTON_A, "fire");
 
-    tracker.handlePress(32);
+    tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("fire"));
     EXPECT_FALSE(tracker.consume("fire"));
 
-    tracker.handlePress(0);
+    tracker.handlePress(vde::GAMEPAD_BUTTON_A);
     EXPECT_TRUE(tracker.consume("fire"));
 }
 
@@ -122,18 +122,18 @@ TEST_F(KeyStateTrackerTest, MultipleKeysSameOneShotAction) {
 // ---------------------------------------------------------------------------
 
 TEST_F(KeyStateTrackerTest, HeldAndOneShotOnDifferentKeys) {
-    tracker.bindHeld(65, "move");
-    tracker.bindOneShot(32, "fire");
+    tracker.bindHeld(vde::KEY_A, "move");
+    tracker.bindOneShot(vde::KEY_SPACE, "fire");
 
-    tracker.handlePress(65);
-    tracker.handlePress(32);
+    tracker.handlePress(vde::KEY_A);
+    tracker.handlePress(vde::KEY_SPACE);
 
     EXPECT_TRUE(tracker.isHeld("move"));
     EXPECT_TRUE(tracker.consume("fire"));
     EXPECT_FALSE(tracker.consume("fire"));
     EXPECT_TRUE(tracker.isHeld("move"));  // still held
 
-    tracker.handleRelease(65);
+    tracker.handleRelease(vde::KEY_A);
     EXPECT_FALSE(tracker.isHeld("move"));
 }
 
@@ -142,10 +142,34 @@ TEST_F(KeyStateTrackerTest, HeldAndOneShotOnDifferentKeys) {
 // ---------------------------------------------------------------------------
 
 TEST_F(KeyStateTrackerTest, UnboundKeyPressAndReleaseIgnored) {
-    tracker.bindHeld(65, "left");
+    tracker.bindHeld(vde::KEY_A, "left");
     tracker.handlePress(999);    // unbound
     tracker.handleRelease(999);  // unbound
     EXPECT_FALSE(tracker.isHeld("left"));
+}
+
+// ---------------------------------------------------------------------------
+// Repeat-event robustness (e.g. GLFW_REPEAT forwarded as another press)
+// ---------------------------------------------------------------------------
+
+TEST_F(KeyStateTrackerTest, RepeatPressDoesNotInflateHeldCount) {
+    tracker.bindHeld(vde::KEY_A, "left");
+    tracker.handlePress(vde::KEY_A);
+    tracker.handlePress(vde::KEY_A);  // simulate GLFW_REPEAT forwarded as press
+    tracker.handlePress(vde::KEY_A);
+    EXPECT_TRUE(tracker.isHeld("left"));
+
+    // A single release must fully clear the action
+    tracker.handleRelease(vde::KEY_A);
+    EXPECT_FALSE(tracker.isHeld("left"));
+}
+
+TEST_F(KeyStateTrackerTest, RepeatPressDoesNotFireOneShotMultipleTimes) {
+    tracker.bindOneShot(vde::KEY_SPACE, "jump");
+    tracker.handlePress(vde::KEY_SPACE);
+    tracker.handlePress(vde::KEY_SPACE);  // simulate GLFW_REPEAT
+    EXPECT_TRUE(tracker.consume("jump"));
+    EXPECT_FALSE(tracker.consume("jump"));
 }
 
 // ---------------------------------------------------------------------------

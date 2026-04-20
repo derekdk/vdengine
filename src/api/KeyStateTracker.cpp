@@ -33,6 +33,10 @@ bool KeyStateTracker::consume(const std::string& name) {
 }
 
 void KeyStateTracker::handlePress(int keyCode) {
+    // Only process transitions from up to down to avoid count drift on repeat events
+    if (!m_pressedKeys.insert(keyCode).second) {
+        return;
+    }
     auto it = m_bindings.find(keyCode);
     if (it == m_bindings.end()) {
         return;
@@ -47,6 +51,7 @@ void KeyStateTracker::handlePress(int keyCode) {
 }
 
 void KeyStateTracker::handleRelease(int keyCode) {
+    m_pressedKeys.erase(keyCode);
     auto it = m_bindings.find(keyCode);
     if (it == m_bindings.end()) {
         return;

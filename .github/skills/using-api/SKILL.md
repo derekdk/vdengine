@@ -81,8 +81,8 @@ Implement `vde::InputHandler` interface for event-driven input (keyboard, mouse,
 
 For keyboard actions, use **`KeyStateTracker`** to bind named actions to keys and query them in `update()` without manual per-key booleans:
 ```cpp
-m_keys.bindHeld("left", vde::KEY_LEFT);
-m_keys.bindOneShot("jump", vde::KEY_SPACE);
+m_keys.bindHeld(vde::KEY_LEFT, "left");
+m_keys.bindOneShot(vde::KEY_SPACE, "jump");
 // In update(): m_keys.isHeld("left"), m_keys.consume("jump")
 ```
 

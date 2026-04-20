@@ -172,7 +172,7 @@ Prefer `PhysicsScene` unless you have a specific reason not to. It handles times
 For the full app structure (input handler, game class, `main()`), see the `writing-examples` skill. The 2D-specific parts go in `onEnter()` and `update()`:
 
 ```cpp
-class MyScene : public vde::examples::BaseExampleScene {
+class MyScene : public vde::examples::BaseExampleScene, public vde::InputHandler {
   public:
     MyScene() : BaseExampleScene(30.0f) {}
 
@@ -194,7 +194,7 @@ class MyScene : public vde::examples::BaseExampleScene {
             vde::PhysicsBodyDef::dynamicBox({0.0f, 5.0f}, {0.5f, 0.5f}));
 
         // Input — use KeyStateTracker for action bindings
-        m_keys.bindOneShot("action", vde::KEY_SPACE);
+        m_keys.bindOneShot(vde::KEY_SPACE, "action");
         setInputHandler(this);
     }
 
