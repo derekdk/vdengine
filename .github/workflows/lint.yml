@@ -1,0 +1,185 @@
+# VDE Lint Workflow
+# Runs lightweight static checks on every PR and push to main.
+# Each job is independent so failures in one don't block the others.
+
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── clang-format ──────────────────────────────────────────────────────────
+  format-check:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-format-18
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
+
+      - name: Check C++ formatting
+        run: |
+          echo "::group::Finding C++ files"
+          FILES=$(find include/vde src examples tests tools \
+                  -type f \( -name '*.cpp' -o -name '*.h' \) \
+                  ! -path '*/third_party/*')
+          FILE_COUNT=$(echo "$FILES" | wc -l)
+          echo "Found $FILE_COUNT files to check"
+          echo "::endgroup::"
+
+          FAILED=0
+          for f in $FILES; do
+            if ! clang-format --dry-run --Werror "$f" 2>/dev/null; then
+              echo "::error file=$f::File needs formatting: $f"
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "::error::Some files need formatting. Run: ./scripts/format.ps1"
+            exit 1
+          fi
+          echo "All files are properly formatted."
+
+  # ── GLSL shader validation ────────────────────────────────────────────────
+  shader-lint:
+    name: glslangValidator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install glslang-tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq glslang-tools
+
+      - name: Validate GLSL shaders
+        run: |
+          echo "Validating Vulkan GLSL shaders..."
+          FAILED=0
+
+          for shader in shaders/*.vert shaders/*.frag; do
+            [ -f "$shader" ] || continue
+            echo "  Checking $shader"
+            if ! glslangValidator -V "$shader"; then
+              echo "::error file=$shader::Shader validation failed: $shader"
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more shaders failed validation."
+            exit 1
+          fi
+          echo "All shaders passed validation."
+
+  # ── cppcheck ──────────────────────────────────────────────────────────────
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cppcheck
+
+      - name: Run cppcheck
+        run: |
+          echo "Running cppcheck on VDE sources..."
+          cppcheck \
+            --enable=warning,performance,portability \
+            --std=c++20 \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --suppress=missingInclude \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            -Iinclude \
+            -i third_party \
+            src/ include/vde/ examples/ tests/ tools/ \
+            2>&1 | tee cppcheck-output.txt
+
+          # Also show the count of issues found
+          ISSUES=$(grep -c '^\[' cppcheck-output.txt || true)
+          echo "cppcheck found $ISSUES issue(s)."
+
+  # ── cmake-lint ────────────────────────────────────────────────────────────
+  cmake-lint:
+    name: cmake-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cmakelang
+        run: pip install cmakelang
+
+      - name: Lint CMakeLists.txt files
+        run: |
+          echo "Linting CMakeLists.txt files..."
+          FAILED=0
+
+          for f in CMakeLists.txt \
+                   examples/CMakeLists.txt \
+                   tests/CMakeLists.txt \
+                   tools/CMakeLists.txt \
+                   tools/geometry_repl/CMakeLists.txt \
+                   tools/vlauncher/CMakeLists.txt \
+                   tools/resource_editor/CMakeLists.txt; do
+            if [ -f "$f" ]; then
+              echo "  Checking $f"
+              # cmake-lint returns non-zero on warnings; treat as advisory
+              cmake-lint "$f" || FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::warning::cmake-lint reported issues (advisory, not blocking)."
+          fi
+          echo "cmake-lint complete."
+        # cmake-lint issues are advisory — don't fail the workflow
+        continue-on-error: true
+
+  # ── PSScriptAnalyzer ──────────────────────────────────────────────────────
+  powershell-lint:
+    name: PSScriptAnalyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Write-Host "Installing PSScriptAnalyzer..."
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+
+          Write-Host "Analyzing PowerShell scripts..."
+          $results = Invoke-ScriptAnalyzer -Path scripts/ -Recurse -Severity Warning,Error
+
+          if ($results) {
+            $results | Format-Table -AutoSize
+            $errorCount = ($results | Where-Object Severity -eq 'Error').Count
+            $warningCount = ($results | Where-Object Severity -eq 'Warning').Count
+            Write-Host "Found $errorCount error(s) and $warningCount warning(s)."
+
+            if ($errorCount -gt 0) {
+              Write-Error "PSScriptAnalyzer found errors."
+              exit 1
+            }
+            # Warnings are advisory
+            Write-Warning "PSScriptAnalyzer found warnings (advisory, not blocking)."
+          } else {
+            Write-Host "No issues found."
+          }

@@ -23,6 +23,13 @@ Write-Cmd '.\scripts\test.ps1' 'Run unit tests'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Run VLauncher (builds target if missing)'
 Write-Cmd '.\scripts\install-hooks.ps1' 'Configure repo-managed Git hooks (blocks commits to main)'
 
+Write-Title "LINT & FORMAT SCRIPTS"
+Write-Cmd '.\scripts\lint.ps1' 'Run all available linters (format, shaders, cppcheck, clang-tidy)'
+Write-Cmd '.\scripts\lint.ps1 -Quick' 'Quick lint (format check + cppcheck only)'
+Write-Cmd '.\scripts\lint.ps1 -Fix' 'Auto-fix formatting issues'
+Write-Cmd '.\scripts\format.ps1' 'Format all C++ files with clang-format'
+Write-Cmd '.\scripts\format.ps1 -Check' 'Check formatting without modifying files'
+
 Write-Title "BENCHMARK SCRIPTS"
 Write-Cmd '.\scripts\benchmark-compile.ps1 -Label "baseline"' 'Capture per-TU compile timing (clean build)'
 Write-Cmd '.\scripts\benchmark-compile.ps1 -Label "modules" -CaptureDetail' 'Capture timing + MSVC FE/BE split'
@@ -35,6 +42,7 @@ Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
 Write-Cmd '.\scripts\test.ps1' 'Run all tests'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'
 Write-Cmd '.\scripts\smoke-test.ps1' 'Run smoke tests'
+Write-Cmd '.\scripts\lint.ps1' 'Run all linters'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Launch VLauncher from root'
 Write-Cmd '.\scripts\install-hooks.ps1' 'Enable local main-branch commit protection'
 

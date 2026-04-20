@@ -1,0 +1,256 @@
+# VDE Lint Script
+# Runs available linters in sequence for local development.
+#
+# Usage:
+#   .\scripts\lint.ps1              # Run all available linters
+#   .\scripts\lint.ps1 -Quick       # Format check + cppcheck only (fast)
+#   .\scripts\lint.ps1 -Fix         # Auto-fix formatting issues
+#   .\scripts\lint.ps1 -Help        # Show this help message
+#
+# Linters run (in order):
+#   1. clang-format check      (requires clang-format in PATH)
+#   2. GLSL shader validation  (requires glslangValidator in PATH)
+#   3. cppcheck                (requires cppcheck in PATH)
+#   4. clang-tidy              (requires clang-tidy + compile_commands.json)
+#
+# Each linter is skipped if its tool is not installed.
+
+param(
+    [switch]$Quick,       # Only run format check + cppcheck (fast)
+    [switch]$Fix,         # Auto-fix formatting issues (runs clang-format -i)
+    [switch]$Help
+)
+
+function Show-Help {
+    Write-Host @"
+VDE Lint Script - Run static analysis tools
+
+Usage:
+    .\scripts\lint.ps1              # Run all available linters
+    .\scripts\lint.ps1 -Quick       # Format check + cppcheck only (fast)
+    .\scripts\lint.ps1 -Fix         # Auto-fix formatting issues
+    .\scripts\lint.ps1 -Help        # Show this help message
+
+Linters (in order):
+    1. clang-format check      Verifies C++ formatting matches .clang-format
+    2. GLSL shader validation  Validates shaders with glslangValidator
+    3. cppcheck                Static analysis for bugs, performance, portability
+    4. clang-tidy              Deep static analysis (needs compile_commands.json)
+
+Options:
+    -Quick   Skip slow linters (shader validation, clang-tidy)
+    -Fix     Run clang-format in fix mode (modifies files in-place)
+    -Help    Show this help
+
+Each linter is skipped if its tool is not installed.
+Install tools:
+    clang-format:      Visual Studio C++ clang tools or LLVM distribution
+    glslangValidator:  Vulkan SDK
+    cppcheck:          https://cppcheck.sourceforge.io/ or package manager
+    clang-tidy:        Visual Studio C++ clang tools or LLVM distribution
+
+"@
+    exit 0
+}
+
+if ($Help) {
+    Show-Help
+}
+
+$ErrorActionPreference = "Stop"
+
+# Navigate to project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent $scriptDir
+
+if (Test-Path $projectRoot) {
+    Set-Location $projectRoot
+}
+
+$bar = "=" * 50
+$overallPass = $true
+$results = [ordered]@{}
+
+function Write-StageHeader {
+    param([string]$Name)
+    Write-Host ""
+    Write-Host $bar -ForegroundColor Cyan
+    Write-Host "  $Name" -ForegroundColor Cyan
+    Write-Host $bar -ForegroundColor Cyan
+}
+
+function Write-StageResult {
+    param([string]$Name, [bool]$Pass, [string]$Detail = "")
+    if ($Pass) {
+        Write-Host "  PASSED: $Name" -ForegroundColor Green
+    } else {
+        Write-Host "  FAILED: $Name $Detail" -ForegroundColor Red
+    }
+}
+
+# ── 1. clang-format ─────────────────────────────────────────────────────────
+
+$clangFormat = Get-Command clang-format -ErrorAction SilentlyContinue
+if ($clangFormat) {
+    Write-StageHeader "clang-format"
+
+    if ($Fix) {
+        Write-Host "  Running clang-format in fix mode..." -ForegroundColor Yellow
+        $formatArgs = @("-File", (Join-Path $scriptDir "format.ps1"))
+        & pwsh -NoProfile -ExecutionPolicy Bypass @formatArgs
+        $formatPass = ($LASTEXITCODE -eq 0)
+    } else {
+        Write-Host "  Checking C++ formatting..." -ForegroundColor Yellow
+        $formatArgs = @("-File", (Join-Path $scriptDir "format.ps1"), "-Check")
+        & pwsh -NoProfile -ExecutionPolicy Bypass @formatArgs
+        $formatPass = ($LASTEXITCODE -eq 0)
+    }
+
+    $results["clang-format"] = $formatPass
+    Write-StageResult "clang-format" $formatPass
+    if (-not $formatPass) { $overallPass = $false }
+} else {
+    Write-Host ""
+    Write-Host "  SKIPPED: clang-format (not found in PATH)" -ForegroundColor DarkGray
+    $results["clang-format"] = "skipped"
+}
+
+# ── 2. GLSL shader validation ───────────────────────────────────────────────
+
+if (-not $Quick) {
+    $glslangValidator = Get-Command glslangValidator -ErrorAction SilentlyContinue
+    if ($glslangValidator) {
+        Write-StageHeader "glslangValidator"
+        Write-Host "  Validating GLSL shaders..." -ForegroundColor Yellow
+
+        $shaderPass = $true
+        $shaderFiles = Get-ChildItem -Path "shaders" -Include "*.vert","*.frag" -Recurse -ErrorAction SilentlyContinue
+
+        foreach ($shader in $shaderFiles) {
+            Write-Host "    Checking $($shader.Name)" -ForegroundColor Gray
+            & glslangValidator -V $shader.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "    FAILED: $($shader.Name)" -ForegroundColor Red
+                & glslangValidator -V $shader.FullName
+                $shaderPass = $false
+            }
+        }
+
+        $results["glslangValidator"] = $shaderPass
+        Write-StageResult "glslangValidator" $shaderPass
+        if (-not $shaderPass) { $overallPass = $false }
+    } else {
+        Write-Host ""
+        Write-Host "  SKIPPED: glslangValidator (not found in PATH)" -ForegroundColor DarkGray
+        $results["glslangValidator"] = "skipped"
+    }
+}
+
+# ── 3. cppcheck ─────────────────────────────────────────────────────────────
+
+$cppcheck = Get-Command cppcheck -ErrorAction SilentlyContinue
+if ($cppcheck) {
+    Write-StageHeader "cppcheck"
+    Write-Host "  Running cppcheck..." -ForegroundColor Yellow
+
+    $cppcheckArgs = @(
+        "--enable=warning,performance,portability",
+        "--std=c++20",
+        "--error-exitcode=1",
+        "--suppress=missingIncludeSystem",
+        "--suppress=missingInclude",
+        "--suppress=unmatchedSuppression",
+        "--inline-suppr",
+        "-Iinclude",
+        "-i", "third_party",
+        "src/", "include/vde/", "examples/", "tests/", "tools/"
+    )
+
+    & cppcheck @cppcheckArgs 2>&1
+    $cppcheckPass = ($LASTEXITCODE -eq 0)
+
+    $results["cppcheck"] = $cppcheckPass
+    Write-StageResult "cppcheck" $cppcheckPass
+    if (-not $cppcheckPass) { $overallPass = $false }
+} else {
+    Write-Host ""
+    Write-Host "  SKIPPED: cppcheck (not found in PATH)" -ForegroundColor DarkGray
+    $results["cppcheck"] = "skipped"
+}
+
+# ── 4. clang-tidy ───────────────────────────────────────────────────────────
+
+if (-not $Quick) {
+    $clangTidy = Get-Command clang-tidy -ErrorAction SilentlyContinue
+    if ($clangTidy) {
+        # clang-tidy needs compile_commands.json — check for it
+        $compileDb = $null
+        foreach ($buildDir in @("build_ninja", "build")) {
+            $candidate = Join-Path $projectRoot "$buildDir/compile_commands.json"
+            if (Test-Path $candidate) {
+                $compileDb = $candidate
+                break
+            }
+        }
+
+        if ($compileDb) {
+            Write-StageHeader "clang-tidy"
+            Write-Host "  Using compile database: $compileDb" -ForegroundColor Yellow
+            Write-Host "  Running clang-tidy on src/ files..." -ForegroundColor Yellow
+
+            $srcFiles = Get-ChildItem -Path "src" -Filter "*.cpp" -Recurse -ErrorAction SilentlyContinue
+            $tidyPass = $true
+
+            foreach ($file in $srcFiles) {
+                $output = & clang-tidy -p (Split-Path $compileDb) $file.FullName 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "    Issues in: $($file.FullName)" -ForegroundColor Yellow
+                    $output | ForEach-Object { Write-Host "      $_" }
+                    $tidyPass = $false
+                }
+            }
+
+            $results["clang-tidy"] = $tidyPass
+            Write-StageResult "clang-tidy" $tidyPass
+            if (-not $tidyPass) { $overallPass = $false }
+        } else {
+            Write-Host ""
+            Write-Host "  SKIPPED: clang-tidy (no compile_commands.json found)" -ForegroundColor DarkGray
+            Write-Host "    Build with Ninja first: .\scripts\build.ps1" -ForegroundColor DarkGray
+            $results["clang-tidy"] = "skipped"
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  SKIPPED: clang-tidy (not found in PATH)" -ForegroundColor DarkGray
+        $results["clang-tidy"] = "skipped"
+    }
+}
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+
+Write-Host ""
+Write-Host $bar -ForegroundColor Cyan
+Write-Host "  LINT SUMMARY" -ForegroundColor Cyan
+Write-Host $bar -ForegroundColor Cyan
+
+foreach ($name in $results.Keys) {
+    $val = $results[$name]
+    if ($val -eq "skipped") {
+        Write-Host "  $name : SKIPPED" -ForegroundColor DarkGray
+    } elseif ($val) {
+        Write-Host "  $name : PASSED" -ForegroundColor Green
+    } else {
+        Write-Host "  $name : FAILED" -ForegroundColor Red
+    }
+}
+
+Write-Host ""
+if ($overallPass) {
+    Write-Host "  OVERALL: ALL CHECKS PASSED" -ForegroundColor Green
+} else {
+    Write-Host "  OVERALL: SOME CHECKS FAILED" -ForegroundColor Red
+}
+Write-Host $bar -ForegroundColor Cyan
+Write-Host ""
+
+if ($overallPass) { exit 0 } else { exit 1 }

@@ -11,6 +11,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
 | **smoke-test.ps1** | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Extended -Filter "*physics*"` |
+| **lint.ps1** | Run all available linters | `.\scripts\lint.ps1` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 | **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `\.\scripts\run-vlauncher.ps1` |
 | **install-hooks.ps1** | Configure repo-managed Git hooks | `\.\scripts\install-hooks.ps1` |
@@ -286,6 +287,47 @@ Format C++ source files using clang-format according to the project's style guid
 - clang-format must be installed and in PATH
 - Install via Visual Studio (C++ clang tools) or LLVM distribution
 
+### lint.ps1
+
+Run all available linters in sequence. Each linter is skipped if its tool is not installed.
+
+**Syntax:**
+```powershell
+.\scripts\lint.ps1 [-Quick] [-Fix] [-Help]
+```
+
+**Parameters:**
+- `-Quick` - Only run format check + cppcheck (fast)
+- `-Fix` - Auto-fix formatting issues (runs clang-format in fix mode)
+- `-Help` - Show detailed help
+
+**Linters (in order):**
+1. **clang-format** — Verifies C++ formatting matches `.clang-format`
+2. **glslangValidator** — Validates GLSL shaders against the Vulkan spec
+3. **cppcheck** — Static analysis for bugs, performance, portability
+4. **clang-tidy** — Deep static analysis (needs `compile_commands.json` from a Ninja build)
+
+**Examples:**
+```powershell
+# Run all available linters
+.\scripts\lint.ps1
+
+# Quick lint (format + cppcheck only)
+.\scripts\lint.ps1 -Quick
+
+# Auto-fix formatting issues
+.\scripts\lint.ps1 -Fix
+
+# Show help
+.\scripts\lint.ps1 -Help
+```
+
+**Tool Installation:**
+- **clang-format:** Visual Studio C++ clang tools or LLVM distribution
+- **glslangValidator:** Vulkan SDK
+- **cppcheck:** https://cppcheck.sourceforge.io/ or package manager
+- **clang-tidy:** Visual Studio C++ clang tools or LLVM distribution
+
 ### install-hooks.ps1
 
 Configure this clone to use tracked hooks from `.githooks/`.
@@ -526,3 +568,27 @@ For more detailed information about build workflows, see:
 - `.github/skills/build-tool-workflows/SKILL.md` - Complete build documentation
 - `README.md` - Project overview
 - `docs/GETTING_STARTED.md` - Getting started guide
+
+## CI/CD Workflows
+
+The project uses GitHub Actions for continuous integration. Workflows are defined in `.github/workflows/`:
+
+| Workflow | File | Trigger | Purpose |
+|----------|------|---------|---------|
+| **Lint** | `lint.yml` | PR + push to main | clang-format, shader validation, cppcheck, cmake-lint, PSScriptAnalyzer |
+| **Build & Test** | `build-and-test.yml` | PR + push to main | Build (Debug/Release with `-Werror`) + unit tests + sanitizer run |
+| **CodeQL** | `codeql.yml` | PR + push to main + weekly | Security vulnerability scanning |
+
+### Lint Workflow Jobs
+
+- **format-check** — Verifies all C++ files match `.clang-format` rules (~30s)
+- **shader-lint** — Validates GLSL shaders with `glslangValidator -V` (~10s)
+- **cppcheck** — Static analysis for bugs, performance, portability (~2min)
+- **cmake-lint** — Lints `CMakeLists.txt` files (advisory, non-blocking)
+- **powershell-lint** — PSScriptAnalyzer on `scripts/` (errors block, warnings advisory)
+
+### Build & Test Workflow Jobs
+
+- **build-and-test (Debug)** — Build with `-Werror` + unit tests
+- **build-and-test (Release)** — Build with `-Werror` + unit tests
+- **sanitizer** — Build with AddressSanitizer + UndefinedBehaviorSanitizer, run tests
