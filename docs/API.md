@@ -598,7 +598,7 @@ When enabled, the scheduler splits `update()` into three ordered phases:
 
 | Method | Description |
 |--------|-------------|
-| `void setup2D()` | Quick 2D setup: Camera2D(1920×1080) + white LightBox + black background |
+| `void setup2D(float viewWidth, float viewHeight, const Color& bgColor = Color::black())` | Quick 2D setup: Camera2D with given world-unit viewport + white LightBox + bg color |
 | `void setCamera(std::unique_ptr<GameCamera>)` | Set scene camera |
 | `void setCamera(GameCamera*)` | Set scene camera (takes ownership) |
 | `GameCamera* getCamera()` | Get scene camera |

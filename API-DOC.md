@@ -939,23 +939,23 @@ For most 2D scenes, `setup2D()` replaces the manual camera + background + lighti
 
 ```cpp
 void onEnter() override {
-    // Sets Camera2D (1920×1080), white SimpleColorLightBox, and black background
-    setup2D();
+    // Sets Camera2D with the given world-unit viewport, white SimpleColorLightBox, black background
+    setup2D(20.0f, 15.0f);
 
-    // Optionally override individual settings afterward
-    setBackgroundColor(vde::Color(0.1f, 0.1f, 0.2f));
+    // Optional: custom background color
+    setup2D(20.0f, 15.0f, vde::Color(0.1f, 0.1f, 0.2f));
 }
 ```
 
-`setup2D()` is equivalent to:
+`setup2D(viewWidth, viewHeight, bgColor)` is equivalent to:
 ```cpp
-setCamera(new vde::Camera2D(1920, 1080));
+setCamera(new vde::Camera2D(viewWidth, viewHeight));
 setLightBox(new vde::SimpleColorLightBox(vde::Color::white()));
-setBackgroundColor(vde::Color::black());
+setBackgroundColor(bgColor);  // defaults to Color::black()
 ```
 
-> **When to use manual setup:** If you need a non-white `LightBox`, a transparent background
-> (for overlay scenes), or a non-default viewport size, set up the camera manually.
+> **When to use manual setup:** If you need a non-white `LightBox` or a transparent background
+> (for overlay scenes), set those up manually after calling `setup2D()` or skip it entirely.
 
 ---
 

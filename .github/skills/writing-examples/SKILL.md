@@ -120,31 +120,35 @@ Do not declare a new or modified example complete after only building it or manu
 #include "../ExampleBase.h"
 ```
 
-### 2. Input Handler (Inherit from BaseExampleInputHandler)
+### 2. Input (KeyStateTracker — preferred for keyboard actions)
+
+For most examples that only need keyboard input, use `KeyStateTracker` directly inside the scene — no separate `InputHandler` subclass required:
 
 ```cpp
-class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
-public:
-    void onKeyPress(int key) override {
-        // Call base class first for ESC and F keys
-        BaseExampleInputHandler::onKeyPress(key);
-        
-        // Add your custom keys here
-        if (key == vde::KEY_SPACE) {
-            m_spacePressed = true;
-        }
-    }
-    
-    bool isSpacePressed() {
-        bool val = m_spacePressed;
-        m_spacePressed = false;
-        return val;
+class DemoScene : public vde::examples::BaseExampleScene {
+    vde::KeyStateTracker m_keys;
+
+    void onEnter() override {
+        m_keys.bindOneShot("action", vde::KEY_SPACE);
+        m_keys.bindHeld("left",   vde::KEY_LEFT);
+        setInputHandler(this);  // Scene IS the input handler
     }
 
-private:
-    bool m_spacePressed = false;
+    void onKeyPress(int key) override {
+        BaseExampleScene::onKeyPress(key);  // ESC / F pass-through
+        m_keys.handlePress(key);
+    }
+    void onKeyRelease(int key) override { m_keys.handleRelease(key); }
+
+    void update(float dt) override {
+        BaseExampleScene::update(dt);
+        if (m_keys.consume("action")) { /* ... */ }
+        if (m_keys.isHeld("left"))    { /* ... */ }
+    }
 };
 ```
+
+If you need mouse or gamepad event callbacks, inherit from `BaseExampleInputHandler` and set it as a separate handler as before.
 
 ### 3. Scene (Inherit from BaseExampleScene)
 
@@ -166,36 +170,22 @@ public:
         BaseExampleScene::update(deltaTime);
         
         // Your custom update logic here...
-        auto* input = dynamic_cast<DemoInputHandler*>(getInputHandler());
-        if (input) {
-            // Handle your custom keys
-        }
     }
 
 protected:
     // Override these to customize the header output
-    std::string getExampleName() const override {
-        return "Feature Name";
-    }
+    std::string getExampleName() const override { return "Feature Name"; }
     
     std::vector<std::string> getFeatures() const override {
-        return {
-            "Feature 1 description",
-            "Feature 2 description"
-        };
+        return {"Feature 1 description", "Feature 2 description"};
     }
     
     std::vector<std::string> getExpectedVisuals() const override {
-        return {
-            "Visual element 1",
-            "Visual element 2"
-        };
+        return {"Visual element 1", "Visual element 2"};
     }
     
     std::vector<std::string> getControls() const override {
-        return {
-            "SPACE - Toggle something"
-        };
+        return {"SPACE - Toggle something"};
     }
 };
 ```
@@ -203,17 +193,11 @@ protected:
 ### 4. Game Class (Use BaseExampleGame Template)
 
 ```cpp
-class DemoGame : public vde::examples::BaseExampleGame<DemoInputHandler, DemoScene> {
-public:
-    DemoGame() = default;
-    
-    // Optionally override onStart() if you need custom initialization
-    // But make sure to call the base class version!
-    void onStart() override {
-        BaseExampleGame::onStart();
-        // Your custom initialization...
-    }
-};
+// When using KeyStateTracker (scene handles its own input), use the base handler:
+class DemoGame : public vde::examples::BaseExampleGame<vde::examples::BaseExampleInputHandler, DemoScene> {};
+
+// When using a separate DemoInputHandler subclass (mouse/gamepad callbacks):
+class DemoGame : public vde::examples::BaseExampleGame<DemoInputHandler, DemoScene> {};
 ```
 
 ### 5. Main Function (Use runExample Helper)

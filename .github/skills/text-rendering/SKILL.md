@@ -26,9 +26,11 @@ label->setText("HELLO WORLD");
 label->setFont(BitmapFont::small());
 label->setStyle({.color = Color::white(), .pixelScale = 1});
 label->setPosition(0.0f, 4.0f, 0.0f);
-label->setAnchor(0.5f, 0.5f);
 label->setWorldHeight(0.35f);     // Auto-size to 0.35 world units tall
 ```
+
+> **Note:** Entity anchor defaults to `(0.5, 0.5)` (center). Only call `setAnchor()` when
+> you want a non-center origin (e.g., `(0, 0.5)` for left-aligned text).
 
 When `setWorldHeight()` is configured, `update()` automatically calls `sizeToFit()` after every texture rebuild. No manual `update(0.0f)` + `sizeToFit()` dance is needed.
 
@@ -55,7 +57,6 @@ label->setText("HELLO WORLD");
 label->setFont(BitmapFont::small());
 label->setStyle({.color = Color::white(), .pixelScale = 1});
 label->setPosition(0.0f, 4.0f, 0.0f);
-label->setAnchor(0.5f, 0.5f);
 label->update(0.0f);              // Forces texture rebuild — REQUIRED before manual sizeToFit
 label->sizeToFit(0.35f);          // Size to 0.35 world units tall
 ```
@@ -89,7 +90,7 @@ For manual sizing, you must rebuild the texture and re-size:
 ```cpp
 m_label->setText("NEW VALUE");
 m_label->update(0.0f);
-sizeToFit(*m_label, 0.35f);
+m_label->sizeToFit(0.35f);  // member method, not free function
 ```
 
 **Exception:** If the text length is constant or nearly constant (e.g., a clock display "HH:MM:SS"), you can skip the re-size after the initial setup. The normal game-loop `update(dt)` will rebuild the texture, and the scale remains correct because the aspect ratio is unchanged.
