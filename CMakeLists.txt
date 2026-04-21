@@ -326,6 +326,9 @@ target_link_libraries(vde PUBLIC
     glslang::glslang
     glslang::glslang-default-resource-limits
     glslang::SPIRV
+    MachineIndependent
+    OSDependent
+    GenericCodeGen
 )
 
 target_link_libraries(vde PRIVATE
