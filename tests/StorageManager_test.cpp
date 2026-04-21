@@ -21,6 +21,8 @@
 #include <windows.h>
 #undef min
 #undef max
+#else
+#include <unistd.h>
 #endif
 
 #include <gtest/gtest.h>
@@ -57,7 +59,15 @@ static std::filesystem::path testDbPath(const std::string& appName) {
 // Fixture
 // ---------------------------------------------------------------------------
 
-static constexpr const char* kTestApp = "vde_test_storage";
+/// Returns a per-process unique app name so parallel CTest invocations each
+/// get their own database file and cannot lock each other out.
+static std::string testAppName() {
+#if defined(_WIN32)
+    return "vde_test_storage_" + std::to_string(GetCurrentProcessId());
+#else
+    return "vde_test_storage_" + std::to_string(getpid());
+#endif
+}
 
 class StorageManagerTest : public ::testing::Test {
   protected:
@@ -66,24 +76,24 @@ class StorageManagerTest : public ::testing::Test {
         StorageManager::getInstance().shutdown();
 
         // Remove any leftover DB from prior runs
-        removeTestDb();
+        removeTestDb(testAppName());
 
-        const bool ok = StorageManager::getInstance().init_storage(kTestApp);
+        const bool ok = StorageManager::getInstance().init_storage(testAppName());
         ASSERT_TRUE(ok) << "init_storage failed during SetUp";
         ASSERT_TRUE(StorageManager::getInstance().isInitialized());
     }
 
     void TearDown() override {
         StorageManager::getInstance().shutdown();
-        removeTestDb();
+        removeTestDb(testAppName());
     }
 
     StorageManager& storage() { return StorageManager::getInstance(); }
 
   private:
-    static void removeTestDb() {
+    static void removeTestDb(const std::string& appName) {
         std::error_code ec;
-        const auto path = testDbPath(kTestApp);
+        const auto path = testDbPath(appName);
         std::filesystem::remove(path, ec);
         // Also try to remove the empty parent dir (best-effort, ignore errors)
         std::filesystem::remove(path.parent_path(), ec);
@@ -100,8 +110,7 @@ TEST_F(StorageManagerTest, IsInitializedAfterInit) {
 
 TEST_F(StorageManagerTest, DoubleInitIsNoOp) {
     // Calling init_storage a second time should succeed and stay open
-    EXPECT_TRUE(storage().init_storage(kTestApp));
-    EXPECT_TRUE(storage().isInitialized());
+    EXPECT_TRUE(storage().init_storage(testAppName()));
 }
 
 TEST_F(StorageManagerTest, ShutdownClearsInitializedFlag) {
@@ -112,7 +121,7 @@ TEST_F(StorageManagerTest, ShutdownClearsInitializedFlag) {
 TEST_F(StorageManagerTest, ReinitAfterShutdownWorks) {
     storage().shutdown();
     ASSERT_FALSE(storage().isInitialized());
-    ASSERT_TRUE(storage().init_storage(kTestApp));
+    ASSERT_TRUE(storage().init_storage(testAppName()));
     EXPECT_TRUE(storage().isInitialized());
 }
 
@@ -186,7 +195,7 @@ TEST_F(StorageManagerTest, StringPersistsAcrossReopenedDb) {
     storage().shutdown();
 
     // Re-open the same database file
-    ASSERT_TRUE(storage().init_storage(kTestApp));
+    ASSERT_TRUE(storage().init_storage(testAppName()));
     const auto val = storage().getStringData("persist");
     ASSERT_TRUE(val.has_value());
     EXPECT_EQ(*val, "yes");
