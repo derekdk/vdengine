@@ -22,6 +22,7 @@
 #include <vde/Window.h>
 #include <vde/api/GameAPI.h>
 
+#include <cinttypes>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -280,7 +281,7 @@ class BaseExampleScene : public vde::Scene {
         ImGui::SetNextWindowSize(ImVec2(280, 140), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Debug Info")) {
             ImGui::Text("FPS: %.1f", game->getFPS());
-            ImGui::Text("Frame: %llu", game->getFrameCount());
+            ImGui::Text("Frame: %" PRIu64, game->getFrameCount());
             ImGui::Text("Delta: %.3f ms", game->getDeltaTime() * 1000.0f);
             ImGui::Text("Entities: %zu", getEntities().size());
             ImGui::Text("DPI Scale: %.2f", game->getDPIScale());

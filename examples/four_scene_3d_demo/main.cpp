@@ -793,7 +793,7 @@ class FourScene3DDemo : public vde::Game {
         ImGui::SetNextWindowSize(ImVec2(280, 160), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Debug Info")) {
             ImGui::Text("FPS: %.1f", getFPS());
-            ImGui::Text("Frame: %llu", getFrameCount());
+            ImGui::Text("Frame: %" PRIu64, getFrameCount());
             ImGui::Text("Delta: %.3f ms", getDeltaTime() * 1000.0f);
             ImGui::Text("DPI Scale: %.2f", getDPIScale());
             ImGui::Separator();

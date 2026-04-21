@@ -159,7 +159,7 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         if (ImGui::Begin("Engine Stats")) {
             auto* game = getGame();
             ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
-            ImGui::Text("Frame: %llu", game ? game->getFrameCount() : 0ULL);
+            ImGui::Text("Frame: %" PRIu64, game ? game->getFrameCount() : 0ULL);
             ImGui::Text("Delta: %.3f ms", game ? game->getDeltaTime() * 1000.0f : 0.0f);
             ImGui::Text("Entities: %zu", getEntities().size());
             ImGui::Text("DPI Scale: %.2f", game ? game->getDPIScale() : 1.0f);

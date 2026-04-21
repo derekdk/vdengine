@@ -210,7 +210,7 @@ class OsStressScene : public vde::examples::BaseExampleScene {
         ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(420, 350), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("OS Stress Test")) {
-            ImGui::Text("FPS: %.1f  Frame: %llu", game->getFPS(), game->getFrameCount());
+            ImGui::Text("FPS: %.1f  Frame: %" PRIu64, game->getFPS(), game->getFrameCount());
             if (m_autoTerminateSeconds > 0.0f) {
                 ImGui::Text("Elapsed: %.1f / %.0f s", m_elapsedTime, m_autoTerminateSeconds);
             } else {
