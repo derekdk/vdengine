@@ -12,7 +12,6 @@ void KeyStateTracker::bindOneShot(int keyCode, const std::string& name) {
     m_bindings[keyCode].push_back({name, BindingType::OneShot});
     // Initialize one-shot state to false if not already present
     m_oneShotTriggered.try_emplace(name, false);
-    m_oneShotKeysByName[name].push_back(keyCode);
 }
 
 bool KeyStateTracker::isHeld(const std::string& name) const {
@@ -30,18 +29,6 @@ bool KeyStateTracker::consume(const std::string& name) {
     }
     bool triggered = it->second;
     it->second = false;
-    if (triggered) {
-        // Allow the bound keys to re-fire on the next press by clearing their
-        // pressed state. This lets consume() + re-press work correctly while
-        // still deduplicating true OS key-repeat events (which arrive without
-        // an intervening consume()).
-        auto keysIt = m_oneShotKeysByName.find(name);
-        if (keysIt != m_oneShotKeysByName.end()) {
-            for (int key : keysIt->second) {
-                m_pressedKeys.erase(key);
-            }
-        }
-    }
     return triggered;
 }
 

@@ -99,7 +99,12 @@ TEST_F(KeyStateTrackerTest, OneShotResetsAfterConsume) {
     tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("fire"));
 
-    // Press again
+    // A repeat press while the key is still held must NOT re-arm the action
+    tracker.handlePress(vde::KEY_SPACE);  // OS repeat or redundant press
+    EXPECT_FALSE(tracker.consume("fire"));
+
+    // Only release + re-press re-arms the one-shot
+    tracker.handleRelease(vde::KEY_SPACE);
     tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("fire"));
     EXPECT_FALSE(tracker.consume("fire"));
@@ -227,6 +232,49 @@ TEST_F(KeyStateTrackerTest, DocumentedPattern_OneShotActions) {
     tracker.handleRelease(vde::KEY_SPACE);
     tracker.handlePress(vde::KEY_SPACE);
     EXPECT_TRUE(tracker.consume("jump"));
+}
+
+// ---------------------------------------------------------------------------
+// Repeat/consume interaction regression tests
+// ---------------------------------------------------------------------------
+
+// Regression: consume() must not clear pressed state — an OS repeat arriving
+// while the key is still physically held must NOT re-trigger the one-shot.
+TEST_F(KeyStateTrackerTest, RepeatAfterConsumeDoesNotRetriggerOneShot) {
+    tracker.bindOneShot(vde::KEY_SPACE, "fire");
+    tracker.handlePress(vde::KEY_SPACE);
+    EXPECT_TRUE(tracker.consume("fire"));
+
+    // Key still held — OS sends repeat events
+    tracker.handlePress(vde::KEY_SPACE);  // OS repeat
+    tracker.handlePress(vde::KEY_SPACE);  // OS repeat
+    EXPECT_FALSE(tracker.consume("fire"));
+
+    // Only an actual release + re-press should re-arm the action
+    tracker.handleRelease(vde::KEY_SPACE);
+    tracker.handlePress(vde::KEY_SPACE);
+    EXPECT_TRUE(tracker.consume("fire"));
+}
+
+// Regression: a key bound to both Held and OneShot — after consume() + repeat,
+// the held count must stay at 1 (not drift upward) and clear on a single release.
+TEST_F(KeyStateTrackerTest, RepeatAfterConsumeDoesNotInflateHeldCount) {
+    tracker.bindHeld(vde::KEY_A, "move");
+    tracker.bindOneShot(vde::KEY_A, "dash");
+
+    tracker.handlePress(vde::KEY_A);
+    EXPECT_TRUE(tracker.isHeld("move"));
+    EXPECT_TRUE(tracker.consume("dash"));
+
+    // OS sends repeat events while key is still physically held
+    tracker.handlePress(vde::KEY_A);        // OS repeat
+    tracker.handlePress(vde::KEY_A);        // OS repeat
+    EXPECT_FALSE(tracker.consume("dash"));  // one-shot must not re-fire
+    EXPECT_TRUE(tracker.isHeld("move"));    // held still active
+
+    // A single release must fully drop the held action (no count inflation)
+    tracker.handleRelease(vde::KEY_A);
+    EXPECT_FALSE(tracker.isHeld("move"));
 }
 
 }  // namespace vde::test

@@ -88,11 +88,11 @@ class ResourceManager {
 public:
     // Existing: weak_ptr cache (auto-cleanup when last external ref dies)
     template<typename T>
-    void add(const std::string& key, std::shared_ptr<T> resource);
+    ResourcePtr<T> add(const std::string& key, ResourcePtr<T> resource);
 
     // New: strong cache (lives until explicitly removed or manager destroyed)
     template<typename T>
-    void addPersistent(const std::string& key, std::shared_ptr<T> resource);
+    ResourcePtr<T> addPersistent(const std::string& key, ResourcePtr<T> resource);
 };
 ```
 
