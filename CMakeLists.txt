@@ -324,6 +324,7 @@ target_link_libraries(vde PUBLIC
     glfw
     glm::glm
     glslang::glslang
+    MachineIndependent
     glslang::glslang-default-resource-limits
     glslang::SPIRV
 )
