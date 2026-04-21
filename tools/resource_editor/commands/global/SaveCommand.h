@@ -37,7 +37,9 @@ class SaveCommand final : public GlobalCommand {
                     {.name = "filepath",
                      .type = ParamType::QuotedString,
                      .required = false,
-                     .description = "Output file path"},
+                     .description = "Output file path",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = R"(save "sprite.png")",
         };

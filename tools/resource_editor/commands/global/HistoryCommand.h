@@ -37,7 +37,8 @@ class HistoryCommand final : public GlobalCommand {
                      .type = ParamType::Int,
                      .required = false,
                      .description = "Number of entries to show",
-                     .defaultValue = "20"},
+                     .defaultValue = "20",
+                     .enumValues = {}},
                 },
             .syntaxExample = "history 10",
         };

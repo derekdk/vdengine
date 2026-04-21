@@ -40,7 +40,9 @@ class SelectCommand final : public GlobalCommand {
                     {.name = "name",
                      .type = ParamType::String,
                      .required = true,
-                     .description = "Canvas name or ID to select"},
+                     .description = "Canvas name or ID to select",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "select canvas mysprite",
         };

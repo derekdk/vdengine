@@ -36,6 +36,7 @@ class GridCommand final : public GlobalCommand {
                      .type = ParamType::Enum,
                      .required = true,
                      .description = "Grid visibility",
+                     .defaultValue = "",
                      .enumValues = {"on", "off"}},
                 },
             .syntaxExample = "grid on",

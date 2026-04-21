@@ -35,7 +35,9 @@ class SetColorCommand final : public GlobalCommand {
                     {.name = "color",
                      .type = ParamType::Color,
                      .required = true,
-                     .description = "Color in #RRGGBB or #RRGGBBAA format, or a named color"},
+                     .description = "Color in #RRGGBB or #RRGGBBAA format, or a named color",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "setcolor #FF0000",
         };

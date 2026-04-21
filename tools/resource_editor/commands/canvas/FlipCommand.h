@@ -33,6 +33,7 @@ class FlipCommand final : public CanvasCommand {
                      .type = ParamType::Enum,
                      .required = true,
                      .description = "Flip direction",
+                     .defaultValue = "",
                      .enumValues = {"horizontal", "vertical"}},
                 },
             .syntaxExample = "flip horizontal",
