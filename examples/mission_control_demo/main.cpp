@@ -209,8 +209,8 @@ class MissionScene : public vde::examples::BaseExampleScene {
         int mm = (totalSec / 60) % 60;
         int hh = totalSec / 3600;
 
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%02d", hh, mm, ss, cs);
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%02d", hh, mm, ss, cs);
         m_clockValue->setText(buf);
     }
 
@@ -218,11 +218,11 @@ class MissionScene : public vde::examples::BaseExampleScene {
     std::string formatValue(int idx, float t) {
         float noise = std::sin(t * (1.3f + idx * 0.7f)) * (m_telemetryBase[idx] * 0.02f);
         float val = m_telemetryBase[idx] + noise;
-        char buf[16];
+        char buf[32];
         if (std::fabs(val) >= 100.0f)
-            snprintf(buf, sizeof(buf), "%7.1f", static_cast<double>(val));
+            std::snprintf(buf, sizeof(buf), "%7.1f", static_cast<double>(val));
         else
-            snprintf(buf, sizeof(buf), "%7.2f", static_cast<double>(val));
+            std::snprintf(buf, sizeof(buf), "%7.2f", static_cast<double>(val));
         return buf;
     }
 
