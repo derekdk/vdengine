@@ -323,12 +323,12 @@ target_link_libraries(vde PUBLIC
     Vulkan::Vulkan
     glfw
     glm::glm
-)
-
-target_link_libraries(vde PRIVATE
     glslang::glslang
     glslang::glslang-default-resource-limits
     glslang::SPIRV
+)
+
+target_link_libraries(vde PRIVATE
     sqlite3
 )
 
