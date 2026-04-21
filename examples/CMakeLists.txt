@@ -43,6 +43,7 @@ function(add_vde_example target_name)
         target_link_libraries(${target_name} PRIVATE vde imgui_backend)
         target_compile_definitions(${target_name} PRIVATE VDE_EXAMPLE_USE_IMGUI)
     endif()
+    target_compile_options(${target_name} PRIVATE ${VDE_WARNING_FLAGS})
     add_dependencies(${target_name} copy_example_shaders)
 endfunction()
 

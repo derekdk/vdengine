@@ -26,4 +26,6 @@ if(WIN32)
     target_link_libraries(vde_vlauncher PRIVATE ole32 uuid)
 endif()
 
+target_compile_options(vde_vlauncher PRIVATE ${VDE_WARNING_FLAGS})
+
 vde_add_shader_sync(vde_vlauncher)

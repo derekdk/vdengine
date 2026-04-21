@@ -576,7 +576,7 @@ The project uses GitHub Actions for continuous integration. Workflows are define
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | **Lint** | `lint.yml` | PR + push to main | clang-format, shader validation, cppcheck, cmake-lint, PSScriptAnalyzer |
-| **Build & Test** | `build-and-test.yml` | PR + push to main | Build (Debug/Release with `-Werror`) + unit tests + sanitizer run |
+| **Build & Test** | `build-and-test.yml` | PR + push to main | Build (Debug/Release, `-Werror` on VDE targets) + unit tests + sanitizer run |
 | **CodeQL** | `codeql.yml` | PR + push to main + weekly | Security vulnerability scanning |
 
 ### Lint Workflow Jobs
@@ -589,6 +589,6 @@ The project uses GitHub Actions for continuous integration. Workflows are define
 
 ### Build & Test Workflow Jobs
 
-- **build-and-test (Debug)** — Build with `-Werror` + unit tests
-- **build-and-test (Release)** — Build with `-Werror` + unit tests
+- **build-and-test (Debug)** — Build with `-Werror` on VDE targets + unit tests
+- **build-and-test (Release)** — Build with `-Werror` on VDE targets + unit tests
 - **sanitizer** — Build with AddressSanitizer + UndefinedBehaviorSanitizer, run tests

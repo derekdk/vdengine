@@ -113,6 +113,8 @@ target_compile_definitions(vde_tests PRIVATE
     VDE_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
 )
 
+target_compile_options(vde_tests PRIVATE ${VDE_WARNING_FLAGS})
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(vde_tests)
@@ -160,5 +162,7 @@ target_link_libraries(vde_resource_editor_tests PRIVATE
 if(WIN32)
     target_link_libraries(vde_resource_editor_tests PRIVATE ole32 uuid)
 endif()
+
+target_compile_options(vde_resource_editor_tests PRIVATE ${VDE_WARNING_FLAGS})
 
 gtest_discover_tests(vde_resource_editor_tests)

@@ -25,10 +25,8 @@ jobs:
       matrix:
         include:
           - config: Debug
-            cmake_flags: "-Werror"
             sanitizer: false
           - config: Release
-            cmake_flags: "-Werror"
             sanitizer: false
 
     steps:
@@ -47,7 +45,6 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
-            -DCMAKE_CXX_FLAGS="${{ matrix.cmake_flags }}" \
             -DGLFW_BUILD_WAYLAND=OFF \
             -DVDE_BUILD_EXAMPLES=ON \
             -DVDE_BUILD_TOOLS=ON \

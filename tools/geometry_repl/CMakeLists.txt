@@ -30,4 +30,6 @@ if(WIN32)
     target_link_libraries(vde_geometry_repl PRIVATE ole32 uuid)
 endif()
 
+target_compile_options(vde_geometry_repl PRIVATE ${VDE_WARNING_FLAGS})
+
 vde_add_shader_sync(vde_geometry_repl)

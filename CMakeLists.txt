@@ -24,12 +24,14 @@ if(MSVC)
         add_compile_options(/Bt)
         message(STATUS "VDE: compiler timing enabled (/Bt)")
     endif()
+    set(VDE_WARNING_FLAGS /W4 /WX /FS)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
     if(VDE_TIMING)
         add_compile_options(-ftime-report)
         message(STATUS "VDE: compiler timing enabled (-ftime-report)")
     endif()
+    set(VDE_WARNING_FLAGS -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Enable testing support
@@ -291,6 +293,9 @@ if(VDE_SHARED_LIBS)
 else()
     add_library(vde STATIC ${VDE_SOURCES} ${VDE_PUBLIC_HEADERS})
 endif()
+
+# Strict warnings on VDE sources only (not third-party dependencies)
+target_compile_options(vde PRIVATE ${VDE_WARNING_FLAGS})
 
 # Add alias for namespaced target
 add_library(vde::vde ALIAS vde)
