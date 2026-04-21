@@ -52,6 +52,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DGLFW_BUILD_WAYLAND=OFF \
             -DVDE_BUILD_EXAMPLES=OFF \
             -DVDE_BUILD_TOOLS=OFF \
             -DVDE_BUILD_TESTS=ON
