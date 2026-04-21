@@ -16,8 +16,8 @@ namespace {
 
 constexpr size_t kMaxOutputReadBytes = 8 * 1024 * 1024;
 
-std::filesystem::path makeTempOutputPath() {
 #ifdef _WIN32
+std::filesystem::path makeTempOutputPath() {
     std::error_code error;
     auto tempDir = std::filesystem::temp_directory_path(error);
     if (error || tempDir.empty()) {
@@ -28,9 +28,6 @@ std::filesystem::path makeTempOutputPath() {
     std::string fileName = "vde_vlauncher_" + std::to_string(GetCurrentProcessId()) + "_" +
                            std::to_string(nowTicks) + ".log";
     return tempDir / fileName;
-#else
-    return {};
-#endif
 }
 
 // Windows command-line escaping per CommandLineToArgvW rules.
@@ -62,6 +59,7 @@ std::string escapeCommandLineArg(const std::string& arg) {
     out += '"';
     return out;
 }
+#endif
 
 }  // namespace
 
@@ -177,6 +175,7 @@ bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& execu
 #else
     (void)executablePath;
     (void)launchedProcess;
+    (void)extraArgs;
     error = "Process launching is currently only implemented for Windows";
     return false;
 #endif
