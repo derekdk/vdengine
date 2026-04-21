@@ -23,10 +23,10 @@ namespace vde {
 TrueTypeFont::TrueTypeFont(TrueTypeFont&& other) noexcept
     : m_loaded(other.m_loaded), m_fontSize(other.m_fontSize), m_lineHeight(other.m_lineHeight),
       m_atlasWidth(other.m_atlasWidth), m_atlasHeight(other.m_atlasHeight),
-            m_atlas(std::move(other.m_atlas)), m_glyphs(std::move(other.m_glyphs)),
-            m_lastError(std::move(other.m_lastError)) {
+      m_atlas(std::move(other.m_atlas)), m_glyphs(std::move(other.m_glyphs)),
+      m_lastError(std::move(other.m_lastError)) {
     other.m_loaded = false;
-        other.m_lastError.clear();
+    other.m_lastError.clear();
 }
 
 TrueTypeFont& TrueTypeFont::operator=(TrueTypeFont&& other) noexcept {

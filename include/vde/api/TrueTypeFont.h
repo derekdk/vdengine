@@ -71,7 +71,7 @@ class TrueTypeFont {
      * @param path Path to the .ttf font file
      * @param sizePixels Desired font size in pixels
      * @return true if the font was loaded and atlas built successfully
-    * @note On failure, getLastError() contains a human-readable reason.
+     * @note On failure, getLastError() contains a human-readable reason.
      */
     bool loadFromFile(VulkanContext* ctx, const std::string& path, float sizePixels);
 
