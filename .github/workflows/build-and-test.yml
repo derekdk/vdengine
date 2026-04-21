@@ -48,6 +48,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
             -DCMAKE_CXX_FLAGS="${{ matrix.cmake_flags }}" \
+            -DGLFW_BUILD_WAYLAND=OFF \
             -DVDE_BUILD_EXAMPLES=ON \
             -DVDE_BUILD_TOOLS=ON \
             -DVDE_BUILD_TESTS=ON
@@ -84,6 +85,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DGLFW_BUILD_WAYLAND=OFF \
             -DVDE_BUILD_EXAMPLES=OFF \
             -DVDE_BUILD_TOOLS=OFF \
             -DVDE_BUILD_TESTS=ON
