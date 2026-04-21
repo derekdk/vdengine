@@ -10,6 +10,8 @@
 #include <vde/VulkanContext.h>
 #include <vde/api/TransitionManager.h>
 
+#include <memory>
+
 #include <gtest/gtest.h>
 
 namespace vde {
@@ -32,19 +34,26 @@ class MockVulkanContextForTransition : public VulkanContext {
 /// A concrete test transition.
 class TestTransition : public Transition {
   public:
+    struct State {
+        bool startCalled = false;
+        bool completeCalled = false;
+        int updateCount = 0;
+        float lastProgress = -1.0f;
+    };
+
+    explicit TestTransition(std::shared_ptr<State> state = std::make_shared<State>())
+        : state(std::move(state)) {}
+
     const char* getName() const override { return "Test"; }
     std::string getFragmentShaderPath() const override { return "test.frag"; }
 
-    bool startCalled = false;
-    bool completeCalled = false;
-    int updateCount = 0;
-    float lastProgress = -1.0f;
+    std::shared_ptr<State> state;
 
-    void onStart() override { startCalled = true; }
-    void onComplete() override { completeCalled = true; }
+    void onStart() override { state->startCalled = true; }
+    void onComplete() override { state->completeCalled = true; }
     void update(const TransitionUpdateContext& ctx, TransitionUniforms& outUniforms) override {
-        ++updateCount;
-        lastProgress = ctx.progress;
+        ++state->updateCount;
+        state->lastProgress = ctx.progress;
         Transition::update(ctx, outUniforms);
     }
 };
@@ -66,22 +75,25 @@ TEST_F(TransitionManagerTest, InitiallyInactive) {
 // ---- Start ---------------------------------------------------------------
 
 TEST_F(TransitionManagerTest, StartMakesActive) {
-    auto t = std::make_unique<TestTransition>();
-    auto* raw = t.get();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
     manager.start(std::move(t), 1.0f);
 
     EXPECT_TRUE(manager.isActive());
-    EXPECT_TRUE(raw->startCalled);
+    EXPECT_TRUE(state->startCalled);
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);
 }
 
 // ---- Update progresses ---------------------------------------------------
 
 TEST_F(TransitionManagerTest, UpdateAdvancesProgress) {
-    auto t = std::make_unique<TestTransition>();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
     manager.start(std::move(t), 1.0f);
 
     manager.update(0.5f);
+    EXPECT_EQ(state->updateCount, 1);
+    EXPECT_NEAR(state->lastProgress, 0.5f, 0.001f);
     EXPECT_NEAR(manager.getProgress(), 0.5f, 0.001f);
     EXPECT_TRUE(manager.isActive());
 }
@@ -89,20 +101,19 @@ TEST_F(TransitionManagerTest, UpdateAdvancesProgress) {
 // ---- Completion ----------------------------------------------------------
 
 TEST_F(TransitionManagerTest, CompletesWhenProgressReachesOne) {
-    auto t = std::make_unique<TestTransition>();
-    auto* raw = t.get();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
 
     bool callbackFired = false;
     manager.start(std::move(t), 1.0f, [&]() { callbackFired = true; });
 
-    // raw is now owned by manager; it stays valid until completion
     manager.update(0.5f);
     EXPECT_FALSE(callbackFired);
     EXPECT_TRUE(manager.isActive());
 
     manager.update(0.6f);  // total elapsed = 1.1 → progress clamped to 1.0
     EXPECT_TRUE(callbackFired);
-    EXPECT_TRUE(raw->completeCalled);
+    EXPECT_TRUE(state->completeCalled);
     EXPECT_FALSE(manager.isActive());
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);
 }
@@ -110,7 +121,8 @@ TEST_F(TransitionManagerTest, CompletesWhenProgressReachesOne) {
 // ---- Cancel --------------------------------------------------------------
 
 TEST_F(TransitionManagerTest, CancelStopsTransition) {
-    auto t = std::make_unique<TestTransition>();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
     bool callbackFired = false;
     manager.start(std::move(t), 1.0f, [&]() { callbackFired = true; });
 
@@ -119,6 +131,7 @@ TEST_F(TransitionManagerTest, CancelStopsTransition) {
 
     manager.cancel();
     EXPECT_FALSE(manager.isActive());
+    EXPECT_FALSE(state->completeCalled);
     EXPECT_FALSE(callbackFired);  // Cancel does NOT fire callback
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);
 }
@@ -131,13 +144,13 @@ TEST_F(TransitionManagerTest, StartWhileActiveReplacesTransition) {
     manager.start(std::move(t1), 1.0f, [&]() { cb1 = true; });
     manager.update(0.3f);
 
-    auto t2 = std::make_unique<TestTransition>();
-    auto* raw2 = t2.get();
+    auto state2 = std::make_shared<TestTransition::State>();
+    auto t2 = std::make_unique<TestTransition>(state2);
     bool cb2 = false;
     manager.start(std::move(t2), 2.0f, [&]() { cb2 = true; });
 
     EXPECT_TRUE(manager.isActive());
-    EXPECT_TRUE(raw2->startCalled);
+    EXPECT_TRUE(state2->startCalled);
     EXPECT_FALSE(cb1);                             // First callback should not fire
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);  // Reset for new transition
 }
@@ -145,21 +158,24 @@ TEST_F(TransitionManagerTest, StartWhileActiveReplacesTransition) {
 // ---- Instant transition (duration <= 0) -----------------------------------
 
 TEST_F(TransitionManagerTest, ZeroDurationCompletesImmediately) {
-    auto t = std::make_unique<TestTransition>();
-    auto* raw = t.get();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
     bool callbackFired = false;
     manager.start(std::move(t), 0.0f, [&]() { callbackFired = true; });
 
     EXPECT_TRUE(callbackFired);
-    EXPECT_TRUE(raw->startCalled);
-    EXPECT_TRUE(raw->completeCalled);
+    EXPECT_TRUE(state->startCalled);
+    EXPECT_TRUE(state->completeCalled);
     EXPECT_FALSE(manager.isActive());
 }
 
 TEST_F(TransitionManagerTest, NegativeDurationCompletesImmediately) {
+    auto state = std::make_shared<TestTransition::State>();
     bool callbackFired = false;
-    manager.start(std::make_unique<TestTransition>(), -0.5f, [&]() { callbackFired = true; });
+    manager.start(std::make_unique<TestTransition>(state), -0.5f, [&]() { callbackFired = true; });
     EXPECT_TRUE(callbackFired);
+    EXPECT_TRUE(state->startCalled);
+    EXPECT_TRUE(state->completeCalled);
     EXPECT_FALSE(manager.isActive());
 }
 
