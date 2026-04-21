@@ -47,7 +47,7 @@ static std::unordered_map<Texture*, CachedDescriptor> s_meshTextureDescriptorSet
  * Declared as extern in Game.cpp.
  */
 void clearSpriteDescriptorCache() {
-    for (int i = 0; i < MAX_FRAMES; ++i) {
+    for (uint32_t i = 0; i < MAX_FRAMES; ++i) {
         s_textureDescriptorSets[i].clear();
         s_meshTextureDescriptorSets[i].clear();
     }
