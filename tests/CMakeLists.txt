@@ -105,6 +105,9 @@ target_link_libraries(vde_tests PRIVATE
 target_include_directories(vde_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb
+)
+
+target_include_directories(vde_tests SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/flip
 )
 

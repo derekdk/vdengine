@@ -284,7 +284,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
     }
 
     void spawnAsteroid(const glm::vec2& position, float sizeMultiplier, const glm::vec2& velocity,
-                       float angularVelocity) {
+                       float /*angularVelocity*/) {
         auto asteroid = addEntity<PhysicsSpriteEntity>();
         if (!asteroid)
             return;
@@ -420,7 +420,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         }
     }
 
-    void updateShip(float deltaTime) {
+    void updateShip(float /*deltaTime*/) {
         auto* ship = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(m_shipId));
         if (!ship)
             return;
