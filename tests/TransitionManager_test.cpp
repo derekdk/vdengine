@@ -37,12 +37,15 @@ class TestTransition : public Transition {
     struct State {
         bool startCalled = false;
         bool completeCalled = false;
+        bool destroyed = false;
         int updateCount = 0;
         float lastProgress = -1.0f;
     };
 
     explicit TestTransition(std::shared_ptr<State> state = std::make_shared<State>())
         : state(std::move(state)) {}
+
+    ~TestTransition() override { state->destroyed = true; }
 
     const char* getName() const override { return "Test"; }
     std::string getFragmentShaderPath() const override { return "test.frag"; }
@@ -114,6 +117,7 @@ TEST_F(TransitionManagerTest, CompletesWhenProgressReachesOne) {
     manager.update(0.6f);  // total elapsed = 1.1 → progress clamped to 1.0
     EXPECT_TRUE(callbackFired);
     EXPECT_TRUE(state->completeCalled);
+    EXPECT_TRUE(state->destroyed);
     EXPECT_FALSE(manager.isActive());
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);
 }
@@ -132,6 +136,7 @@ TEST_F(TransitionManagerTest, CancelStopsTransition) {
     manager.cancel();
     EXPECT_FALSE(manager.isActive());
     EXPECT_FALSE(state->completeCalled);
+    EXPECT_TRUE(state->destroyed);
     EXPECT_FALSE(callbackFired);  // Cancel does NOT fire callback
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);
 }
@@ -139,7 +144,8 @@ TEST_F(TransitionManagerTest, CancelStopsTransition) {
 // ---- Start-while-active replaces -----------------------------------------
 
 TEST_F(TransitionManagerTest, StartWhileActiveReplacesTransition) {
-    auto t1 = std::make_unique<TestTransition>();
+    auto state1 = std::make_shared<TestTransition::State>();
+    auto t1 = std::make_unique<TestTransition>(state1);
     bool cb1 = false;
     manager.start(std::move(t1), 1.0f, [&]() { cb1 = true; });
     manager.update(0.3f);
@@ -150,6 +156,7 @@ TEST_F(TransitionManagerTest, StartWhileActiveReplacesTransition) {
     manager.start(std::move(t2), 2.0f, [&]() { cb2 = true; });
 
     EXPECT_TRUE(manager.isActive());
+    EXPECT_TRUE(state1->destroyed);
     EXPECT_TRUE(state2->startCalled);
     EXPECT_FALSE(cb1);                             // First callback should not fire
     EXPECT_FLOAT_EQ(manager.getProgress(), 0.0f);  // Reset for new transition
@@ -166,6 +173,7 @@ TEST_F(TransitionManagerTest, ZeroDurationCompletesImmediately) {
     EXPECT_TRUE(callbackFired);
     EXPECT_TRUE(state->startCalled);
     EXPECT_TRUE(state->completeCalled);
+    EXPECT_TRUE(state->destroyed);
     EXPECT_FALSE(manager.isActive());
 }
 
@@ -176,6 +184,7 @@ TEST_F(TransitionManagerTest, NegativeDurationCompletesImmediately) {
     EXPECT_TRUE(callbackFired);
     EXPECT_TRUE(state->startCalled);
     EXPECT_TRUE(state->completeCalled);
+    EXPECT_TRUE(state->destroyed);
     EXPECT_FALSE(manager.isActive());
 }
 
@@ -204,19 +213,22 @@ TEST_F(TransitionManagerTest, CancelWhenInactiveIsSafe) {
 // ---- Progress clamps to 1.0 ----------------------------------------------
 
 TEST_F(TransitionManagerTest, ProgressClampsToOne) {
-    auto t = std::make_unique<TestTransition>();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
     manager.start(std::move(t), 0.5f);
 
     // Update with a huge delta that would exceed duration
     manager.update(10.0f);
     // After completion, progress resets to 0
+    EXPECT_TRUE(state->destroyed);
     EXPECT_FALSE(manager.isActive());
 }
 
 // ---- Multiple update cycles -----------------------------------------------
 
 TEST_F(TransitionManagerTest, MultipleSmallUpdates) {
-    auto t = std::make_unique<TestTransition>();
+    auto state = std::make_shared<TestTransition::State>();
+    auto t = std::make_unique<TestTransition>(state);
     manager.start(std::move(t), 1.0f);
 
     for (int i = 0; i < 10; ++i) {
@@ -226,6 +238,7 @@ TEST_F(TransitionManagerTest, MultipleSmallUpdates) {
     EXPECT_NEAR(manager.getProgress(), 0.9f, 0.01f);
 
     manager.update(0.2f);
+    EXPECT_TRUE(state->destroyed);
     EXPECT_FALSE(manager.isActive());  // Should complete
 }
 
@@ -252,8 +265,10 @@ TEST_F(TransitionManagerTest, GetActiveTransitionDuringActive) {
 // ---- getActiveTransition after completion ---------------------------------
 
 TEST_F(TransitionManagerTest, GetActiveTransitionAfterCompletion) {
-    manager.start(std::make_unique<TestTransition>(), 0.5f);
+    auto state = std::make_shared<TestTransition::State>();
+    manager.start(std::make_unique<TestTransition>(state), 0.5f);
     manager.update(1.0f);  // completes
+    EXPECT_TRUE(state->destroyed);
     EXPECT_EQ(manager.getActiveTransition(), nullptr);
 }
 
