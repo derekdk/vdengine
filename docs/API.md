@@ -598,6 +598,7 @@ When enabled, the scheduler splits `update()` into three ordered phases:
 
 | Method | Description |
 |--------|-------------|
+| `void setup2D(float viewWidth, float viewHeight, const Color& bgColor = Color::black())` | Quick 2D setup: Camera2D with given world-unit viewport + white LightBox + bg color |
 | `void setCamera(std::unique_ptr<GameCamera>)` | Set scene camera |
 | `void setCamera(GameCamera*)` | Set scene camera (takes ownership) |
 | `GameCamera* getCamera()` | Get scene camera |
@@ -966,6 +967,40 @@ Key, mouse button, and gamepad constants are defined in `<vde/api/KeyCodes.h>`:
 
 ---
 
+## vde::KeyStateTracker
+
+**Header**: `<vde/api/KeyStateTracker.h>` (also included via `GameAPI.h`)
+
+Utility class that maps key codes to named actions, eliminating per-key boolean state tracking.
+
+### Binding Methods
+
+| Method | Description |
+|--------|-------------|
+| `void bindHeld(int keyCode, const std::string& name)` | Bind key to a held (continuous) action |
+| `void bindOneShot(int keyCode, const std::string& name)` | Bind key to a one-shot (consume-once) action |
+
+### Event Forwarding
+
+| Method | Description |
+|--------|-------------|
+| `void handlePress(int key)` | Call from `onKeyPress()` |
+| `void handleRelease(int key)` | Call from `onKeyRelease()` |
+
+### Query Methods
+
+| Method | Description |
+|--------|-------------|
+| `bool isHeld(const std::string& name) const` | Returns `true` every frame the key is down |
+| `bool consume(const std::string& name)` | Returns `true` once per press, then `false` until re-pressed |
+
+### Notes
+
+- Multiple keys can be bound to the same action name (e.g., `KEY_LEFT` and `KEY_A` both mapped to `"left"`)
+- `isHeld()` returns `true` for held bindings only; `consume()` returns `true` for one-shot bindings only
+
+---
+
 ## vde::ResourceManager
 
 **Header**: `<vde/api/ResourceManager.h>`
@@ -977,7 +1012,8 @@ Global resource cache with automatic deduplication using weak references.
 | Method | Description |
 |--------|-------------|
 | `template<T> ResourcePtr<T> load(const std::string& path)` | Load or retrieve cached resource |
-| `template<T> ResourcePtr<T> add(const std::string& key, ResourcePtr<T>)` | Add pre-created resource |
+| `template<T> ResourcePtr<T> add(const std::string& key, ResourcePtr<T>)` | Add pre-created resource (weak cache — expires when external refs drop) |
+| `template<T> ResourcePtr<T> addPersistent(const std::string& key, ResourcePtr<T>)` | Add with strong cache — survives until `remove()` or `clear()` |
 | `template<T> ResourcePtr<T> get(const std::string& path)` | Get cached resource |
 | `bool has(const std::string& path) const` | Check if resource is cached |
 | `void remove(const std::string& path)` | Remove from cache |
@@ -1340,6 +1376,12 @@ struct PhysicsBodyDef {
     float mass, friction, restitution;
     float linearDamping;     // Decay rate in 1/s (v *= 1/(1+d*dt) per step); negative values are clamped to 0
     bool isSensor;           // Triggers callbacks but no collision response
+
+    // Factory methods
+    static PhysicsBodyDef dynamicBox(glm::vec2 pos, glm::vec2 extents, float mass);
+    static PhysicsBodyDef dynamicCircle(glm::vec2 pos, float radius, float mass);
+    static PhysicsBodyDef staticBox(glm::vec2 pos, glm::vec2 extents);
+    static PhysicsBodyDef kinematicBox(glm::vec2 pos, glm::vec2 extents);
 };
 ```
 

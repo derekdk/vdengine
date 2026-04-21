@@ -50,9 +50,8 @@ struct FontEntry {
 };
 
 static std::string toLowerCopy(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     return value;
 }
 
@@ -561,7 +560,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
                 auto tex = vde::TextRenderer::createTexture(m_ctx, labels[h], small, style);
                 auto sprite = addEntity<vde::SpriteEntity>();
                 sprite->setTexture(tex);
-                sprite->setAnchor(0.5f, 0.5f);
                 m_alignLabels[h] = sprite;
             }
 
@@ -575,7 +573,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
                 auto tex = vde::TextRenderer::createTexture(m_ctx, lines[v], *m_ttfFont, style);
                 auto sprite = addEntity<vde::SpriteEntity>();
                 sprite->setTexture(tex);
-                sprite->setAnchor(0.5f, 0.5f);  // will be adjusted per alignment
 
                 m_alignTexts[h][v].sprite = sprite;
                 m_alignTexts[h][v].texture = tex;
@@ -710,7 +707,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             auto tex = vde::TextRenderer::createTexture(m_ctx, "WORD WRAP", small, style);
             auto sprite = addEntity<vde::SpriteEntity>();
             sprite->setTexture(tex);
-            sprite->setAnchor(0.5f, 0.5f);
             m_wrapLabel = sprite;
         }
 
@@ -866,7 +862,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             auto tex = vde::TextRenderer::createTexture(m_ctx, "FIT TO RECT", small, style);
             auto sprite = addEntity<vde::SpriteEntity>();
             sprite->setTexture(tex);
-            sprite->setAnchor(0.5f, 0.5f);
             m_fitLabel = sprite;
         }
 
@@ -885,7 +880,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
 
             auto sprite = addEntity<vde::SpriteEntity>();
             sprite->setTexture(m_fitTextTexture);
-            sprite->setAnchor(0.5f, 0.5f);
             m_fitTextSprite = sprite;
         }
 
@@ -959,7 +953,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             sprite->setTexture(tex);
             sprite->setScale(h * aspect, h, 1.0f);
             sprite->setPosition(0.0f, kCameraHeight * 0.5f - 0.55f, 0.0f);
-            sprite->setAnchor(0.5f, 0.5f);
             m_titleSprite = sprite;
         }
     }
@@ -973,7 +966,6 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             auto sprite = addEntity<vde::SpriteEntity>();
             sprite->setTexture(tex);
             sprite->setColor(color);
-            sprite->setAnchor(0.5f, 0.5f);
             return sprite;
         };
 

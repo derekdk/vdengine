@@ -310,12 +310,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         e->setColor(color);
         e->setScale(vde::Scale(extents.x * 2.0f, extents.y * 2.0f, 1.0f));
 
-        vde::PhysicsBodyDef def;
-        def.type = vde::PhysicsBodyType::Static;
-        def.shape = vde::PhysicsShape::Box;
-        def.position = pos;
-        def.extents = extents;
-        e->createPhysicsBody(def);
+        e->createPhysicsBody(vde::PhysicsBodyDef::staticBox(pos, extents));
     }
 
     // -----------------------------------------------------------------------
@@ -414,14 +409,8 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         e->setColor(color);
         e->setScale(vde::Scale(halfW * 2.0f, halfH * 2.0f, 1.0f));
 
-        vde::PhysicsBodyDef def;
-        def.type = vde::PhysicsBodyType::Dynamic;
-        def.shape = vde::PhysicsShape::Box;
-        def.position = {x, y};
-        def.extents = {halfW, halfH};
-        def.mass = 1.0f;
-        def.restitution = restitution;
-        def.friction = friction;
+        auto def =
+            vde::PhysicsBodyDef::dynamicBox({x, y}, {halfW, halfH}, 1.0f, restitution, friction);
         def.linearDamping = damping;
         e->createPhysicsBody(def);
 
@@ -436,14 +425,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         e->setColor(color);
         e->setScale(vde::Scale(radius * 2.0f, radius * 2.0f, 1.0f));
 
-        vde::PhysicsBodyDef def;
-        def.type = vde::PhysicsBodyType::Dynamic;
-        def.shape = vde::PhysicsShape::Circle;
-        def.position = {x, y};
-        def.extents = {radius, 0.0f};
-        def.mass = 1.0f;
-        def.restitution = restitution;
-        def.friction = friction;
+        auto def = vde::PhysicsBodyDef::dynamicCircle({x, y}, radius, 1.0f, restitution, friction);
         def.linearDamping = damping;
         e->createPhysicsBody(def);
 
@@ -576,12 +558,8 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         m_wreckingBall->setColor(vde::Color(0.9f, 0.85f, 0.1f, 1.0f));
         m_wreckingBall->setScale(vde::Scale(1.0f, 1.0f, 1.0f));
 
-        vde::PhysicsBodyDef bdef;
-        bdef.type = vde::PhysicsBodyType::Kinematic;
-        bdef.shape = vde::PhysicsShape::Box;
-        bdef.position = {-ARENA_HALF_W + 1.0f, ARENA_FLOOR_Y + 1.5f};
-        bdef.extents = {0.5f, 0.5f};
-        m_wreckingBall->createPhysicsBody(bdef);
+        m_wreckingBall->createPhysicsBody(vde::PhysicsBodyDef::kinematicBox(
+            {-ARENA_HALF_W + 1.0f, ARENA_FLOOR_Y + 1.5f}, {0.5f, 0.5f}));
     }
 
     void updateWreckingBall(float dt) {

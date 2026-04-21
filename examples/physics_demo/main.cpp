@@ -203,12 +203,7 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
         ground->setColor(vde::Color(0.2f, 0.7f, 0.3f, 1.0f));
         ground->setScale(vde::Scale(12.0f, 0.6f, 1.0f));
 
-        vde::PhysicsBodyDef groundDef;
-        groundDef.type = vde::PhysicsBodyType::Static;
-        groundDef.shape = vde::PhysicsShape::Box;
-        groundDef.position = {0.0f, -2.0f};
-        groundDef.extents = {6.0f, 0.3f};
-        ground->createPhysicsBody(groundDef);
+        ground->createPhysicsBody(vde::PhysicsBodyDef::staticBox({0.0f, -2.0f}, {6.0f, 0.3f}));
     }
 
     void createPlayer() {
@@ -216,14 +211,7 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
         m_player->setColor(vde::Color(0.2f, 0.9f, 0.9f, 1.0f));
         m_player->setScale(vde::Scale(0.7f, 0.7f, 1.0f));
 
-        vde::PhysicsBodyDef def;
-        def.type = vde::PhysicsBodyType::Dynamic;
-        def.shape = vde::PhysicsShape::Box;
-        def.position = {-3.0f, 0.0f};
-        def.extents = {0.35f, 0.35f};
-        def.mass = 1.0f;
-        def.restitution = 0.1f;
-        def.friction = 0.5f;
+        auto def = vde::PhysicsBodyDef::dynamicBox({-3.0f, 0.0f}, {0.35f, 0.35f}, 1.0f, 0.1f, 0.5f);
         def.linearDamping = 0.05f;
         m_player->createPhysicsBody(def);
     }
@@ -256,14 +244,8 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
         sprite->setColor(color);
         sprite->setScale(vde::Scale(halfSize * 2.0f, halfSize * 2.0f, 1.0f));
 
-        vde::PhysicsBodyDef boxDef;
-        boxDef.type = vde::PhysicsBodyType::Dynamic;
-        boxDef.shape = vde::PhysicsShape::Box;
-        boxDef.position = {x, y};
-        boxDef.extents = {halfSize, halfSize};
-        boxDef.mass = 1.0f;
-        boxDef.restitution = 0.3f;
-        boxDef.friction = 0.4f;
+        auto boxDef =
+            vde::PhysicsBodyDef::dynamicBox({x, y}, {halfSize, halfSize}, 1.0f, 0.3f, 0.4f);
         boxDef.linearDamping = 0.01f;
         sprite->createPhysicsBody(boxDef);
 

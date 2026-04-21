@@ -165,7 +165,6 @@ class PlatformEntity : public vde::SpriteEntity {
         setPosition(x, y + height / 2.0f, -0.1f);
         setScale(width, height, 1.0f);
         setColor(vde::Color::fromHex(0x6c5ce7));  // Purple platform
-        setAnchor(0.5f, 0.5f);
 
         m_bounds = {x - width / 2.0f, x + width / 2.0f, y, y + height};
     }

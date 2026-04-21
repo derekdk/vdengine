@@ -79,13 +79,20 @@ Implement scenes by inheriting from `vde::Scene` and overriding lifecycle method
 
 Implement `vde::InputHandler` interface for event-driven input (keyboard, mouse, gamepad). Set handler globally via `game.setInputHandler()` or per-scene via `scene->setInputHandler()`.
 
+For keyboard actions, use **`KeyStateTracker`** to bind named actions to keys and query them in `update()` without manual per-key booleans:
+```cpp
+m_keys.bindHeld(vde::KEY_LEFT, "left");
+m_keys.bindOneShot(vde::KEY_SPACE, "jump");
+// In update(): m_keys.isHeld("left"), m_keys.consume("jump")
+```
+
 **Gamepad support:**
 - Automatic detection and hot-plug
 - Standard button/axis mapping (Xbox/PlayStation layout)
 - Event callbacks (`onGamepadButtonPress`, `onGamepadAxis`, etc.)
 - Dead zone filtering (default 0.1)
 
-See [API-DOC.md#input-system](../../../API-DOC.md#input-system) for complete interface and key codes.
+See [API-DOC.md#input-system](../../../API-DOC.md#input-system) for the full `InputHandler` interface, `KeyStateTracker` reference, and key codes.
 
 ## Decision Guide: Choosing the Right Components
 
@@ -147,6 +154,8 @@ if (auto* context = getGame()->getVulkanContext()) {
 
 **Mesh Primitives:** `createCube()`, `createSphere()`, `createPlane()`, `createCylinder()`
 
+**Sharing resources across scenes:** Use `addPersistent<T>(key, resource)` to keep a resource alive in the `ResourceManager` regardless of external ref count. Use plain `add<T>()` when you want automatic cleanup after the owning code finishes.
+
 See [API-DOC.md#resource](../../../API-DOC.md#resource) and [API-DOC.md#resourcemanager](../../../API-DOC.md#resourcemanager).
 
 ## Feature Workflows
@@ -155,7 +164,7 @@ See [API-DOC.md#resource](../../../API-DOC.md#resource) and [API-DOC.md#resource
 
 1. **Enable physics in scene:** `enablePhysics()` or `enablePhysics(customConfig)`
 2. **Create physics entities:** Use `PhysicsSpriteEntity` or `PhysicsMeshEntity`
-3. **Define body:** Set `PhysicsBodyDef` (type, shape, mass, friction, restitution)
+3. **Define body:** Use factory methods for common cases (`PhysicsBodyDef::dynamicBox()`, `dynamicCircle()`, `staticBox()`, `kinematicBox()`) or set properties manually
 4. **Create body:** `entity->createPhysicsBody(def)`
 5. **Apply forces:** `entity->applyForce()` or `applyImpulse()`
 6. **Handle collisions:** Set callbacks via `getPhysicsScene()->setOnCollisionBegin()`
@@ -165,7 +174,7 @@ See [API-DOC.md#resource](../../../API-DOC.md#resource) and [API-DOC.md#resource
 
 **Important:** Apply forces, not direct position changes (except for initialization or teleportation).
 
-See [API-DOC.md#physics-system](../../../API-DOC.md#physics-system) for comprehensive guide.
+See [API-DOC.md#physics-system](../../../API-DOC.md#physics-system) for factory signatures, properties, and comprehensive guide.
 
 ### Multi-Scene & Split-Screen
 

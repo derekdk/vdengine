@@ -49,12 +49,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
     void onEnter() override {
         printExampleHeader();
 
-        auto* camera = new Camera2D(VIEW_W, VIEW_H);
-        camera->setPosition(0.0f, 0.0f);
-        camera->setZoom(1.0f);
-        setCamera(camera);
-        setBackgroundColor(Color(0.03f, 0.03f, 0.10f, 1.0f));
-        setLightBox(std::make_unique<SimpleColorLightBox>(Color::white()));
+        setup2D(VIEW_W, VIEW_H, Color(0.03f, 0.03f, 0.10f, 1.0f));
 
         // ---- Mission Clock (top-left) ----
         m_clockLabel = addEntity<TextEntity>();

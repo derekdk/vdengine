@@ -287,12 +287,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         // Set up 2D camera
         m_worldWidth = 16.0f;
         m_worldHeight = 12.0f;
-        auto* camera = new Camera2D(m_worldWidth, m_worldHeight);
-        camera->setPosition(0.0f, 0.0f);
-        camera->setZoom(1.0f);
-        setCamera(camera);
-
-        setBackgroundColor(Color::fromHex(0x2c3e50));
+        setup2D(m_worldWidth, m_worldHeight, Color::fromHex(0x2c3e50));
 
         // Initialize game
         initializeGame();
@@ -373,7 +368,6 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         m_spaceship = addEntity<Spaceship>(m_worldWidth, m_worldHeight);
         m_spaceship->setName("Spaceship");
         m_spaceship->setScale(0.6f, 0.8f, 1.0f);
-        m_spaceship->setAnchor(0.5f, 0.5f);
         m_spaceship->setPosition(0.0f, 0.0f, 0.0f);
         m_spaceship->setColor(Color::fromHex(0x00b894));
 
@@ -503,7 +497,6 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
             auto newBullet = addEntity<Bullet>(m_worldWidth, m_worldHeight);
             newBullet->setName("Bullet");
             newBullet->setScale(0.1f, 0.1f, 1.0f);
-            newBullet->setAnchor(0.5f, 0.5f);
             newBullet->setColor(Color::white());
             m_bullets.push_back(newBullet);
             bullet = newBullet.get();
@@ -564,7 +557,6 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
     void spawnAsteroidAt(const glm::vec3& position, float size) {
         auto asteroid = addEntity<Asteroid>(m_worldWidth, m_worldHeight, size);
         asteroid->setName("Asteroid");
-        asteroid->setAnchor(0.5f, 0.5f);
         asteroid->setPosition(position);
         m_asteroids.push_back(asteroid);
     }

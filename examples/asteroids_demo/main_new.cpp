@@ -133,12 +133,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         printExampleHeader();
 
         // Set up 2D camera
-        auto* camera = new Camera2D(WORLD_WIDTH, WORLD_HEIGHT);
-        camera->setPosition(0.0f, 0.0f);
-        camera->setZoom(1.0f);
-        setCamera(camera);
-
-        setBackgroundColor(Color::fromHex(0x0f1419));  // Dark space
+        setup2D(WORLD_WIDTH, WORLD_HEIGHT, Color::fromHex(0x0f1419));
 
         // Enable physics with no gravity (space!)
         PhysicsConfig physicsConfig;
@@ -246,7 +241,6 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         m_shipId = ship->getId();
         ship->setName("Spaceship");
         ship->setScale(0.6f, 0.8f, 1.0f);
-        ship->setAnchor(0.5f, 0.5f);
         ship->setPosition(0.0f, 0.0f, 0.0f);
         ship->setColor(Color::fromHex(0x00d9ff));  // Cyan
 
@@ -298,7 +292,6 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         asteroid->setName("Asteroid");
         float visualSize = sizeMultiplier;
         asteroid->setScale(visualSize, visualSize, 1.0f);
-        asteroid->setAnchor(0.5f, 0.5f);
         asteroid->setPosition(position.x, position.y, 0.0f);
 
         // Color based on size
@@ -351,7 +344,6 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
 
         bullet->setName("Bullet");
         bullet->setScale(0.15f, 0.15f, 1.0f);
-        bullet->setAnchor(0.5f, 0.5f);
         bullet->setPosition(firePos.x, firePos.y, 0.0f);
         bullet->setColor(Color::fromHex(0xffd700));  // Gold
 

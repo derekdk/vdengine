@@ -116,18 +116,6 @@ static void drawStar(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, ui
 }
 
 // ============================================================================
-// Text sizing helper — call after update(0) to match world height
-// ============================================================================
-
-static void sizeToFit(TextEntity& te, float worldHeight) {
-    auto tex = te.getTexture();
-    if (!tex || tex->getWidth() < 2)
-        return;
-    float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
-    te.setScale(worldHeight * aspect, worldHeight, 1.0f);
-}
-
-// ============================================================================
 // Input handler
 // ============================================================================
 
@@ -221,14 +209,12 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
             border->setColor(Color(0.2f, 0.2f, 0.3f, 1.0f));
             border->setPosition(0.0f, 0.0f, -0.1f);
             border->setScale(kFieldHalfW * 2.0f + 0.4f, kFieldHalfH * 2.0f + 0.4f, 1.0f);
-            border->setAnchor(0.5f, 0.5f);
         }
         {
             auto inner = addEntity<SpriteEntity>();
             inner->setColor(Color(0.1f, 0.1f, 0.16f, 1.0f));
             inner->setPosition(0.0f, 0.0f, -0.05f);
             inner->setScale(kFieldHalfW * 2.0f, kFieldHalfH * 2.0f, 1.0f);
-            inner->setAnchor(0.5f, 0.5f);
         }
 
         // Create character sprites
@@ -240,7 +226,6 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
             sprite->setTexture(texture);
             sprite->setUVRect(uv.u, uv.v, uv.width, uv.height);
             sprite->setScale(1.2f, 1.2f, 1.0f);
-            sprite->setAnchor(0.5f, 0.5f);
 
             // Spread initial positions
             float angle = static_cast<float>(i) * 1.2566f;  // 2PI/5
@@ -268,8 +253,7 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
             label->setFont(BitmapFont::small());
             label->setStyle({.color = roster[i].tint, .pixelScale = 1});
             label->setAnchor(0.5f, 0.0f);
-            label->update(0.0f);
-            sizeToFit(*label, 0.30f);
+            label->setWorldHeight(0.30f);
             m_nameLabels.push_back(label);
         }
 
@@ -279,9 +263,7 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
         title->setFont(BitmapFont::small());
         title->setStyle({.color = Color::white(), .pixelScale = 1});
         title->setPosition(0.0f, 4.5f, 0.0f);
-        title->setAnchor(0.5f, 0.5f);
-        title->update(0.0f);
-        sizeToFit(*title, 0.30f);
+        title->setWorldHeight(0.30f);
     }
 
     void update(float dt) override {
@@ -414,13 +396,11 @@ class DetailScene : public vde::examples::BaseExampleScene {
         charPanel->setColor(Color(0.12f, 0.12f, 0.2f, 1.0f));
         charPanel->setPosition(-4.0f, 0.0f, -0.1f);
         charPanel->setScale(5.5f, 5.5f, 1.0f);
-        charPanel->setAnchor(0.5f, 0.5f);
 
         auto statsPanel = addEntity<SpriteEntity>();
         statsPanel->setColor(Color(0.12f, 0.12f, 0.2f, 1.0f));
         statsPanel->setPosition(3.5f, 0.0f, -0.1f);
         statsPanel->setScale(7.0f, 5.5f, 1.0f);
-        statsPanel->setAnchor(0.5f, 0.5f);
 
         // Character sprite (after panels so it draws on top)
         auto uv = m_sheet->getUVRect(roster[0].spriteName);
@@ -429,14 +409,12 @@ class DetailScene : public vde::examples::BaseExampleScene {
         m_characterSprite->setUVRect(uv.u, uv.v, uv.width, uv.height);
         m_characterSprite->setScale(4.0f, 4.0f, 1.0f);
         m_characterSprite->setPosition(-4.0f, 0.0f, 0.0f);
-        m_characterSprite->setAnchor(0.5f, 0.5f);
 
         // Title — character name
         m_titleLabel = addEntity<TextEntity>();
         m_titleLabel->setFont(BitmapFont::large());
         m_titleLabel->setStyle({.color = Color::white(), .pixelScale = 2});
         m_titleLabel->setPosition(0.0f, 4.2f, 0.0f);
-        m_titleLabel->setAnchor(0.5f, 0.5f);
 
         // Stat layout
         constexpr float kStatX = 1.5f;
@@ -452,7 +430,6 @@ class DetailScene : public vde::examples::BaseExampleScene {
             star->setScale(0.6f, 0.6f, 1.0f);
             star->setPosition(kStatX - 0.3f, kStatStartY - static_cast<float>(i) * kStatSpacing,
                               0.0f);
-            star->setAnchor(0.5f, 0.5f);
         }
 
         // Stat name labels
@@ -465,8 +442,7 @@ class DetailScene : public vde::examples::BaseExampleScene {
             nameLabel->setPosition(kStatX + 0.2f,
                                    kStatStartY - static_cast<float>(i) * kStatSpacing, 0.0f);
             nameLabel->setAnchor(0.0f, 0.5f);
-            nameLabel->update(0.0f);
-            sizeToFit(*nameLabel, 0.35f);
+            nameLabel->setWorldHeight(0.35f);
         }
 
         // Stat value labels
@@ -486,9 +462,7 @@ class DetailScene : public vde::examples::BaseExampleScene {
         nav->setFont(BitmapFont::small());
         nav->setStyle({.color = Color(0.5f, 0.5f, 0.6f, 1.0f), .pixelScale = 1});
         nav->setPosition(0.0f, -4.2f, 0.0f);
-        nav->setAnchor(0.5f, 0.5f);
-        nav->update(0.0f);
-        sizeToFit(*nav, 0.25f);
+        nav->setWorldHeight(0.25f);
 
         // Set initial character
         showCharacter(0);
@@ -572,8 +546,7 @@ class DetailScene : public vde::examples::BaseExampleScene {
         // Update title
         m_titleLabel->setText(info.name);
         m_titleLabel->setStyle({.color = info.tint, .pixelScale = 2});
-        m_titleLabel->update(0.0f);
-        sizeToFit(*m_titleLabel, 0.55f);
+        m_titleLabel->setWorldHeight(0.55f);
 
         // Update stat values
         if (m_statValues.size() >= 4) {
@@ -582,8 +555,7 @@ class DetailScene : public vde::examples::BaseExampleScene {
             m_statValues[2]->setText(std::to_string(info.defense));
             m_statValues[3]->setText(std::to_string(info.speed));
             for (auto& sv : m_statValues) {
-                sv->update(0.0f);
-                sizeToFit(*sv, 0.35f);
+                sv->setWorldHeight(0.35f);
             }
         }
     }
@@ -691,12 +663,10 @@ class SpriteSheetMultiSceneDemo : public vde::Game {
         sheet->addSprite("star", 5 * kCellSize, 0, kCellSize, kCellSize);
 
         // Cache in ResourceManager for cross-scene sharing.
-        // Keep a strong reference so the weak_ptr cache doesn't expire.
-        m_sharedSheet = sheet;
-        getResourceManager().add<SpriteSheet>("shared_spritesheet", sheet);
+        // addPersistent keeps the resource alive without needing an external strong ref.
+        getResourceManager().addPersistent<SpriteSheet>("shared_spritesheet", sheet);
     }
 
-    SpriteSheet::Ref m_sharedSheet;
     std::unique_ptr<MultiSheetInputHandler> m_inputHandler;
     PlayfieldScene* m_playfield = nullptr;
     DetailScene* m_detail = nullptr;

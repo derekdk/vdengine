@@ -91,8 +91,8 @@ void GameScene::enterTitle() {
     m_titleBanner = addEntity<TextEntity>();
     m_titleBanner->setText("VERTICAL SHOOTER");
     m_titleBanner->setFont(BitmapFont::small());
-    m_titleBanner->setStyle({.color = Color(0.0f, 0.898f, 1.0f), .pixelScale = 3, .letterSpacing = 1});
-    m_titleBanner->setAnchor(0.5f, 0.5f);
+    m_titleBanner->setStyle(
+        {.color = Color(0.0f, 0.898f, 1.0f), .pixelScale = 3, .letterSpacing = 1});
     m_titleBanner->setPosition(0.0f, VIEW_HEIGHT * 0.5f + 2.0f, 0.0f);
     // Force first update to build the texture so we can read its dimensions
     m_titleBanner->update(0.0f);
@@ -100,8 +100,8 @@ void GameScene::enterTitle() {
         auto tex = m_titleBanner->getTexture();
         if (tex && tex->getWidth() > 1) {
             const float w = 4.5f;
-            const float h = w * static_cast<float>(tex->getHeight()) /
-                            static_cast<float>(tex->getWidth());
+            const float h =
+                w * static_cast<float>(tex->getHeight()) / static_cast<float>(tex->getWidth());
             m_titleBanner->setScale(w, h, 1.0f);
         }
     }
@@ -110,15 +110,14 @@ void GameScene::enterTitle() {
     m_promptSprite->setText("PRESS ENTER / START");
     m_promptSprite->setFont(BitmapFont::small());
     m_promptSprite->setStyle({.color = Color::white(), .pixelScale = 2, .letterSpacing = 1});
-    m_promptSprite->setAnchor(0.5f, 0.5f);
     m_promptSprite->setPosition(0.0f, VIEW_HEIGHT * 0.5f - 1.5f, 0.0f);
     m_promptSprite->update(0.0f);
     {
         auto tex = m_promptSprite->getTexture();
         if (tex && tex->getWidth() > 1) {
             const float w = 4.0f;
-            const float h = w * static_cast<float>(tex->getHeight()) /
-                            static_cast<float>(tex->getWidth());
+            const float h =
+                w * static_cast<float>(tex->getHeight()) / static_cast<float>(tex->getWidth());
             m_promptSprite->setScale(w, h, 1.0f);
         }
     }
@@ -153,7 +152,6 @@ void GameScene::enterPlaying() {
     m_player = addEntity<SpriteEntity>();
     m_player->setScale(0.7f, 0.9f, 1.0f);
     m_player->setPosition(0.0f, 2.0f, 0.0f);
-    m_player->setAnchor(0.5f, 0.5f);
     m_player->setTexture(m_playerTex);
 
     initStars();
@@ -356,7 +354,6 @@ void GameScene::spawnPlayerBullet(glm::vec2 pos, glm::vec2 vel) {
     auto sprite = addEntity<SpriteEntity>();
     sprite->setScale(0.15f, 0.35f, 1.0f);
     sprite->setPosition(pos.x, pos.y, -0.1f);
-    sprite->setAnchor(0.5f, 0.5f);
     int idx = static_cast<int>(m_weapon);
     if (m_bulletTex[idx])
         sprite->setTexture(m_bulletTex[idx]);
@@ -370,7 +367,6 @@ void GameScene::spawnEnemyBullet(glm::vec2 pos, glm::vec2 vel) {
     auto sprite = addEntity<SpriteEntity>();
     sprite->setScale(0.2f, 0.2f, 1.0f);
     sprite->setPosition(pos.x, pos.y, -0.1f);
-    sprite->setAnchor(0.5f, 0.5f);
     if (m_enemyBulletTex)
         sprite->setTexture(m_enemyBulletTex);
     else
@@ -420,7 +416,6 @@ void GameScene::spawnVisibleEnemies() {
         glm::vec2 halfExt = enemyHalfExtents(spawn.type);
         sprite->setScale(halfExt.x * 2.0f, halfExt.y * 2.0f, 1.0f);
         sprite->setPosition(spawn.x, spawn.y, 0.0f);
-        sprite->setAnchor(0.5f, 0.5f);
 
         int texIdx = static_cast<int>(spawn.type);
         if (m_enemyTex[texIdx])
@@ -501,7 +496,6 @@ void GameScene::initStars() {
         float x = rng.range(-HALF_VIEW_W, HALF_VIEW_W);
         float y = rng.range(camY - HALF_VIEW_H - 2.0f, camY + HALF_VIEW_H + 2.0f);
         sprite->setPosition(x, y, 0.5f);  // behind everything
-        sprite->setAnchor(0.5f, 0.5f);
         if (m_starTex)
             sprite->setTexture(m_starTex);
         float bright = rng.range(0.3f, 1.0f);

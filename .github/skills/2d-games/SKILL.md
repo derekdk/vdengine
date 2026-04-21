@@ -169,35 +169,21 @@ Prefer `PhysicsScene` unless you have a specific reason not to. It handles times
 
 ## Complete 2D Scene Template
 
+For the full app structure (input handler, game class, `main()`), see the `writing-examples` skill. The 2D-specific parts go in `onEnter()` and `update()`:
+
 ```cpp
-#include <vde/api/GameAPI.h>
-#include "../ExampleBase.h"
-
-class MyInputHandler : public vde::examples::BaseExampleInputHandler {
+class MyScene : public vde::examples::BaseExampleScene, public vde::InputHandler {
   public:
-    void onKeyPress(int key) override {
-        BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_SPACE) m_spacePressed = true;
-    }
-    bool consumeSpace() { bool v = m_spacePressed; m_spacePressed = false; return v; }
-  private:
-    bool m_spacePressed = false;
-};
-
-class MyScene : public vde::examples::BaseExampleScene {
-  public:
-    MyScene() : BaseExampleScene(30.0f) {}  // 30s auto-terminate
+    MyScene() : BaseExampleScene(30.0f) {}
 
     void onEnter() override {
         printExampleHeader();
 
-        // One-call 2D setup: Camera2D + lighting + background
+        // One-call 2D setup: Camera2D + white lighting + background
         setup2D(20.0f, 15.0f, vde::Color(0.1f, 0.1f, 0.15f, 1.0f));
 
-        // Enable physics
+        // Physics
         enablePhysics();
-
-        // Create arena walls
         createPhysicsWalls(18.0f, 13.0f, 0.5f, vde::Color(0.3f, 0.5f, 0.3f, 1.0f));
 
         // Create a dynamic entity
@@ -206,11 +192,18 @@ class MyScene : public vde::examples::BaseExampleScene {
         box->setScale(vde::Scale(1.0f, 1.0f, 1.0f));
         box->createPhysicsBody(
             vde::PhysicsBodyDef::dynamicBox({0.0f, 5.0f}, {0.5f, 0.5f}));
+
+        // Input — use KeyStateTracker for action bindings
+        m_keys.bindOneShot(vde::KEY_SPACE, "action");
+        setInputHandler(this);
     }
+
+    void onKeyPress(int key) override { m_keys.handlePress(key); }
+    void onKeyRelease(int key) override { m_keys.handleRelease(key); }
 
     void update(float dt) override {
         BaseExampleScene::update(dt);
-        // Game logic here
+        if (m_keys.consume("action")) { /* ... */ }
     }
 
   protected:
@@ -218,14 +211,10 @@ class MyScene : public vde::examples::BaseExampleScene {
     std::vector<std::string> getFeatures() const override { return {"2D physics"}; }
     std::vector<std::string> getExpectedVisuals() const override { return {"Boxes falling"}; }
     std::vector<std::string> getControls() const override { return {"SPACE - Action"}; }
+
+  private:
+    vde::KeyStateTracker m_keys;
 };
-
-class MyGame : public vde::examples::BaseExampleGame<MyInputHandler, MyScene> {};
-
-int main(int argc, char** argv) {
-    MyGame game;
-    return vde::examples::runExample(game, "My 2D Demo", 1280, 720, argc, argv);
-}
 ```
 
 ## Common Patterns

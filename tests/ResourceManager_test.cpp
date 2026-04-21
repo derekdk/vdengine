@@ -298,3 +298,79 @@ TEST_F(ResourceManagerTest, MultipleManagers) {
     // Different manager, different cache
     EXPECT_FALSE(manager2.has("test"));
 }
+
+// ============================================================================
+// addPersistent Tests
+// ============================================================================
+
+TEST_F(ResourceManagerTest, AddPersistentKeepsResourceAlive) {
+    {
+        auto texture = std::make_shared<Texture>();
+        manager->addPersistent<Texture>("persistent", texture);
+    }  // texture local ref goes out of scope
+
+    // Unlike add(), the resource should still be alive
+    auto retrieved = manager->get<Texture>("persistent");
+    EXPECT_NE(retrieved, nullptr);
+    EXPECT_TRUE(manager->has("persistent"));
+}
+
+TEST_F(ResourceManagerTest, AddPersistentReturnsResource) {
+    auto texture = std::make_shared<Texture>();
+    auto result = manager->addPersistent<Texture>("test", texture);
+    EXPECT_EQ(result, texture);
+}
+
+TEST_F(ResourceManagerTest, AddPersistentNullReturnsNullptr) {
+    auto result = manager->addPersistent<Texture>("null", nullptr);
+    EXPECT_EQ(result, nullptr);
+    EXPECT_FALSE(manager->has("null"));
+}
+
+TEST_F(ResourceManagerTest, AddPersistentSurvivesPrune) {
+    {
+        auto texture = std::make_shared<Texture>();
+        manager->addPersistent<Texture>("persistent", texture);
+    }  // local ref gone
+
+    manager->pruneExpired();
+
+    EXPECT_TRUE(manager->has("persistent"));
+    EXPECT_NE(manager->get<Texture>("persistent"), nullptr);
+}
+
+TEST_F(ResourceManagerTest, AddPersistentClearedByRemove) {
+    auto texture = std::make_shared<Texture>();
+    manager->addPersistent<Texture>("persistent", texture);
+    texture.reset();
+
+    manager->remove("persistent");
+
+    EXPECT_FALSE(manager->has("persistent"));
+    EXPECT_EQ(manager->get<Texture>("persistent"), nullptr);
+}
+
+TEST_F(ResourceManagerTest, AddPersistentClearedByClear) {
+    auto texture = std::make_shared<Texture>();
+    manager->addPersistent<Texture>("persistent", texture);
+    texture.reset();
+
+    manager->clear();
+
+    EXPECT_EQ(manager->getCachedCount(), 0u);
+}
+
+TEST_F(ResourceManagerTest, WeakAddStillExpiresAfterPersistentExists) {
+    // Verify that regular add() still has weak semantics
+    auto persistent = std::make_shared<Texture>();
+    manager->addPersistent<Texture>("persistent", persistent);
+
+    {
+        auto weak = std::make_shared<Texture>();
+        manager->add<Texture>("weak", weak);
+    }  // weak ref gone
+
+    // Persistent still alive, weak expired
+    EXPECT_TRUE(manager->has("persistent"));
+    EXPECT_FALSE(manager->has("weak"));
+}

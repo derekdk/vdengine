@@ -159,12 +159,7 @@ class PhysicsWorldScene : public vde::Scene {
         ground->setColor(m_groundColor);
         ground->setScale(vde::Scale(10.0f, 0.5f, 1.0f));
 
-        vde::PhysicsBodyDef groundDef;
-        groundDef.type = vde::PhysicsBodyType::Static;
-        groundDef.shape = vde::PhysicsShape::Box;
-        groundDef.position = {0.0f, -2.0f};
-        groundDef.extents = {5.0f, 0.25f};
-        ground->createPhysicsBody(groundDef);
+        ground->createPhysicsBody(vde::PhysicsBodyDef::staticBox({0.0f, -2.0f}, {5.0f, 0.25f}));
     }
 
     void spawnBoxes() {
@@ -187,14 +182,8 @@ class PhysicsWorldScene : public vde::Scene {
         sprite->setColor(color);
         sprite->setScale(vde::Scale(halfSize * 2.0f, halfSize * 2.0f, 1.0f));
 
-        vde::PhysicsBodyDef boxDef;
-        boxDef.type = vde::PhysicsBodyType::Dynamic;
-        boxDef.shape = vde::PhysicsShape::Box;
-        boxDef.position = {x, y};
-        boxDef.extents = {halfSize, halfSize};
-        boxDef.mass = 1.0f;
-        boxDef.restitution = 0.4f;
-        boxDef.friction = 0.3f;
+        auto boxDef =
+            vde::PhysicsBodyDef::dynamicBox({x, y}, {halfSize, halfSize}, 1.0f, 0.4f, 0.3f);
         boxDef.linearDamping = 0.01f;
         sprite->createPhysicsBody(boxDef);
 

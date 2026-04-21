@@ -46,6 +46,7 @@
 #include "InputScript.h"
 #include "InputScriptExecutor.h"
 #include "KeyCodes.h"
+#include "KeyStateTracker.h"
 #include "ScriptEnvironment.h"
 
 // Storage
