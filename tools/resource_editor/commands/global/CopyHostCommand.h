@@ -105,9 +105,8 @@ class CopyHostCommand final : public GlobalCommand {
         }
 
         if (!ctx.canvases->copyResource(name, srcCanvas->id, dstCanvas->id, copyName)) {
-            return {false,
-                    "Failed to copy resource '" + name + "' from '" + srcCanvas->name + "' to '" +
-                        dstCanvas->name + "'"};
+            return {false, "Failed to copy resource '" + name + "' from '" + srcCanvas->name +
+                               "' to '" + dstCanvas->name + "'"};
         }
 
         std::string finalName = copyName.empty() ? name : copyName;

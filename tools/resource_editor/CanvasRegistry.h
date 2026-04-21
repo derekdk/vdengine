@@ -145,8 +145,8 @@ class CanvasRegistry {
      * @param newName Name for the copy in the destination (empty = same name).
      * @return true on success.
      */
-    bool copyResource(const std::string& resourceName, uint32_t srcCanvasId,
-                      uint32_t dstCanvasId, const std::string& newName = "");
+    bool copyResource(const std::string& resourceName, uint32_t srcCanvasId, uint32_t dstCanvasId,
+                      const std::string& newName = "");
 
   private:
     std::map<uint32_t, std::unique_ptr<Canvas>> m_canvases;  ///< ID -> Canvas.

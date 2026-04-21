@@ -95,8 +95,7 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
         }
 
         bool endsWithSpace = !argsText.empty() && argsText.back() == ' ';
-        size_t paramIdx =
-            endsWithSpace ? tokens.size() : (tokens.empty() ? 0 : tokens.size() - 1);
+        size_t paramIdx = endsWithSpace ? tokens.size() : (tokens.empty() ? 0 : tokens.size() - 1);
         std::string currentToken = (!endsWithSpace && !tokens.empty()) ? tokens.back() : "";
 
         if (paramIdx < matchedCmd->params.size()) {
@@ -112,10 +111,9 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
             if (param.type == ParamType::Enum) {
                 for (const auto& ev : param.enumValues) {
                     std::string evLower = ev;
-                    std::transform(evLower.begin(), evLower.end(), evLower.begin(),
-                                   [](unsigned char c) {
-                                       return static_cast<char>(std::tolower(c));
-                                   });
+                    std::transform(
+                        evLower.begin(), evLower.end(), evLower.begin(),
+                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                     if (currentToken.empty() ||
                         (evLower.find(currentLower) == 0 && evLower != currentLower)) {
                         m_completions.push_back(ev);
@@ -126,10 +124,9 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
                 if (ctx) {
                     for (const auto& [name, color] : ctx->namedColors) {
                         std::string nameLower = name;
-                        std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(),
-                                       [](unsigned char c) {
-                                           return static_cast<char>(std::tolower(c));
-                                       });
+                        std::transform(
+                            nameLower.begin(), nameLower.end(), nameLower.begin(),
+                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                         if (currentToken.empty() ||
                             (nameLower.find(currentLower) == 0 && nameLower != currentLower)) {
                             m_completions.push_back(name);
@@ -379,8 +376,7 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
             if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
                 // Tab — accept the currently selected completion.
                 if (panels.m_showCompletions && panels.m_selectedCompletion >= 0 &&
-                    panels.m_selectedCompletion <
-                        static_cast<int>(panels.m_completions.size())) {
+                    panels.m_selectedCompletion < static_cast<int>(panels.m_completions.size())) {
                     const std::string& completion =
                         panels.m_completions[panels.m_selectedCompletion];
                     int start = panels.m_completionReplaceStart;
@@ -394,12 +390,11 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
             if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
                 if (panels.m_showCompletions && !panels.m_completions.empty()) {
                     if (data->EventKey == ImGuiKey_UpArrow) {
-                        panels.m_selectedCompletion =
-                            std::max(0, panels.m_selectedCompletion - 1);
+                        panels.m_selectedCompletion = std::max(0, panels.m_selectedCompletion - 1);
                     } else if (data->EventKey == ImGuiKey_DownArrow) {
-                        panels.m_selectedCompletion = std::min(
-                            static_cast<int>(panels.m_completions.size()) - 1,
-                            panels.m_selectedCompletion + 1);
+                        panels.m_selectedCompletion =
+                            std::min(static_cast<int>(panels.m_completions.size()) - 1,
+                                     panels.m_selectedCompletion + 1);
                     }
                 }
             }
@@ -408,12 +403,11 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
         };
 
         bool reclaim = false;
-        if (ImGui::InputText("##consoleinput", m_consoleInputBuffer, sizeof(m_consoleInputBuffer),
-                             ImGuiInputTextFlags_EnterReturnsTrue |
-                                 ImGuiInputTextFlags_CallbackAlways |
-                                 ImGuiInputTextFlags_CallbackCompletion |
-                                 ImGuiInputTextFlags_CallbackHistory,
-                             consoleCallback, &cbData)) {
+        if (ImGui::InputText(
+                "##consoleinput", m_consoleInputBuffer, sizeof(m_consoleInputBuffer),
+                ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways |
+                    ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory,
+                consoleCallback, &cbData)) {
             std::string input(m_consoleInputBuffer);
             if (!input.empty()) {
                 cmd.logRawInput(input);  // Echo verbatim before any parsing
@@ -446,9 +440,8 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
         // Draw parameter hint as ghost text overlaid inside the input area.
         if (!m_paramHint.empty() && m_consoleInputFocused) {
             float textWidth = ImGui::CalcTextSize(m_consoleInputBuffer).x;
-            ImVec2 hintPos =
-                ImVec2(inputRectMin.x + textWidth + ImGui::GetStyle().FramePadding.x,
-                       inputRectMin.y + ImGui::GetStyle().FramePadding.y);
+            ImVec2 hintPos = ImVec2(inputRectMin.x + textWidth + ImGui::GetStyle().FramePadding.x,
+                                    inputRectMin.y + ImGui::GetStyle().FramePadding.y);
             ImGui::GetWindowDrawList()->AddText(hintPos, IM_COL32(128, 128, 128, 160),
                                                 m_paramHint.c_str());
         }
@@ -462,17 +455,14 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 4));
             if (ImGui::Begin("##autocomplete", nullptr,
                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                                 ImGuiWindowFlags_NoMove |
-                                 ImGuiWindowFlags_NoFocusOnAppearing |
-                                 ImGuiWindowFlags_NoNav |
-                                 ImGuiWindowFlags_AlwaysAutoResize |
+                                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing |
+                                 ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize |
                                  ImGuiWindowFlags_NoSavedSettings)) {
                 int maxVisible = std::min(static_cast<int>(m_completions.size()), 8);
                 for (int i = 0; i < maxVisible; ++i) {
                     bool isSelected = (i == m_selectedCompletion);
                     if (isSelected) {
-                        ImGui::PushStyleColor(ImGuiCol_Text,
-                                              ImVec4(1.0f, 1.0f, 0.4f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.4f, 1.0f));
                     }
                     ImGui::TextUnformatted(m_completions[i].c_str());
                     if (isSelected) {

@@ -96,10 +96,9 @@ class DrawArcCommand final : public CanvasCommand {
         canvas.document->drawArc(center.x, center.y, r, static_cast<float>(startAngle),
                                  static_cast<float>(endAngle), color, thickness);
 
-        return {true, "Drew arc at (" + std::to_string(center.x) + "," +
-                          std::to_string(center.y) + ") r=" + std::to_string(r) + " from " +
-                          std::to_string(startAngle) + " to " + std::to_string(endAngle) +
-                          " with " + color.toHex()};
+        return {true, "Drew arc at (" + std::to_string(center.x) + "," + std::to_string(center.y) +
+                          ") r=" + std::to_string(r) + " from " + std::to_string(startAngle) +
+                          " to " + std::to_string(endAngle) + " with " + color.toHex()};
     }
 };
 

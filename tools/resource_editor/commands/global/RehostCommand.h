@@ -90,9 +90,8 @@ class RehostCommand final : public GlobalCommand {
         }
 
         if (!ctx.canvases->transferResource(name, srcCanvas->id, dstCanvas->id)) {
-            return {false,
-                    "Failed to transfer resource '" + name + "' from '" + srcCanvas->name +
-                        "' to '" + dstCanvas->name + "'"};
+            return {false, "Failed to transfer resource '" + name + "' from '" + srcCanvas->name +
+                               "' to '" + dstCanvas->name + "'"};
         }
 
         return {true, "Transferred '" + name + "' from '" + srcCanvas->name + "' to '" +

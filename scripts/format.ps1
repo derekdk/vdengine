@@ -21,9 +21,14 @@ Description:
     
     Files formatted:
     - include/vde/**/*.h
+    - src/**/*.h
     - src/**/*.cpp
+    - examples/**/*.h
     - examples/**/*.cpp
+    - tests/**/*.h
     - tests/**/*.cpp
+    - tools/**/*.h
+    - tools/**/*.cpp
 
 Requirements:
     - clang-format must be installed and available in PATH
@@ -60,9 +65,14 @@ Write-Host "Using clang-format: $($clangFormat.Source)" -ForegroundColor Cyan
 # Find all C++ files
 $patterns = @(
     "include\vde\**\*.h",
+    "src\**\*.h",
     "src\**\*.cpp",
+    "examples\**\*.h",
     "examples\**\*.cpp",
-    "tests\**\*.cpp"
+    "tests\**\*.h",
+    "tests\**\*.cpp",
+    "tools\**\*.h",
+    "tools\**\*.cpp"
 )
 
 $files = @()
