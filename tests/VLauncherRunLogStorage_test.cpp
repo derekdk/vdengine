@@ -17,6 +17,8 @@
 #include <windows.h>
 #undef min
 #undef max
+#else
+#include <unistd.h>
 #endif
 
 namespace vde::test {
@@ -44,7 +46,17 @@ std::filesystem::path testDbPath(const std::string& appName) {
 
 }  // namespace
 
-static constexpr const char* kTestApp = "vde_test_vlauncher_runlog";
+/// Returns a per-process unique app name so parallel CTest invocations each
+/// get their own database file and cannot lock each other out.
+static std::string testAppName() {
+#if defined(_WIN32)
+    return "vde_test_vlauncher_runlog_" + std::to_string(GetCurrentProcessId());
+#else
+    return "vde_test_vlauncher_runlog_" + std::to_string(getpid());
+#endif
+}
+
+static const std::string kTestApp = testAppName();
 
 class VLauncherRunLogStorageTest : public ::testing::Test {
   protected:
