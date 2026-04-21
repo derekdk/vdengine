@@ -145,11 +145,13 @@ TEST_F(SchedulerTest, LinearChainExecutesInOrder) {
 // ============================================================================
 
 TEST_F(SchedulerTest, DiamondDependenciesExecuteCorrectly) {
-    //      A
-    //     / \
-    //    B   C
-    //     \ /
-    //      D
+    /*
+          A
+         / \
+        B   C
+         \ /
+          D
+    */
     TaskId a = scheduler.addTask(makeLoggingTask("A", TaskPhase::Input));
     TaskId b = scheduler.addTask(makeLoggingTask("B", TaskPhase::GameLogic, {a}));
     TaskId c = scheduler.addTask(makeLoggingTask("C", TaskPhase::GameLogic, {a}));
