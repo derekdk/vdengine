@@ -452,28 +452,30 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
 
     void applyWorldWrapping() {
         // Wrap all dynamic entities around world boundaries
-        if (auto* physics = getPhysicsScene()) {
-            auto* ship = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(m_shipId));
-            if (ship) {
-                wrapEntity(ship);
-            }
+        if (!getPhysicsScene()) {
+            return;
+        }
 
-            // Wrap asteroids
-            for (const auto& [entityId, tag] : m_entityTags) {
-                if (tag == EntityTag::Asteroid) {
-                    auto* entity = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(entityId));
-                    if (entity) {
-                        wrapEntity(entity);
-                    }
-                }
-            }
+        auto* ship = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(m_shipId));
+        if (ship) {
+            wrapEntity(ship);
+        }
 
-            // Wrap bullets
-            for (const auto& bullet : m_bullets) {
-                auto* entity = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(bullet.entityId));
+        // Wrap asteroids
+        for (const auto& [entityId, tag] : m_entityTags) {
+            if (tag == EntityTag::Asteroid) {
+                auto* entity = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(entityId));
                 if (entity) {
                     wrapEntity(entity);
                 }
+            }
+        }
+
+        // Wrap bullets
+        for (const auto& bullet : m_bullets) {
+            auto* entity = dynamic_cast<PhysicsSpriteEntity*>(this->getEntity(bullet.entityId));
+            if (entity) {
+                wrapEntity(entity);
             }
         }
     }

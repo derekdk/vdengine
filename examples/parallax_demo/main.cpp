@@ -225,7 +225,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
 
         auto* game = getGame();
         ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
-        ImGui::Text("Frame: %" PRIu64, game ? game->getFrameCount() : 0ULL);
+        ImGui::Text("Frame: %" PRIu64, game ? game->getFrameCount() : uint64_t{0});
         ImGui::Text("Playback Time: %.2fs", m_playbackTime);
         ImGui::Text("State: %s", m_paused ? "Paused" : "Running");
         ImGui::Separator();
