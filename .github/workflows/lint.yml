@@ -22,10 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install clang-format
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang-format-18
-          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
+        run: pip install "clang-format==21.1.8"
 
       - name: Check C++ formatting
         run: |
