@@ -474,7 +474,10 @@ class InputScriptFileTest : public ::testing::Test {
   protected:
     std::string m_tempFile;
 
-    void SetUp() override { m_tempFile = "test_script_temp.vdescript"; }
+    void SetUp() override {
+        const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
+        m_tempFile = std::string("test_script_") + info->name() + ".vdescript";
+    }
 
     void TearDown() override { std::remove(m_tempFile.c_str()); }
 
