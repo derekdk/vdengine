@@ -43,9 +43,9 @@ extern void clearSpriteDescriptorCache();
 
 Game::Game()
     : m_initialized(false), m_running(false), m_settings(), m_window(nullptr),
-      m_vulkanContext(nullptr), m_activeScene(nullptr), m_inputHandler(nullptr), m_deltaTime(0.0f),
-      m_totalTime(0.0), m_fps(0.0f), m_frameCount(0), m_lastFrameTime(0.0), m_fpsAccumulator(0.0),
-      m_fpsFrameCount(0), m_sceneSwitchPending(false) {}
+      m_vulkanContext(nullptr), m_activeScene(nullptr), m_sceneSwitchPending(false),
+      m_inputHandler(nullptr), m_deltaTime(0.0f), m_totalTime(0.0), m_fps(0.0f), m_frameCount(0),
+      m_lastFrameTime(0.0), m_fpsAccumulator(0.0), m_fpsFrameCount(0) {}
 
 Game::~Game() {
     if (m_initialized) {
@@ -2469,8 +2469,8 @@ void Game::rebuildSchedulerGraph() {
     //         This avoids race conditions with worker threads: all
     //         input is fully committed before game-logic tasks begin.
     // ---------------------------------------------------------------
-    TaskId inputScriptTask =
-        m_scheduler.addTask({"input.script", TaskPhase::Input, [this]() { processInputScript(); }});
+    TaskId inputScriptTask = m_scheduler.addTask(
+        {"input.script", TaskPhase::Input, [this]() { processInputScript(); }, {}, false});
 
     // ---------------------------------------------------------------
     // Task 0b: Window/OS operations — execute queued window changes.
@@ -2480,7 +2480,8 @@ void Game::rebuildSchedulerGraph() {
     TaskId windowOpsTask = m_scheduler.addTask({"window.ops",
                                                 TaskPhase::Input,
                                                 [this]() { executePendingWindowOperations(); },
-                                                {inputScriptTask}});
+                                                {inputScriptTask},
+                                                false});
 
     // ---------------------------------------------------------------
     // Task 1: GameLogic — onUpdate hook + all scene updates
@@ -2489,7 +2490,8 @@ void Game::rebuildSchedulerGraph() {
     TaskId prevTask = m_scheduler.addTask({"game.update",
                                            TaskPhase::GameLogic,
                                            [this]() { onUpdate(m_deltaTime); },
-                                           {windowOpsTask}});
+                                           {windowOpsTask},
+                                           false});
 
     // Track per-scene audio tasks so audio.global can depend on all of them
     std::vector<TaskId> audioTasks;
@@ -2506,14 +2508,16 @@ void Game::rebuildSchedulerGraph() {
                 m_scheduler.addTask({"scene.gameLogic." + sceneName,
                                      TaskPhase::GameLogic,
                                      [this, scene]() { scene->updateGameLogic(m_deltaTime); },
-                                     {prevTask}});
+                                     {prevTask},
+                                     false});
 
             // Audio task (depends on gameLogic so queued events are available)
             TaskId audioTask =
                 m_scheduler.addTask({"scene.audio." + sceneName,
                                      TaskPhase::Audio,
                                      [this, scene]() { scene->updateAudio(m_deltaTime); },
-                                     {gameLogicTask}});
+                                     {gameLogicTask},
+                                     false});
             audioTasks.push_back(audioTask);
 
             // Visuals task (depends on gameLogic; can run concurrently with audio in future)
@@ -2521,7 +2525,8 @@ void Game::rebuildSchedulerGraph() {
                 m_scheduler.addTask({"scene.visuals." + sceneName,
                                      TaskPhase::GameLogic,
                                      [this, scene]() { scene->updateVisuals(m_deltaTime); },
-                                     {gameLogicTask}});
+                                     {gameLogicTask},
+                                     false});
 
             // The next scene's tasks depend on the last task of this scene
             // (visuals, since it's the broadest output)
@@ -2531,7 +2536,8 @@ void Game::rebuildSchedulerGraph() {
             prevTask = m_scheduler.addTask({"scene.update." + sceneName,
                                             TaskPhase::GameLogic,
                                             [this, scene]() { scene->update(m_deltaTime); },
-                                            {prevTask}});
+                                            {prevTask},
+                                            false});
         }
     }
 
@@ -2572,7 +2578,8 @@ void Game::rebuildSchedulerGraph() {
                          }
                      }
                  },
-                 {physicsTask}});
+                 {physicsTask},
+                 false});
 
             postPhysicsTasks.push_back(postPhysicsTask);
             lastPhysicsTask = postPhysicsTask;
@@ -2594,7 +2601,7 @@ void Game::rebuildSchedulerGraph() {
 
     TaskId audioTask = m_scheduler.addTask(
         {"audio.global", TaskPhase::Audio,
-         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioDeps});
+         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioDeps, false});
 
     // ---------------------------------------------------------------
     // Task 3: PreRender — apply clear color from primary scene.
@@ -2610,7 +2617,8 @@ void Game::rebuildSchedulerGraph() {
                  m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
              }
          },
-         {audioTask}});
+         {audioTask},
+         false});
 
     // ---------------------------------------------------------------
     // Task 3b: Transition update — advance transition progress.
@@ -2622,7 +2630,8 @@ void Game::rebuildSchedulerGraph() {
             m_scheduler.addTask({"transition.update",
                                  TaskPhase::PreRender,
                                  [this]() { m_transitionManager->update(m_deltaTime); },
-                                 {preRenderTask}});
+                                 {preRenderTask},
+                                 false});
         renderDep = transitionUpdateTask;
     }
 
@@ -2665,7 +2674,8 @@ void Game::rebuildSchedulerGraph() {
                                  renderSingleViewport();
                              }
                          },
-                         {renderDep}});
+                         {renderDep},
+                         false});
 }
 
 }  // namespace vde

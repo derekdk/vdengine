@@ -88,15 +88,15 @@ bool Mesh::loadFromFile(const std::string& path) {
 
                 // Create vertex
                 Vertex vertex{};
-                if (posIdx >= 0 && posIdx < positions.size()) {
-                    vertex.position = positions[posIdx];
+                if (posIdx >= 0 && static_cast<size_t>(posIdx) < positions.size()) {
+                    vertex.position = positions[static_cast<size_t>(posIdx)];
                 }
-                if (texIdx >= 0 && texIdx < texCoords.size()) {
-                    vertex.texCoord = texCoords[texIdx];
+                if (texIdx >= 0 && static_cast<size_t>(texIdx) < texCoords.size()) {
+                    vertex.texCoord = texCoords[static_cast<size_t>(texIdx)];
                 }
                 // Use normal as color for now (or white if no normal)
-                if (normIdx >= 0 && normIdx < normals.size()) {
-                    vertex.color = glm::abs(normals[normIdx]);
+                if (normIdx >= 0 && static_cast<size_t>(normIdx) < normals.size()) {
+                    vertex.color = glm::abs(normals[static_cast<size_t>(normIdx)]);
                 } else {
                     vertex.color = glm::vec3(1.0f);
                 }

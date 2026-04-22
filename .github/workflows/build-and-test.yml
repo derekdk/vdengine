@@ -1,0 +1,103 @@
+# VDE Build and Test CI Workflow
+# Builds the project and runs unit tests on every PR and push to main.
+# Includes a sanitizer matrix entry for runtime bug detection.
+
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Standard build + tests ────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test (${{ matrix.config }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config: Debug
+            sanitizer: false
+          - config: Release
+            sanitizer: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            cmake ninja-build \
+            libvulkan-dev vulkan-validationlayers \
+            libglfw3-dev libglm-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
+            -DGLFW_BUILD_WAYLAND=OFF \
+            -DVDE_BUILD_EXAMPLES=ON \
+            -DVDE_BUILD_TOOLS=ON \
+            -DVDE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run unit tests
+        run: |
+          cd build
+          ctest --output-on-failure --parallel $(nproc)
+
+  # ── Sanitizer build + tests ──────────────────────────────────────────────
+  sanitizer:
+    name: Build & Test (ASan+UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            cmake ninja-build \
+            libvulkan-dev vulkan-validationlayers \
+            libglfw3-dev libglm-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Configure with sanitizers
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DGLFW_BUILD_WAYLAND=OFF \
+            -DVDE_BUILD_EXAMPLES=OFF \
+            -DVDE_BUILD_TOOLS=OFF \
+            -DVDE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run unit tests under sanitizers
+        env:
+          ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1"
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+        run: |
+          cd build
+          ctest --output-on-failure --parallel 1

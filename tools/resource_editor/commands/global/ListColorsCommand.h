@@ -22,7 +22,8 @@ class ListColorsCommand final : public GlobalCommand {
             .aliases = {},
             .category = "Color",
             .summary = "List all named colors.",
-            .description = "Lists all named colors defined in the editor context in alphabetical order.",
+            .description =
+                "Lists all named colors defined in the editor context in alphabetical order.",
             .scope = CommandScope::Global,
             .params = {},
             .syntaxExample = "list colors",

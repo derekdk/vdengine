@@ -341,7 +341,7 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             // --- Engine Stats ---
             if (ImGui::CollapsingHeader("Engine Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Text("FPS: %.1f", game ? game->getFPS() : 0.0f);
-                ImGui::Text("Frame: %llu", game ? game->getFrameCount() : 0ULL);
+                ImGui::Text("Frame: %" PRIu64, game ? game->getFrameCount() : uint64_t{0});
                 ImGui::Text("Time: %.1f s", m_time);
             }
 

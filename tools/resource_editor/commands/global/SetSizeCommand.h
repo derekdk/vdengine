@@ -34,7 +34,9 @@ class SetSizeCommand final : public GlobalCommand {
                     {.name = "size",
                      .type = ParamType::Int,
                      .required = true,
-                     .description = "Brush diameter in pixels"},
+                     .description = "Brush diameter in pixels",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "setsize 3",
         };

@@ -39,7 +39,9 @@ class DeleteCanvasCommand final : public GlobalCommand {
                     {.name = "name",
                      .type = ParamType::String,
                      .required = true,
-                     .description = "Canvas name or ID to delete"},
+                     .description = "Canvas name or ID to delete",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "delete mysprite",
         };

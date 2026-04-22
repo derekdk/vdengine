@@ -158,10 +158,6 @@ uint32_t AudioManager::playSFX(const std::shared_ptr<AudioClip>& clip, float vol
         flags |= MA_SOUND_FLAG_STREAM;
     }
 
-    // Initialize from data decoder
-    ma_decoder_config decoderConfig = ma_decoder_config_init(
-        ma_format_f32, clip->getFormat().channels, clip->getFormat().sampleRate);
-
     ma_result result = ma_sound_init_from_file(m_engine, clip->getPath().c_str(), flags,
                                                nullptr,  // Group (nullptr = default)
                                                nullptr,  // Fence

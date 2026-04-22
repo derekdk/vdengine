@@ -1,0 +1,64 @@
+# VDE clang-tidy Configuration
+# Run: clang-tidy -p build_ninja src/**/*.cpp
+# Or via CMake: cmake -DCMAKE_CXX_CLANG_TIDY="clang-tidy" ...
+
+---
+# Enable high-value check categories; disable noisy or conflicting checks.
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-braces-around-statements,
+  readability-container-size-empty,
+  readability-duplicate-include,
+  readability-else-after-return,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-redundant-control-flow,
+  readability-redundant-string-cstr,
+  readability-simplify-boolean-expr,
+  readability-static-accessed-through-instance,
+  readability-string-compare,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-init-variables,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-special-member-functions,
+  -modernize-avoid-c-arrays,
+  -modernize-use-trailing-return-type,
+  -modernize-concat-nested-namespaces,
+
+# Only warn on VDE headers, not third-party or system headers.
+HeaderFilterRegex: '.*(include/vde|src)/.*'
+
+# Treat clang-tidy warnings as warnings (not errors) by default.
+# CI can promote to errors with --warnings-as-errors=*.
+WarningsAsErrors: ''
+
+# Check options — tune individual check parameters.
+CheckOptions:
+  # performance-move-const-arg: VDE uses const ref extensively; allow it.
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: 'false'
+
+  # readability-braces-around-statements: always require braces.
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '0'
+
+  # modernize-use-override: VDE convention uses override consistently.
+  - key: modernize-use-override.AllowOverrideAndFinal
+    value: 'false'

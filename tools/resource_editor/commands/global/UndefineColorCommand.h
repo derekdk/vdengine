@@ -29,7 +29,9 @@ class UndefineColorCommand final : public GlobalCommand {
                     {.name = "name",
                      .type = ParamType::String,
                      .required = true,
-                     .description = "Name of the color to remove"},
+                     .description = "Name of the color to remove",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "undefine color sky",
         };

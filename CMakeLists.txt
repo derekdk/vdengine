@@ -24,12 +24,14 @@ if(MSVC)
         add_compile_options(/Bt)
         message(STATUS "VDE: compiler timing enabled (/Bt)")
     endif()
+    set(VDE_WARNING_FLAGS /W4 /WX /FS)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
     if(VDE_TIMING)
         add_compile_options(-ftime-report)
         message(STATUS "VDE: compiler timing enabled (-ftime-report)")
     endif()
+    set(VDE_WARNING_FLAGS -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Enable testing support
@@ -88,6 +90,7 @@ FetchContent_Declare(
 set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
 set(ENABLE_SPVREMAPPER OFF CACHE BOOL "" FORCE)
 set(ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+set(ENABLE_RTTI ON CACHE BOOL "" FORCE)
 set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
@@ -292,6 +295,9 @@ else()
     add_library(vde STATIC ${VDE_SOURCES} ${VDE_PUBLIC_HEADERS})
 endif()
 
+# Strict warnings on VDE sources only (not third-party dependencies)
+target_compile_options(vde PRIVATE ${VDE_WARNING_FLAGS})
+
 # Add alias for namespaced target
 add_library(vde::vde ALIAS vde)
 
@@ -305,6 +311,10 @@ target_include_directories(vde PUBLIC
 target_include_directories(vde PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
+)
+
+# Third-party includes as SYSTEM so their warnings are suppressed by /external:W0 (MSVC) or -isystem (GCC/Clang)
+target_include_directories(vde SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/flip
     ${miniaudio_SOURCE_DIR}
 )
@@ -314,12 +324,14 @@ target_link_libraries(vde PUBLIC
     Vulkan::Vulkan
     glfw
     glm::glm
+    glslang::glslang
+    MachineIndependent
+    OSDependent
+    glslang::glslang-default-resource-limits
+    glslang::SPIRV
 )
 
 target_link_libraries(vde PRIVATE
-    glslang::glslang
-    glslang::glslang-default-resource-limits
-    glslang::SPIRV
     sqlite3
 )
 

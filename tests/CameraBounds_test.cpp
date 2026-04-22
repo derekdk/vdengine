@@ -356,6 +356,9 @@ TEST_F(CameraBounds2DTest, ConstraintsPreventOutOfBounds) {
     glm::vec2 center = camera.getCenter();
     WorldBounds2D visible = camera.getVisibleBounds();
 
+    EXPECT_LE(center.x, 10.0f);
+    EXPECT_LE(center.y, 10.0f);
+
     // Visible area should stay within constraints
     EXPECT_LE(visible.maxX.value, 10.0f + 0.1f);
     EXPECT_LE(visible.maxY.value, 10.0f + 0.1f);

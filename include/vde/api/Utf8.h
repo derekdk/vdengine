@@ -69,7 +69,8 @@ inline char32_t decode(const std::string& s, std::size_t& pos) {
         pos += 3;
         if (cp < 0x800)  // reject overlong encodings
             return kReplacementChar;
-        if (cp >= 0xD800 && cp <= 0xDFFF)  // reject surrogate range (not valid Unicode scalar values)
+        if (cp >= 0xD800 &&
+            cp <= 0xDFFF)  // reject surrogate range (not valid Unicode scalar values)
             return kReplacementChar;
         return cp;
     }

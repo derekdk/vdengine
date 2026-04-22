@@ -1,5 +1,6 @@
 # VDE Build Script
 # Builds the VDE project with optional Ninja or MSBuild generator
+# Ninja builds also export compile_commands.json for clang-tidy.
 # Usage: .\scripts\build.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Clean] [-Parallel <jobs>]
 
 param(
@@ -83,6 +84,12 @@ try {
         if ($cacheContent -notmatch "CMAKE_GENERATOR:INTERNAL=Ninja") {
             $needsConfigure = $true
             Write-Info "Generator mismatch - reconfiguring..."
+        } elseif ($cacheContent -notmatch "CMAKE_BUILD_TYPE:STRING=$Config") {
+            $needsConfigure = $true
+            Write-Info "Build configuration mismatch - reconfiguring..."
+        } elseif ($cacheContent -notmatch "CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON") {
+            $needsConfigure = $true
+            Write-Info "compile_commands.json export is disabled - reconfiguring..."
         }
     } elseif ($Generator -eq "MSBuild") {
         $cacheContent = Get-Content "CMakeCache.txt" -Raw
@@ -96,7 +103,7 @@ try {
         Write-Info "Configuring CMake with $Generator generator..."
         
         if ($Generator -eq "Ninja") {
-            cmake -S $vdeRoot -B $buildDir -G Ninja "-DCMAKE_BUILD_TYPE=$Config"
+            cmake -S $vdeRoot -B $buildDir -G Ninja "-DCMAKE_BUILD_TYPE=$Config" "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
         } else {
             cmake -S $vdeRoot -B $buildDir
         }
@@ -143,6 +150,12 @@ try {
         Write-Info "  Executables: $buildDir\bin\"
         Write-Info "  Libraries: $buildDir\lib\"
         Write-Info "  Tests: $buildDir\tests\vde_tests.exe"
+        $compileDbPath = Join-Path $buildDir "compile_commands.json"
+        if (Test-Path $compileDbPath) {
+            Write-Info "  Compile DB: $compileDbPath"
+        } else {
+            Write-Warn "  Compile DB: not found (expected at $compileDbPath)"
+        }
     } else {
         Write-Info "  Executables: $buildDir\examples\$Config\"
         Write-Info "  Libraries: $buildDir\$Config\"

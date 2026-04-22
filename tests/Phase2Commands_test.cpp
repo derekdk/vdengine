@@ -334,7 +334,8 @@ TEST_F(Phase2CommandsTest, DrawArc_Success) {
                 break;
             }
         }
-        if (anyPixelSet) break;
+        if (anyPixelSet)
+            break;
     }
     EXPECT_TRUE(anyPixelSet);
 }
@@ -362,14 +363,14 @@ TEST_F(Phase2CommandsTest, DrawArc_UndoWorks) {
                 break;
             }
         }
-        if (anyPixelSet) break;
+        if (anyPixelSet)
+            break;
     }
     EXPECT_FALSE(anyPixelSet);
 }
 
 TEST_F(Phase2CommandsTest, DrawBezier_Success) {
-    EXPECT_TRUE(
-        cmdSys.execute("draw bezier (0, 0) (2, 6) (5, 6) (7, 0) with #00FF00FF"));
+    EXPECT_TRUE(cmdSys.execute("draw bezier (0, 0) (2, 6) (5, 6) (7, 0) with #00FF00FF"));
 
     const auto& log = cmdSys.getLog();
     ASSERT_FALSE(log.empty());
@@ -385,7 +386,8 @@ TEST_F(Phase2CommandsTest, DrawBezier_Success) {
                 break;
             }
         }
-        if (anyPixelSet) break;
+        if (anyPixelSet)
+            break;
     }
     EXPECT_TRUE(anyPixelSet);
 }
@@ -394,8 +396,7 @@ TEST_F(Phase2CommandsTest, DrawBezier_UndoWorks) {
     // Fill with a known color first so we can verify restoration.
     EXPECT_TRUE(cmdSys.execute("fill #000000FF"));
 
-    EXPECT_TRUE(
-        cmdSys.execute("draw bezier (0, 0) (2, 6) (5, 6) (7, 0) with #00FF00FF"));
+    EXPECT_TRUE(cmdSys.execute("draw bezier (0, 0) (2, 6) (5, 6) (7, 0) with #00FF00FF"));
 
     // Confirm at least one green pixel was drawn.
     bool hasGreen = false;
@@ -407,7 +408,8 @@ TEST_F(Phase2CommandsTest, DrawBezier_UndoWorks) {
                 break;
             }
         }
-        if (hasGreen) break;
+        if (hasGreen)
+            break;
     }
     EXPECT_TRUE(hasGreen);
 
@@ -423,7 +425,8 @@ TEST_F(Phase2CommandsTest, DrawBezier_UndoWorks) {
                 break;
             }
         }
-        if (anyGreenRemains) break;
+        if (anyGreenRemains)
+            break;
     }
     EXPECT_FALSE(anyGreenRemains);
 }
@@ -442,7 +445,8 @@ TEST_F(Phase2CommandsTest, ImageDocument_DrawArc) {
                 break;
             }
         }
-        if (anyPixelSet) break;
+        if (anyPixelSet)
+            break;
     }
     EXPECT_TRUE(anyPixelSet);
 

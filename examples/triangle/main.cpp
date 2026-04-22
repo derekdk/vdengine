@@ -21,6 +21,7 @@
 #include <glm/glm.hpp>
 
 #include <array>
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <string>

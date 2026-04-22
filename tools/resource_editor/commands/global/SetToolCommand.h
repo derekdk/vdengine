@@ -35,7 +35,9 @@ class SetToolCommand final : public GlobalCommand {
                     {.name = "toolname",
                      .type = ParamType::String,
                      .required = true,
-                     .description = "Tool name"},
+                     .description = "Tool name",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "settool brush",
         };

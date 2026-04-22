@@ -27,8 +27,8 @@ static SimpleColorLightBox s_defaultLightBox(Color::white());
 // ============================================================================
 
 Scene::Scene()
-    : m_name(""), m_game(nullptr), m_lightBox(nullptr), m_camera(nullptr), m_inputHandler(nullptr),
-      m_backgroundColor(Color::black()), m_nextResourceId(1) {}
+    : m_name(""), m_game(nullptr), m_nextResourceId(1), m_lightBox(nullptr), m_camera(nullptr),
+      m_inputHandler(nullptr), m_backgroundColor(Color::black()) {}
 
 Scene::~Scene() {
     // Clear all entities, calling their onDetach

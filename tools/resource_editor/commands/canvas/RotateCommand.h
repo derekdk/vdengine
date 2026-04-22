@@ -35,6 +35,7 @@ class RotateCommand final : public CanvasCommand {
                      .type = ParamType::Enum,
                      .required = true,
                      .description = "Rotation angle in degrees (clockwise)",
+                     .defaultValue = "",
                      .enumValues = {"90", "180", "270"}},
                 },
             .syntaxExample = "rotate 90",

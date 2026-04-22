@@ -365,8 +365,8 @@ void ImageDocument::drawArc(int cx, int cy, int r, float startAngle, float endAn
                         int fy = py + dy;
                         if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
                             static_cast<uint32_t>(fy) < m_height) {
-                            setPixelUnchecked(static_cast<uint32_t>(fx),
-                                              static_cast<uint32_t>(fy), color);
+                            setPixelUnchecked(static_cast<uint32_t>(fx), static_cast<uint32_t>(fy),
+                                              color);
                         }
                     }
                 }
@@ -424,8 +424,8 @@ void ImageDocument::drawBezier(const std::vector<std::pair<int, int>>& points, R
                         int fy = py + dy;
                         if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
                             static_cast<uint32_t>(fy) < m_height) {
-                            setPixelUnchecked(static_cast<uint32_t>(fx),
-                                              static_cast<uint32_t>(fy), color);
+                            setPixelUnchecked(static_cast<uint32_t>(fx), static_cast<uint32_t>(fy),
+                                              color);
                         }
                     }
                 }

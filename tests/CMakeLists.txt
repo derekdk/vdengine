@@ -105,6 +105,9 @@ target_link_libraries(vde_tests PRIVATE
 target_include_directories(vde_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb
+)
+
+target_include_directories(vde_tests SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/flip
 )
 
@@ -112,6 +115,8 @@ target_compile_definitions(vde_tests PRIVATE
     VDE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
     VDE_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
 )
+
+target_compile_options(vde_tests PRIVATE ${VDE_WARNING_FLAGS})
 
 # Register tests with CTest
 include(GoogleTest)
@@ -129,7 +134,6 @@ set(VDE_RESOURCE_EDITOR_SRC ${CMAKE_SOURCE_DIR}/tools/resource_editor)
 add_executable(vde_resource_editor_tests
     CommandSystem_test.cpp
     ToolPalette_test.cpp
-    Phase2Commands_test.cpp
     Phase2Commands_test.cpp
 
     # Domain sources (main.cpp and EditorPanels excluded — no GPU/window needed)
@@ -160,5 +164,7 @@ target_link_libraries(vde_resource_editor_tests PRIVATE
 if(WIN32)
     target_link_libraries(vde_resource_editor_tests PRIVATE ole32 uuid)
 endif()
+
+target_compile_options(vde_resource_editor_tests PRIVATE ${VDE_WARNING_FLAGS})
 
 gtest_discover_tests(vde_resource_editor_tests)

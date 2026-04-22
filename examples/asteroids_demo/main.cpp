@@ -74,7 +74,7 @@ class AsteroidsInputHandler : public vde::examples::BaseExampleInputHandler {
             m_thrust = false;
     }
 
-    void onGamepadAxis(int gamepadId, int axis, float value) override {
+    void onGamepadAxis(int /*gamepadId*/, int axis, float value) override {
         if (axis == vde::GAMEPAD_AXIS_LEFT_X) {
             m_leftStickX = value;
         }

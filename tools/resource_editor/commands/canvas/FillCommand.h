@@ -32,7 +32,9 @@ class FillCommand final : public CanvasCommand {
                     {.name = "color",
                      .type = ParamType::Color,
                      .required = true,
-                     .description = "Fill color"},
+                     .description = "Fill color",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "fill #FF0000",
         };

@@ -37,27 +37,38 @@ class RehostCommand final : public GlobalCommand {
                      .type = ParamType::Enum,
                      .required = true,
                      .description = "Resource type",
+                     .defaultValue = "",
                      .enumValues = {"image"}},
                     {.name = "name",
                      .type = ParamType::String,
                      .required = true,
-                     .description = "Resource name"},
+                     .description = "Resource name",
+                     .defaultValue = "",
+                     .enumValues = {}},
                     {.name = "from",
                      .type = ParamType::Keyword,
                      .required = false,
-                     .description = "Keyword separator"},
+                     .description = "Keyword separator",
+                     .defaultValue = "",
+                     .enumValues = {}},
                     {.name = "source",
                      .type = ParamType::String,
                      .required = false,
-                     .description = "Source canvas name (default: active)"},
+                     .description = "Source canvas name (default: active)",
+                     .defaultValue = "",
+                     .enumValues = {}},
                     {.name = "to",
                      .type = ParamType::Keyword,
                      .required = true,
-                     .description = "Keyword separator"},
+                     .description = "Keyword separator",
+                     .defaultValue = "",
+                     .enumValues = {}},
                     {.name = "dest",
                      .type = ParamType::String,
                      .required = true,
-                     .description = "Destination canvas name"},
+                     .description = "Destination canvas name",
+                     .defaultValue = "",
+                     .enumValues = {}},
                 },
             .syntaxExample = "rehost image face from hero to body",
         };
@@ -90,9 +101,8 @@ class RehostCommand final : public GlobalCommand {
         }
 
         if (!ctx.canvases->transferResource(name, srcCanvas->id, dstCanvas->id)) {
-            return {false,
-                    "Failed to transfer resource '" + name + "' from '" + srcCanvas->name +
-                        "' to '" + dstCanvas->name + "'"};
+            return {false, "Failed to transfer resource '" + name + "' from '" + srcCanvas->name +
+                               "' to '" + dstCanvas->name + "'"};
         }
 
         return {true, "Transferred '" + name + "' from '" + srcCanvas->name + "' to '" +

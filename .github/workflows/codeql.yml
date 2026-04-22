@@ -1,0 +1,64 @@
+# VDE CodeQL Security Scanning
+# Deep semantic analysis for security vulnerabilities in C++ code.
+# Runs on PRs to main and on a weekly schedule.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Sunday at 03:00 UTC
+    - cron: '0 3 * * 0'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [c-cpp]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Use extended queries for deeper analysis
+          queries: security-extended
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            cmake ninja-build \
+            libvulkan-dev vulkan-validationlayers \
+            libglfw3-dev libglm-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Build for CodeQL analysis
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DGLFW_BUILD_WAYLAND=OFF \
+            -DVDE_BUILD_EXAMPLES=OFF \
+            -DVDE_BUILD_TOOLS=OFF \
+            -DVDE_BUILD_TESTS=ON
+          cmake --build build --parallel
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

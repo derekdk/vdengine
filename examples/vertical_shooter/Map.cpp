@@ -5,9 +5,9 @@
 
 #include "Map.h"
 
+#include <algorithm>
 #include <cmath>
 #include <random>
-#include <algorithm>
 
 namespace shooter {
 
