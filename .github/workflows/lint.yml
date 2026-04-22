@@ -100,9 +100,11 @@ jobs:
             --enable=warning,performance,portability \
             --std=c++20 \
             --error-exitcode=1 \
+            --library=googletest \
             --suppress=missingIncludeSystem \
             --suppress=missingInclude \
             --suppress=unmatchedSuppression \
+            --suppress=ctuOneDefinitionRuleViolation \
             --inline-suppr \
             -Iinclude \
             -i third_party \

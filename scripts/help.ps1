@@ -37,7 +37,7 @@ Write-Cmd '.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate module
 Write-Cmd '.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate modules -Markdown' 'Diff and write Markdown report'
 
 Write-Title "QUICK START"
-Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default)'
+Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default; also writes compile_commands.json)'
 Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
 Write-Cmd '.\scripts\test.ps1' 'Run all tests'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'

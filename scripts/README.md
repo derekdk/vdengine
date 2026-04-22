@@ -103,6 +103,7 @@ Build the VDE project with your choice of generator and configuration.
 **Features:**
 - Automatically loads VS Developer environment for Ninja builds
 - Auto-detects if reconfiguration is needed
+- Ninja builds automatically generate `build_ninja/compile_commands.json` for `clang-tidy`
 - Shows output locations after successful build
 
 ### rebuild.ps1
@@ -305,7 +306,7 @@ Run all available linters in sequence. Each linter is skipped if its tool is not
 1. **clang-format** — Verifies C++ formatting matches `.clang-format`
 2. **glslangValidator** — Validates GLSL shaders against the Vulkan spec
 3. **cppcheck** — Static analysis for bugs, performance, portability
-4. **clang-tidy** — Deep static analysis (needs `compile_commands.json` from a Ninja build)
+4. **clang-tidy** — Deep static analysis (needs `compile_commands.json`, generated automatically by `./scripts/build.ps1 -Generator Ninja`, or by configuring Ninja with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`)
 
 **Examples:**
 ```powershell

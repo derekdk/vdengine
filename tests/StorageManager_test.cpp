@@ -111,6 +111,7 @@ TEST_F(StorageManagerTest, IsInitializedAfterInit) {
 TEST_F(StorageManagerTest, DoubleInitIsNoOp) {
     // Calling init_storage a second time should succeed and stay open
     EXPECT_TRUE(storage().init_storage(testAppName()));
+    EXPECT_TRUE(storage().isInitialized());
 }
 
 TEST_F(StorageManagerTest, ShutdownClearsInitializedFlag) {
