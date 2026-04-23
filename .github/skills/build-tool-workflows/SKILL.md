@@ -30,7 +30,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 | `clean.ps1` | Clean build artifacts | `.\scripts\clean.ps1 -Generator Ninja -Full` |
 | `clean-all.ps1` | Clean both Ninja and MSBuild builds | `.\scripts\clean-all.ps1 -Full` |
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
-| `smoke-test.ps1` | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Build` |
+| `smoke-test.ps1` | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Build` |
 | `format.ps1` | Format C++ code with clang-format | `.\scripts\format.ps1 -Check` |
 | `run-vlauncher.ps1` | Launch VLauncher (builds if missing) | `.\scripts\run-vlauncher.ps1` |
 | `help.ps1` | Show quick help for build scripts | `.\scripts\help.ps1` |

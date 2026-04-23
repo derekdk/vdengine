@@ -168,7 +168,7 @@ if ($cppcheck) {
         "--inline-suppr",
         "-Iinclude",
         "-i", "third_party",
-        "src/", "include/vde/", "examples/", "tests/", "tools/"
+        "src/", "include/vde/", "examples/", "games/", "tests/", "tools/"
     )
 
     & cppcheck @cppcheckArgs 2>&1

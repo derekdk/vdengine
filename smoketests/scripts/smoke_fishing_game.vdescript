@@ -1,0 +1,8 @@
+# Smoke test for Pond Fisher
+wait startup
+wait 200
+press SPACE
+wait 1600
+press SPACE
+wait 300
+exit

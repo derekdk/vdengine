@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
 option(VDE_BUILD_EXAMPLES "Build example applications" ON)
+option(VDE_BUILD_GAMES "Build game applications" ON)
 option(VDE_BUILD_TESTS "Build unit tests" ON)
 option(VDE_BUILD_TOOLS "Build asset creation tools" ON)
 option(VDE_SHARED_LIBS "Build as shared library" OFF)
@@ -375,8 +376,8 @@ install(DIRECTORY include/vde
 # are not exported. For proper package installation, use FetchContent or add_subdirectory
 # to include VDE in your project.
 
-# ImGui for examples and tools (single declaration shared by both)
-if(VDE_BUILD_EXAMPLES OR VDE_BUILD_TOOLS)
+# ImGui for examples, games, and tools (single declaration shared by all app categories)
+if(VDE_BUILD_EXAMPLES OR VDE_BUILD_GAMES OR VDE_BUILD_TOOLS)
     if(NOT TARGET imgui)
         FetchContent_Declare(
             imgui
@@ -418,6 +419,11 @@ if(VDE_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+# Games
+if(VDE_BUILD_GAMES)
+    add_subdirectory(games)
+endif()
+
 # Tools
 if(VDE_BUILD_TOOLS)
     add_subdirectory(tools)
@@ -436,6 +442,7 @@ message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Shared library: ${VDE_SHARED_LIBS}")
 message(STATUS "  Build examples: ${VDE_BUILD_EXAMPLES}")
+message(STATUS "  Build games: ${VDE_BUILD_GAMES}")
 message(STATUS "  Build tools: ${VDE_BUILD_TOOLS}")
 message(STATUS "  Build tests: ${VDE_BUILD_TESTS}")
 message(STATUS "  Compiler timing: ${VDE_TIMING}")

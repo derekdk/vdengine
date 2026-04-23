@@ -6,7 +6,7 @@ description: Quick map of engine layout and key systems. Use this skill when you
 # Project Layout
 
 ## When to use this skill
-- You need to know where to place or find engine code, public headers, shaders, examples, or tests.
+- You need to know where to place or find engine code, public headers, shaders, examples, games, or tests.
 - You are wiring new features into the engine and want the correct header/implementation/test locations.
 - You are orienting an AI agent to the repo so it can navigate modules without guessing.
 
@@ -17,6 +17,7 @@ description: Quick map of engine layout and key systems. Use this skill when you
 - src/api/ – Implementations for the gameplay API (Game, Scene, Entity, Mesh, GameCamera, CameraBounds, LightBox, GameTypes).
 - shaders/ – GLSL sources for core examples (triangle, sprite, mesh variants).
 - examples/ – Sample apps demonstrating engine usage (triangle, sprite demo, simple_game, world_bounds_demo). Each has its own CMake target.
+- games/ – Larger playable applications organized by per-game directories and built through games/CMakeLists.txt.
 - tests/ – Google Test suite covering engine and game API components (Camera, Window, VulkanContext-adjacent helpers, HexGeometry, Mesh, Scene, GameCamera, WorldBounds, etc.). Registered via tests/CMakeLists.txt.
 - scripts/ – Build/test helpers (PowerShell build-and-test.ps1).
 - docs/ – Project docs (ARCHITECTURE, API guides, getting started).
@@ -41,8 +42,9 @@ description: Quick map of engine layout and key systems. Use this skill when you
 - New public engine API: add header in include/vde/, implementation in src/, register target in root CMakeLists.txt, and include via Core.h if part of the main surface.
 - New gameplay-facing API: add header in include/vde/api/, implementation in src/api/, register in CMake, and add coverage in tests/ with matching CMakeLists entry.
 - New sample: add under examples/, update examples/CMakeLists.txt, provide shader assets in shaders/ if needed.
+- New game: add under games/, update games/CMakeLists.txt, add `vde.toml` smoke metadata, and keep source split by concern.
 - New shader assets: place in shaders/, referenced by examples or engine runtime loaders.
 
 ## Notes for agents
 - Namespace is vde::; prefer RAII around Vulkan handles. Check conventions skill for style details.
-- Generated build directories should stay untouched; source edits belong in include/, src/, src/api/, shaders/, tests/, and examples/.
+- Generated build directories should stay untouched; source edits belong in include/, src/, src/api/, shaders/, tests/, examples/, and games/.

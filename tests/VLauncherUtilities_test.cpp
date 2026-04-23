@@ -94,11 +94,16 @@ class VLauncherUtilitiesTest : public ::testing::Test {
 TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
     const std::filesystem::path repoRoot = m_tempRoot / "repo";
     const std::filesystem::path sourceDir = repoRoot / "examples" / "sample";
+    const std::filesystem::path gameSourceDir = repoRoot / "games" / "sample_game";
     const std::filesystem::path executablePath =
         repoRoot / "build_ninja" / "examples" / "vde_sample.exe";
+    const std::filesystem::path gameExecutablePath =
+        repoRoot / "build_ninja" / "games" / "sample_game" / "vde_sample_game.exe";
 
     std::error_code error;
     std::filesystem::create_directories(sourceDir, error);
+    ASSERT_FALSE(error);
+    std::filesystem::create_directories(gameSourceDir, error);
     ASSERT_FALSE(error);
     std::filesystem::create_directories(repoRoot / "tools", error);
     ASSERT_FALSE(error);
@@ -106,11 +111,16 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
     ASSERT_FALSE(error);
     std::filesystem::create_directories(executablePath.parent_path(), error);
     ASSERT_FALSE(error);
+    std::filesystem::create_directories(gameExecutablePath.parent_path(), error);
+    ASSERT_FALSE(error);
 
     writeTextFile(repoRoot / "CMakeLists.txt",
                   "cmake_minimum_required(VERSION 3.20)\nproject(VLauncherScannerTest)\n");
     writeTextFile(sourceDir / "CMakeLists.txt", "add_executable(vde_sample \"main.cpp\")\n");
     writeTextFile(sourceDir / "main.cpp", "int main() { return 0; }\n");
+    writeTextFile(repoRoot / "games" / "CMakeLists.txt", "add_subdirectory(sample_game)\n");
+    writeTextFile(gameSourceDir / "CMakeLists.txt", "add_vde_game(vde_sample_game \"main.cpp\")\n");
+    writeTextFile(gameSourceDir / "main.cpp", "int main() { return 0; }\n");
     writeTextFile(sourceDir / "vde.toml",
                   "[smoke]\n"
                   "scripts = [\"fallback.vdescript\"]\n\n"
@@ -118,7 +128,63 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
                   "scripts = [\"smoke_valid.vdescript\", \"../escape.vdescript\", "
                   "\"nested/escape.vdescript\", \"..\\\\windows_escape.vdescript\", "
                   "\"\"]\n");
+    writeTextFile(gameSourceDir / "vde.toml", "[smoke]\n"
+                                              "scripts = [\"smoke_game.vdescript\"]\n"
+                                              "priority = 2\n");
     writeTextFile(executablePath, "");
+    writeTextFile(gameExecutablePath, "");
+
+    vde::tools::ExecutableScanner scanner(repoRoot, std::chrono::seconds(1),
+                                          std::chrono::seconds(1));
+    scanner.start();
+    const auto snapshot = waitForSnapshotEntries(scanner, 2);
+    scanner.stop();
+
+    ASSERT_EQ(snapshot.entries.size(), 2u);
+
+    const auto sampleIt = std::find_if(
+        snapshot.entries.begin(), snapshot.entries.end(),
+        [](const vde::tools::ExecutableEntry& entry) { return entry.targetName == "vde_sample"; });
+    ASSERT_NE(sampleIt, snapshot.entries.end());
+    const std::vector<std::string> expectedScripts = {"smoke_valid.vdescript"};
+    EXPECT_EQ(sampleIt->smokeScripts, expectedScripts);
+    EXPECT_EQ(sampleIt->kind, "Example");
+
+    const auto gameIt = std::find_if(snapshot.entries.begin(), snapshot.entries.end(),
+                                     [](const vde::tools::ExecutableEntry& entry) {
+                                         return entry.targetName == "vde_sample_game";
+                                     });
+    ASSERT_NE(gameIt, snapshot.entries.end());
+    const std::vector<std::string> expectedGameScripts = {"smoke_game.vdescript"};
+    EXPECT_EQ(gameIt->smokeScripts, expectedGameScripts);
+    EXPECT_EQ(gameIt->smokePriority, 2);
+    EXPECT_EQ(gameIt->kind, "Game");
+}
+
+TEST_F(VLauncherUtilitiesTest, ScannerIncludesUnbuiltGameTargetsFromSourceMap) {
+    const std::filesystem::path repoRoot = m_tempRoot / "repo";
+    const std::filesystem::path gameSourceDir = repoRoot / "games" / "sample_game";
+
+    std::error_code error;
+    std::filesystem::create_directories(repoRoot / "examples", error);
+    ASSERT_FALSE(error);
+    std::filesystem::create_directories(gameSourceDir, error);
+    ASSERT_FALSE(error);
+    std::filesystem::create_directories(repoRoot / "tools", error);
+    ASSERT_FALSE(error);
+    std::filesystem::create_directories(repoRoot / "src", error);
+    ASSERT_FALSE(error);
+
+    writeTextFile(repoRoot / "CMakeLists.txt",
+                  "cmake_minimum_required(VERSION 3.20)\nproject(VLauncherScannerTest)\n");
+    writeTextFile(repoRoot / "games" / "CMakeLists.txt", "add_subdirectory(sample_game)\n");
+    writeTextFile(gameSourceDir / "CMakeLists.txt", "add_vde_game(vde_sample_game\n"
+                                                    "    main.cpp\n"
+                                                    ")\n");
+    writeTextFile(gameSourceDir / "main.cpp", "int main() { return 0; }\n");
+    writeTextFile(gameSourceDir / "vde.toml", "[smoke]\n"
+                                              "scripts = [\"smoke_game.vdescript\"]\n"
+                                              "priority = 2\n");
 
     vde::tools::ExecutableScanner scanner(repoRoot, std::chrono::seconds(1),
                                           std::chrono::seconds(1));
@@ -127,10 +193,17 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
     scanner.stop();
 
     ASSERT_EQ(snapshot.entries.size(), 1u);
-    EXPECT_EQ(snapshot.entries.front().targetName, "vde_sample");
-
-    const std::vector<std::string> expectedScripts = {"smoke_valid.vdescript"};
-    EXPECT_EQ(snapshot.entries.front().smokeScripts, expectedScripts);
+    const auto& entry = snapshot.entries.front();
+    EXPECT_EQ(entry.targetName, "vde_sample_game");
+    EXPECT_EQ(entry.kind, "Game");
+    EXPECT_TRUE(entry.sourceFound);
+    EXPECT_FALSE(entry.executableFound);
+    EXPECT_TRUE(entry.executablePath.empty());
+    EXPECT_TRUE(entry.outOfDate);
+    EXPECT_EQ(entry.outOfDateReason, "Executable missing");
+    const std::vector<std::string> expectedScripts = {"smoke_game.vdescript"};
+    EXPECT_EQ(entry.smokeScripts, expectedScripts);
+    EXPECT_EQ(entry.smokePriority, 2);
 }
 
 #if defined(_WIN32)

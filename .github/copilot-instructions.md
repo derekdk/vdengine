@@ -29,7 +29,7 @@ The following skills provide domain-specific knowledge for working with VDE:
 
 ### adding-features
 **Purpose:** Guide for implementing new features in the VDE project, including mandatory build/test/smoke verification and subagent review before completion.  
-**Use when:** Implementing enhancements or new capabilities in engine code, examples, tools, or APIs that change supported behavior.  
+**Use when:** Implementing enhancements or new capabilities in engine code, examples, games, tools, or APIs that change supported behavior.  
 **Location:** `.github/skills/adding-features/SKILL.md`
 
 ### adding-skills
@@ -85,6 +85,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Creating demo or example applications that showcase engine features.  
 **Location:** `.github/skills/writing-examples/SKILL.md`
 
+### writing-games
+**Purpose:** Guide for creating larger game applications in VDE.  
+**Use when:** Building multi-file playable games that should integrate with the same build, smoke, and launcher workflows as the repo's other runnable app categories.  
+**Location:** `.github/skills/writing-games/SKILL.md`
+
 ### writing-tools
 **Purpose:** Guide for creating asset creation tools in VDE.  
 **Use when:** Creating tools that support both interactive GUI mode and scriptable batch mode.  
@@ -103,7 +108,7 @@ The following skills provide domain-specific knowledge for working with VDE:
 
 ### smoke-testing
 **Purpose:** Guide for running smoke tests and interpreting the results.  
-**Use when:** Running, debugging, or extending automated smoke tests for examples and tools.  
+**Use when:** Running, debugging, or extending automated smoke tests for examples, games, and tools.  
 **Skip when:** Only running unit tests or the change doesn't affect any runnable executable.  
 **Location:** `.github/skills/smoke-testing/SKILL.md`
 

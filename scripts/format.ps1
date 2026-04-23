@@ -25,6 +25,8 @@ Description:
     - src/**/*.cpp
     - examples/**/*.h
     - examples/**/*.cpp
+    - games/**/*.h
+    - games/**/*.cpp
     - tests/**/*.h
     - tests/**/*.cpp
     - tools/**/*.h
@@ -69,6 +71,8 @@ $patterns = @(
     "src\**\*.cpp",
     "examples\**\*.h",
     "examples\**\*.cpp",
+    "games\**\*.h",
+    "games\**\*.cpp",
     "tests\**\*.h",
     "tests\**\*.cpp",
     "tools\**\*.h",

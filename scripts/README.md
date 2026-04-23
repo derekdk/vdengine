@@ -10,7 +10,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **rebuild.ps1** | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator Ninja` |
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
-| **smoke-test.ps1** | Run smoke tests on examples and tools | `.\scripts\smoke-test.ps1 -Extended -Filter "*physics*"` |
+| **smoke-test.ps1** | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Extended -Filter "*physics*"` |
 | **lint.ps1** | Run all available linters | `.\scripts\lint.ps1` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 | **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `\.\scripts\run-vlauncher.ps1` |
@@ -215,20 +215,20 @@ Run unit tests with optional filtering and building.
 
 ### smoke-test.ps1
 
-Run smoke tests against examples and tools, with optional filtering, priority-based example selection, and AI-friendly failure-only output.
+Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output.
 
 **Syntax:**
 ```powershell
-.\scripts\smoke-test.ps1 [-Category All|Examples|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-Verbose] [-ProblemsOnly]
+.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
-- `-Category` - `All` (default), `Examples`, or `Tools`
+- `-Category` - `All` (default), `Examples`, `Games`, or `Tools`
 - `-Filter <pattern>` - Wildcard pattern for executable names (for example `"*physics*"`)
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests
-- `-Extended` - Include priority 2 examples; default runs only priority 1 examples while tools always run
+- `-Extended` - Include priority 2 examples and games; default runs only priority 1 examples/games while tools always run
 - `-Verbose` - Verbose output with detailed error messages
 - `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
 
@@ -242,6 +242,9 @@ Run smoke tests against examples and tools, with optional filtering, priority-ba
 
 # Run only example smoke tests
 .\scripts\smoke-test.ps1 -Category Examples
+
+# Run only games
+.\scripts\smoke-test.ps1 -Category Games
 
 # Run one subset
 .\scripts\smoke-test.ps1 -Filter "*physics*"
@@ -282,6 +285,7 @@ Format C++ source files using clang-format according to the project's style guid
 - `include/vde/**/*.h` - Public headers
 - `src/**/*.cpp` - Implementation files
 - `examples/**/*.cpp` - Example code
+- `games/**/*.cpp` - Game code
 - `tests/**/*.cpp` - Test files
 
 **Requirements:**
@@ -457,7 +461,7 @@ timing via the `/Bt` compiler flag.  Results are written to `benchmarks/`.
 **The JSON report contains:**
 - `build_wall_sec` — real elapsed seconds for the whole build
 - `summary` — aggregate stats (total/avg/max/p95 wall ms across all TUs)
-- `by_target` — per-target totals (`vde`, `examples`, `tools`, `tests`, `deps`)
+- `by_target` — per-target totals (`vde`, `examples`, `games`, `tools`, `tests`, `deps`)
 - `files` — per-TU row with `wall_ms`, and (if `-CaptureDetail`) `frontend_cpu_s`,
   `backend_cpu_s`, `frontend_pct`
 

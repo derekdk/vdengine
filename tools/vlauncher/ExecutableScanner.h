@@ -21,6 +21,7 @@ struct ExecutableEntry {
     std::filesystem::path executablePath;
     std::filesystem::path sourceDirectory;
 
+    bool executableFound = false;
     bool sourceFound = false;
     bool outOfDate = false;
     bool sourceNewerThanExecutable = false;
@@ -129,7 +130,7 @@ class ExecutableScanner {
     static std::string inferKind(const std::filesystem::path& sourceDir,
                                  const std::filesystem::path& repoRoot);
 
-    /// Collect the file_time_type of every CMakeLists.txt under examples/ and tools/.
+    /// Collect the file_time_type of every CMakeLists.txt under examples/, games/, and tools/.
     static std::unordered_map<std::string, std::filesystem::file_time_type>
     collectCmakeTimestamps(const std::filesystem::path& repoRoot);
 };

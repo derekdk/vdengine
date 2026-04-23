@@ -1,18 +1,19 @@
 # VDE Smoke Test Script
-# Runs automated smoke tests on example and tool executables
-# Auto-discovers vde_*.exe in the build directory for both examples and tools.
+# Runs automated smoke tests on example, game, and tool executables
+# Auto-discovers vde_*.exe in the build directory for examples, games, and tools.
 #
 # Usage:
-#   .\scripts\smoke-test.ps1                              # Run all (examples + tools)
-#   .\scripts\smoke-test.ps1 -Extended                    # Run priority 1 and 2 examples
+#   .\scripts\smoke-test.ps1                              # Run all (examples + games + tools)
+#   .\scripts\smoke-test.ps1 -Extended                    # Run priority 1 and 2 examples/games
 #   .\scripts\smoke-test.ps1 -Category Examples           # Examples only
+#   .\scripts\smoke-test.ps1 -Category Games              # Games only
 #   .\scripts\smoke-test.ps1 -Category Tools              # Tools only
 #   .\scripts\smoke-test.ps1 -Filter "*physics*"          # Filter by name
 #   .\scripts\smoke-test.ps1 -Build -Verbose              # Build first, verbose output
 #   .\scripts\smoke-test.ps1 -ProblemsOnly                # Emit only warnings/failures plus final PASS/FAIL
 
 param(
-    [ValidateSet("All", "Examples", "Tools")]
+    [ValidateSet("All", "Examples", "Games", "Tools")]
     [string]$Category = "All",
 
     [string]$Filter = "",  # Wildcard filter for executable names (e.g. "*physics*", "vde_vlauncher*")
@@ -25,7 +26,7 @@ param(
 
     [switch]$Build = $false,  # Build before testing
 
-    [switch]$Extended = $false,  # Include priority 2 examples
+    [switch]$Extended = $false,  # Include priority 2 examples/games
 
     [switch]$Verbose = $false,  # Verbose output
 
@@ -61,9 +62,9 @@ Write-Info "Build Directory: $buildDir"
 Write-Info "Configuration: $Config"
 Write-Info "Category: $Category"
 if ($Extended) {
-    Write-Info "Smoke Set: Extended (priority 1 and 2 examples)"
+    Write-Info "Smoke Set: Extended (priority 1 and 2 examples/games)"
 } else {
-    Write-Info "Smoke Set: Normal (priority 1 examples only)"
+    Write-Info "Smoke Set: Normal (priority 1 examples/games only)"
 }
 if ($Filter) {
     Write-Info "Filter: $Filter"
@@ -96,6 +97,10 @@ $excludeFromExamples = @(
 $excludeFromTools = @(
 )
 
+# Executables to exclude from game smoke testing
+$excludeFromGames = @(
+)
+
 # Tools still use an explicit mapping; example smoke metadata is read from
 # each source directory's vde.toml.
 $toolSmokeScriptMap = @{
@@ -110,13 +115,18 @@ $scriptBaseDir = Join-Path $vdeRoot 'smoketests\scripts'
 $exampleTargetSourceMap = @{}
 $explicitExampleTomlTargetMap = @{}
 $missingExampleMetadataWarnings = @{}
+$gameTargetSourceMap = @{}
+$explicitGameTomlTargetMap = @{}
+$missingGameMetadataWarnings = @{}
 $smokeTomlCache = @{}
 
 function Add-TargetSourceMapEntry {
     param(
         [hashtable]$TargetMap,
         [string]$TargetName,
-        [string[]]$BlockLines
+        [string[]]$BlockLines,
+        [string]$SourceRootPath,
+        [string]$CmakeDirectoryPath
     )
 
     if ([string]::IsNullOrWhiteSpace($TargetName) -or $TargetName -notlike 'vde_*') {
@@ -140,18 +150,38 @@ function Add-TargetSourceMapEntry {
             continue
         }
 
-        $TargetMap[$TargetName] = Join-Path (Join-Path $vdeRoot 'examples') $sourceDir
+        $TargetMap[$TargetName] = Join-Path $SourceRootPath $sourceDir
         return
+    }
+
+    if ([string]::IsNullOrWhiteSpace($CmakeDirectoryPath)) {
+        return
+    }
+
+    $normalizedSourceRoot = [System.IO.Path]::GetFullPath($SourceRootPath).TrimEnd('\', '/')
+    $normalizedCmakeDir = [System.IO.Path]::GetFullPath($CmakeDirectoryPath).TrimEnd('\', '/')
+    $sourceRootPrefix = $normalizedSourceRoot + [System.IO.Path]::DirectorySeparatorChar
+    if ($normalizedCmakeDir.StartsWith($sourceRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $relativeDir = $normalizedCmakeDir.Substring($sourceRootPrefix.Length)
+        if (-not [string]::IsNullOrWhiteSpace($relativeDir)) {
+            $TargetMap[$TargetName] = Join-Path $SourceRootPath $relativeDir
+        }
     }
 }
 
-function Get-ExampleTargetSourceMap {
-    param([string]$CmakePath)
+function Get-TargetSourceMap {
+    param(
+        [string]$CmakePath,
+        [string]$SourceRootPath,
+        [string[]]$CommandNames
+    )
 
     $targetMap = @{}
     if (-not (Test-Path $CmakePath)) {
         return $targetMap
     }
+
+    $commandPattern = (($CommandNames | ForEach-Object { [regex]::Escape($_) }) -join '|')
 
     $collecting = $false
     $currentTarget = ''
@@ -159,12 +189,12 @@ function Get-ExampleTargetSourceMap {
 
     foreach ($line in Get-Content -Path $CmakePath) {
         if (-not $collecting) {
-            if ($line -match '^\s*(add_vde_example|add_executable)\(\s*([A-Za-z0-9_]+)') {
+            if ($line -match "^\s*($commandPattern)\(\s*([A-Za-z0-9_]+)") {
                 $currentTarget = $Matches[2]
                 $currentBlockLines = @($line)
 
                 if ($line -match '\)') {
-                    Add-TargetSourceMapEntry -TargetMap $targetMap -TargetName $currentTarget -BlockLines $currentBlockLines
+                    Add-TargetSourceMapEntry -TargetMap $targetMap -TargetName $currentTarget -BlockLines $currentBlockLines -SourceRootPath $SourceRootPath -CmakeDirectoryPath (Split-Path -Path $CmakePath -Parent)
                     $currentTarget = ''
                     $currentBlockLines = @()
                 } else {
@@ -177,10 +207,31 @@ function Get-ExampleTargetSourceMap {
 
         $currentBlockLines += $line
         if ($line -match '\)') {
-            Add-TargetSourceMapEntry -TargetMap $targetMap -TargetName $currentTarget -BlockLines $currentBlockLines
+            Add-TargetSourceMapEntry -TargetMap $targetMap -TargetName $currentTarget -BlockLines $currentBlockLines -SourceRootPath $SourceRootPath -CmakeDirectoryPath (Split-Path -Path $CmakePath -Parent)
             $collecting = $false
             $currentTarget = ''
             $currentBlockLines = @()
+        }
+    }
+
+    return $targetMap
+}
+
+function Get-CategoryTargetSourceMap {
+    param(
+        [string]$SourceRootPath,
+        [string[]]$CommandNames
+    )
+
+    $targetMap = @{}
+    if (-not (Test-Path $SourceRootPath)) {
+        return $targetMap
+    }
+
+    foreach ($cmakeFile in Get-ChildItem -Path $SourceRootPath -Filter 'CMakeLists.txt' -Recurse -File) {
+        $partialMap = Get-TargetSourceMap -CmakePath $cmakeFile.FullName -SourceRootPath $SourceRootPath -CommandNames $CommandNames
+        foreach ($targetName in $partialMap.Keys) {
+            $targetMap[$targetName] = $partialMap[$targetName]
         }
     }
 
@@ -238,14 +289,21 @@ function Get-SmokeSectionMap {
     return $sectionMap
 }
 
-function Get-ExampleSmokeMetadata {
-    param([string]$ExeName)
+function Get-AppSmokeMetadata {
+    param(
+        [string]$ExeName,
+        [string]$CategoryRoot,
+        [hashtable]$TargetSourceMap,
+        [hashtable]$ExplicitTomlTargetMap,
+        [hashtable]$MissingMetadataWarnings,
+        [string]$CategoryLabel
+    )
 
     $targetName = [System.IO.Path]::GetFileNameWithoutExtension($ExeName)
-    $sourceDir = Resolve-ExampleSourceDir -TargetName $targetName
-    if (-not $sourceDir -and -not $missingExampleMetadataWarnings.ContainsKey($targetName)) {
-        Write-Warn "No vde.toml source mapping found for $targetName; using default smoke metadata"
-        $missingExampleMetadataWarnings[$targetName] = $true
+    $sourceDir = Resolve-AppSourceDir -TargetName $targetName -CategoryRoot $CategoryRoot -TargetSourceMap $TargetSourceMap -ExplicitTomlTargetMap $ExplicitTomlTargetMap
+    if (-not $sourceDir -and -not $MissingMetadataWarnings.ContainsKey($targetName)) {
+        Write-Warn "No $CategoryLabel vde.toml source mapping found for $targetName; using default smoke metadata"
+        $MissingMetadataWarnings[$targetName] = $true
     }
 
     $tomlPath = $null
@@ -288,15 +346,15 @@ function Get-ExampleSmokeMetadata {
     }
 }
 
-function Get-ExplicitExampleTomlTargetMap {
-    param([string]$ExamplesDir)
+function Get-ExplicitTomlTargetMap {
+    param([string]$SourceDir)
 
     $targetMap = @{}
-    if (-not (Test-Path $ExamplesDir)) {
+    if (-not (Test-Path $SourceDir)) {
         return $targetMap
     }
 
-    foreach ($tomlFile in Get-ChildItem -Path $ExamplesDir -Filter 'vde.toml' -Recurse -File) {
+    foreach ($tomlFile in Get-ChildItem -Path $SourceDir -Filter 'vde.toml' -Recurse -File) {
         $sectionMap = Get-SmokeSectionMap -TomlPath $tomlFile.FullName
         foreach ($sectionName in $sectionMap.Keys) {
             if ($sectionName -notlike 'smoke.*') {
@@ -315,15 +373,20 @@ function Get-ExplicitExampleTomlTargetMap {
     return $targetMap
 }
 
-function Resolve-ExampleSourceDir {
-    param([string]$TargetName)
+function Resolve-AppSourceDir {
+    param(
+        [string]$TargetName,
+        [string]$CategoryRoot,
+        [hashtable]$TargetSourceMap,
+        [hashtable]$ExplicitTomlTargetMap
+    )
 
-    if ($exampleTargetSourceMap.ContainsKey($TargetName)) {
-        return $exampleTargetSourceMap[$TargetName]
+    if ($TargetSourceMap.ContainsKey($TargetName)) {
+        return $TargetSourceMap[$TargetName]
     }
 
-    if ($explicitExampleTomlTargetMap.ContainsKey($TargetName)) {
-        return $explicitExampleTomlTargetMap[$TargetName]
+    if ($ExplicitTomlTargetMap.ContainsKey($TargetName)) {
+        return $ExplicitTomlTargetMap[$TargetName]
     }
 
     $candidateNames = @()
@@ -338,7 +401,7 @@ function Resolve-ExampleSourceDir {
     }
 
     foreach ($candidateName in ($candidateNames | Select-Object -Unique)) {
-        $candidateDir = Join-Path (Join-Path $vdeRoot 'examples') $candidateName
+        $candidateDir = Join-Path (Join-Path $vdeRoot $CategoryRoot) $candidateName
         if (Test-Path (Join-Path $candidateDir 'vde.toml')) {
             return $candidateDir
         }
@@ -347,8 +410,10 @@ function Resolve-ExampleSourceDir {
     return $null
 }
 
-$exampleTargetSourceMap = Get-ExampleTargetSourceMap -CmakePath (Join-Path $vdeRoot 'examples\CMakeLists.txt')
-$explicitExampleTomlTargetMap = Get-ExplicitExampleTomlTargetMap -ExamplesDir (Join-Path $vdeRoot 'examples')
+$exampleTargetSourceMap = Get-CategoryTargetSourceMap -SourceRootPath (Join-Path $vdeRoot 'examples') -CommandNames @('add_vde_example', 'add_executable')
+$explicitExampleTomlTargetMap = Get-ExplicitTomlTargetMap -SourceDir (Join-Path $vdeRoot 'examples')
+$gameTargetSourceMap = Get-CategoryTargetSourceMap -SourceRootPath (Join-Path $vdeRoot 'games') -CommandNames @('add_vde_game', 'add_executable')
+$explicitGameTomlTargetMap = Get-ExplicitTomlTargetMap -SourceDir (Join-Path $vdeRoot 'games')
 
 # --- Executable Discovery ---
 
@@ -367,12 +432,36 @@ function Get-ExampleExes {
     $exes = Get-ChildItem -Path $dir -Filter "vde_*.exe" -File |
         Where-Object { $_.Name -notin $excludeFromExamples } |
         ForEach-Object {
-            $metadata = Get-ExampleSmokeMetadata -ExeName $_.Name
+            $metadata = Get-AppSmokeMetadata -ExeName $_.Name -CategoryRoot 'examples' -TargetSourceMap $exampleTargetSourceMap -ExplicitTomlTargetMap $explicitExampleTomlTargetMap -MissingMetadataWarnings $missingExampleMetadataWarnings -CategoryLabel 'example'
             [pscustomobject]@{
                 Name          = $_.Name
                 FullPath      = $_.FullName
                 WorkDir       = $_.DirectoryName
                 Category      = "Example"
+                SmokeScript   = $metadata.SmokeScript
+                SmokePriority = $metadata.SmokePriority
+            }
+        }
+    return @($exes)
+}
+
+function Get-GameExes {
+    $dir = Join-Path $buildDir "games"
+
+    if (-not (Test-Path $dir)) {
+        Write-Warn "Games directory not found: $dir"
+        return @()
+    }
+
+    $exes = Get-ChildItem -Path $dir -Recurse -Filter "vde_*.exe" -File |
+        Where-Object { $_.Name -notin $excludeFromGames } |
+        ForEach-Object {
+            $metadata = Get-AppSmokeMetadata -ExeName $_.Name -CategoryRoot 'games' -TargetSourceMap $gameTargetSourceMap -ExplicitTomlTargetMap $explicitGameTomlTargetMap -MissingMetadataWarnings $missingGameMetadataWarnings -CategoryLabel 'game'
+            [pscustomobject]@{
+                Name          = $_.Name
+                FullPath      = $_.FullName
+                WorkDir       = $_.DirectoryName
+                Category      = "Game"
                 SmokeScript   = $metadata.SmokeScript
                 SmokePriority = $metadata.SmokePriority
             }
@@ -417,6 +506,10 @@ if ($Category -eq "All" -or $Category -eq "Examples") {
     $allExes += Get-ExampleExes
 }
 
+if ($Category -eq "All" -or $Category -eq "Games") {
+    $allExes += Get-GameExes
+}
+
 if ($Category -eq "All" -or $Category -eq "Tools") {
     $allExes += Get-ToolExes
 }
@@ -429,8 +522,8 @@ if ($Filter) {
 $discoveredCount = $allExes.Count
 $filteredPriority2Count = 0
 if (-not $Extended) {
-    $filteredPriority2Count = @($allExes | Where-Object { $_.Category -eq 'Example' -and $_.SmokePriority -eq 2 }).Count
-    $allExes = @($allExes | Where-Object { $_.Category -ne 'Example' -or $_.SmokePriority -eq 1 })
+    $filteredPriority2Count = @($allExes | Where-Object { ($_.Category -eq 'Example' -or $_.Category -eq 'Game') -and $_.SmokePriority -eq 2 }).Count
+    $allExes = @($allExes | Where-Object { (($_.Category -ne 'Example') -and ($_.Category -ne 'Game')) -or $_.SmokePriority -eq 1 })
 }
 
 if ($allExes.Count -eq 0) {
@@ -439,23 +532,30 @@ if ($allExes.Count -eq 0) {
         Write-Warn "Filter '$Filter' matched nothing. Try a different pattern."
     }
     if (-not $Extended -and $filteredPriority2Count -gt 0) {
-        Write-Warn "Only priority 2 examples matched. Re-run with -Extended to include them."
+        Write-Warn "Only priority 2 examples/games matched. Re-run with -Extended to include them."
     }
     Write-Warn "Run with -Build flag to build first, or run .\scripts\build.ps1"
     exit 1
 }
 
-# Sort: examples first, then tools, alphabetically within each category
-$allExes = @($allExes | Sort-Object Category, Name)
+# Sort: examples first, then games, then tools, alphabetically within each category
+$categoryOrder = @{
+    'Example' = 0
+    'Game' = 1
+    'Tool' = 2
+}
+$allExes = @($allExes | Sort-Object @{ Expression = { $categoryOrder[$_.Category] } }, Name)
 
 Write-Info ""
 Write-Info "Selected $($allExes.Count) executable(s) to test (from $discoveredCount discovered):"
 $exampleCount = @($allExes | Where-Object { $_.Category -eq "Example" }).Count
+$gameCount = @($allExes | Where-Object { $_.Category -eq "Game" }).Count
 $toolCount = @($allExes | Where-Object { $_.Category -eq "Tool" }).Count
 if ($exampleCount -gt 0) { Write-Info "  Examples: $exampleCount" }
+if ($gameCount -gt 0) { Write-Info "  Games:    $gameCount" }
 if ($toolCount -gt 0) { Write-Info "  Tools:    $toolCount" }
 if (-not $Extended -and $filteredPriority2Count -gt 0) {
-    Write-Info "  Priority 2 examples excluded: $filteredPriority2Count"
+    Write-Info "  Priority 2 examples/games excluded: $filteredPriority2Count"
 }
 
 # --- Run Smoke Tests ---

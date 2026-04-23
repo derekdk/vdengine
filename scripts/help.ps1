@@ -51,7 +51,7 @@ Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
 Write-Cmd '.\scripts\test.ps1 -Filter "Camera*"' 'Run specific tests'
 Write-Cmd '.\scripts\test.ps1 -ProblemsOnly' 'Show only warnings/failures plus final status'
 Write-Cmd '.\scripts\smoke-test.ps1 -ProblemsOnly' 'Show only smoke-test warnings/failures plus final status'
-Write-Cmd '.\scripts\smoke-test.ps1 -Extended' 'Include priority 2 examples in the smoke run'
+Write-Cmd '.\scripts\smoke-test.ps1 -Extended' 'Include priority 2 examples and games in the smoke run'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean rebuild'
 Write-Cmd '.\scripts\clean.ps1 -Full' 'Full clean (removes build dir)'
 

@@ -81,7 +81,7 @@ A filtered pass is only the inner loop. Do not stop there.
 
 - After the targeted test passes, run the surrounding suite or a related pattern.
 - Before declaring a bug fix or feature complete, run the full unit suite with `.\scripts\test.ps1`.
-- If the change affects examples, tools, rendering, input, windowing, audio, physics, launcher flows, or other runtime behavior, follow with `.\scripts\smoke-test.ps1`.
+- If the change affects examples, games, tools, rendering, input, windowing, audio, physics, launcher flows, or other runtime behavior, follow with `.\scripts\smoke-test.ps1`.
 - If follow-up edits are required after a build failure, test failure, or review finding, restart the loop from the filtered repro and widen back out again.
 
 ## Common failure modes

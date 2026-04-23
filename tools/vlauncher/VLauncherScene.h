@@ -32,7 +32,7 @@ class VLauncherScene : public BaseToolScene {
 
     std::string getToolName() const override { return "VLauncher"; }
     std::string getToolDescription() const override {
-        return "Launch VDE examples/tools and monitor executable freshness";
+        return "Launch VDE examples/games/tools and monitor executable freshness";
     }
 
   private:
