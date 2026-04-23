@@ -78,6 +78,7 @@ class InputScriptExecutor {
     bool handleAssertScene(InputScriptState& state, const ScriptCommand& cmd);
     bool handleCompare(InputScriptState& state, const ScriptCommand& cmd);
     bool handleSet(InputScriptState& state, const ScriptCommand& cmd);
+    bool handleHoldKey(InputScriptState& state, const ScriptCommand& cmd);
 
     ScriptEnvironment& m_env;
     float m_deltaTime = 0.0f;

@@ -52,7 +52,8 @@ enum class InputCommandType {
     AssertSceneCount,  ///< assert rendered_scene_count == N
     AssertScene,       ///< assert scene "name" <field> <op> <value>
     Compare,           ///< compare actual.png golden.png 0.02 — image comparison
-    Set                ///< set VAR value — define a script variable
+    Set,               ///< set VAR value — define a script variable
+    HoldKey  ///< hold W 500 / hold W 0.5s — keydown, wait duration (ms or s-suffix seconds), keyup
 };
 
 /**
@@ -143,6 +144,13 @@ struct InputScriptState {
 
     /// A1: Track whether any assertion has failed
     bool assertionFailed = false;
+
+    /// HoldKey: true after keydown is sent and before keyup is sent
+    bool holdKeyActive = false;
+
+    /// Modifier reference counts for accurate chord tracking across keydown/keyup commands.
+    /// Maps modifier key code -> number of active script-level presses.
+    std::unordered_map<int, int> modifierRefCounts;
 };
 
 // ============================================================================

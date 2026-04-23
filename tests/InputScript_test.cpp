@@ -254,6 +254,52 @@ TEST(InputScriptParseLine, ParsesKeyDownWithModifiers) {
 }
 
 // ============================================================================
+// Line parser tests — HoldKey
+// ============================================================================
+
+TEST(InputScriptParseLine, ParsesHoldKeyMs) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("hold RIGHT 500", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::HoldKey);
+    EXPECT_EQ(cmd.keyCode, KEY_RIGHT);
+    EXPECT_DOUBLE_EQ(cmd.waitMs, 500.0);
+}
+
+TEST(InputScriptParseLine, ParsesHoldKeySeconds) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("hold right 0.5s", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::HoldKey);
+    EXPECT_EQ(cmd.keyCode, KEY_RIGHT);
+    EXPECT_DOUBLE_EQ(cmd.waitMs, 500.0);
+}
+
+TEST(InputScriptParseLine, ParsesHoldKeyWithModifier) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("hold ctrl+A 200", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::HoldKey);
+    EXPECT_EQ(cmd.keyCode, KEY_A);
+    EXPECT_EQ(cmd.modifiers, INPUT_SCRIPT_MOD_CTRL);
+    EXPECT_DOUBLE_EQ(cmd.waitMs, 200.0);
+}
+
+TEST(InputScriptParseLine, HoldKeyRejectsMissingArgs) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("hold", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+TEST(InputScriptParseLine, HoldKeyRejectsMissingDuration) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("hold RIGHT", 1, cmd, error));
+    EXPECT_FALSE(error.empty());
+}
+
+// ============================================================================
 // Line parser tests — Mouse
 // ============================================================================
 

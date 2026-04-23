@@ -1,0 +1,62 @@
+# verify_input_script_demo.vdescript
+# Render verification for input script demo.
+# Runs the full input sequence, screenshots the result, and compares against
+# the golden image.  The comparison only passes if every panel, pip, and the
+# cursor sprite reached their expected state.
+
+wait startup
+
+# ── Activate all 8 panels ─────────────────────────────────────────────────────
+
+press A
+wait 100
+
+keydown W
+wait 200
+keyup W
+wait 100
+
+hold RIGHT 400
+wait 100
+
+press shift+B
+wait 100
+
+press ctrl+D
+wait 100
+
+click 520 468
+wait 100
+
+scroll 760 468 -3
+wait 100
+
+mousedown 1000 468
+wait 150
+mouseup 1000 468
+wait 100
+
+# Position cursor at top centre (world 0.0, 3.5) before capture
+mousemove 640 108
+wait 100
+
+# ── Light up all 3 pips via loop ──────────────────────────────────────────────
+label spin_start
+press SPACE
+wait 150
+loop spin_start 3
+
+wait 200
+
+# ── Validate entity count ─────────────────────────────────────────────────────
+# 8 panels + 3 pips + 1 cursor = 12 entities
+set EXPECTED 12
+assert scene "main" entity_count == $EXPECTED
+
+# ── Screenshot + perceptual compare ──────────────────────────────────────────
+wait_frames 5
+screenshot render_verify_output/input_script_demo.png
+wait 100
+compare render_verify_output/input_script_demo.png ../../smoketests/golden/input_script_demo.png 0.05
+
+exit

@@ -7,6 +7,16 @@ description: Decision-making principles for planning, designing, and implementin
 
 This skill encodes the decision-making standards the AI agent must apply when planning features, designing APIs, choosing implementations, or making any judgment call on the user's behalf. These are not suggestions — they are rules that must be actively checked during planning and review.
 
+# Always remember the Goals of the Project
+The goal of this project is to create an easy to use and full featured game API. When we fix bugs, we don't just want them to go away, we want to make sure the behaviour is correct and furthers the overall goals of the project. When we add features, we want to make sure they are designed in a way that is consistent with the rest of the API and doesn't create unnecessary complexity or confusion for users. When we make design decisions, we want to make sure they are based on sound reasoning and not just convenience or personal preference.
+
+# Stop and plan before you act
+Before making any change, stop and ask yourself:
+- What is the goal of this change? What problem am I trying to solve?
+- What are the possible approaches to solving this problem? What are the tradeoffs of each approach?
+- What are the consequences of this change? How will it affect future work, user experience, and maintainability?
+- Is there a simpler way to achieve the same goal?
+
 ## When to use this skill
 
 - Planning a new feature or significant change

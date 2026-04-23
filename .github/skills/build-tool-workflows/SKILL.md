@@ -202,6 +202,24 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 **help.ps1**
 - No parameters - displays quick reference for all build scripts
 
+## Switching Build Configurations with Ninja
+
+`build.ps1` uses a single `build_ninja` directory and detects whether reconfiguration is needed by comparing the cached `CMAKE_BUILD_TYPE` and `CMAKE_EXPORT_COMPILE_COMMANDS` values against the requested ones. If either differs, it forces a reconfigure automatically.
+
+**However:** if an existing `build_ninja` cache was created with a different config *outside* of `build.ps1` (e.g. raw `cmake` commands), `build.ps1` may not detect the mismatch. When in doubt, clean first:
+
+```powershell
+.\scripts\clean.ps1 -Generator Ninja -Full
+.\scripts\build.ps1 -Generator Ninja -Config Release
+```
+
+**Rule:** Never assume changing `-Config` alone on an existing `build_ninja` tree switches the build type. Always clean or use `rebuild.ps1` when switching between Debug and Release to ensure a correct build.
+
+```powershell
+# Safe way to switch configs
+.\scripts\rebuild.ps1 -Generator Ninja -Config Release
+```
+
 ## Reference
 
 The sections below contain manual build commands for advanced troubleshooting. The scripts above handle all standard workflows.

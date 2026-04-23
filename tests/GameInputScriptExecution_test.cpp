@@ -281,4 +281,133 @@ TEST(InputScriptExecutor, AssertWithUndefinedVariableReferenceFailsGracefully) {
     EXPECT_EQ(env.exitCode, 1);
 }
 
+// ============================================================================
+// HoldKey execution
+// ============================================================================
+
+TEST(InputScriptExecutor, HoldKeyYieldsUntilDurationThenAdvances) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand hold = makeCommand(InputCommandType::HoldKey);
+    hold.keyCode = KEY_A;
+    hold.waitMs = 50.0;
+    state->commands = {hold};
+    executor.setState(std::move(state));
+
+    // Frame 1 (16 ms): keydown fires once, command yields.
+    executor.processFrame(0.016f);
+    auto* s = executor.getState();
+    ASSERT_NE(s, nullptr);
+    ASSERT_EQ(env.handler.keyPresses.size(), 1u);
+    EXPECT_EQ(env.handler.keyPresses[0], KEY_A);
+    EXPECT_TRUE(env.handler.keyReleases.empty());
+    EXPECT_EQ(s->currentCommand, 0u);
+
+    // Frame 2 (another 16 ms, total 32 ms): still holding, no second keydown.
+    executor.processFrame(0.016f);
+    EXPECT_EQ(env.handler.keyPresses.size(), 1u);
+    EXPECT_TRUE(env.handler.keyReleases.empty());
+    EXPECT_EQ(s->currentCommand, 0u);
+
+    // Frame 3 (another 25 ms, total 57 ms > 50 ms): keyup fires, command advances, script finishes.
+    executor.processFrame(0.025f);
+    ASSERT_EQ(env.handler.keyReleases.size(), 1u);
+    EXPECT_EQ(env.handler.keyReleases[0], KEY_A);
+    EXPECT_TRUE(s->finished);
+}
+
+TEST(InputScriptExecutor, HoldKeyEmitsModifiersAroundMainKey) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand hold = makeCommand(InputCommandType::HoldKey);
+    hold.keyCode = KEY_A;
+    hold.modifiers = INPUT_SCRIPT_MOD_CTRL;
+    hold.waitMs = 30.0;
+    state->commands = {hold};
+    executor.setState(std::move(state));
+
+    // Frame 1: ctrl down then A down.
+    executor.processFrame(0.016f);
+    ASSERT_EQ(env.handler.keyPresses.size(), 2u);
+    EXPECT_EQ(env.handler.keyPresses[0], KEY_LEFT_CONTROL);
+    EXPECT_EQ(env.handler.keyPresses[1], KEY_A);
+    EXPECT_TRUE(env.handler.keyReleases.empty());
+
+    // Frame 2: exceed duration -> A up then ctrl up.
+    executor.processFrame(0.020f);
+    ASSERT_EQ(env.handler.keyReleases.size(), 2u);
+    EXPECT_EQ(env.handler.keyReleases[0], KEY_A);
+    EXPECT_EQ(env.handler.keyReleases[1], KEY_LEFT_CONTROL);
+    EXPECT_TRUE(executor.getState()->finished);
+}
+
+TEST(InputScriptExecutor, PressWithShiftEmitsUppercase) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand cmd = makeCommand(InputCommandType::Press);
+    cmd.keyCode = KEY_A;
+    cmd.modifiers = INPUT_SCRIPT_MOD_SHIFT;
+    state->commands = {cmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    ASSERT_EQ(env.handler.charInputs.size(), 1u);
+    EXPECT_EQ(env.handler.charInputs[0], static_cast<unsigned int>('A'));
+}
+
+TEST(InputScriptExecutor, PressWithCtrlSuppressesCharInput) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand cmd = makeCommand(InputCommandType::Press);
+    cmd.keyCode = KEY_S;
+    cmd.modifiers = INPUT_SCRIPT_MOD_CTRL;
+    state->commands = {cmd};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    EXPECT_TRUE(env.handler.charInputs.empty());
+}
+
+TEST(InputScriptExecutor, OverlappingKeydownWithSharedModifierKeepsModifierActive) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    ScriptCommand kdA = makeCommand(InputCommandType::KeyDown);
+    kdA.keyCode = KEY_A;
+    kdA.modifiers = INPUT_SCRIPT_MOD_CTRL;
+    ScriptCommand kdB = makeCommand(InputCommandType::KeyDown);
+    kdB.keyCode = KEY_B;
+    kdB.modifiers = INPUT_SCRIPT_MOD_CTRL;
+    ScriptCommand kuA = makeCommand(InputCommandType::KeyUp);
+    kuA.keyCode = KEY_A;
+    kuA.modifiers = INPUT_SCRIPT_MOD_CTRL;
+
+    state->commands = {kdA, kdB, kuA};
+    executor.setState(std::move(state));
+
+    executor.processFrame(0.016f);
+
+    // keydown ctrl+A: ctrl pressed once (ref 0->1), A pressed
+    // keydown ctrl+B: ctrl NOT re-pressed (ref 1->2), B pressed
+    // keyup ctrl+A: A released, ctrl NOT yet released (ref 2->1)
+    ASSERT_EQ(env.handler.keyPresses.size(), 3u);
+    EXPECT_EQ(env.handler.keyPresses[0], KEY_LEFT_CONTROL);
+    EXPECT_EQ(env.handler.keyPresses[1], KEY_A);
+    EXPECT_EQ(env.handler.keyPresses[2], KEY_B);
+
+    ASSERT_EQ(env.handler.keyReleases.size(), 1u);
+    EXPECT_EQ(env.handler.keyReleases[0], KEY_A);  // ctrl not yet released
+}
+
 }  // namespace vde::test

@@ -373,6 +373,26 @@ static void drawTower(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, u
     fillRect(buf, stride, ox + 6, oy + 24, 4, 6, window);
 }
 
+static std::shared_ptr<vde::Texture> createCheckerTexture(vde::VulkanContext* context,
+                                                          uint32_t width, uint32_t height,
+                                                          uint32_t cellSize, RGBA light,
+                                                          RGBA dark) {
+    std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4);
+    for (uint32_t y = 0; y < height; ++y)
+        for (uint32_t x = 0; x < width; ++x) {
+            bool useLight = ((x / cellSize) + (y / cellSize)) % 2 == 0;
+            putPixel(pixels, width, x, y, useLight ? light : dark);
+        }
+
+    auto texture = std::make_shared<vde::Texture>();
+    texture->loadFromData(pixels.data(), width, height);
+    if (context) {
+        texture->uploadToGPU(context);
+    }
+
+    return texture;
+}
+
 // ============================================================================
 // Scene
 // ============================================================================
@@ -475,36 +495,38 @@ class SheetScene : public vde::examples::BaseExampleScene {
         // through while opaque sprite pixels occlude it.
         // =================================================================
         {
-            constexpr uint32_t kChkW = 32;
-            constexpr uint32_t kChkH = 32;
-            constexpr uint32_t kChkCell = 4;  // 8×8 grid of checks
+            // Match each panel's aspect and keep texel density near screen size so
+            // the engine's linear sampler stays crisp instead of smearing a tiny texture.
+            constexpr float kRightCheckerWorldW = 10.0f;
+            constexpr float kRightCheckerWorldH = 8.0f;
+            constexpr float kBottomCheckerWorldW = 16.0f;
+            constexpr float kBottomCheckerWorldH = 2.5f;
+            constexpr uint32_t kCheckerCellPx = 32;
+            constexpr uint32_t kRightCheckerTexW = 640;
+            constexpr uint32_t kRightCheckerTexH = 512;
+            constexpr uint32_t kBottomCheckerTexW = 1024;
+            constexpr uint32_t kBottomCheckerTexH = 160;
             constexpr RGBA kChkLight{200, 200, 200, 255};
             constexpr RGBA kChkDark{100, 100, 100, 255};
 
-            std::vector<uint8_t> chkPixels(kChkW * kChkH * 4);
-            for (uint32_t y = 0; y < kChkH; ++y)
-                for (uint32_t x = 0; x < kChkW; ++x) {
-                    bool light = ((x / kChkCell) + (y / kChkCell)) % 2 == 0;
-                    putPixel(chkPixels, kChkW, x, y, light ? kChkLight : kChkDark);
-                }
-
-            auto chkTex = std::make_shared<vde::Texture>();
-            chkTex->loadFromData(chkPixels.data(), kChkW, kChkH);
-            if (auto* ctx = getGame()->getVulkanContext()) {
-                chkTex->uploadToGPU(ctx);
-            }
+            auto* context = getGame()->getVulkanContext();
+            auto chkRightTex = createCheckerTexture(context, kRightCheckerTexW, kRightCheckerTexH,
+                                                    kCheckerCellPx, kChkLight, kChkDark);
+            auto chkBottomTex =
+                createCheckerTexture(context, kBottomCheckerTexW, kBottomCheckerTexH,
+                                     kCheckerCellPx, kChkLight, kChkDark);
 
             // Behind right-side extracted sprites
             auto chkRight = addEntity<vde::SpriteEntity>();
-            chkRight->setTexture(chkTex);
+            chkRight->setTexture(chkRightTex);
             chkRight->setPosition(3.5f, 1.5f, -0.1f);
-            chkRight->setScale(10.0f, 8.0f, 1.0f);
+            chkRight->setScale(kRightCheckerWorldW, kRightCheckerWorldH, 1.0f);
 
             // Behind bottom interactive player strip
             auto chkBottom = addEntity<vde::SpriteEntity>();
-            chkBottom->setTexture(chkTex);
+            chkBottom->setTexture(chkBottomTex);
             chkBottom->setPosition(0.0f, -3.8f, -0.1f);
-            chkBottom->setScale(16.0f, 2.5f, 1.0f);
+            chkBottom->setScale(kBottomCheckerWorldW, kBottomCheckerWorldH, 1.0f);
         }
 
         // =================================================================

@@ -22,11 +22,59 @@ namespace vde {
 
 namespace {
 
-void emitScriptCharInput(InputHandler& handler, int keyCode) {
+void emitScriptCharInput(InputHandler& handler, int keyCode, int modifiers) {
+    // Control and Alt chords don't produce text input in real systems.
+    if (modifiers & (INPUT_SCRIPT_MOD_CTRL | INPUT_SCRIPT_MOD_ALT)) {
+        return;
+    }
     if (keyCode >= KEY_A && keyCode <= KEY_Z) {
-        handler.onCharInput(static_cast<unsigned int>(keyCode + 32));
+        // KEY_A..KEY_Z are ASCII 65..90 ('A'..'Z').
+        // Shift produces uppercase; bare key produces lowercase (+32).
+        unsigned int codepoint = (modifiers & INPUT_SCRIPT_MOD_SHIFT)
+                                     ? static_cast<unsigned int>(keyCode)
+                                     : static_cast<unsigned int>(keyCode + 32);
+        handler.onCharInput(codepoint);
     } else if (keyCode >= KEY_SPACE && keyCode <= 126) {
         handler.onCharInput(static_cast<unsigned int>(keyCode));
+    }
+}
+
+void emitModifierKeysDown(InputHandler& handler, int modifiers, InputScriptState& state) {
+    if (modifiers & INPUT_SCRIPT_MOD_CTRL) {
+        if (state.modifierRefCounts[KEY_LEFT_CONTROL]++ == 0) {
+            handler.onKeyPress(KEY_LEFT_CONTROL);
+        }
+    }
+    if (modifiers & INPUT_SCRIPT_MOD_SHIFT) {
+        if (state.modifierRefCounts[KEY_LEFT_SHIFT]++ == 0) {
+            handler.onKeyPress(KEY_LEFT_SHIFT);
+        }
+    }
+    if (modifiers & INPUT_SCRIPT_MOD_ALT) {
+        if (state.modifierRefCounts[KEY_LEFT_ALT]++ == 0) {
+            handler.onKeyPress(KEY_LEFT_ALT);
+        }
+    }
+}
+
+void emitModifierKeysUp(InputHandler& handler, int modifiers, InputScriptState& state) {
+    if (modifiers & INPUT_SCRIPT_MOD_ALT) {
+        int& count = state.modifierRefCounts[KEY_LEFT_ALT];
+        if (count > 0 && --count == 0) {
+            handler.onKeyRelease(KEY_LEFT_ALT);
+        }
+    }
+    if (modifiers & INPUT_SCRIPT_MOD_SHIFT) {
+        int& count = state.modifierRefCounts[KEY_LEFT_SHIFT];
+        if (count > 0 && --count == 0) {
+            handler.onKeyRelease(KEY_LEFT_SHIFT);
+        }
+    }
+    if (modifiers & INPUT_SCRIPT_MOD_CTRL) {
+        int& count = state.modifierRefCounts[KEY_LEFT_CONTROL];
+        if (count > 0 && --count == 0) {
+            handler.onKeyRelease(KEY_LEFT_CONTROL);
+        }
     }
 }
 
@@ -202,10 +250,11 @@ const InputScriptExecutor::Handler InputScriptExecutor::s_handlers[] = {
     &InputScriptExecutor::handleAssertScene,       // AssertScene
     &InputScriptExecutor::handleCompare,           // Compare
     &InputScriptExecutor::handleSet,               // Set
+    &InputScriptExecutor::handleHoldKey,           // HoldKey
 };
 
 InputScriptExecutor::InputScriptExecutor(ScriptEnvironment& env) : m_env(env) {
-    static_assert(std::size(s_handlers) == static_cast<size_t>(InputCommandType::Set) + 1,
+    static_assert(std::size(s_handlers) == static_cast<size_t>(InputCommandType::HoldKey) + 1,
                   "Dispatch table out of sync with InputCommandType enum");
 }
 
@@ -300,9 +349,11 @@ bool InputScriptExecutor::handleWaitMs(InputScriptState& state, const ScriptComm
 
 bool InputScriptExecutor::handlePress(InputScriptState& state, const ScriptCommand& cmd) {
     if (InputHandler* handler = m_env.resolveInputHandler()) {
+        emitModifierKeysDown(*handler, cmd.modifiers, state);
         handler->onKeyPress(cmd.keyCode);
         handler->onKeyRelease(cmd.keyCode);
-        emitScriptCharInput(*handler, cmd.keyCode);
+        emitScriptCharInput(*handler, cmd.keyCode, cmd.modifiers);
+        emitModifierKeysUp(*handler, cmd.modifiers, state);
     }
 
     state.currentCommand++;
@@ -311,6 +362,7 @@ bool InputScriptExecutor::handlePress(InputScriptState& state, const ScriptComma
 
 bool InputScriptExecutor::handleKeyDown(InputScriptState& state, const ScriptCommand& cmd) {
     if (InputHandler* handler = m_env.resolveInputHandler()) {
+        emitModifierKeysDown(*handler, cmd.modifiers, state);
         handler->onKeyPress(cmd.keyCode);
     }
 
@@ -321,10 +373,43 @@ bool InputScriptExecutor::handleKeyDown(InputScriptState& state, const ScriptCom
 bool InputScriptExecutor::handleKeyUp(InputScriptState& state, const ScriptCommand& cmd) {
     if (InputHandler* handler = m_env.resolveInputHandler()) {
         handler->onKeyRelease(cmd.keyCode);
+        emitModifierKeysUp(*handler, cmd.modifiers, state);
     }
 
     state.currentCommand++;
     return true;
+}
+
+bool InputScriptExecutor::handleHoldKey(InputScriptState& state, const ScriptCommand& cmd) {
+    if (!state.holdKeyActive) {
+        // First entry: send keydown to simulate the user pressing and holding the key.
+        // If no handler is available yet, yield without starting the timer.
+        InputHandler* handler = m_env.resolveInputHandler();
+        if (!handler) {
+            return false;
+        }
+        emitModifierKeysDown(*handler, cmd.modifiers, state);
+        handler->onKeyPress(cmd.keyCode);
+        state.holdKeyActive = true;
+    }
+
+    state.waitAccumulator += static_cast<double>(m_deltaTime) * 1000.0;
+    if (state.waitAccumulator >= cmd.waitMs) {
+        // Hold duration elapsed: send keyup to release the key.
+        // If handler not available, yield without releasing until it is.
+        InputHandler* handler = m_env.resolveInputHandler();
+        if (!handler) {
+            return false;
+        }
+        handler->onKeyRelease(cmd.keyCode);
+        emitModifierKeysUp(*handler, cmd.modifiers, state);
+        state.holdKeyActive = false;
+        state.waitAccumulator = 0.0;
+        state.currentCommand++;
+        return true;
+    }
+
+    return false;  // Yield — still holding.
 }
 
 bool InputScriptExecutor::handleClick(InputScriptState& state, const ScriptCommand& cmd) {

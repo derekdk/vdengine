@@ -47,6 +47,9 @@ inline float lerp(float from, float to, float t) {
  * @brief Inverse linear interpolation: returns where value falls in [from, to].
  * @return 0 when value == from, 1 when value == to.
  */
+#ifdef _MSC_VER
+__declspec(noinline)
+#endif
 inline float inverseLerp(float from, float to, float value) {
     float range = to - from;
     if (std::abs(range) < 0.0001f)
