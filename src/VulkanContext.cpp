@@ -117,12 +117,14 @@ void VulkanContext::cleanup() {
         m_surface = VK_NULL_HANDLE;
     }
 
-    if (kEnableValidationLayers && m_debugMessenger != VK_NULL_HANDLE) {
-        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            m_instance, "vkDestroyDebugUtilsMessengerEXT");
-        if (func != nullptr) {
-            func(m_instance, m_debugMessenger, nullptr);
-            m_debugMessenger = VK_NULL_HANDLE;
+    if constexpr (kEnableValidationLayers) {
+        if (m_debugMessenger != VK_NULL_HANDLE) {
+            auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+                m_instance, "vkDestroyDebugUtilsMessengerEXT");
+            if (func != nullptr) {
+                func(m_instance, m_debugMessenger, nullptr);
+                m_debugMessenger = VK_NULL_HANDLE;
+            }
         }
     }
 
@@ -237,7 +239,7 @@ std::vector<const char*> VulkanContext::getRequiredExtensions() {
 
     std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-    if (kEnableValidationLayers) {
+    if constexpr (kEnableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
@@ -245,8 +247,10 @@ std::vector<const char*> VulkanContext::getRequiredExtensions() {
 }
 
 void VulkanContext::createInstance() {
-    if (kEnableValidationLayers && !checkValidationLayerSupport()) {
-        throw std::runtime_error("Validation layers requested but not available!");
+    if constexpr (kEnableValidationLayers) {
+        if (!checkValidationLayerSupport()) {
+            throw std::runtime_error("Validation layers requested but not available!");
+        }
     }
 
     VkApplicationInfo appInfo{};
@@ -266,7 +270,7 @@ void VulkanContext::createInstance() {
     createInfo.ppEnabledExtensionNames = extensions.data();
 
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-    if (kEnableValidationLayers) {
+    if constexpr (kEnableValidationLayers) {
         createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
         createInfo.ppEnabledLayerNames = m_validationLayers.data();
         populateDebugMessengerCreateInfo(debugCreateInfo);
@@ -306,18 +310,17 @@ void VulkanContext::populateDebugMessengerCreateInfo(
 }
 
 void VulkanContext::setupDebugMessenger() {
-    if (!kEnableValidationLayers)
-        return;
+    if constexpr (kEnableValidationLayers) {
+        VkDebugUtilsMessengerCreateInfoEXT createInfo;
+        populateDebugMessengerCreateInfo(createInfo);
 
-    VkDebugUtilsMessengerCreateInfoEXT createInfo;
-    populateDebugMessengerCreateInfo(createInfo);
+        auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            m_instance, "vkCreateDebugUtilsMessengerEXT");
 
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-        m_instance, "vkCreateDebugUtilsMessengerEXT");
-
-    if (func != nullptr) {
-        if (func(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to set up debug messenger!");
+        if (func != nullptr) {
+            if (func(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to set up debug messenger!");
+            }
         }
     }
 }
@@ -470,7 +473,7 @@ void VulkanContext::createLogicalDevice() {
     createInfo.enabledExtensionCount = static_cast<uint32_t>(m_deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
 
-    if (kEnableValidationLayers) {
+    if constexpr (kEnableValidationLayers) {
         createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
         createInfo.ppEnabledLayerNames = m_validationLayers.data();
     } else {

@@ -13,7 +13,6 @@ option(VDE_TIMING "Enable per-TU compiler timing flags (MSVC: /Bt, GCC/Clang: -f
 
 # Compiler options
 if(MSVC)
-    add_compile_options(/W4 /FS)
     add_compile_definitions(
         _CRT_SECURE_NO_WARNINGS
         NOMINMAX
@@ -74,7 +73,11 @@ if(NOT TARGET glm)
             GIT_REPOSITORY https://github.com/g-truc/glm.git
             GIT_TAG 1.0.1
         )
+        # Suppress cmake_minimum_required deprecation from glm 1.0.1
+        set(_prev_warn_deprecated ${CMAKE_WARN_DEPRECATED})
+        set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(glm)
+        set(CMAKE_WARN_DEPRECATED ${_prev_warn_deprecated} CACHE BOOL "" FORCE)
     endif()
 endif()
 
@@ -98,6 +101,20 @@ set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
 # Only fetch if not already available
 if(NOT TARGET glslang)
     FetchContent_MakeAvailable(glslang)
+endif()
+
+# Suppress warnings from third-party glslang targets
+if(TARGET MachineIndependent)
+    foreach(_glslang_target
+        glslang MachineIndependent OSDependent GenericCodeGen SPIRV
+        glslang-default-resource-limits glslang-standalone)
+        if(TARGET ${_glslang_target})
+            target_compile_options(${_glslang_target} PRIVATE
+                $<$<CXX_COMPILER_ID:MSVC>:/W0>
+                $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+            )
+        endif()
+    endforeach()
 endif()
 
 # miniaudio for cross-platform audio
