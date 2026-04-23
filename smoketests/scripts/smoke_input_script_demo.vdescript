@@ -1,0 +1,80 @@
+# smoke_input_script_demo.vdescript
+# Exercises every scripted input feature and asserts the final scene state.
+# No render comparison — that is handled by verify_input_script_demo.vdescript.
+
+wait startup
+
+print === Input Script Demo: Smoke Test ===
+
+# ── Feature 1: wait (ms and s suffix) ────────────────────────────────────────
+wait 50
+wait 0.05s
+
+# ── Feature 2: press — bare key → Panel 0 (Red) ──────────────────────────────
+print Step 1: press A  (bare key press)
+press A
+wait 100
+
+# ── Feature 3: keydown + keyup → Panel 1 (Green) ─────────────────────────────
+print Step 2: keydown W then keyup W  (explicit pair)
+keydown W
+wait 200
+keyup W
+wait 100
+
+# ── Feature 4: hold → Panel 2 (Teal) ─────────────────────────────────────────
+print Step 3: hold RIGHT 400  (timed hold)
+hold RIGHT 400
+wait 100
+
+# ── Feature 5: shift modifier → Panel 3 (Orange) ─────────────────────────────
+print Step 4: press shift+B  (shift modifier)
+press shift+B
+wait 100
+
+# ── Feature 6: ctrl modifier → Panel 4 (Yellow) ──────────────────────────────
+print Step 5: press ctrl+D  (ctrl modifier, no char emitted)
+press ctrl+D
+wait 100
+
+# ── Feature 7: mouse click → Panel 5 (Blue) ──────────────────────────────────
+# pixel (520,468) = world (-1.5, -1.5) — inside panel 5 zone
+print Step 6: click 520 468  (left mouse click)
+click 520 468
+wait 100
+
+# ── Feature 8: scroll → Panel 6 (Purple) ─────────────────────────────────────
+print Step 7: scroll  (mouse wheel)
+scroll 760 468 -3
+wait 100
+
+# ── Feature 9: mousedown + mouseup → Panel 7 (White) ─────────────────────────
+# pixel (1000,468) = world (4.5, -1.5) — inside panel 7 drag zone
+print Step 8: mousedown + mouseup  (drag gesture)
+mousedown 1000 468
+wait 150
+mouseup 1000 468
+wait 100
+
+# ── Feature 10: mousemove → cursor sprite follows mouse ──────────────────────
+# pixel (640,108) = world (0.0, 3.5) — top centre
+print Step 9: mousemove 640 108  (cursor tracking)
+mousemove 640 108
+wait 100
+
+# ── Feature 11: label + loop → SPACE pressed exactly 3 times ─────────────────
+print Step 10: loop (press SPACE x3 via label + loop)
+label spin_start
+press SPACE
+wait 150
+loop spin_start 3
+
+wait 200
+
+# ── Feature 12: set + assert ──────────────────────────────────────────────────
+# Scene entities: 8 panels + 3 pips + 1 cursor = 12
+print Step 11: set and assert  (variable + assertion)
+set EXPECTED 12
+assert scene "main" entity_count == $EXPECTED
+
+exit

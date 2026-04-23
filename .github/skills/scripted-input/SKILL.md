@@ -78,9 +78,7 @@ exit                  # Quit the application
 | `keyup <key>` | Release key | `keyup W` |
 | `hold <key> <duration>` | Press, hold for duration, release | `hold right 500` |
 
-`hold` accepts the same duration formats as `wait`: milliseconds (`500`) or seconds with `s` suffix (`0.5s`). Modifiers work too: `hold ctrl+A 200`. This simulates a user pressing and holding a key for a real time duration, firing both `onKeyPress` and `onKeyRelease` at the right moments.
-
-**Modifiers:** `ctrl`, `shift`, `alt` (combine with `+`)
+`hold` accepts the same duration formats as `wait`: milliseconds (`500`) or seconds with `s` suffix (`0.5s`). Modifiers work too: `hold ctrl+A 200`. This simulates a user pressing and holding a key for a real time duration, firing both `onKeyPress` and `onKeyRelease` at the right moments. Modifier keys (`ctrl`, `shift`, `alt`) are pressed before the main key and released after it for all keyboard commands.
 
 **Supported keys:** A-Z, 0-9, SPACE, ENTER, ESC, TAB, arrow keys, function keys (F1-F12), numpad keys, punctuation. See `InputScript.cpp` for full key name map.
 

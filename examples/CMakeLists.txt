@@ -64,6 +64,9 @@ add_vde_example(vde_parallax_demo "parallax_demo/main.cpp")
 # Breakout demo - simple breakout clone demonstrating 2D gameplay and sprite collisions
 add_vde_example(vde_breakout_demo "breakout_demo/main.cpp")
 
+# Input Script Demo - validates all scripted input features with a unique colour-panel display
+add_vde_example(vde_input_script_demo NO_IMGUI "input_script_demo/main.cpp")
+
 # Asteroids demo - classic asteroids clone demonstrating spaceship control, collision detection, and game logic
 add_vde_example(vde_asteroids_demo "asteroids_demo/main.cpp")
 
