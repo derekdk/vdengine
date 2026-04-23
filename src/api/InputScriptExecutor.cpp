@@ -202,10 +202,11 @@ const InputScriptExecutor::Handler InputScriptExecutor::s_handlers[] = {
     &InputScriptExecutor::handleAssertScene,       // AssertScene
     &InputScriptExecutor::handleCompare,           // Compare
     &InputScriptExecutor::handleSet,               // Set
+    &InputScriptExecutor::handleHoldKey,           // HoldKey
 };
 
 InputScriptExecutor::InputScriptExecutor(ScriptEnvironment& env) : m_env(env) {
-    static_assert(std::size(s_handlers) == static_cast<size_t>(InputCommandType::Set) + 1,
+    static_assert(std::size(s_handlers) == static_cast<size_t>(InputCommandType::HoldKey) + 1,
                   "Dispatch table out of sync with InputCommandType enum");
 }
 
@@ -325,6 +326,30 @@ bool InputScriptExecutor::handleKeyUp(InputScriptState& state, const ScriptComma
 
     state.currentCommand++;
     return true;
+}
+
+bool InputScriptExecutor::handleHoldKey(InputScriptState& state, const ScriptCommand& cmd) {
+    if (!state.holdKeyActive) {
+        // First entry: send keydown to simulate the user pressing and holding the key.
+        if (InputHandler* handler = m_env.resolveInputHandler()) {
+            handler->onKeyPress(cmd.keyCode);
+        }
+        state.holdKeyActive = true;
+    }
+
+    state.waitAccumulator += static_cast<double>(m_deltaTime) * 1000.0;
+    if (state.waitAccumulator >= cmd.waitMs) {
+        // Hold duration elapsed: send keyup to release the key.
+        if (InputHandler* handler = m_env.resolveInputHandler()) {
+            handler->onKeyRelease(cmd.keyCode);
+        }
+        state.holdKeyActive = false;
+        state.waitAccumulator = 0.0;
+        state.currentCommand++;
+        return true;
+    }
+
+    return false;  // Yield — still holding.
 }
 
 bool InputScriptExecutor::handleClick(InputScriptState& state, const ScriptCommand& cmd) {

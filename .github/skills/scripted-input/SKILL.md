@@ -76,6 +76,9 @@ exit                  # Quit the application
 | `press <mod>+<key>` | Press with modifiers | `press ctrl+S` |
 | `keydown <key>` | Hold key down | `keydown W` |
 | `keyup <key>` | Release key | `keyup W` |
+| `hold <key> <duration>` | Press, hold for duration, release | `hold right 500` |
+
+`hold` accepts the same duration formats as `wait`: milliseconds (`500`) or seconds with `s` suffix (`0.5s`). Modifiers work too: `hold ctrl+A 200`. This simulates a user pressing and holding a key for a real time duration, firing both `onKeyPress` and `onKeyRelease` at the right moments.
 
 **Modifiers:** `ctrl`, `shift`, `alt` (combine with `+`)
 

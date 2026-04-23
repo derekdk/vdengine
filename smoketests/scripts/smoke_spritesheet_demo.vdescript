@@ -1,8 +1,8 @@
 # Smoke test: spritesheet_demo
 wait startup
 wait 500
-press right
+hold right 500
 wait 500
-press left
+hold left 500
 wait 500
 exit

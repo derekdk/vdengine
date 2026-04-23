@@ -686,6 +686,31 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
             return false;
         }
     }
+    // ---- hold ----
+    else if (verb == "hold") {
+        if (tokens.size() < 3) {
+            errorMsg = "at line " + std::to_string(lineNumber) +
+                       ": 'hold' requires a key argument and a duration (e.g. hold RIGHT 500)";
+            return false;
+        }
+        cmd.type = InputCommandType::HoldKey;
+        if (!parseKeyWithModifiers(tokens[1], cmd.keyCode, cmd.modifiers, errorMsg)) {
+            errorMsg = "at line " + std::to_string(lineNumber) + ": " + errorMsg;
+            return false;
+        }
+        std::string durArg = toLower(tokens[2]);
+        try {
+            if (durArg.back() == 's' && durArg.size() > 1) {
+                cmd.waitMs = std::stod(durArg.substr(0, durArg.size() - 1)) * 1000.0;
+            } else {
+                cmd.waitMs = std::stod(durArg);
+            }
+        } catch (...) {
+            errorMsg = "at line " + std::to_string(lineNumber) + ": invalid hold duration '" +
+                       tokens[2] + "'";
+            return false;
+        }
+    }
     // ---- unknown ----
     else {
         errorMsg =
