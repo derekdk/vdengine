@@ -30,7 +30,7 @@ The workflow writes to `logs/` inside the workspace:
 .\scripts\verify.ps1
 ```
 
-This runs: **Build → Unit Tests → Smoke Tests** and writes all output to two files:
+This runs: **Build → Unit Tests → Smoke Tests → Render Verification** and writes all output to two files:
 
 | File | Purpose |
 |------|---------|
@@ -69,6 +69,7 @@ The final summary is always at the bottom:
   BUILD : PASSED
   UNIT TESTS : PASSED
   SMOKE TESTS : FAILED
+  RENDER VERIFY : SKIPPED
   OVERALL: VERIFICATION FAILED
 ============================================
 ```
@@ -132,6 +133,7 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 |----------|---------|-------------|
 | `-SkipBuild` | — | Skip the build stage; use when code hasn't changed |
 | `-SkipSmoke` | — | Skip smoke tests; faster iteration on unit test failures |
+| `-SkipRenderVerify` | — | Skip render verification; use when visual output wasn't changed |
 | `-Filter <pattern>` | `*` | GoogleTest filter for unit tests (e.g. `"EmojiFont*"`) |
 | `-SmokeFilter <pattern>` | — | Exe wildcard for smoke tests (e.g. `"*emoji*"`) |
 | `-SmokeExtended` | — | Include priority 2 examples in smoke tests |

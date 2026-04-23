@@ -63,6 +63,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Diagnosing or resolving any defect, regression, crash, or incorrect behavior in engine code, examples, or tools.  
 **Location:** `.github/skills/fixing-bugs/SKILL.md`
 
+### linting
+**Purpose:** Guide for running static analysis and code quality checks using lint.ps1, including clang-format, cppcheck, clang-tidy, and GLSL validation.  
+**Use when:** Running linters locally, diagnosing a skipped or failing lint stage, setting up lint tools, or adding cppcheck suppressions.  
+**Location:** `.github/skills/linting/SKILL.md`
+
 ### vulkan-patterns
 **Purpose:** Vulkan patterns and common tasks for the VDE engine.  
 **Use when:** Working with Vulkan resources, buffers, textures, or descriptors.  
@@ -149,4 +154,5 @@ The following skills provide domain-specific knowledge for working with VDE:
 | Write a smoke test | `scripted-input` + `smoke-testing` |
 | Add render verification to an example | `render-verify` |
 | Capture or update golden images | `render-verify` |
+| Run static analysis / format checks | `linting` |
 | Verify before declaring done | `completing-work` + `ai-verification` |
