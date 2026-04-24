@@ -9,6 +9,52 @@
 
 namespace vde::tools {
 
+namespace {
+
+bool hasLaunchableExecutable(const ExecutableEntry& entry) {
+    return entry.executableFound && !entry.executablePath.empty();
+}
+
+std::filesystem::path buildEntryIdentityPath(const ExecutableEntry& entry,
+                                             const std::filesystem::path& repositoryRoot) {
+    if (hasLaunchableExecutable(entry)) {
+        return entry.executablePath;
+    }
+
+    if (!entry.sourceDirectory.empty()) {
+        return repositoryRoot / ".vlauncher" / "source-only" /
+               std::filesystem::relative(entry.sourceDirectory, repositoryRoot);
+    }
+
+    return repositoryRoot / ".vlauncher" / "source-only" / entry.targetName;
+}
+
+std::string getEntryDisplayPath(const ExecutableEntry& entry,
+                                const std::filesystem::path& repositoryRoot) {
+    std::error_code relError;
+    std::filesystem::path displayPath;
+
+    if (hasLaunchableExecutable(entry)) {
+        displayPath = std::filesystem::relative(entry.executablePath, repositoryRoot, relError);
+        if (relError || displayPath.empty()) {
+            displayPath = entry.executablePath;
+        }
+        return displayPath.generic_string();
+    }
+
+    if (!entry.sourceDirectory.empty()) {
+        displayPath = std::filesystem::relative(entry.sourceDirectory, repositoryRoot, relError);
+        if (relError || displayPath.empty()) {
+            displayPath = entry.sourceDirectory;
+        }
+        return displayPath.generic_string() + " [not built]";
+    }
+
+    return entry.targetName + " [not built]";
+}
+
+}  // namespace
+
 VLauncherScene::VLauncherScene(ToolMode mode) : BaseToolScene(mode) {}
 
 VLauncherScene::~VLauncherScene() {
@@ -39,7 +85,7 @@ void VLauncherScene::onEnter() {
         addConsoleMessage("WARNING: Failed to initialize run-log storage.");
     }
 
-    addConsoleMessage("VLauncher started. Monitoring examples/tools for executable updates.");
+    addConsoleMessage("VLauncher started. Monitoring examples/games/tools for executable updates.");
 }
 
 void VLauncherScene::onExit() {
@@ -248,18 +294,11 @@ void VLauncherScene::drawDebugUI() {
                         ImGui::TableNextRow();
                         ImGui::TableSetColumnIndex(0);
 
-                        std::error_code relError;
-                        std::filesystem::path displayPath = std::filesystem::relative(
-                            entry.executablePath, m_snapshot->repositoryRoot, relError);
-                        if (relError || displayPath.empty()) {
-                            displayPath = entry.executablePath;
-                        }
-
                         std::string subLabel = "    ";
                         if (isDefault) {
                             subLabel += "[default] ";
                         }
-                        subLabel += displayPath.generic_string();
+                        subLabel += getEntryDisplayPath(entry, m_snapshot->repositoryRoot);
                         subLabel += "##compact_sub_" + targetId;
 
                         const bool subSelected = (targetId == m_selectedTargetId);
@@ -269,7 +308,7 @@ void VLauncherScene::drawDebugUI() {
                             selectTargetForLogView(entry);
                         }
 
-                        if (ImGui::IsItemHovered() &&
+                        if (hasLaunchableExecutable(entry) && ImGui::IsItemHovered() &&
                             ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                             launchEntry(entry, targetId);
                         }
@@ -357,7 +396,7 @@ void VLauncherScene::drawDebugUI() {
                         selectTargetForLogView(defaultEntry);
                     }
 
-                    if (ImGui::IsItemHovered() &&
+                    if (hasLaunchableExecutable(defaultEntry) && ImGui::IsItemHovered() &&
                         ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                         launchEntry(defaultEntry, defaultTargetId);
                     }
@@ -414,27 +453,30 @@ void VLauncherScene::drawDebugUI() {
                 // Path column
                 ImGui::TableSetColumnIndex(7);
                 {
-                    std::error_code relError;
-                    std::filesystem::path displayPath = std::filesystem::relative(
-                        defaultEntry.executablePath, m_snapshot->repositoryRoot, relError);
-                    if (relError || displayPath.empty()) {
-                        displayPath = defaultEntry.executablePath;
-                    }
+                    std::string displayPath =
+                        getEntryDisplayPath(defaultEntry, m_snapshot->repositoryRoot);
                     if (isMulti) {
-                        std::string pathText = displayPath.generic_string() + " (+" +
+                        std::string pathText = displayPath + " (+" +
                                                std::to_string(group.entries.size() - 1) + " more)";
                         ImGui::TextUnformatted(pathText.c_str());
                     } else {
-                        ImGui::TextUnformatted(displayPath.generic_string().c_str());
+                        ImGui::TextUnformatted(displayPath.c_str());
                     }
                 }
 
                 // Run column
                 ImGui::TableSetColumnIndex(8);
                 {
-                    std::string buttonLabel = "Launch##" + defaultEntry.executablePath.string();
-                    if (ImGui::Button(buttonLabel.c_str())) {
+                    std::string buttonLabel = "Launch##" + defaultTargetId;
+                    if (!hasLaunchableExecutable(defaultEntry)) {
+                        ImGui::BeginDisabled();
+                    }
+                    if (ImGui::Button(buttonLabel.c_str()) &&
+                        hasLaunchableExecutable(defaultEntry)) {
                         launchEntry(defaultEntry, defaultTargetId);
+                    }
+                    if (!hasLaunchableExecutable(defaultEntry)) {
+                        ImGui::EndDisabled();
                     }
                 }
 
@@ -465,13 +507,7 @@ void VLauncherScene::drawDebugUI() {
                                 subLabel += "*  ";
                             }
 
-                            std::error_code relError;
-                            std::filesystem::path displayPath = std::filesystem::relative(
-                                entry.executablePath, m_snapshot->repositoryRoot, relError);
-                            if (relError || displayPath.empty()) {
-                                displayPath = entry.executablePath;
-                            }
-                            subLabel += displayPath.generic_string();
+                            subLabel += getEntryDisplayPath(entry, m_snapshot->repositoryRoot);
                             subLabel += "##sub_" + targetId;
 
                             const bool subSelected = (targetId == m_selectedTargetId);
@@ -481,7 +517,7 @@ void VLauncherScene::drawDebugUI() {
                                 selectTargetForLogView(entry);
                             }
 
-                            if (ImGui::IsItemHovered() &&
+                            if (hasLaunchableExecutable(entry) && ImGui::IsItemHovered() &&
                                 ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                                 launchEntry(entry, targetId);
                             }
@@ -548,21 +584,24 @@ void VLauncherScene::drawDebugUI() {
                         // Path
                         ImGui::TableSetColumnIndex(7);
                         {
-                            std::error_code relError;
-                            std::filesystem::path displayPath = std::filesystem::relative(
-                                entry.executablePath, m_snapshot->repositoryRoot, relError);
-                            if (relError || displayPath.empty()) {
-                                displayPath = entry.executablePath;
-                            }
-                            ImGui::TextUnformatted(displayPath.generic_string().c_str());
+                            std::string displayPath =
+                                getEntryDisplayPath(entry, m_snapshot->repositoryRoot);
+                            ImGui::TextUnformatted(displayPath.c_str());
                         }
 
                         // Run
                         ImGui::TableSetColumnIndex(8);
                         {
-                            std::string buttonLabel = "Launch##" + entry.executablePath.string();
-                            if (ImGui::Button(buttonLabel.c_str())) {
+                            std::string buttonLabel = "Launch##" + targetId;
+                            if (!hasLaunchableExecutable(entry)) {
+                                ImGui::BeginDisabled();
+                            }
+                            if (ImGui::Button(buttonLabel.c_str()) &&
+                                hasLaunchableExecutable(entry)) {
                                 launchEntry(entry, targetId);
+                            }
+                            if (!hasLaunchableExecutable(entry)) {
+                                ImGui::EndDisabled();
                             }
                         }
 
@@ -688,7 +727,12 @@ void VLauncherScene::drawEntryContextMenu(const ExecutableEntry& entry,
         ImGui::TextDisabled("(source directory not found)");
     }
 
-    if (!entry.smokeScripts.empty()) {
+    if (!hasLaunchableExecutable(entry)) {
+        ImGui::BeginDisabled();
+        ImGui::MenuItem("Run Smoke Test");
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("(build target first)");
+    } else if (!entry.smokeScripts.empty()) {
         if (entry.smokeScripts.size() == 1) {
             if (ImGui::MenuItem("Run Smoke Test")) {
                 launchEntryWithSmokeTest(entry, buildTargetId(entry), entry.smokeScripts.front());
@@ -717,6 +761,12 @@ void VLauncherScene::drawEntryContextMenu(const ExecutableEntry& entry,
 }
 
 void VLauncherScene::launchEntry(const ExecutableEntry& entry, const std::string& targetId) {
+    if (!hasLaunchableExecutable(entry)) {
+        addConsoleMessage("Executable missing for " + entry.targetName +
+                          ". Build the target first.");
+        return;
+    }
+
     std::string launchError;
     LaunchedProcess launchedProcess;
     if (ProcessLauncher::launchWithOutputCapture(entry.executablePath, launchedProcess,
@@ -747,7 +797,7 @@ std::string VLauncherScene::buildTargetId(const ExecutableEntry& entry) const {
         }
     }
 
-    return RunLogStorage::buildTargetId(root, entry.executablePath);
+    return RunLogStorage::buildTargetId(root, buildEntryIdentityPath(entry, root));
 }
 
 void VLauncherScene::selectTargetForLogView(const ExecutableEntry& entry) {
@@ -979,14 +1029,10 @@ void VLauncherScene::resolveGroupDefault(TargetGroup& group) const {
             if (root.empty()) {
                 root = std::filesystem::current_path(ec);
             }
-            auto relPath = std::filesystem::relative(group.entries[i].executablePath, root, ec);
-            if (!ec && relPath.generic_string() == savedPath) {
-                group.defaultIndex = i;
-                return;
-            }
-            // Fallback: compare using the absolute path so that defaults saved
-            // when relative() failed (absolute format) can still match.
-            if (ec && group.entries[i].executablePath.generic_string() == savedPath) {
+            auto identityPath = buildEntryIdentityPath(group.entries[i], root);
+            auto relPath = std::filesystem::relative(identityPath, root, ec);
+            std::string comparePath = ec ? identityPath.generic_string() : relPath.generic_string();
+            if (comparePath == savedPath) {
                 group.defaultIndex = i;
                 return;
             }
@@ -1012,8 +1058,9 @@ void VLauncherScene::saveGroupDefault(const std::string& targetName, const Execu
         root = std::filesystem::current_path(ec);
     }
 
-    auto relPath = std::filesystem::relative(entry.executablePath, root, ec);
-    std::string pathStr = ec ? entry.executablePath.generic_string() : relPath.generic_string();
+    auto identityPath = buildEntryIdentityPath(entry, root);
+    auto relPath = std::filesystem::relative(identityPath, root, ec);
+    std::string pathStr = ec ? identityPath.generic_string() : relPath.generic_string();
 
     m_groupDefaults[targetName] = pathStr;
     storage.setStringData(std::string(kGroupDefaultKeyPrefix) + targetName, pathStr);

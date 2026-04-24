@@ -11,7 +11,7 @@ This skill defines the required verification steps before an AI agent may tell t
 
 - After writing or modifying any script (PowerShell, batch, shell, Python, etc.)
 - After writing or modifying any build, test, or automation workflow
-- After adding a new tool, example, or utility that can be executed
+- After adding a new tool, game, example, or utility that can be executed
 - Any time you are about to tell the user "it's done" or "it's working"
 
 ## The Core Rule
@@ -24,11 +24,11 @@ Reasoning about whether code is correct is not the same as running it. Scripts c
 
 ### Required order for code and executable changes
 
-If you changed code that affects a buildable or runnable artifact (engine code, tests, examples, tools, launch flows, or build/test workflows), the verification order is:
+If you changed code that affects a buildable or runnable artifact (engine code, tests, examples, games, tools, launch flows, or build/test workflows), the verification order is:
 
 1. Build the project or affected target and read the output.
 2. Run unit tests and confirm they pass.
-3. Run smoke tests when the change affects examples, tools, rendering, input, windowing, launch flows, or other runtime behavior.
+3. Run smoke tests when the change affects examples, games, tools, rendering, input, windowing, launch flows, or other runtime behavior.
 4. Confirm the expected artifact or runtime outcome exists.
 5. Only then run a subagent code review.
 6. If the review causes more edits, repeat the same verification sequence before re-review.
@@ -169,9 +169,9 @@ Do not:
 - Run script A, confirm it works, then write script B and announce both are done without running B.
 - Run a simplified version of a script to verify part of it while skipping the full end-to-end path.
 
-### Examples, tools, and other runnable artifacts
+### Examples, games, tools, and other runnable artifacts
 
-When you add or modify an example, tool, launcher flow, or any other runnable executable behavior:
+When you add or modify an example, game, tool, launcher flow, or any other runnable executable behavior:
 
 1. Build the project and confirm the target was produced.
 2. Run the unit test suite unless the task is explicitly docs-only.

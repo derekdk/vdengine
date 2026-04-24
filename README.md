@@ -61,7 +61,7 @@ VDE provides PowerShell scripts that handle all environment setup automatically:
 # Run specific tests
 .\scripts\test.ps1 -Filter "CameraTest.*"
 
-# Run smoke tests against all examples
+# Run smoke tests against examples, games, and tools
 .\scripts\smoke-test.ps1
 
 # Clean rebuild
@@ -226,6 +226,7 @@ vdengine/
 ├── shaders/               # GLSL shader sources
 ├── tests/                 # Unit tests (Google Test)
 ├── examples/              # Example applications (30+)
+├── games/                 # Larger playable applications and prototypes
 ├── tools/                 # Asset creation tools (VLauncher, geometry REPL, resource editor)
 ├── scripts/               # Build/test/format PowerShell scripts
 └── third_party/           # Vendored dependencies (if present)
@@ -245,7 +246,7 @@ VDE uses CMake FetchContent for most dependencies. Only the Vulkan SDK requires 
 | **miniaudio** | 0.11.21 | Cross-platform audio |
 | **SQLite3** | 3.49.1 | Persistent key-value storage |
 | **toml++** | v3.4.0 | TOML configuration parsing |
-| **Dear ImGui** | v1.91.8-docking | Debug UI (examples and tools only) |
+| **Dear ImGui** | v1.91.8-docking | Debug UI (examples, games, and tools) |
 | **Google Test** | 1.14.0 | Unit testing |
 
 ## Configuration Options
@@ -259,6 +260,9 @@ cmake .. -DVDE_BUILD_TESTS=OFF
 
 # Disable building examples
 cmake .. -DVDE_BUILD_EXAMPLES=OFF
+
+# Disable building games
+cmake .. -DVDE_BUILD_GAMES=OFF
 
 # Disable building tools
 cmake .. -DVDE_BUILD_TOOLS=OFF

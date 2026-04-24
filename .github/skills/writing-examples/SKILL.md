@@ -13,6 +13,8 @@ This skill describes the standard pattern for creating example programs in VDE t
 - Writing a visual demo for testing rendering functionality
 - Building interactive samples for documentation
 
+If the work is becoming a multi-file playable application rather than a focused demonstration, stop and use `writing-games` instead.
+
 Always build and run the example to verify it works correctly and follows the expected pattern.
 
 ## Completion
@@ -94,14 +96,8 @@ scripts = ["smoke_my_demo_variant.vdescript"]
 sections = ["physics", "input"]
 ```
 
-**Also add to smoke-test.ps1:**
-Edit `scripts/smoke-test.ps1` to add your example to the `$smokeScriptMap` for CI validation. Without this entry, the CI runner falls back to `smoke_quick.vdescript` which only verifies launch and exit:
-
-```powershell
-$smokeScriptMap = @{
-  'vde_my_demo.exe' = 'smoke_my_demo.vdescript'
-}
-```
+**No extra smoke-test mapping is needed for examples:**
+The smoke runner reads example metadata from `vde.toml`. Explicit script maps in `scripts/smoke-test.ps1` are for tools only.
 
 **Run smoke tests:**
 ```bash

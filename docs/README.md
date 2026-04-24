@@ -21,4 +21,5 @@ This folder contains documentation for the Vulkan Display Engine.
 
 - [Main README](../README.md) - Project overview and build instructions
 - [Examples](../examples/) - Sample applications
+- [Games](../games/) - Larger game applications and prototypes
 - [Tests](../tests/) - Unit test documentation

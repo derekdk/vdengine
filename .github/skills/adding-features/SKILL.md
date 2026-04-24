@@ -33,7 +33,7 @@ If the requested feature is underspecified, implement the smallest coherent slic
 - Prefer extending the correct subsystem over introducing one-off helpers.
 - If you are adding a public API, match surrounding naming, error handling, and lifecycle conventions.
 - If you are adding a new component or subsystem, also consult the `add-component` skill.
-- If you are changing examples or tools, also consult `writing-examples` or `writing-tools` as applicable.
+- If you are changing examples, games, or tools, also consult `writing-examples`, `writing-games`, or `writing-tools` as applicable.
 
 ### Step 3 — Implement the feature
 
@@ -67,4 +67,4 @@ Refer to the `writing-code` skill for code organization, naming, and CMake integ
 - `writing-code` — conventions for engine code
 - `add-component` — adding new engine subsystems or classes
 - `create-tests` — adding unit tests
-- `writing-examples` / `writing-tools` — feature work in demos and tools
+- `writing-examples` / `writing-games` / `writing-tools` — feature work in demos, games, and tools

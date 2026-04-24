@@ -170,7 +170,7 @@ if ($totalDeltaMs -lt 0) { Write-CmpOk $sumLine } elseif ($totalDeltaMs -gt 0) {
 
 Write-CmpInfo ""
 Write-CmpInfo "--- Per-target totals ---"
-$targetOrder = @('vde','examples','tools','tests','deps','other')
+$targetOrder = @('vde','examples','games','tools','tests','deps','other')
 foreach ($t in $targetOrder) {
     $tr = Get-TargetRows @($rows) $t
     if ($null -eq $tr) { continue }

@@ -255,3 +255,7 @@ For each scene in active SceneGroup:
 | `physics_demo` | Physics simulation |
 | `parallel_physics_demo` | Multi-threaded physics |
 | `physics_audio_demo` | Physics → game logic → audio pipeline |
+
+## Games
+
+The `games/` directory is for more involved, multi-file playable applications that sit between lightweight examples and authoring tools. Games still use the Game API and the same scripted-input smoke workflow as examples, but they are organized like tools with a per-game subdirectory, their own `CMakeLists.txt`, and room for multiple source files by concern.

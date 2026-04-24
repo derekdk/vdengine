@@ -211,6 +211,19 @@ int main(int argc, char** argv) {
 
 No additional code needed - `runExample` handles CLI parsing and script setup.
 
+### Adding to a Game
+
+Games support scripted input via `runGame()` from `games/GameBase.h`:
+
+```cpp
+int main(int argc, char** argv) {
+   MyGameClass game;
+   return vde::games::runGame(game, "My Game", 1280, 720, argc, argv);
+}
+```
+
+No additional code needed - `runGame` handles CLI parsing and script setup.
+
 ### Adding to a Tool
 
 Tools support scripted input via `runTool()`:
@@ -254,7 +267,7 @@ int main(int argc, char** argv) {
 
 ### Creating Smoke Tests
 
-1. **Create a smoke script** in `smoketests/scripts/<example_name>.vdescript`:
+1. **Create a smoke script** in `smoketests/scripts/smoke_<name>.vdescript`:
    ```vdescript
    wait startup
    wait 100
@@ -263,7 +276,7 @@ int main(int argc, char** argv) {
 
 2. **Run the test:**
    ```bash
-   build_ninja\examples\vde_physics_demo.exe --input-script smoketests/scripts/smoke_physics_demo.vdescript
+   build_ninja\games\my_game\vde_my_game.exe --input-script smoketests/scripts/smoke_my_game.vdescript
    ```
 
 3. **Check exit code:** Exit code 0 = success.
@@ -276,7 +289,7 @@ Use the smoke test runner:
 .\scripts\smoke-test.ps1
 ```
 
-This script runs all examples with their smoke scripts and reports results. See the **smoke-testing** skill for the full reference.
+This script runs all discovered examples, games, and tools with their smoke scripts and reports results. See the **smoke-testing** skill for the full reference.
 
 ## Best Practices
 

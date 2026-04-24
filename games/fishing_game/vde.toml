@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_fishing_game.vdescript"]
+priority = 2
+sections = ["entity", "input", "text"]

@@ -1,7 +1,7 @@
 ```skill
 ---
 name: smoke-testing
-description: Guide for running smoke tests in VDE and interpreting the results. Use this when running, debugging, or extending automated smoke tests for examples and tools.
+description: Guide for running smoke tests in VDE and interpreting the results. Use this when running, debugging, or extending automated smoke tests for examples, games, and tools.
 ---
 
 # VDE Smoke Testing
@@ -10,7 +10,7 @@ This skill describes how to run smoke tests, interpret their results, add smoke 
 
 ## When to use this skill
 
-- Running smoke tests for examples, tools, or both
+- Running smoke tests for examples, games, tools, or any combination of them
 - Interpreting smoke test output and diagnosing failures
 - Adding a smoke test for a new example or tool
 - Filtering smoke tests to run a subset
@@ -18,7 +18,7 @@ This skill describes how to run smoke tests, interpret their results, add smoke 
 
 ## Required: Smoke tests are long-running
 
-Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the script launches every discovered example and tool one at a time.
+Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the script launches every discovered example, game, and tool one at a time.
 
 ### Preferred approach for AI agents: use verify.ps1
 
@@ -65,7 +65,7 @@ For broader rules about long-running commands, timeouts, and truncated output, a
 
 ## Overview
 
-Smoke tests verify that every VDE example and tool can launch, render, and exit cleanly. The system **auto-discovers** all `vde_*.exe` executables in the build directory — you never need to maintain a hardcoded list. Each executable runs with a `.vdescript` input script that automates startup, brief interaction, and clean exit via the `--input-script` CLI argument.
+Smoke tests verify that every VDE example, game, and tool can launch, render, and exit cleanly. The system **auto-discovers** all `vde_*.exe` executables in the build directory — you never need to maintain a hardcoded list. Each executable runs with a `.vdescript` input script that automates startup, brief interaction, and clean exit via the `--input-script` CLI argument.
 
 ## Quick Reference
 
@@ -74,6 +74,7 @@ Smoke tests verify that every VDE example and tool can launch, render, and exit 
 | Run priority 1 smoke tests | `.\scripts\smoke-test.ps1` |
 | Run all (priority 1 + 2) | `.\scripts\smoke-test.ps1 -Extended` |
 | Examples only | `.\scripts\smoke-test.ps1 -Category Examples` |
+| Games only | `.\scripts\smoke-test.ps1 -Category Games` |
 | Tools only | `.\scripts\smoke-test.ps1 -Category Tools` |
 | Filter by name | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
 | Build first | `.\scripts\smoke-test.ps1 -Build` |
@@ -85,9 +86,9 @@ Smoke tests verify that every VDE example and tool can launch, render, and exit 
 
 | Parameter | Values | Default | Description |
 |-----------|--------|---------|-------------|
-| `-Category` | `All`, `Examples`, `Tools` | `All` | Which category of executables to test |
+| `-Category` | `All`, `Examples`, `Games`, `Tools` | `All` | Which category of executables to test |
 | `-Filter` | Wildcard pattern | (none) | Filter executable names (e.g. `"*physics*"`, `"vde_vlauncher*"`) |
-| `-Extended` | switch | `$false` | Include priority 2 examples (default run only tests priority 1) |
+| `-Extended` | switch | `$false` | Include priority 2 examples and games (default run only tests priority 1) |
 | `-Generator` | `MSBuild`, `Ninja` | `Ninja` | Which build system output to test |
 | `-Config` | `Debug`, `Release` | `Debug` | Build configuration |
 | `-Build` | switch | `$false` | Build the project before testing |
@@ -95,10 +96,10 @@ Smoke tests verify that every VDE example and tool can launch, render, and exit 
 
 ## Smoke Priority Model
 
-Each example declares a **smoke priority** (1 or 2) in its `vde.toml` file:
+Each metadata-driven app category declares a **smoke priority** (1 or 2) in its `vde.toml` file. This applies to examples and games:
 
-- **Priority 1** — Core examples that cover unique API subsystems. Run by default in every smoke test invocation, `verify.ps1`, and CI. The priority-1 set is chosen so that every canonical API section (`core`, `entity`, `resource`, `input`, `camera`, `lighting`, `physics`, `audio`, `multi_scene`, `transitions`, `text`, `ui`, `storage`, `world_bounds`) is covered by at least one priority-1 example.
-- **Priority 2** — Extended examples that provide additional coverage or showcase variations of already-covered features. Only included when `-Extended` is passed.
+- **Priority 1** — Core examples/games that cover unique API subsystems. Run by default in every smoke test invocation, `verify.ps1`, and CI. The priority-1 set is chosen so that every canonical API section (`core`, `entity`, `resource`, `input`, `camera`, `lighting`, `physics`, `audio`, `multi_scene`, `transitions`, `text`, `ui`, `storage`, `world_bounds`) is covered by at least one priority-1 executable.
+- **Priority 2** — Extended examples/games that provide additional coverage or showcase variations of already-covered features. Only included when `-Extended` is passed.
 
 Tools always run regardless of priority.
 
@@ -108,9 +109,9 @@ Tools always run regardless of priority.
 - When investigating a failure that only reproduces in less-common examples
 - Periodic full-coverage CI runs
 
-### Assigning priority to a new example
+### Assigning priority to a new example or game
 
-When adding a new example, set its priority in `examples/<name>/vde.toml`:
+When adding a new example or game, set its priority in `examples/<name>/vde.toml` or `games/<name>/vde.toml`:
 
 ```toml
 [smoke]
@@ -119,22 +120,23 @@ priority = 1
 sections = ["entity", "input"]
 ```
 
-Use **priority 1** if the example is the **only** (or primary) smoke coverage for a canonical API section. Use **priority 2** if other priority-1 examples already cover the same sections.
+Use **priority 1** if the executable is the **only** (or primary) smoke coverage for a canonical API section. Use **priority 2** if other priority-1 examples/games already cover the same sections.
 
 ## How Discovery Works
 
 The script finds executables automatically:
 
 - **Examples:** Scans `build_ninja/examples/` (Ninja) or `build/examples/<Config>/` (MSBuild) for `vde_*.exe` files
+- **Games:** Recursively scans `build_ninja/games/` (Ninja) or `build/games/` (MSBuild) for `vde_*.exe` files
 - **Tools:** Recursively scans `build_ninja/tools/` (Ninja) or `build/tools/` (MSBuild) for `vde_*.exe` files in subdirectories
 
 An **exclude list** filters out executables that don't support the Game API input script system (e.g. `vde_triangle_example.exe`).
 
-When a new example or tool is added and built, it is automatically discovered on the next smoke test run.
+When a new example, game, or tool is added and built, it is automatically discovered on the next smoke test run.
 
 ## Smoke Script Selection
 
-Each example's smoke script and priority are read from its `vde.toml` file under the `[smoke]` or `[smoke.<targetName>]` section. Tool smoke scripts are mapped explicitly in `smoke-test.ps1`. If no script is specified, the fallback is `smoke_quick.vdescript`.
+Each example's or game's smoke script and priority are read from its `vde.toml` file under the `[smoke]` or `[smoke.<targetName>]` section. Tool smoke scripts are mapped explicitly in `smoke-test.ps1`. If no script is specified, the fallback is `smoke_quick.vdescript`.
 
 Smoke scripts live in `smoketests/scripts/` and follow the naming convention `smoke_<name>.vdescript`.
 

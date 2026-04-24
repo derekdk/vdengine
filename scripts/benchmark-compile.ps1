@@ -184,12 +184,14 @@ if ($CaptureDetail) {
 }
 
 # ---------------------------------------------------------------------------
-# 7. Classify entries by target (vde, tests, examples, tools, deps)
+# 7. Classify entries by target (vde, tests, examples, games, tools, deps)
 # ---------------------------------------------------------------------------
 function Get-Target([string]$OutputPath) {
     if ($OutputPath -like 'CMakeFiles/vde.dir/*')           { return 'vde' }
     if ($OutputPath -like 'tests/CMakeFiles/*')              { return 'tests' }
     if ($OutputPath -like 'examples/CMakeFiles/*')           { return 'examples' }
+    if ($OutputPath -like 'games/CMakeFiles/*' -or
+        $OutputPath -like 'games/*/CMakeFiles/*')            { return 'games' }
     if ($OutputPath -like 'tools/CMakeFiles/*' -or
         $OutputPath -like 'tools/*/CMakeFiles/*')            { return 'tools' }
     if ($OutputPath -like '_deps/*')                         { return 'deps' }
@@ -315,7 +317,7 @@ Write-BenchInfo ("  Max single-TU : {0:N0} ms" -f $overallSummary.max_wall_ms)
 Write-BenchInfo ""
 Write-BenchInfo "  Per-target breakdown:"
 
-$targetOrder = @('vde','examples','tools','tests','deps','other')
+$targetOrder = @('vde','examples','games','tools','tests','deps','other')
 foreach ($t in $targetOrder) {
     if ($targetSummaries.ContainsKey($t)) {
         $s = $targetSummaries[$t]

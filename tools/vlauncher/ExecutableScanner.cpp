@@ -29,6 +29,24 @@ bool hasKnownSourceExtension(const std::filesystem::path& path) {
            kSourceExtensions.end();
 }
 
+std::string stripCmakeComments(const std::string& content) {
+    std::string result;
+    result.reserve(content.size());
+    for (size_t i = 0; i < content.size();) {
+        if (content[i] == '#') {
+            while (i < content.size() && content[i] != '\n') {
+                ++i;
+            }
+            if (i < content.size() && content[i] == '\n') {
+                result += content[i++];
+            }
+        } else {
+            result += content[i++];
+        }
+    }
+    return result;
+}
+
 std::string trim(const std::string& value) {
     size_t start = value.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) {
@@ -74,6 +92,26 @@ std::optional<std::string> sanitizeSmokeScriptName(const std::string& rawScript)
     }
 
     return fileName;
+}
+
+std::filesystem::path inferTargetSourceDir(const std::filesystem::path& cmakeDirectory,
+                                           const std::string& sourceBlock) {
+    static const std::regex sourcePathRegex(R"(["']?([A-Za-z0-9_./-]+/[^"'\s\)]+)["']?)",
+                                            std::regex::icase);
+
+    for (std::sregex_iterator matchIt(sourceBlock.begin(), sourceBlock.end(), sourcePathRegex),
+         matchEnd;
+         matchIt != matchEnd; ++matchIt) {
+        std::string sourceRel = trim((*matchIt)[1].str());
+        if (sourceRel.empty() || sourceRel.find('$') != std::string::npos) {
+            continue;
+        }
+
+        std::filesystem::path sourcePath = normalizePath(cmakeDirectory / sourceRel);
+        return sourcePath.parent_path();
+    }
+
+    return normalizePath(cmakeDirectory);
 }
 
 }  // namespace
@@ -222,17 +260,21 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
         std::filesystem::path exePath;
         std::string targetName;
         std::filesystem::path sourceDir;
+        bool executableFound = false;
         bool sourceFound = false;
         std::string kind;
     };
 
     std::vector<PreEntry> preEntries;
-    preEntries.reserve(executablePaths.size());
+    preEntries.reserve(executablePaths.size() + m_cachedTargetMap.targetMap.size());
+    std::unordered_set<std::string> seenTargets;
+    seenTargets.reserve(executablePaths.size());
 
     for (const auto& exePath : executablePaths) {
         PreEntry pre;
         pre.exePath = exePath;
         pre.targetName = exePath.stem().string();
+        pre.executableFound = true;
 
         auto sourceIt = m_cachedTargetMap.targetMap.find(pre.targetName);
         if (sourceIt != m_cachedTargetMap.targetMap.end()) {
@@ -245,10 +287,14 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
             }
 
             std::filesystem::path exampleGuess = snapshot.repositoryRoot / "examples" / baseName;
+            std::filesystem::path gameGuess = snapshot.repositoryRoot / "games" / baseName;
             std::filesystem::path toolGuess = snapshot.repositoryRoot / "tools" / baseName;
 
             if (std::filesystem::exists(exampleGuess)) {
                 pre.sourceDir = exampleGuess;
+                pre.sourceFound = true;
+            } else if (std::filesystem::exists(gameGuess)) {
+                pre.sourceDir = gameGuess;
                 pre.sourceFound = true;
             } else if (std::filesystem::exists(toolGuess)) {
                 pre.sourceDir = toolGuess;
@@ -256,6 +302,25 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
             }
         }
 
+        pre.kind = inferKind(pre.sourceDir, snapshot.repositoryRoot);
+
+        if (pre.sourceFound) {
+            sourceDirs.push_back(pre.sourceDir);
+        }
+
+        seenTargets.insert(pre.targetName);
+        preEntries.push_back(std::move(pre));
+    }
+
+    for (const auto& [targetName, sourceDir] : m_cachedTargetMap.targetMap) {
+        if (seenTargets.find(targetName) != seenTargets.end()) {
+            continue;
+        }
+
+        PreEntry pre;
+        pre.targetName = targetName;
+        pre.sourceDir = sourceDir;
+        pre.sourceFound = std::filesystem::exists(pre.sourceDir);
         pre.kind = inferKind(pre.sourceDir, snapshot.repositoryRoot);
 
         if (pre.sourceFound) {
@@ -288,13 +353,16 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
         entry.executablePath = pre.exePath;
         entry.targetName = pre.targetName;
         entry.sourceDirectory = pre.sourceDir;
+        entry.executableFound = pre.executableFound;
         entry.sourceFound = pre.sourceFound;
         entry.kind = pre.kind;
 
-        std::error_code error;
-        auto exeWrite = std::filesystem::last_write_time(pre.exePath, error);
-        if (!error) {
-            entry.executableWriteTime = fileTimeToSystemClock(exeWrite);
+        if (entry.executableFound) {
+            std::error_code error;
+            auto exeWrite = std::filesystem::last_write_time(pre.exePath, error);
+            if (!error) {
+                entry.executableWriteTime = fileTimeToSystemClock(exeWrite);
+            }
         }
 
         if (entry.sourceFound) {
@@ -307,6 +375,7 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
                 entry.newestSourceWriteTime = *newest;
                 entry.hasNewestSourceWriteTime = true;
                 entry.sourceNewerThanExecutable =
+                    entry.executableFound &&
                     entry.newestSourceWriteTime > entry.executableWriteTime;
             }
 
@@ -322,8 +391,11 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
         }
 
         entry.gitAvailable = snapshot.gitAvailable;
-        entry.outOfDate = entry.sourceNewerThanExecutable || entry.sourceDirty;
-        if (entry.sourceDirty && entry.sourceNewerThanExecutable) {
+        entry.outOfDate =
+            !entry.executableFound || entry.sourceNewerThanExecutable || entry.sourceDirty;
+        if (!entry.executableFound) {
+            entry.outOfDateReason = "Executable missing";
+        } else if (entry.sourceDirty && entry.sourceNewerThanExecutable) {
             entry.outOfDateReason = "Source modified and newer than executable";
         } else if (entry.sourceDirty) {
             entry.outOfDateReason = "Uncommitted source changes";
@@ -368,8 +440,9 @@ std::filesystem::path ExecutableScanner::findRepositoryRoot(const std::filesyste
 std::vector<std::filesystem::path>
 ExecutableScanner::findExecutablePaths(const std::filesystem::path& repoRoot) {
     std::vector<std::filesystem::path> scanRoots = {
-        repoRoot / "build" / "examples", repoRoot / "build" / "tools",
-        repoRoot / "build_ninja" / "examples", repoRoot / "build_ninja" / "tools"};
+        repoRoot / "build" / "examples",    repoRoot / "build" / "games",
+        repoRoot / "build" / "tools",       repoRoot / "build_ninja" / "examples",
+        repoRoot / "build_ninja" / "games", repoRoot / "build_ninja" / "tools"};
 
     std::vector<std::filesystem::path> executablePaths;
     std::unordered_set<std::string> seen;
@@ -416,13 +489,16 @@ std::unordered_map<std::string, std::filesystem::path>
 ExecutableScanner::buildTargetSourceMap(const std::filesystem::path& repoRoot) {
     std::unordered_map<std::string, std::filesystem::path> targetMap;
 
-    std::vector<std::filesystem::path> roots = {repoRoot / "examples", repoRoot / "tools"};
+    std::vector<std::filesystem::path> roots = {repoRoot / "examples", repoRoot / "games",
+                                                repoRoot / "tools"};
 
     // Static regex objects: compiled once, reused across all scan cycles.
     static const std::regex addExecutableRegex(
         R"(add_executable\s*\(\s*([A-Za-z0-9_\-]+)\s+\"?([^\s\)\"]+)\"?)", std::regex::icase);
     static const std::regex addVdeExampleRegex(
-        R"(add_vde_example\s*\(\s*([A-Za-z0-9_\-]+)\s+\"([^\"]+)\")", std::regex::icase);
+        R"(add_vde_example\s*\(\s*([A-Za-z0-9_\-]+)([\s\S]*?)\))", std::regex::icase);
+    static const std::regex addVdeGameRegex(R"(add_vde_game\s*\(\s*([A-Za-z0-9_\-]+)([\s\S]*?)\))",
+                                            std::regex::icase);
 
     for (const auto& root : roots) {
         if (!std::filesystem::exists(root)) {
@@ -445,18 +521,24 @@ ExecutableScanner::buildTargetSourceMap(const std::filesystem::path& repoRoot) {
                 continue;
             }
 
-            std::string content((std::istreambuf_iterator<char>(file)),
-                                std::istreambuf_iterator<char>());
+            std::string rawContent((std::istreambuf_iterator<char>(file)),
+                                   std::istreambuf_iterator<char>());
+            std::string content = stripCmakeComments(rawContent);
 
             for (std::sregex_iterator matchIt(content.begin(), content.end(), addVdeExampleRegex),
                  matchEnd;
                  matchIt != matchEnd; ++matchIt) {
                 std::string target = trim((*matchIt)[1].str());
-                std::string sourceRel = trim((*matchIt)[2].str());
+                targetMap[target] =
+                    inferTargetSourceDir(it->path().parent_path(), (*matchIt)[2].str());
+            }
 
-                std::filesystem::path sourcePath =
-                    normalizePath(it->path().parent_path() / sourceRel);
-                targetMap[target] = sourcePath.parent_path();
+            for (std::sregex_iterator matchIt(content.begin(), content.end(), addVdeGameRegex),
+                 matchEnd;
+                 matchIt != matchEnd; ++matchIt) {
+                std::string target = trim((*matchIt)[1].str());
+                targetMap[target] =
+                    inferTargetSourceDir(it->path().parent_path(), (*matchIt)[2].str());
             }
 
             for (std::sregex_iterator matchIt(content.begin(), content.end(), addExecutableRegex),
@@ -596,6 +678,9 @@ std::string ExecutableScanner::inferKind(const std::filesystem::path& sourceDir,
     if (first == "examples") {
         return "Example";
     }
+    if (first == "games") {
+        return "Game";
+    }
     if (first == "tools") {
         return "Tool";
     }
@@ -629,7 +714,8 @@ std::unordered_map<std::string, std::filesystem::file_time_type>
 ExecutableScanner::collectCmakeTimestamps(const std::filesystem::path& repoRoot) {
     std::unordered_map<std::string, std::filesystem::file_time_type> timestamps;
 
-    std::vector<std::filesystem::path> roots = {repoRoot / "examples", repoRoot / "tools"};
+    std::vector<std::filesystem::path> roots = {repoRoot / "examples", repoRoot / "games",
+                                                repoRoot / "tools"};
 
     for (const auto& root : roots) {
         if (!std::filesystem::exists(root)) {
