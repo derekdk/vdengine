@@ -37,6 +37,9 @@ std::string stripCmakeComments(const std::string& content) {
             while (i < content.size() && content[i] != '\n') {
                 ++i;
             }
+            if (i < content.size() && content[i] == '\n') {
+                result += content[i++];
+            }
         } else {
             result += content[i++];
         }
