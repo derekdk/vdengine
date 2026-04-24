@@ -29,6 +29,21 @@ bool hasKnownSourceExtension(const std::filesystem::path& path) {
            kSourceExtensions.end();
 }
 
+std::string stripCmakeComments(const std::string& content) {
+    std::string result;
+    result.reserve(content.size());
+    for (size_t i = 0; i < content.size();) {
+        if (content[i] == '#') {
+            while (i < content.size() && content[i] != '\n') {
+                ++i;
+            }
+        } else {
+            result += content[i++];
+        }
+    }
+    return result;
+}
+
 std::string trim(const std::string& value) {
     size_t start = value.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) {
@@ -503,8 +518,9 @@ ExecutableScanner::buildTargetSourceMap(const std::filesystem::path& repoRoot) {
                 continue;
             }
 
-            std::string content((std::istreambuf_iterator<char>(file)),
-                                std::istreambuf_iterator<char>());
+            std::string rawContent((std::istreambuf_iterator<char>(file)),
+                                   std::istreambuf_iterator<char>());
+            std::string content = stripCmakeComments(rawContent);
 
             for (std::sregex_iterator matchIt(content.begin(), content.end(), addVdeExampleRegex),
                  matchEnd;
