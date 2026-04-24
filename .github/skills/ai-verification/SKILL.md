@@ -166,18 +166,21 @@ Note: for AI agents, using `read_file` on the `logs/` path directly is always pr
 
 ---
 
-## When to Use Individual Scripts Instead
+## When to Use Individual Scripts or Tasks Instead
 
-Use `verify.ps1` for final verification gates. Use individual scripts for interactive development:
+Use `verify.ps1` for final verification gates. Use VS Code tasks or individual scripts for interactive development:
 
-| Situation | Command |
-|-----------|---------|
+| Situation | Preferred |
+|-----------|-----------|
 | Iterating on a single failing test | `.\scripts\test.ps1 -Filter "Suite.Test"` |
-| Watching build progress live (colored) | `.\scripts\build.ps1` |
+| Full build (standard, default config) | `scripts: build` task |
+| Full unit test run (standard) | `scripts: test` task or `scripts: build-and-test` task |
+| Full smoke test run (standard) | `scripts: smoke-test` task |
+| Watching build progress live (colored) | `scripts: build` task or `.\scripts\build.ps1` |
 | Running a specific smoke test interactively | `.\scripts\smoke-test.ps1 -Filter "*emoji*"` |
 | Full gate after completing a feature | `.\scripts\verify.ps1` |
 
-The individual scripts output to the terminal in real-time with colors. `verify.ps1` buffers output until each stage completes (needed for reliable log capture).
+Tasks are preferred over scripts for full runs at default config. Scripts are required when you need parameters (filter, generator, config, category).
 
 ---
 

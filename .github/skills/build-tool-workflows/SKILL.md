@@ -17,11 +17,51 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 - Troubleshooting build issues
 - Choosing between build systems
 
-## Quick Start - Using Build Scripts (RECOMMENDED)
+## Quick Start — VS Code Tasks (RECOMMENDED)
 
-**The VDE project provides convenient PowerShell scripts in the `scripts/` directory for all build operations.**
+**For standard operations, always prefer VS Code tasks over running scripts directly.** Tasks are the correct method for AI agents using the `run_task` tool and for interactive use via **Terminal → Run Task...** in VS Code.
 
-### Build Scripts Overview
+### Available Tasks
+
+| Task ID | Purpose |
+|---------|---------|
+| `scripts: build` | Build the project (Ninja, Debug) |
+| `scripts: rebuild` | Clean and rebuild (Ninja, Debug) |
+| `scripts: build-and-test` | Build the project and run all unit tests |
+| `scripts: test` | Run all unit tests (project must already be built) |
+| `scripts: smoke-test` | Run priority 1 smoke tests |
+| `scripts: render-verify` | Run render verification (golden image comparison) |
+| `scripts: clean` | Clean Ninja build artifacts |
+| `scripts: clean-all` | Clean both Ninja and MSBuild build directories |
+| `scripts: format` | Format C++ code with clang-format |
+| `scripts: run-vlauncher` | Launch VLauncher (Release config) |
+| `scripts: help` | Show quick help for all build scripts |
+
+### AI agent usage
+
+Use the `run_task` tool with the task ID and workspace folder:
+
+```
+run_task("scripts: build", workspaceFolder="c:\\...\\vdengine")
+run_task("scripts: build-and-test", workspaceFolder="c:\\...\\vdengine")
+run_task("scripts: smoke-test", workspaceFolder="c:\\...\\vdengine")
+```
+
+### When to use scripts instead of tasks
+
+Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you need:
+- A non-default generator or config (`-Generator MSBuild`, `-Config Release`)
+- A test filter (`.\scripts\test.ps1 -Filter "CameraTest.*"`)
+- A smoke test category or name filter
+- A full clean (`.\scripts\clean.ps1 -Full`)
+
+---
+
+## Script Commands (for parameterized or advanced use)
+
+**The PowerShell scripts in `scripts/` provide all options not exposed by tasks.**
+
+### Script Overview
 
 | Script | Purpose | Example |
 |--------|---------|---------|
@@ -35,116 +75,40 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 | `run-vlauncher.ps1` | Launch VLauncher (builds if missing) | `.\scripts\run-vlauncher.ps1` |
 | `help.ps1` | Show quick help for build scripts | `.\scripts\help.ps1` |
 
-### Common Build Tasks
+### Common Script Examples
 
-**Build with Ninja (default):**
-```powershell
-.\scripts\build.ps1
-```
-
-**Build with MSBuild:**
+**Non-default generator or config:**
 ```powershell
 .\scripts\build.ps1 -Generator MSBuild
-```
-
-**Release build:**
-```powershell
 .\scripts\build.ps1 -Config Release
-```
-
-**Clean and rebuild:**
-```powershell
 .\scripts\rebuild.ps1 -Generator Ninja
-```
-
-**Clean build artifacts:**
-```powershell
-.\scripts\clean.ps1
 ```
 
 **Full clean (removes entire build directory):**
 ```powershell
 .\scripts\clean.ps1 -Full
-```
-
-**Run tests:**
-```powershell
-.\scripts\test.ps1
-```
-
-**Run tests with filter:**
-```powershell
-.\scripts\test.ps1 -Filter "CameraTest.*"
-```
-
-**Run tests with AI-friendly failure-only output:**
-```powershell
-.\scripts\test.ps1 -ProblemsOnly
-```
-
-**Build and test in one command:**
-```powershell
-.\scripts\test.ps1 -Build
-```
-
-**Run priority 1 smoke tests (default):**
-```powershell
-.\scripts\smoke-test.ps1
-```
-
-**Run all smoke tests (priority 1 + 2):**
-```powershell
-.\scripts\smoke-test.ps1 -Extended
-```
-
-**Smoke test only examples:**
-```powershell
-.\scripts\smoke-test.ps1 -Category Examples
-```
-
-**Smoke test only tools:**
-```powershell
-.\scripts\smoke-test.ps1 -Category Tools
-```
-
-**Smoke test with filter:**
-```powershell
-.\scripts\smoke-test.ps1 -Filter "*physics*"
-```
-
-**Run smoke tests with AI-friendly failure-only output:**
-```powershell
-.\scripts\smoke-test.ps1 -ProblemsOnly
-```
-
-**Build and smoke test:**
-```powershell
-.\scripts\smoke-test.ps1 -Build
-```
-
-**Clean both Ninja and MSBuild builds:**
-```powershell
-.\scripts\clean-all.ps1
-```
-
-**Full clean both build directories:**
-```powershell
 .\scripts\clean-all.ps1 -Full
 ```
 
-**Format C++ code:**
+**Tests with filter (inner loop — tasks don't support this):**
 ```powershell
-.\scripts\format.ps1
+.\scripts\test.ps1 -Filter "CameraTest.*"
+.\scripts\test.ps1 -Build -Filter "Suite.TestName"
+.\scripts\test.ps1 -ProblemsOnly
 ```
 
-**Check formatting without modifying files:**
+**Smoke tests with filter or category:**
+```powershell
+.\scripts\smoke-test.ps1 -Filter "*physics*"
+.\scripts\smoke-test.ps1 -Category Examples
+.\scripts\smoke-test.ps1 -Category Tools
+.\scripts\smoke-test.ps1 -Extended
+.\scripts\smoke-test.ps1 -ProblemsOnly
+```
+
+**Format check without modifying files:**
 ```powershell
 .\scripts\format.ps1 -Check
-```
-
-**Launch VLauncher:**
-```powershell
-.\scripts\run-vlauncher.ps1
 ```
 
 **Show quick help:**
@@ -324,6 +288,8 @@ cmake --build build_ninja
 
 ## Running Unit Tests
 
+For standard all-tests runs, prefer the `scripts: test` or `scripts: build-and-test` VS Code tasks. Use scripts directly for filtered or parameterized runs:
+
 ```powershell
 .\scripts\test.ps1                                    # Run all tests (default Ninja Debug)
 .\scripts\test.ps1 -Filter "CameraTest.*"             # Filter by test name
@@ -339,7 +305,7 @@ For fast red-green iteration with filtered tests, see the `test-fix-loop` skill.
 
 **Problem:** Build fails with "no include path set" or "Cannot open include file"
 **Solution:** 
-- When using scripts: Run `.\scripts\build.ps1 -Generator Ninja` - it handles environment setup
+- When using VS Code tasks or scripts: run the `scripts: build` task or `.\scripts\build.ps1 -Generator Ninja` — both handle environment setup automatically
 - When using manual commands: Load VS Developer environment first (see Manual Build section)
 
 **Problem:** Wrong architecture errors (x86 vs x64)
@@ -353,7 +319,8 @@ For fast red-green iteration with filtered tests, see the `test-fix-loop` skill.
 
 ## Best Practices
 
-- **Use the build scripts for all standard tasks** — never bypass them with raw CMake unless troubleshooting.
+- **Use VS Code tasks for all standard operations** — `scripts: build`, `scripts: test`, `scripts: smoke-test`, `scripts: build-and-test`. Prefer the `run_task` tool over running scripts directly in the terminal.
+- **Use scripts when you need parameters** — generator, config, filter, category, or full clean flags require calling scripts directly.
 - **Ninja (default)** for faster builds during development. MSBuild for IDE integration.
 - **Use `-Filter`** for focused test runs during development. See `test-fix-loop` skill for the full iteration strategy.
 - **Use `-ProblemsOnly`** when running tests for verification — keeps output small and parseable.
