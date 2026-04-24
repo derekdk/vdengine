@@ -31,6 +31,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 | `scripts: test` | Run all unit tests (project must already be built) |
 | `scripts: smoke-test` | Run priority 1 smoke tests |
 | `scripts: render-verify` | Run render verification (golden image comparison) |
+| `scripts: verify` | Full end-to-end verification: Build → Unit Tests → Smoke Tests → Render Verify |
 | `scripts: clean` | Clean Ninja build artifacts |
 | `scripts: clean-all` | Clean both Ninja and MSBuild build directories |
 | `scripts: format` | Format C++ code with clang-format |
@@ -45,6 +46,7 @@ Use the `run_task` tool with the task ID and workspace folder:
 run_task("scripts: build", workspaceFolder="c:\\...\\vdengine")
 run_task("scripts: build-and-test", workspaceFolder="c:\\...\\vdengine")
 run_task("scripts: smoke-test", workspaceFolder="c:\\...\\vdengine")
+run_task("scripts: verify", workspaceFolder="c:\\...\\vdengine")
 ```
 
 ### When to use scripts instead of tasks
@@ -71,6 +73,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 | `clean-all.ps1` | Clean both Ninja and MSBuild builds | `.\scripts\clean-all.ps1 -Full` |
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
 | `smoke-test.ps1` | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Build` |
+| `verify.ps1` | Full end-to-end: build → unit tests → smoke → render verify | `.\scripts\verify.ps1` |
 | `format.ps1` | Format C++ code with clang-format | `.\scripts\format.ps1 -Check` |
 | `run-vlauncher.ps1` | Launch VLauncher (builds if missing) | `.\scripts\run-vlauncher.ps1` |
 | `help.ps1` | Show quick help for build scripts | `.\scripts\help.ps1` |
@@ -153,6 +156,16 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-Build` - Build before running smoke tests
 - `-Verbose` - Verbose output with detailed error messages
 - `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
+
+**verify.ps1**
+- `-SkipBuild` - Skip the build stage (tests + smoke only)
+- `-SkipSmoke` - Skip the smoke test stage (build + unit tests only)
+- `-SkipRenderVerify` - Skip the render verification stage
+- `-Filter` - GoogleTest filter pattern passed to test.ps1
+- `-SmokeFilter` - Wildcard pattern for smoke test executables
+- `-SmokeExtended` - Include priority 2 examples in the smoke run
+- `-Generator` - Ninja (default) or MSBuild
+- `-Config` - Debug (default) or Release
 
 **format.ps1**
 - `-Check` - Check formatting without modifying files (CI/pre-commit)
