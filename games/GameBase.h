@@ -238,7 +238,7 @@ class BaseGame : public vde::Game {
 #endif
     }
 
-    int getExitCode() const { return Game::getExitCode(); }
+    int getExitCode() const override { return Game::getExitCode(); }
 
   protected:
     TInputHandler* getGameInputHandler() { return m_inputHandler.get(); }

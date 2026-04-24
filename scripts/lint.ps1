@@ -156,6 +156,18 @@ if ($cppcheck) {
     Write-StageHeader "cppcheck"
     Write-Host "  Running cppcheck..." -ForegroundColor Yellow
 
+    $cppcheckSupportsProgress = $false
+    try {
+        $cppcheckHelp = & cppcheck --help 2>&1
+        $cppcheckSupportsProgress = ($cppcheckHelp | Select-String -SimpleMatch "--report-progress" -Quiet)
+    } catch {
+        $cppcheckSupportsProgress = $false
+    }
+
+    if ($cppcheckSupportsProgress) {
+        Write-Host "  Progress reporting enabled; cppcheck may still pause on a file while exploring multiple macro configurations." -ForegroundColor DarkGray
+    }
+
     $cppcheckArgs = @(
         "--enable=warning,performance,portability",
         "--std=c++20",
@@ -170,6 +182,10 @@ if ($cppcheck) {
         "-i", "third_party",
         "src/", "include/vde/", "examples/", "games/", "tests/", "tools/"
     )
+
+    if ($cppcheckSupportsProgress) {
+        $cppcheckArgs = @("--report-progress") + $cppcheckArgs
+    }
 
     & cppcheck @cppcheckArgs 2>&1
     $cppcheckPass = ($LASTEXITCODE -eq 0)

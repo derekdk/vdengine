@@ -606,7 +606,7 @@ class SpriteSheetMultiSceneDemo : public vde::Game {
             m_exitCode = 1;
     }
 
-    int getExitCode() const {
+    int getExitCode() const override {
         if (m_exitCode != 0)
             return m_exitCode;
         return Game::getExitCode();

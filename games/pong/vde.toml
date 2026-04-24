@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_pong.vdescript"]
+priority = 2
+sections = ["entity", "input", "text"]

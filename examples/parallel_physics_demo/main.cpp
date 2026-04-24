@@ -363,7 +363,7 @@ class ParallelPhysicsGame : public vde::Game {
         getScheduler().setWorkerThreadCount(0);
     }
 
-    int getExitCode() const { return 0; }
+    int getExitCode() const override { return 0; }
 
   private:
     std::unique_ptr<ParallelPhysicsInputHandler> m_input;
