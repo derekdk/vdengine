@@ -126,7 +126,22 @@ bool Game::initialize(const GameSettings& settings) {
         if (m_inputScriptFile.empty()) {
             const char* envScript = std::getenv("VDE_INPUT_SCRIPT");
             if (envScript && envScript[0] != '\0') {
-                m_inputScriptFile = envScript;
+                std::filesystem::path scriptPath(envScript);
+                // Only allow .vdescript files to prevent unintended file access via the env var.
+                if (scriptPath.extension() == ".vdescript") {
+                    std::error_code ec;
+                    auto canonical = std::filesystem::weakly_canonical(scriptPath, ec);
+                    if (!ec) {
+                        m_inputScriptFile = canonical.string();
+                    } else {
+                        std::cerr << "[VDE] VDE_INPUT_SCRIPT path could not be resolved: "
+                                  << envScript << std::endl;
+                    }
+                } else {
+                    std::cerr << "[VDE] VDE_INPUT_SCRIPT rejected: path must have a .vdescript "
+                                 "extension"
+                              << std::endl;
+                }
             }
         }
         if (!m_inputScriptFile.empty()) {
