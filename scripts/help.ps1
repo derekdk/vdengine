@@ -66,6 +66,7 @@ Write-Host " (default), " -NoNewline
 Write-Host "Release" -ForegroundColor Yellow
 
 Write-Title "EXAMPLES"
+Write-Cmd '.\scripts\new-example.ps1 -Name my_demo' 'Scaffold a new example (creates files, smoke/render scripts, CMakeLists entry)'
 Write-Cmd '.\scripts\build.ps1 -Config Release' 'Release build'
 Write-Cmd '.\scripts\test.ps1 -Generator Ninja -Build' 'Build with Ninja and test'
 Write-Cmd '.\scripts\clean.ps1 -Full; .\scripts\build.ps1' 'Full clean rebuild'

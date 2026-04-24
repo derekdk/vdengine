@@ -22,6 +22,21 @@ Always build and run the example to verify it works correctly and follows the ex
 After implementing or editing an example, follow the `completing-work` skill for mandatory verification before declaring the task complete.
 
 
+## Creating a New Example — Start Here
+
+**Always use the scaffold script to create a new example.** It generates the correct folder, source file, `vde.toml`, smoke script, and render-verify scripts in one step, and appends the CMakeLists.txt entry automatically:
+
+```powershell
+.\scripts\new-example.ps1 -Name my_feature_demo
+```
+
+Optional parameters:
+- `-Title "My Feature Demo"` — human-readable window title (defaults to prettified name)
+- `-Sections entity,input` — canonical smoke-test sections (see `API-DOC.md`)
+- `-NoRenderVerify` — skip render-verify script generation
+
+After running the script, open `examples/my_feature_demo/main.cpp` and fill in the `TODO` sections. Everything else (CMakeLists.txt, smoke script, render-verify scripts, vde.toml) is already wired up.
+
 ## Example Structure
 
 All VDE examples should follow this standard pattern to enable:
@@ -245,7 +260,7 @@ int main() {
 
 ## CMakeLists.txt Entry
 
-Add the example to `examples/CMakeLists.txt`. See the `writing-code` skill's CMake section for the standard `add_executable` / `target_link_libraries` / shader-copy pattern. Use existing examples in that file as a template.
+The scaffold script (`scripts/new-example.ps1`) appends the CMakeLists.txt entry automatically. If you need to add a multi-file or asset-syncing example by hand, see the `writing-code` skill's CMake section and use existing examples in that file as a template.
 
 ## Best Practices
 
