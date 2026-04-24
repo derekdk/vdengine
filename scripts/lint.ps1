@@ -22,6 +22,8 @@ param(
     [switch]$Help
 )
 
+$ErrorActionPreference = "Stop"
+
 function Show-Help {
     Write-Host @"
 VDE Lint Script - Run static analysis tools
@@ -59,8 +61,6 @@ Install tools:
 if ($Help) {
     Show-Help
 }
-
-$ErrorActionPreference = "Stop"
 
 # Navigate to project root
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

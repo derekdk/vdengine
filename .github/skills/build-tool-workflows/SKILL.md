@@ -35,6 +35,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 | `scripts: clean` | Clean Ninja build artifacts |
 | `scripts: clean-all` | Clean both Ninja and MSBuild build directories |
 | `scripts: format` | Format C++ code with clang-format |
+| `scripts: lint` | Run all available linters (format, shaders, cppcheck, clang-tidy) |
 | `scripts: run-vlauncher` | Launch VLauncher (Release config) |
 | `scripts: help` | Show quick help for all build scripts |
 
@@ -47,6 +48,7 @@ run_task("scripts: build", workspaceFolder="c:\\...\\vdengine")
 run_task("scripts: build-and-test", workspaceFolder="c:\\...\\vdengine")
 run_task("scripts: smoke-test", workspaceFolder="c:\\...\\vdengine")
 run_task("scripts: verify", workspaceFolder="c:\\...\\vdengine")
+run_task("scripts: lint", workspaceFolder="c:\\...\\vdengine")
 ```
 
 ### When to use scripts instead of tasks
@@ -73,7 +75,9 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 | `clean-all.ps1` | Clean both Ninja and MSBuild builds | `.\scripts\clean-all.ps1 -Full` |
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
 | `smoke-test.ps1` | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Build` |
+| `render-verify.ps1` | Run golden-image comparison tests using FLIP | `.\scripts\render-verify.ps1` |
 | `verify.ps1` | Full end-to-end: build → unit tests → smoke → render verify | `.\scripts\verify.ps1` |
+| `lint.ps1` | Run all available linters in sequence | `.\scripts\lint.ps1` |
 | `format.ps1` | Format C++ code with clang-format | `.\scripts\format.ps1 -Check` |
 | `run-vlauncher.ps1` | Launch VLauncher (builds if missing) | `.\scripts\run-vlauncher.ps1` |
 | `help.ps1` | Show quick help for build scripts | `.\scripts\help.ps1` |
@@ -166,6 +170,21 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-SmokeExtended` - Include priority 2 examples in the smoke run
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
+
+**render-verify.ps1**
+- `-Filter` - Wildcard pattern for executable names
+- `-Generator` - Ninja (default) or MSBuild
+- `-Config` - Debug (default) or Release
+- `-Build` - Build before running
+- `-Extended` - Include priority 2 examples
+- `-UpdateGolden` - Capture new golden images instead of comparing
+- `-Verbose` - Verbose output
+- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
+
+**lint.ps1**
+- `-Quick` - Only run format check + cppcheck (fast)
+- `-Fix` - Auto-fix formatting issues (clang-format in fix mode)
+- `-Help` - Show detailed help
 
 **format.ps1**
 - `-Check` - Check formatting without modifying files (CI/pre-commit)
