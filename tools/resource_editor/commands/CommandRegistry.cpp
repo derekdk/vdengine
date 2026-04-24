@@ -61,7 +61,7 @@ CommandBase* CommandRegistry::find(const std::string& name) const {
         auto pos = candidate.rfind(' ');
         if (pos == std::string::npos)
             break;
-        candidate = candidate.substr(0, pos);
+        candidate.resize(pos);
 
         auto it = m_nameIndex.find(candidate);
         if (it != m_nameIndex.end())

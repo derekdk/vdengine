@@ -71,8 +71,10 @@ class ListCommand final : public GlobalCommand {
 
             // Name (20 chars, left-aligned)
             std::string nameStr = c->name;
-            if (nameStr.size() > 20)
-                nameStr = nameStr.substr(0, 17) + "...";
+            if (nameStr.size() > 20) {
+                nameStr.resize(17);
+                nameStr += "...";
+            }
             os << nameStr;
             for (size_t i = nameStr.size(); i < 21; ++i)
                 os << ' ';

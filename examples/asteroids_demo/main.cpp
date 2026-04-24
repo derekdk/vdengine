@@ -357,7 +357,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
   private:
     void initializeGame() {
         // Clear existing entities
-        clearEntities();
+        clearGameEntities();
 
         m_score = 0;
         m_gameOver = false;
@@ -377,7 +377,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         std::cout << "Score: " << m_score << std::endl;
     }
 
-    void clearEntities() {
+    void clearGameEntities() {
         if (m_spaceship) {
             removeEntity(m_spaceship->getId());
             m_spaceship.reset();
@@ -589,7 +589,8 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
     std::vector<std::shared_ptr<Bullet>> m_bullets;
     std::vector<PendingSpawn> m_pendingSpawns;
 
-    float m_worldWidth, m_worldHeight;
+    float m_worldWidth = 0.0f;
+    float m_worldHeight = 0.0f;
     int m_score = 0;
     bool m_gameOver = false;
 };

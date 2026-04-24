@@ -139,7 +139,7 @@ void GeometryReplScene::update(float deltaTime) {
                     (lastSlash != std::string::npos) ? filename.substr(lastSlash + 1) : filename;
                 size_t dot = stem.rfind('.');
                 if (dot != std::string::npos) {
-                    stem = stem.substr(0, dot);
+                    stem.resize(dot);
                 }
                 name = stem;
             }
@@ -245,7 +245,7 @@ void GeometryReplScene::update(float deltaTime) {
                     (lastSlash != std::string::npos) ? filename.substr(lastSlash + 1) : filename;
                 size_t dot = stem.rfind('.');
                 if (dot != std::string::npos) {
-                    stem = stem.substr(0, dot);
+                    stem.resize(dot);
                 }
                 name = stem;
             }

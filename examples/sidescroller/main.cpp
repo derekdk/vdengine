@@ -85,7 +85,6 @@ class AnimatedSpriteEntity : public vde::SpriteEntity {
 
     void play() { m_playing = true; }
     void pause() { m_playing = false; }
-    void setFlipX(bool flip) { m_flipX = flip; }
 
   protected:
     int m_frameCount = 1;
@@ -96,7 +95,6 @@ class AnimatedSpriteEntity : public vde::SpriteEntity {
     float m_frameHeight = 1.0f;
     float m_animTime = 0.0f;
     bool m_playing = false;
-    bool m_flipX = false;  // Note: would need shader support
 };
 
 /**
@@ -189,14 +187,9 @@ class PlatformEntity : public vde::SpriteEntity {
  */
 class TiledBackground : public vde::Entity {
   public:
-    TiledBackground(float tilesWide, float tilesHigh, float tileSize, vde::Color color,
-                    float depth) {
-        m_tilesWide = static_cast<int>(tilesWide);
-        m_tilesHigh = static_cast<int>(tilesHigh);
-        m_tileSize = tileSize;
-        m_color = color;
-        m_depth = depth;
-    }
+    TiledBackground(float tilesWide, float tilesHigh, float tileSize, vde::Color color, float depth)
+        : m_tilesWide(static_cast<int>(tilesWide)), m_tilesHigh(static_cast<int>(tilesHigh)),
+          m_tileSize(tileSize), m_depth(depth), m_color(color) {}
 
     void onAttach(vde::Scene* scene) override {
         vde::Entity::onAttach(scene);
@@ -311,9 +304,9 @@ class SidescrollerScene : public vde::examples::BaseExampleScene {
         printExampleHeader();
 
         // Create 2D camera
-        m_camera = new vde::Camera2D(20.0f, 15.0f);  // 20x15 world units
-        m_camera->setPosition(0.0f, 5.0f);
-        setCamera(m_camera);
+        m_sceneCamera2D = new vde::Camera2D(20.0f, 15.0f);  // 20x15 world units
+        m_sceneCamera2D->setPosition(0.0f, 5.0f);
+        setCamera(m_sceneCamera2D);
 
         // Set background color (sky blue)
         setBackgroundColor(vde::Color::fromHex(0x74b9ff));
@@ -389,7 +382,7 @@ class SidescrollerScene : public vde::examples::BaseExampleScene {
 
         // Camera follows player with smoothing
         auto playerPos = m_player->getPosition();
-        auto camPos = m_camera->getPosition();
+        auto camPos = m_sceneCamera2D->getPosition();
 
         // Smooth camera following
         float cameraSpeed = 3.0f;
@@ -399,7 +392,7 @@ class SidescrollerScene : public vde::examples::BaseExampleScene {
         float targetY = std::max(5.0f, playerPos.y);
         camPos.y += (targetY - camPos.y) * cameraSpeed * deltaTime;
 
-        m_camera->setPosition(camPos.x, camPos.y);
+        m_sceneCamera2D->setPosition(camPos.x, camPos.y);
 
         // Simple platform collision (very basic)
         // A proper implementation would use better collision detection
@@ -440,7 +433,7 @@ class SidescrollerScene : public vde::examples::BaseExampleScene {
   private:
     std::shared_ptr<PlayerEntity> m_player;
     std::vector<std::shared_ptr<PlatformEntity>> m_platforms;
-    vde::Camera2D* m_camera = nullptr;
+    vde::Camera2D* m_sceneCamera2D = nullptr;
 };
 
 /**

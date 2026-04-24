@@ -116,7 +116,7 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
                         evLower.begin(), evLower.end(), evLower.begin(),
                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                     if (currentToken.empty() ||
-                        (evLower.find(currentLower) == 0 && evLower != currentLower)) {
+                        (evLower.starts_with(currentLower) && evLower != currentLower)) {
                         m_completions.push_back(ev);
                     }
                 }
@@ -129,7 +129,7 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
                             nameLower.begin(), nameLower.end(), nameLower.begin(),
                             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                         if (currentToken.empty() ||
-                            (nameLower.find(currentLower) == 0 && nameLower != currentLower)) {
+                            (nameLower.starts_with(currentLower) && nameLower != currentLower)) {
                             m_completions.push_back(name);
                         }
                     }
@@ -155,7 +155,7 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
             std::string lower = name;
             std::transform(lower.begin(), lower.end(), lower.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (lower.find(textLower) == 0 && lower != textLower) {
+            if (lower.starts_with(textLower) && lower != textLower) {
                 m_completions.push_back(name);
             }
         };
@@ -335,7 +335,7 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
                     line = line.substr(s);
                     auto e = line.find_last_not_of(" \t\r\n");
                     if (e != std::string::npos)
-                        line = line.substr(0, e + 1);
+                        line.resize(e + 1);
                     // Skip blank lines and comments
                     if (line.empty() || line[0] == '#')
                         continue;
