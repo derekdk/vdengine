@@ -6,6 +6,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 #include <imgui.h>
@@ -479,13 +480,27 @@ bool HexEditorScene::loadFile(const std::string& path) {
     }
 
     std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
+    if (size < 0) {
+        addConsoleMessage("ERROR: Failed to determine file size: " + path);
+        return false;
+    }
+
+    if (static_cast<unsigned long long>(size) >
+        static_cast<unsigned long long>(std::numeric_limits<size_t>::max())) {
+        addConsoleMessage("ERROR: File too large to open: " + path);
+        return false;
+    }
+
+    if (!file.seekg(0, std::ios::beg)) {
+        addConsoleMessage("ERROR: Failed to seek file: " + path);
+        return false;
+    }
 
     HexFile hf;
     hf.path = path;
     hf.label = shortName(path);
     hf.data.resize(static_cast<size_t>(size));
-    if (!file.read(reinterpret_cast<char*>(hf.data.data()), size)) {
+    if (!hf.data.empty() && !file.read(reinterpret_cast<char*>(hf.data.data()), size)) {
         addConsoleMessage("ERROR: Failed to read file: " + path);
         return false;
     }
