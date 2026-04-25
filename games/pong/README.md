@@ -30,4 +30,4 @@ Serve the ball from center court, defend the left paddle, and send the ball past
 .\scripts\run-vlauncher.ps1
 ```
 
-Select **Pong** in the launcher, or run $TargetName directly from the build output directory.
+Select **Pong** in the launcher, or run `vde_pong` directly from the build output directory.

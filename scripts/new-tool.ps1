@@ -308,8 +308,8 @@ Write-Ok "tools/$Name/vde.toml"
 
 # --- README.md ---
 
-$Readme = @"
-# $Title
+$Readme = @'
+# {Title}
 
 TODO: Describe what this tool does and what assets it produces.
 
@@ -317,15 +317,15 @@ TODO: Describe what this tool does and what assets it produces.
 
 ### Interactive mode
 
-``````
-$TargetName
-``````
+```
+{TargetName}
+```
 
 ### Script mode
 
-``````
-$TargetName path/to/script.txt
-``````
+```
+{TargetName} path/to/script.txt
+```
 
 ## Commands
 
@@ -342,7 +342,8 @@ $TargetName path/to/script.txt
 | F11 | Toggle fullscreen |
 | Mouse drag | Rotate camera |
 | Mouse wheel | Zoom camera |
-"@
+'@
+$Readme = $Readme.Replace('{Title}', $Title).Replace('{TargetName}', $TargetName)
 
 Set-Content -Path (Join-Path $ToolDir "README.md") -Value $Readme -Encoding UTF8
 Write-Ok "tools/$Name/README.md"

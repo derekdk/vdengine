@@ -98,7 +98,7 @@ class ${Name}_InputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     // Add key bindings here if needed, for example:
     //   vde::KeyStateTracker keys;
-    //   ${name}_InputHandler() { keys.bindOneShot(vde::KEY_SPACE, "action"); }
+    //   ${Name}_InputHandler() { keys.bindOneShot(vde::KEY_SPACE, "action"); }
     //   void onKeyPress(int key) override { BaseExampleInputHandler::onKeyPress(key); keys.handlePress(key); }
     //   void onKeyRelease(int key) override { keys.handleRelease(key); }
 };

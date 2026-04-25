@@ -268,8 +268,8 @@ Write-Ok "games/$Name/vde.toml"
 
 # --- README.md ---
 
-$Readme = @"
-# $Title
+$Readme = @'
+# {Title}
 
 TODO: One-paragraph description of the game.
 
@@ -286,18 +286,19 @@ TODO: Describe gameplay, objective, and controls.
 
 ## Building
 
-``````
+```
 .\scripts\build.ps1
-``````
+```
 
 ## Running
 
-``````
+```
 .\scripts\run-vlauncher.ps1
-``````
+```
 
-Select **$Title** in the launcher, or run `$TargetName` directly from the build output directory.
-"@
+Select **{Title}** in the launcher, or run `{TargetName}` directly from the build output directory.
+'@
+$Readme = $Readme.Replace('{Title}', $Title).Replace('{TargetName}', $TargetName)
 
 Set-Content -Path (Join-Path $GameDir "README.md") -Value $Readme -Encoding UTF8
 Write-Ok "games/$Name/README.md"
