@@ -198,6 +198,7 @@ Tasks are preferred over scripts for full runs at default config. Scripts are re
 
 - `verify.ps1` always passes `-ProblemsOnly` to `test.ps1` and `smoke-test.ps1`. Unit test pass/fail noise is suppressed; only warnings and failures appear in the log.
 - `verify.ps1` runs targeted lint by default; use `-FullLint` when you want the slower full-repo lint pass in the same verification run.
+- `verify.ps1` passes its `-Generator` choice through to the lint stage. Use `-Generator Ninja` when you need clang-tidy coverage from `compile_commands.json`.
 - Build output is not filtered — full CMake/Ninja output is in the log.
 - If build fails, remaining stages are skipped automatically.
 - The `logs/` directory is created automatically on first run; it is in `.gitignore`.

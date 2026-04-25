@@ -193,7 +193,7 @@ if (-not $SkipRenderVerify) {
 
 # Stage 5: Lint
 if (-not $SkipLint) {
-    $lintArgs = @()
+    $lintArgs = @('-Generator', $Generator)
     if (-not $FullLint) {
         $lintArgs += "-ChangedOnly"
     }

@@ -311,7 +311,8 @@ Run all available linters in sequence. Full-repo lint remains the default, and `
 
 **Syntax:**
 ```powershell
-.\scripts\lint.ps1 [-Quick] [-Fix] [-ChangedOnly] [-Files <paths>] [-Since <git-ref>] [-Help]
+.\scripts\lint.ps1 [-Quick] [-Fix] [-ChangedOnly] [-Files <paths>] [-Since <git-ref>]
+                  [-Generator Auto|Ninja|MSBuild] [-Help]
 ```
 
 **Parameters:**
@@ -320,6 +321,7 @@ Run all available linters in sequence. Full-repo lint remains the default, and `
 - `-ChangedOnly` - Lint only files changed in the current git working tree
 - `-Files <paths>` - Lint an explicit file list (relative or absolute)
 - `-Since <git-ref>` - Lint files changed since a git revision or range (implies `-ChangedOnly`)
+- `-Generator Auto|Ninja|MSBuild` - Compile database preference for clang-tidy (default: `Auto`)
 - `-Help` - Show detailed help
 
 **Linters (in order):**
@@ -327,6 +329,8 @@ Run all available linters in sequence. Full-repo lint remains the default, and `
 2. **glslangValidator** — Validates GLSL shaders against the Vulkan spec via `lint-shaders.ps1`
 3. **cppcheck** — Static analysis for bugs, performance, portability via `lint-cppcheck.ps1`
 4. **clang-tidy** — Deep static analysis via `lint-clang-tidy.ps1` (needs `compile_commands.json`, generated automatically by `./scripts/build.ps1 -Generator Ninja`, or by configuring Ninja with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`)
+
+Changed-header clang-tidy runs use a local heuristic: paired source files first, then direct includers in the same runnable area. This keeps targeted lint focused on the current slice instead of broadening every public header change to the whole repository.
 
 **Examples:**
 ```powershell
@@ -347,6 +351,9 @@ Run all available linters in sequence. Full-repo lint remains the default, and `
 
 # Lint one file explicitly
 .\scripts\lint.ps1 -Files src\BufferUtils.cpp
+
+# Force clang-tidy to use the Ninja compile database
+.\scripts\lint.ps1 -ChangedOnly -Generator Ninja
 
 # Show help
 .\scripts\lint.ps1 -Help

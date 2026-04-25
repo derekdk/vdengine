@@ -100,6 +100,101 @@ function Add-MatchingTranslationUnits {
     }
 }
 
+function Add-RelativeTranslationUnit {
+    param(
+        [System.Collections.Generic.HashSet[string]]$TargetSet,
+        [string[]]$Candidates,
+        [string]$RelativePath
+    )
+
+    foreach ($candidate in $Candidates) {
+        $relative = Get-VdeRelativePath -RepoRoot $RepoRoot -Path $candidate
+        if ($relative -and $relative.Equals($RelativePath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            [void]$TargetSet.Add($candidate)
+            return
+        }
+    }
+}
+
+function Add-PairedTranslationUnits {
+    param(
+        [System.Collections.Generic.HashSet[string]]$TargetSet,
+        [string[]]$Candidates,
+        [string]$RelativePath
+    )
+
+    if ($RelativePath.StartsWith('include\vde\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $subPath = $RelativePath.Substring('include\vde\'.Length)
+        $pairedRelative = Join-Path 'src' ([System.IO.Path]::ChangeExtension($subPath, '.cpp'))
+        Add-RelativeTranslationUnit -TargetSet $TargetSet -Candidates $Candidates -RelativePath $pairedRelative
+        return
+    }
+
+    if ($RelativePath.StartsWith('src\', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $RelativePath -match '^(examples|games|tools|tests)\\[^\\]+\\') {
+        $pairedRelative = [System.IO.Path]::ChangeExtension($RelativePath, '.cpp')
+        Add-RelativeTranslationUnit -TargetSet $TargetSet -Candidates $Candidates -RelativePath $pairedRelative
+    }
+}
+
+function Get-HeaderIncludePatterns {
+    param([string]$RelativePath)
+
+    $normalized = $RelativePath.Replace('\', '/')
+    $patterns = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    $fileName = [System.IO.Path]::GetFileName($normalized)
+    if (-not [string]::IsNullOrWhiteSpace($fileName)) {
+        [void]$patterns.Add('"' + $fileName + '"')
+        [void]$patterns.Add('<' + $fileName + '>')
+    }
+
+    if ($normalized.StartsWith('include/vde/', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $publicPath = $normalized.Substring('include/'.Length)
+        [void]$patterns.Add('"' + $publicPath + '"')
+        [void]$patterns.Add('<' + $publicPath + '>')
+    } elseif ($normalized.StartsWith('src/', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $sourcePath = $normalized.Substring('src/'.Length)
+        [void]$patterns.Add('"' + $sourcePath + '"')
+        [void]$patterns.Add('<' + $sourcePath + '>')
+    } elseif ($normalized -match '^(examples|games|tools|tests)/[^/]+/(.+)$') {
+        $projectRelative = $matches[2]
+        [void]$patterns.Add('"' + $projectRelative + '"')
+        [void]$patterns.Add('<' + $projectRelative + '>')
+    }
+
+    return @($patterns)
+}
+
+function Add-DirectIncludingTranslationUnits {
+    param(
+        [System.Collections.Generic.HashSet[string]]$TargetSet,
+        [string[]]$Candidates,
+        [string]$RelativeHeaderPath,
+        [string]$CandidatePrefix = ''
+    )
+
+    $patterns = Get-HeaderIncludePatterns -RelativePath $RelativeHeaderPath
+    if (-not $patterns -or $patterns.Count -eq 0) {
+        return
+    }
+
+    foreach ($candidate in $Candidates) {
+        $relative = Get-VdeRelativePath -RepoRoot $RepoRoot -Path $candidate
+        if (-not $relative) {
+            continue
+        }
+
+        if ($CandidatePrefix -and -not $relative.StartsWith($CandidatePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        if (Select-String -Path $candidate -Pattern $patterns -SimpleMatch -Quiet) {
+            [void]$TargetSet.Add($candidate)
+        }
+    }
+}
+
 if ($Files.Count -gt 0) {
     $selectedFiles = Resolve-VdeFiles -RepoRoot $RepoRoot -Files $Files -AllowedExtensions @('.cpp', '.cc', '.cxx', '.h', '.hpp', '.hh', '.hxx')
     $targetSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -118,21 +213,18 @@ if ($Files.Count -gt 0) {
             continue
         }
 
-        if ($relative.StartsWith('include\vde\', [System.StringComparison]::OrdinalIgnoreCase) -or
-            $relative.StartsWith('src\', [System.StringComparison]::OrdinalIgnoreCase)) {
-            Add-MatchingTranslationUnits -TargetSet $targetSet -Candidates $userTranslationUnits -Prefix 'src\'
-            continue
+        Add-PairedTranslationUnits -TargetSet $targetSet -Candidates $userTranslationUnits -RelativePath $relative
+
+        $directIncludePrefix = ''
+        if ($relative.StartsWith('include\vde\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $directIncludePrefix = 'src\'
+        } elseif ($relative -match '^(examples|games|tools)\\([^\\]+)\\') {
+            $directIncludePrefix = "{0}\{1}\" -f $matches[1], $matches[2]
+        } elseif ($relative.StartsWith('tests\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $directIncludePrefix = 'tests\'
         }
 
-        if ($relative -match '^(examples|games|tools)\\([^\\]+)\\') {
-            $prefix = "{0}\{1}\" -f $matches[1], $matches[2]
-            Add-MatchingTranslationUnits -TargetSet $targetSet -Candidates $userTranslationUnits -Prefix $prefix
-            continue
-        }
-
-        if ($relative.StartsWith('tests\', [System.StringComparison]::OrdinalIgnoreCase)) {
-            Add-MatchingTranslationUnits -TargetSet $targetSet -Candidates $userTranslationUnits -Prefix 'tests\'
-        }
+        Add-DirectIncludingTranslationUnits -TargetSet $targetSet -Candidates $userTranslationUnits -RelativeHeaderPath $relative -CandidatePrefix $directIncludePrefix
     }
 
     $targets = @($targetSet) | Sort-Object

@@ -204,6 +204,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-ChangedOnly` - Lint files changed in the current git working tree
 - `-Files` - Explicit file list to lint
 - `-Since` - Git revision/range for changed-file linting (implies `-ChangedOnly`)
+- `-Generator` - Compile database preference for clang-tidy (`Auto`, `Ninja`, or `MSBuild`)
 - `-Quick` - Only run format check + cppcheck (fast)
 - `-Fix` - Auto-fix formatting issues (clang-format in fix mode)
 - `-Help` - Show detailed help

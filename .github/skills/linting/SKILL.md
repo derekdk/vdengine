@@ -41,6 +41,9 @@ Runs four linters in order. Each linter is **skipped silently** if its tool is n
 # Run targeted lint on changed files
 .\scripts\lint.ps1 -ChangedOnly
 
+# Force clang-tidy to use the Ninja compile database
+.\scripts\lint.ps1 -ChangedOnly -Generator Ninja
+
 # Fast check: format + cppcheck only (skip shader validation + clang-tidy)
 .\scripts\lint.ps1 -Quick
 
@@ -81,7 +84,7 @@ clang-tidy needs a `compile_commands.json` database to resolve includes correctl
 .\scripts\build.ps1 -Generator Ninja
 ```
 
-`build.ps1` passes `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` automatically when using Ninja. If `compile_commands.json` is missing, clang-tidy is skipped with a hint to run the Ninja build.
+`build.ps1` passes `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` automatically when using Ninja. If `compile_commands.json` is missing, clang-tidy is skipped with a hint to run the Ninja build. `lint.ps1` accepts `-Generator Auto|Ninja|MSBuild` so targeted lint can follow the same build tree you are verifying.
 
 If the existing `build_ninja` cache was configured without `CMAKE_EXPORT_COMPILE_COMMANDS`, `build.ps1` will detect the mismatch and reconfigure automatically.
 
@@ -143,6 +146,8 @@ Regular local verification should use targeted lint:
 .\scripts\lint.ps1
 .\scripts\verify.ps1 -FullLint
 ```
+
+For header changes, targeted clang-tidy expands to paired source files and direct includers in the same runnable area rather than scanning every translation unit in the repository.
 
 ---
 

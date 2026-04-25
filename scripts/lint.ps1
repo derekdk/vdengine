@@ -21,6 +21,9 @@ param(
 
     [string]$Since = '',
 
+    [ValidateSet('Auto', 'Ninja', 'MSBuild')]
+    [string]$Generator = 'Auto',
+
     [switch]$Help
 )
 
@@ -47,6 +50,7 @@ Options:
     -ChangedOnly  Use git working tree changes as the lint file set
     -Files        Explicit file list (relative or absolute)
     -Since        Git revision/range for changed-file linting (implies -ChangedOnly)
+    -Generator    Compile database preference for clang-tidy (Auto, Ninja, MSBuild)
     -Help         Show this help
 
 The top-level script orchestrates these stages:
@@ -251,16 +255,23 @@ if ($Quick) {
     Mark-Skipped -Name 'clang-tidy' -Reason 'skipped by -Quick'
 } else {
     $clangTidyTool = Get-Command clang-tidy -ErrorAction SilentlyContinue
-    $compileDb = Get-VdeCompileDatabasePath -RepoRoot $projectRoot -Generator 'Auto'
+    $compileDb = Get-VdeCompileDatabasePath -RepoRoot $projectRoot -Generator $Generator
 
     if (-not $clangTidyTool) {
         Mark-Skipped -Name 'clang-tidy' -Reason 'not found in PATH'
     } elseif (-not $compileDb) {
-        Mark-Skipped -Name 'clang-tidy' -Reason 'no compile_commands.json found'
+        $compileDbReason = if ($Generator -eq 'MSBuild') {
+            'no MSBuild compile_commands.json found; use a Ninja build for clang-tidy coverage unless you generated one manually'
+        } else {
+            'no compile_commands.json found; use .\scripts\build.ps1 -Generator Ninja for clang-tidy coverage'
+        }
+        Mark-Skipped -Name 'clang-tidy' -Reason $compileDbReason
     } elseif ($targetedMode -and $codeFiles.Count -eq 0) {
         Mark-Skipped -Name 'clang-tidy' -Reason 'no matching source files selected'
     } else {
         $tidyArgs = @()
+        $tidyArgs += '-Generator'
+        $tidyArgs += $Generator
         if ($targetedMode) {
             $tidyArgs += '-Files'
             $tidyArgs += $codeFiles
