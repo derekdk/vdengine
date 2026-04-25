@@ -34,6 +34,30 @@ This skill defines the standard pattern for creating VDE games that are larger t
 
 If the artifact is meant to be played, put it in `games/`. If it is meant to demonstrate an API, keep it in `examples/`. If it is meant to author or inspect content, use `tools/`.
 
+## Scaffold Script
+
+Always start a new game with the scaffold script — it creates all required files and wires everything into the build and smoke systems automatically:
+
+```powershell
+.\scripts\new-game.ps1 -Name my_game
+# Optional overrides:
+.\scripts\new-game.ps1 -Name my_game -Title "My Game" -Sections entity,input,physics
+```
+
+Or run the VS Code task: **Terminal → Run Task → scripts: new-game** (prompts for the name).
+
+The script generates:
+- `games/my_game/main.cpp` — entry point using `runGame(...)`
+- `games/my_game/MyGameScene.h` / `.cpp` — scene stub with `update`, metadata methods
+- `games/my_game/Input.h` — input handler with `KeyStateTracker`
+- `games/my_game/CMakeLists.txt` — uses `add_vde_game(...)`
+- `games/my_game/vde.toml` — smoke metadata
+- `games/my_game/README.md`
+- `smoketests/scripts/smoke_my_game.vdescript`
+- Appends `add_subdirectory(my_game)` to `games/CMakeLists.txt`
+
+After running the script, implement the game by editing the generated scene and input files.
+
 ## Standard Game Structure
 
 ```text

@@ -285,3 +285,5 @@ add_vde_example(vde_spritesheet_multiscene_demo "spritesheet_multiscene_demo/mai
 
 # Text Rendering Showcase - canonical reference for TextEntity auto-sizing, scrolling, dynamic resize
 add_vde_example(vde_text_rendering_demo "text_rendering_demo/main.cpp")
+
+

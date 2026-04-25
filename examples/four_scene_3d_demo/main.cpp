@@ -868,7 +868,7 @@ class FourScene3DDemo : public vde::Game {
         }
     }
 
-    int getExitCode() const { return m_exitCode; }
+    int getExitCode() const override { return m_exitCode; }
 
     void setAutoTerminateSeconds(float s) { m_autoTerminateSeconds = s; }
 

@@ -115,9 +115,7 @@ void Scheduler::execute() {
         std::unordered_map<TaskId, std::vector<TaskId>> dependents;
 
         for (const auto& [id, entry] : m_tasks) {
-            if (inDegree.find(id) == inDegree.end()) {
-                inDegree[id] = 0;
-            }
+            inDegree.try_emplace(id, 0);
             for (TaskId dep : entry.descriptor.dependsOn) {
                 dependents[dep].push_back(id);
                 inDegree[id]++;
@@ -269,9 +267,7 @@ std::vector<TaskId> Scheduler::topologicalSort() const {
     std::unordered_map<TaskId, std::vector<TaskId>> dependents;  // task -> tasks that depend on it
 
     for (const auto& [id, entry] : m_tasks) {
-        if (inDegree.find(id) == inDegree.end()) {
-            inDegree[id] = 0;
-        }
+        inDegree.try_emplace(id, 0);
         for (TaskId dep : entry.descriptor.dependsOn) {
             // dep -> id (id depends on dep)
             dependents[dep].push_back(id);

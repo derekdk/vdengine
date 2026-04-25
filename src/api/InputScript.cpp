@@ -78,12 +78,12 @@ static std::string stripComment(const std::string& line) {
 
     auto hashPos = result.find('#');
     if (hashPos != std::string::npos) {
-        result = result.substr(0, hashPos);
+        result.erase(hashPos);
     }
 
     auto slashPos = result.find("//");
     if (slashPos != std::string::npos) {
-        result = result.substr(0, slashPos);
+        result.erase(slashPos);
     }
 
     return result;

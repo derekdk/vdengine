@@ -648,7 +648,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         float lifetime;
     };
 
-    EntityId m_shipId;
+    EntityId m_shipId = INVALID_ENTITY_ID;
     std::vector<BulletInfo> m_bullets;
     std::unordered_map<EntityId, EntityTag> m_entityTags;
     std::unordered_map<EntityId, float> m_asteroidSizes;

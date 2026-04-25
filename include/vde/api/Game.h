@@ -576,7 +576,7 @@ class Game : private ScriptEnvironment {
      * @brief Get the current exit code.
      * @return 0 for success, 1 for failure
      */
-    int getExitCode() const { return m_exitCode; }
+    virtual int getExitCode() const { return m_exitCode; }
 
     /// Get the script executor (for test inspection).
     InputScriptExecutor* getScriptExecutor() { return m_scriptExecutor.get(); }

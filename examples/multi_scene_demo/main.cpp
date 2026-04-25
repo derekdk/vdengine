@@ -172,25 +172,12 @@ class DemoScene : public vde::examples::BaseExampleScene {
   public:
     explicit DemoScene(const std::string& label) : BaseExampleScene(), m_label(label) {}
 
-    // ------ Background simulation toggle ------
-
-    /**
-     * @brief When true, the engine scheduler will keep calling update()
-     *        on this scene even when it's not in the active scene group.
-     */
-    void setContinueInBackground(bool enabled) {
-        m_continueInBackground = enabled;
-        // Also set the engine-level flag so the scheduler knows
-        Scene::setContinueInBackground(enabled);
-    }
-    bool getContinueInBackground() const { return m_continueInBackground; }
-
     // ------ Lifecycle overrides ------
 
     void onPause() override {
         recordPauseTime();
         std::cout << "[" << m_label << "] paused"
-                  << (m_continueInBackground ? " (will continue simulation)" : " (suspended)")
+                  << (getContinueInBackground() ? " (will continue simulation)" : " (suspended)")
                   << std::endl;
     }
 
@@ -219,7 +206,7 @@ class DemoScene : public vde::examples::BaseExampleScene {
         recordPauseTime();
         m_wasExited = true;
         std::cout << "[" << m_label << "] exited"
-                  << (m_continueInBackground ? " (simulation continues)" : " (suspended)")
+                  << (getContinueInBackground() ? " (simulation continues)" : " (suspended)")
                   << std::endl;
     }
 
@@ -258,7 +245,6 @@ class DemoScene : public vde::examples::BaseExampleScene {
 
   private:
     std::string m_label;
-    bool m_continueInBackground = false;
     double m_pauseTimestamp = 0.0;
     float m_accumulatedBackgroundTime = 0.0f;
     bool m_wasExited = false;
@@ -266,7 +252,7 @@ class DemoScene : public vde::examples::BaseExampleScene {
     void recordPauseTime() { m_pauseTimestamp = getCurrentGameTime(); }
 
     void applyBackgroundTime() {
-        if (m_continueInBackground && m_pauseTimestamp > 0.0) {
+        if (getContinueInBackground() && m_pauseTimestamp > 0.0) {
             double now = getCurrentGameTime();
             m_accumulatedBackgroundTime += static_cast<float>(now - m_pauseTimestamp);
         }
@@ -909,7 +895,7 @@ class MultiSceneDemo : public vde::Game {
         }
     }
 
-    int getExitCode() const { return m_exitCode; }
+    int getExitCode() const override { return m_exitCode; }
 
   private:
     void printMasterHeader() {

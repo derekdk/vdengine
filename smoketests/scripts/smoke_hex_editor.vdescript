@@ -1,0 +1,13 @@
+# Smoke test: Hex Editor
+# Verify the tool starts, renders the UI, and exits cleanly.
+wait startup
+wait 2s
+
+# Toggle UI visibility (F1) and restore it
+press F1
+wait 500
+press F1
+wait 500
+
+wait 1s
+exit

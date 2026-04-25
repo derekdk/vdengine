@@ -36,6 +36,15 @@ bool CommandSystem::execute(const std::string& commandLine) {
         return true;
     }
 
+    if (!m_ctx) {
+        constexpr const char* kErrorMsg = "Command system is not initialized.";
+        addLogEntry(line, kErrorMsg, false);
+        std::cerr << kErrorMsg << "\n";
+        return false;
+    }
+
+    EditorContext& context = *m_ctx;
+
     // Resolve the command (handles @canvas prefix, longest-match lookup)
     ResolvedCommand resolved = resolveCommand(line);
 
@@ -52,11 +61,11 @@ bool CommandSystem::execute(const std::string& commandLine) {
         // Custom-parsing commands receive the raw argument string as remainder
         // Set the remainder directly via the friend relationship through CommandArgParser
         // We do a trivial parse that puts everything in remainder
-        auto parseResult = CommandArgParser::parse(resolved.rawArgs, {}, *m_ctx);
+        auto parseResult = CommandArgParser::parse(resolved.rawArgs, {}, context);
         args = std::move(parseResult.args);
     } else {
         auto parseResult =
-            CommandArgParser::parse(resolved.rawArgs, resolved.command->metadata().params, *m_ctx);
+            CommandArgParser::parse(resolved.rawArgs, resolved.command->metadata().params, context);
         if (!parseResult.success) {
             std::string errorMsg = "Parse error: " + parseResult.error;
             addLogEntry(line, errorMsg, false);
@@ -71,12 +80,12 @@ bool CommandSystem::execute(const std::string& commandLine) {
         (resolved.targetCanvasId != 0) ? resolved.targetCanvasId : m_activeCanvasId;
 
     // Execute
-    CommandResult result = resolved.command->execute(targetCanvasId, args, *m_ctx);
+    CommandResult result = resolved.command->execute(targetCanvasId, args, context);
 
     // Determine canvas name for the log
     std::string canvasName;
-    if (m_ctx && m_ctx->canvases) {
-        Canvas* c = m_ctx->canvases->getById(targetCanvasId);
+    if (context.canvases) {
+        Canvas* c = context.canvases->getById(targetCanvasId);
         if (c) {
             canvasName = c->name;
         }

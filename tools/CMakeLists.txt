@@ -35,3 +35,5 @@ endfunction()
 add_subdirectory(geometry_repl)
 add_subdirectory(resource_editor)
 add_subdirectory(vlauncher)
+
+add_subdirectory(hex_editor)

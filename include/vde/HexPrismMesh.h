@@ -27,7 +27,8 @@ struct HexPrismVertex {
     uint8_t faceType;    ///< 0=top face, 1=side face, 2=bottom face
     uint8_t padding[3];  ///< Alignment padding to 32 bytes
 
-    HexPrismVertex() = default;
+    HexPrismVertex()
+        : position(0.0f), normal(0.0f), texCoord(0.0f), faceType(0), padding{0, 0, 0} {}
 
     HexPrismVertex(const glm::vec3& pos, const glm::vec3& norm, const glm::vec2& uv, uint8_t face)
         : position(pos), normal(norm), texCoord(uv), faceType(face), padding{0, 0, 0} {}

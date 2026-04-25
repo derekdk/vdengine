@@ -1,0 +1,16 @@
+# Smoke test: Pong
+# Serve the ball, move the player paddle in both directions, then exit.
+wait startup
+wait 250
+press SPACE
+wait 250
+keydown DOWN
+wait 350
+keyup DOWN
+wait 250
+keydown UP
+wait 350
+keyup UP
+wait 1500
+
+exit

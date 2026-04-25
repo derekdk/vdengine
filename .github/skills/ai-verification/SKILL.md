@@ -30,7 +30,7 @@ The workflow writes to `logs/` inside the workspace:
 .\scripts\verify.ps1
 ```
 
-This runs: **Build → Unit Tests → Smoke Tests → Render Verification** and writes all output to two files:
+This runs: **Build → Unit Tests → Smoke Tests → Render Verification → Lint** and writes all output to two files:
 
 | File | Purpose |
 |------|---------|
@@ -70,6 +70,7 @@ The final summary is always at the bottom:
   UNIT TESTS : PASSED
   SMOKE TESTS : FAILED
   RENDER VERIFY : SKIPPED
+  LINT : PASSED
   OVERALL: VERIFICATION FAILED
 ============================================
 ```
@@ -107,6 +108,12 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 .\scripts\verify.ps1 -SkipSmoke
 ```
 
+### Full verification with full-repo lint
+
+```powershell
+.\scripts\verify.ps1 -FullLint
+```
+
 ### Full verification targeting one smoke test
 
 ```powershell
@@ -134,6 +141,8 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 | `-SkipBuild` | — | Skip the build stage; use when code hasn't changed |
 | `-SkipSmoke` | — | Skip smoke tests; faster iteration on unit test failures |
 | `-SkipRenderVerify` | — | Skip render verification; use when visual output wasn't changed |
+| `-SkipLint` | — | Skip the lint stage |
+| `-FullLint` | — | Run full-repo lint instead of targeted changed-file lint |
 | `-Filter <pattern>` | `*` | GoogleTest filter for unit tests (e.g. `"EmojiFont*"`) |
 | `-SmokeFilter <pattern>` | — | Exe wildcard for smoke tests (e.g. `"*emoji*"`) |
 | `-SmokeExtended` | — | Include priority 2 examples in smoke tests |
@@ -166,24 +175,30 @@ Note: for AI agents, using `read_file` on the `logs/` path directly is always pr
 
 ---
 
-## When to Use Individual Scripts Instead
+## When to Use Individual Scripts or Tasks Instead
 
-Use `verify.ps1` for final verification gates. Use individual scripts for interactive development:
+Use `verify.ps1` for final verification gates. Use VS Code tasks or individual scripts for interactive development:
 
-| Situation | Command |
-|-----------|---------|
+| Situation | Preferred |
+|-----------|-----------|
 | Iterating on a single failing test | `.\scripts\test.ps1 -Filter "Suite.Test"` |
-| Watching build progress live (colored) | `.\scripts\build.ps1` |
+| Full build (standard, default config) | `scripts: build` task |
+| Full unit test run (standard) | `scripts: test` task or `scripts: build-and-test` task |
+| Full smoke test run (standard) | `scripts: smoke-test` task |
+| Watching build progress live (colored) | `scripts: build` task or `.\scripts\build.ps1` |
 | Running a specific smoke test interactively | `.\scripts\smoke-test.ps1 -Filter "*emoji*"` |
 | Full gate after completing a feature | `.\scripts\verify.ps1` |
+| Full gate with full-repo lint | `.\scripts\verify.ps1 -FullLint` |
 
-The individual scripts output to the terminal in real-time with colors. `verify.ps1` buffers output until each stage completes (needed for reliable log capture).
+Tasks are preferred over scripts for full runs at default config. Scripts are required when you need parameters (filter, generator, config, category).
 
 ---
 
 ## Important Notes
 
 - `verify.ps1` always passes `-ProblemsOnly` to `test.ps1` and `smoke-test.ps1`. Unit test pass/fail noise is suppressed; only warnings and failures appear in the log.
+- `verify.ps1` runs targeted lint by default; use `-FullLint` when you want the slower full-repo lint pass in the same verification run.
+- `verify.ps1` passes its `-Generator` choice through to the lint stage. Use `-Generator Ninja` when you need clang-tidy coverage from `compile_commands.json`.
 - Build output is not filtered — full CMake/Ninja output is in the log.
 - If build fails, remaining stages are skipped automatically.
 - The `logs/` directory is created automatically on first run; it is in `.gitignore`.

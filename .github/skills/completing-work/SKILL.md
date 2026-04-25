@@ -30,25 +30,28 @@ If you changed code that affects a buildable or runnable artifact (engine code, 
 2. Run unit tests and confirm they pass.
 3. Run smoke tests when the change affects examples, games, tools, rendering, input, windowing, launch flows, or other runtime behavior.
 4. Confirm the expected artifact or runtime outcome exists.
-5. Only then run a subagent code review.
-6. If the review causes more edits, repeat the same verification sequence before re-review.
+5. Run all linters and confirm no new failures.
+6. Only then run a subagent code review.
+7. If the review causes more edits, repeat the same verification sequence before re-review.
 
-Do not reverse this order. A subagent review is not a substitute for build/test/smoke verification, and build/test/smoke verification is not a substitute for code review.
+Do not reverse this order. A subagent review is not a substitute for build/test/smoke/lint verification, and verification is not a substitute for code review.
 
-### Preferred: run all gates with `verify.ps1`
+### Preferred: run all gates via VS Code tasks
 
-For final verification, use `verify.ps1` to run all gates in one command and capture results to a known log path:
+For final verification, use the `scripts: verify` task — never call `verify.ps1` directly. The task ensures consistent environment setup and matches what CI runs:
 
-```powershell
-.\scripts\verify.ps1
+```
+run_task("scripts: verify", workspaceFolder="c:\\...\\vdengine")
 ```
 
-Then read the results:
+Then read the results with `read_file` (do **not** rely on terminal streaming output):
 ```
 read_file("logs/verify-latest.log", startLine=1, endLine=80)
 ```
 
 This writes to `logs/verify-latest.log` inside the workspace, so `read_file` works directly without permission prompts or temp-file management. See the `ai-verification` skill for the full workflow and parameter reference.
+
+> **Why tasks, not scripts?** `build-tool-workflows` designates VS Code tasks as the canonical invocation method for AI agents. Calling scripts directly bypasses the task runner and produces inconsistent behavior. Always use `run_task` for standard verification gates.
 
 ### Step 1 — Run the script or command
 
@@ -90,7 +93,17 @@ If the script is supposed to produce a file, list the directory and confirm the 
 Get-ChildItem benchmarks\*.json | Select-Object Name
 ```
 
-### Step 5 — Run a subagent review (mandatory)
+### Step 5 — Run all linters
+
+Run the `scripts: lint` task and confirm no new failures are introduced:
+
+```
+run_task("scripts: lint", workspaceFolder="c:\\...\\vdengine")
+```
+
+Linters run in order: clang-format, GLSL shader validation, cppcheck, clang-tidy. Each linter is skipped if its tool is not installed, so a clean run on a workstation with partial tooling is still useful. A lint failure is a blocking issue — do not proceed to subagent review until lint is clean.
+
+### Step 6 — Run a subagent review (mandatory)
 
 Before declaring completion, launch a subagent to review the full set of changes.
 
@@ -99,21 +112,21 @@ Required behavior:
 - Ask it to prioritize bugs, regressions, risky behavior changes, and missing tests.
 - Treat this as a required gate, not an optional best practice.
 
-### Step 6 — Fix findings and re-review until clean
+### Step 7 — Fix findings and re-review until clean
 
 If the subagent reports issues:
 
 1. Fix the issues.
-2. Re-run the relevant verification commands in the same order: build, unit tests, smoke tests when applicable, then read the outputs.
+2. Re-run the relevant verification commands in the same order: build, unit tests, smoke tests when applicable, lint, then read the outputs.
 3. Launch the subagent review again on the updated diff.
 
 Repeat until the subagent reports no material issues.
 
-### Step 7 — Only then announce completion
+### Step 8 — Only then announce completion
 
-Once you have: run the command, seen a zero exit code, read the output, confirmed the expected artifact, and completed a clean subagent review loop, you may tell the user the task is complete.
+Once you have: run the command, seen a zero exit code, read the output, confirmed the expected artifact, linters passed, and completed a clean subagent review loop, you may tell the user the task is complete.
 
-For executable/code changes in VDE, interpret this as: build passed, unit tests passed, smoke tests passed when applicable, artifacts were confirmed, and only then was a clean subagent review completed on the verified diff.
+For executable/code changes in VDE, interpret this as: build passed, unit tests passed, smoke tests passed when applicable, linters passed, artifacts were confirmed, and only then was a clean subagent review completed on the verified diff.
 
 Acceptable:
 > "Both benchmark runs completed. The JSON files are in `benchmarks/`. The comparison shows a 3.2% variance between runs, which is expected noise."
@@ -123,7 +136,8 @@ Not acceptable:
 > "The script looks correct. It's ready to use."
 
 Also not acceptable:
-> "Build and tests passed, so I'm done." (without subagent review)
+> "Build and tests passed, so I'm done." (without lint or subagent review)  
+> "Build, tests, and lint passed, so I'm done." (without subagent review)
 
 ---
 

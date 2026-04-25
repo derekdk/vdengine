@@ -32,6 +32,11 @@ The following skills provide domain-specific knowledge for working with VDE:
 **Use when:** Implementing enhancements or new capabilities in engine code, examples, games, tools, or APIs that change supported behavior.  
 **Location:** `.github/skills/adding-features/SKILL.md`
 
+### adding-scripts
+**Purpose:** Guide for adding new PowerShell scripts to the VDE project, including all required documentation and registration steps.  
+**Use when:** Creating any new script in `scripts/` — ensures the script is registered in tasks.json, help.ps1, README.md, and the build-tool-workflows skill.  
+**Location:** `.github/skills/adding-scripts/SKILL.md`
+
 ### adding-skills
 **Purpose:** Guide for creating new skills in the VDE project.  
 **Use when:** Recognizing a repeatable process with expensive-to-acquire knowledge, or when the user identifies a deficiency in how the AI completed work — create a skill immediately to close the loop.  

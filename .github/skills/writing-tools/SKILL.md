@@ -31,6 +31,30 @@ This skill describes the standard pattern for creating asset creation tools in V
 - Support both interactive and scriptable modes
 - Export assets to standard formats
 
+## Scaffold Script
+
+Always start a new tool with the scaffold script — it creates all required files and wires everything into the build and smoke systems automatically:
+
+```powershell
+.\scripts\new-tool.ps1 -Name my_tool
+# Optional overrides:
+.\scripts\new-tool.ps1 -Name my_tool -Title "My Tool" -Sections entity,input
+```
+
+Or run the VS Code task: **Terminal → Run Task → scripts: new-tool** (prompts for the name).
+
+The script generates:
+- `tools/my_tool/main.cpp` — entry point with interactive + script mode
+- `tools/my_tool/MyToolScene.h` / `.cpp` — scene stub with `executeCommand`, `drawDebugUI`
+- `tools/my_tool/CMakeLists.txt` — wired with `vde_add_shader_sync`
+- `tools/my_tool/vde.toml` — smoke metadata
+- `tools/my_tool/README.md`
+- `smoketests/scripts/smoke_my_tool.vdescript`
+- Appends `add_subdirectory(my_tool)` to `tools/CMakeLists.txt`
+- Inserts the entry into `$toolSmokeScriptMap` in `scripts/smoke-test.ps1`
+
+After running the script, implement the tool by editing the generated scene files.
+
 ## Standard Tool Structure
 
 All VDE tools follow this pattern:

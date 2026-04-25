@@ -475,7 +475,7 @@ class BaseExampleGame : public vde::Game {
      * Combines this game's exit code with the base Game class exit code
      * (which tracks input script assertion failures).
      */
-    int getExitCode() const {
+    int getExitCode() const override {
         // Check both ExampleGame failures and Game-level assertion failures
         if (m_exitCode != 0)
             return m_exitCode;

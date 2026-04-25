@@ -1,41 +1,37 @@
 # Format VDE Code
-# Applies clang-format to all C++ source files in the project
+# Applies clang-format to VDE C++ source files.
 
+[CmdletBinding()]
 param(
-    [switch]$Check,  # Only check formatting without modifying files
+    [string[]]$Files = @(),
+
+    [switch]$Check,
+
     [switch]$Help
 )
 
+$ErrorActionPreference = "Stop"
+
+Import-Module (Join-Path $PSScriptRoot "lint-common.psm1") -Force
+
 function Show-Help {
     Write-Host @"
-Format VDE Code - Apply clang-format to all C++ files
+Format VDE Code - Apply clang-format to VDE C++ files
 
 Usage:
-    .\scripts\format.ps1           # Format all files in-place
-    .\scripts\format.ps1 -Check    # Check formatting without modifying files
-    .\scripts\format.ps1 -Help     # Show this help message
+    .\scripts\format.ps1                           # Format all files in-place
+    .\scripts\format.ps1 -Check                    # Check formatting without modifying files
+    .\scripts\format.ps1 -Files src\BufferUtils.cpp
+    .\scripts\format.ps1 -Help                     # Show this help message
 
 Description:
-    This script formats all C++ source files (.h, .cpp) in the VDE project
-    according to the .clang-format configuration file.
-    
-    Files formatted:
-    - include/vde/**/*.h
-    - src/**/*.h
-    - src/**/*.cpp
-    - examples/**/*.h
-    - examples/**/*.cpp
-    - games/**/*.h
-    - games/**/*.cpp
-    - tests/**/*.h
-    - tests/**/*.cpp
-    - tools/**/*.h
-    - tools/**/*.cpp
+    Formats VDE C++ files according to the repository .clang-format configuration.
+    With no -Files argument, the standard repository source roots are scanned.
 
-Requirements:
-    - clang-format must be installed and available in PATH
-    - Run from project root or scripts directory
-
+Parameters:
+    -Files <paths>   Optional explicit source/header file list (relative or absolute)
+    -Check           Check formatting without modifying files
+    -Help            Show this help message
 "@
     exit 0
 }
@@ -44,15 +40,9 @@ if ($Help) {
     Show-Help
 }
 
-# Navigate to project root
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = Split-Path -Parent $scriptDir
+$projectRoot = Get-VdeLintRepoRoot -ScriptRoot $PSScriptRoot
+Set-Location $projectRoot
 
-if (Test-Path $projectRoot) {
-    Set-Location $projectRoot
-}
-
-# Check if clang-format is available
 $clangFormat = Get-Command clang-format -ErrorAction SilentlyContinue
 if (-not $clangFormat) {
     Write-Host "ERROR: clang-format not found in PATH" -ForegroundColor Red
@@ -64,71 +54,74 @@ if (-not $clangFormat) {
 
 Write-Host "Using clang-format: $($clangFormat.Source)" -ForegroundColor Cyan
 
-# Find all C++ files
-$patterns = @(
-    "include\vde\**\*.h",
-    "src\**\*.h",
-    "src\**\*.cpp",
-    "examples\**\*.h",
-    "examples\**\*.cpp",
-    "games\**\*.h",
-    "games\**\*.cpp",
-    "tests\**\*.h",
-    "tests\**\*.cpp",
-    "tools\**\*.h",
-    "tools\**\*.cpp"
-)
+$allowedExtensions = @('.h', '.hpp', '.hh', '.hxx', '.cpp', '.cc', '.cxx')
+if ($Files.Count -gt 0) {
+    $targetFiles = Resolve-VdeFiles -RepoRoot $projectRoot -Files $Files -AllowedExtensions $allowedExtensions
+} else {
+    $patterns = @(
+        'include\vde\**\*.h',
+        'src\**\*.h',
+        'src\**\*.cpp',
+        'examples\**\*.h',
+        'examples\**\*.cpp',
+        'games\**\*.h',
+        'games\**\*.cpp',
+        'tests\**\*.h',
+        'tests\**\*.cpp',
+        'tools\**\*.h',
+        'tools\**\*.cpp'
+    )
 
-$files = @()
-foreach ($pattern in $patterns) {
-    $found = Get-ChildItem -Path $pattern -Recurse -ErrorAction SilentlyContinue
-    if ($found) {
-        $files += $found
+    $targetFiles = @()
+    foreach ($pattern in $patterns) {
+        $targetFiles += Get-ChildItem -Path $pattern -Recurse -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
     }
+    $targetFiles = @($targetFiles | Sort-Object -Unique)
 }
 
-if ($files.Count -eq 0) {
-    Write-Host "No C++ files found to format" -ForegroundColor Yellow
+if (-not $targetFiles -or $targetFiles.Count -eq 0) {
+    Write-Host 'No matching C++ files found to format' -ForegroundColor Yellow
     exit 0
 }
 
-Write-Host "Found $($files.Count) files to format" -ForegroundColor Cyan
+Write-Host "Found $($targetFiles.Count) file(s) to process" -ForegroundColor Cyan
 
 if ($Check) {
     Write-Host "`nChecking formatting (files will not be modified)..." -ForegroundColor Cyan
     $needsFormatting = @()
-    
-    foreach ($file in $files) {
-        $result = & clang-format --dry-run --Werror $file.FullName 2>&1
+
+    foreach ($file in $targetFiles) {
+        & clang-format --dry-run --Werror $file 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             $needsFormatting += $file
         }
     }
-    
+
     if ($needsFormatting.Count -eq 0) {
         Write-Host "`n[SUCCESS] All files are properly formatted!" -ForegroundColor Green
         exit 0
-    } else {
-        Write-Host "`n[FAILED] The following files need formatting:" -ForegroundColor Red
-        foreach ($file in $needsFormatting) {
-            Write-Host "  - $($file.FullName)" -ForegroundColor Yellow
-        }
-        Write-Host "`nRun without -Check to format these files" -ForegroundColor Cyan
-        exit 1
     }
-} else {
-    Write-Host "`nFormatting files..." -ForegroundColor Cyan
-    
-    $formatted = 0
-    foreach ($file in $files) {
-        & clang-format -i $file.FullName
-        if ($LASTEXITCODE -eq 0) {
-            $formatted++
-            Write-Host "  Formatted: $($file.FullName)" -ForegroundColor Gray
-        } else {
-            Write-Host "  ERROR: Failed to format $($file.FullName)" -ForegroundColor Red
-        }
+
+    Write-Host "`n[FAILED] The following files need formatting:" -ForegroundColor Red
+    foreach ($file in $needsFormatting) {
+        Write-Host "  - $file" -ForegroundColor Yellow
     }
-    
-    Write-Host "`n[SUCCESS] Formatted $formatted files" -ForegroundColor Green
+    Write-Host "`nRun without -Check to format these files" -ForegroundColor Cyan
+    exit 1
 }
+
+Write-Host "`nFormatting files..." -ForegroundColor Cyan
+
+$formatted = 0
+foreach ($file in $targetFiles) {
+    & clang-format -i $file
+    if ($LASTEXITCODE -eq 0) {
+        $formatted++
+        Write-Host "  Formatted: $file" -ForegroundColor Gray
+    } else {
+        Write-Host "  ERROR: Failed to format $file" -ForegroundColor Red
+    }
+}
+
+Write-Host "`n[SUCCESS] Formatted $formatted files" -ForegroundColor Green
+exit 0
