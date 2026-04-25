@@ -8,6 +8,8 @@
 #include "../ToolBase.h"
 #include "../geometry_repl/FileDialog.h"
 
+namespace vde::tools {
+
 // ---------------------------------------------------------------------------
 // Data model for a single opened file
 // ---------------------------------------------------------------------------
@@ -42,6 +44,7 @@ class HexEditorScene : public vde::tools::BaseToolScene {
     bool m_showCompare = false;
     bool m_showAscii = true;
     char m_openPathBuf[1024] = {};
+    char m_consoleBuf[512] = {};
 
     // ----- UI helpers -----
     void drawToolbar();
@@ -60,3 +63,5 @@ class HexEditorScene : public vde::tools::BaseToolScene {
     bool loadFile(const std::string& path);
     static std::string shortName(const std::string& path);
 };
+
+}  // namespace vde::tools

@@ -47,6 +47,7 @@ FishingGameScene::FishingGameScene() : m_rng(1337) {}  // NOLINT(bugprone-random
 
 void FishingGameScene::onEnter() {
     printGameHeader();
+    m_input = dynamic_cast<FishingInput*>(getInputHandler());
     setup2D(kViewWidth, kViewHeight, Color(0.72f, 0.88f, 0.98f, 1.0f));
 
     createEnvironment();
@@ -401,7 +402,7 @@ void FishingGameScene::catchFish(FishState& fish) {
 }
 
 FishingInput* FishingGameScene::input() {
-    return dynamic_cast<FishingInput*>(getInputHandler());
+    return m_input;
 }
 
 }  // namespace fishing

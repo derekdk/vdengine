@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cinttypes>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -11,7 +13,7 @@
 
 #include <imgui.h>
 
-using namespace vde::tools;
+namespace vde::tools {
 
 // =============================================================================
 // Construction / lifecycle
@@ -129,14 +131,13 @@ void HexEditorScene::drawDebugUI() {
         ImGui::Separator();
         ImGui::Text(">");
         ImGui::SameLine();
-        static char consoleBuf[512] = {};
-        if (ImGui::InputText("##ConsoleInput", consoleBuf, sizeof(consoleBuf),
+        if (ImGui::InputText("##ConsoleInput", m_consoleBuf, sizeof(m_consoleBuf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
-            std::string line(consoleBuf);
+            std::string line(m_consoleBuf);
             if (!line.empty()) {
                 addConsoleMessage("> " + line);
                 executeCommand(line);
-                consoleBuf[0] = '\0';
+                m_consoleBuf[0] = '\0';
             }
             ImGui::SetKeyboardFocusHere(-1);
         }
@@ -293,7 +294,7 @@ void HexEditorScene::drawHexPanel(const char* /*panelId*/, int fileIdx, bool hig
             size_t offset = static_cast<size_t>(row) * bpr;
 
             // Offset column
-            std::snprintf(rowBuf, sizeof(rowBuf), "%08zX", offset);
+            std::snprintf(rowBuf, sizeof(rowBuf), "%08" PRIX64, static_cast<std::uint64_t>(offset));
             ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", rowBuf);
             ImGui::SameLine();
 
@@ -514,3 +515,5 @@ std::string HexEditorScene::shortName(const std::string& path) {
     std::filesystem::path p(path);
     return p.filename().string();
 }
+
+}  // namespace vde::tools

@@ -13,6 +13,7 @@ PongScene::PongScene() = default;
 
 void PongScene::onEnter() {
     printGameHeader();
+    m_input = dynamic_cast<PongInput*>(getInputHandler());
 
     setup2D(kViewWidth, kViewHeight, Color::fromHex(0x08131f));
     createArena();
@@ -23,22 +24,21 @@ void PongScene::onEnter() {
 void PongScene::update(float deltaTime) {
     BaseGameScene::update(deltaTime);
 
-    auto* input = dynamic_cast<PongInput*>(getInputHandler());
-    if (!input) {
+    if (!m_input) {
         return;
     }
 
-    if (input->keys.consume("restart")) {
+    if (m_input->keys.consume("restart")) {
         resetMatch();
         return;
     }
 
     if (m_roundState == RoundState::GameOver) {
-        if (input->keys.consume("serve")) {
+        if (m_input->keys.consume("serve")) {
             resetMatch();
             return;
         }
-    } else if (m_roundState == RoundState::WaitingForServe && input->keys.consume("serve")) {
+    } else if (m_roundState == RoundState::WaitingForServe && m_input->keys.consume("serve")) {
         startRound();
     }
 
@@ -126,6 +126,7 @@ void PongScene::createHud() {
     m_scoreText = addEntity<TextEntity>();
     m_scoreText->setFont(BitmapFont::large());
     m_scoreText->setStyle({.color = Color::white(), .pixelScale = 2});
+    m_scoreText->setAnchor(0.5f, 0.5f);
     m_scoreText->setPosition(0.0f, 4.3f, 0.0f);
     m_scoreText->setWorldHeight(0.5f);
 
@@ -311,7 +312,7 @@ void PongScene::setBallVelocity(float directionX, float directionY) {
 }
 
 PongInput* PongScene::input() {
-    return dynamic_cast<PongInput*>(getInputHandler());
+    return m_input;
 }
 
 bool PongScene::overlapsAabb(float ax, float ay, float aw, float ah, float bx, float by, float bw,
@@ -321,8 +322,8 @@ bool PongScene::overlapsAabb(float ax, float ay, float aw, float ah, float bx, f
     float bHalfW = bw * 0.5f;
     float bHalfH = bh * 0.5f;
 
-    return !(ax + aHalfW < bx - bHalfW || ax - aHalfW > bx + bHalfW || ay + aHalfH < by - bHalfH ||
-             ay - aHalfH > by + bHalfH);
+    return ax + aHalfW >= bx - bHalfW && ax - aHalfW <= bx + bHalfW && ay + aHalfH >= by - bHalfH &&
+           ay - aHalfH <= by + bHalfH;
 }
 
 }  // namespace pong

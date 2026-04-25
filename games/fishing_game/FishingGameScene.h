@@ -90,6 +90,7 @@ class FishingGameScene : public vde::games::BaseGameScene {
     float m_elapsed = 0.0f;
     int m_score = 0;
     int m_caughtCount = 0;
+    fishing::FishingInput* m_input = nullptr;
     std::string m_status = "Move to a fish, cast the line, and wait for a bite.";
 };
 

@@ -78,6 +78,7 @@ class PongScene : public vde::games::BaseGameScene {
     float m_ballVX = 0.0f;
     float m_ballVY = 0.0f;
     float m_serveDirection = 1.0f;
+    PongInput* m_input = nullptr;
     std::string m_status = "Press SPACE to serve.";
 };
 
