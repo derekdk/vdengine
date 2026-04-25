@@ -5,7 +5,7 @@ description: Guide for running static analysis and code quality checks in VDE us
 
 # Linting in VDE
 
-This skill covers how to run the VDE lint script, what each linter does, and how to ensure tools are discoverable. All linting is orchestrated through `scripts/lint.ps1`.
+This skill covers how to run the VDE lint script, what each linter does, and how to ensure tools are discoverable. `scripts/lint.ps1` remains the top-level entry point and now orchestrates dedicated sub-scripts for shader validation, cppcheck, and clang-tidy.
 
 ## When to use this skill
 
@@ -38,11 +38,22 @@ Runs four linters in order. Each linter is **skipped silently** if its tool is n
 # Run all available linters
 .\scripts\lint.ps1
 
+# Run targeted lint on changed files
+.\scripts\lint.ps1 -ChangedOnly
+
 # Fast check: format + cppcheck only (skip shader validation + clang-tidy)
 .\scripts\lint.ps1 -Quick
 
 # Auto-fix formatting in place
 .\scripts\lint.ps1 -Fix
+```
+
+### Direct stage scripts
+
+```powershell
+.\scripts\lint-shaders.ps1
+.\scripts\lint-cppcheck.ps1
+.\scripts\lint-clang-tidy.ps1 -Files src\BufferUtils.cpp
 ```
 
 ---
@@ -90,7 +101,7 @@ Required so cppcheck correctly parses `TEST` / `TEST_F` macros. Without this, al
 ```
 Required for repo-wide scans that include `examples/`. Multiple example executables legitimately reuse scene class names (e.g. `GameScene`). This suppression prevents bogus cross-TU ODR violations across unrelated standalone executables.
 
-These flags are already built into `lint.ps1` — they are noted here so you don't remove them thinking they are unnecessary.
+These flags are already built into `lint-cppcheck.ps1` — they are noted here so you don't remove them thinking they are unnecessary.
 
 ### Inline suppressions
 
@@ -110,9 +121,28 @@ The script passes `--inline-suppr`, so these are honoured. Use them sparingly an
 |---------|-------|-----|
 | All stages show SKIPPED | Tools not on PATH | Install tools; verify with `Get-Command clang-tidy` |
 | clang-tidy skipped, tool present | No `compile_commands.json` | Run `.\scripts\build.ps1 -Generator Ninja` |
-| cppcheck syntax errors in tests | `--library=googletest` missing | Do not remove this flag from `lint.ps1` |
-| False ctuOneDefinitionRuleViolation | Cross-example ODR scan | Suppression already in `lint.ps1`; do not remove |
+| cppcheck syntax errors in tests | `--library=googletest` missing | Do not remove this flag from `lint-cppcheck.ps1` |
+| False ctuOneDefinitionRuleViolation | Cross-example ODR scan | Suppression already in `lint-cppcheck.ps1`; do not remove |
 | clang-format fails | Formatting doesn't match `.clang-format` | Run `.\scripts\lint.ps1 -Fix` to auto-fix |
+| Windows PowerShell task fails before showing real clang-tidy results | Native stderr handling in the host shell | Use the dedicated `lint-clang-tidy.ps1` path through `lint.ps1`; it captures stdout/stderr safely |
+
+---
+
+## Targeted linting for regular verification
+
+Regular local verification should use targeted lint:
+
+```powershell
+.\scripts\lint.ps1 -ChangedOnly
+.\scripts\verify.ps1
+```
+
+`verify.ps1` now runs targeted lint by default at the end of the pipeline. Use full lint only when you intentionally want the slower repository-wide pass:
+
+```powershell
+.\scripts\lint.ps1
+.\scripts\verify.ps1 -FullLint
+```
 
 ---
 

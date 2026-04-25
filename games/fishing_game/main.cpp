@@ -7,7 +7,7 @@ class FishingGame : public vde::games::BaseGame<fishing::FishingInput, fishing::
     FishingGame() = default;
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) {  // NOLINT(bugprone-exception-escape)
     FishingGame game;
     return vde::games::runGame(game, "VDE Pond Fisher", 1280, 720, argc, argv);
 }

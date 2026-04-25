@@ -31,11 +31,15 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 | `scripts: test` | Run all unit tests (project must already be built) |
 | `scripts: smoke-test` | Run priority 1 smoke tests |
 | `scripts: render-verify` | Run render verification (golden image comparison) |
-| `scripts: verify` | Full end-to-end verification: Build → Unit Tests → Smoke Tests → Render Verify |
+| `scripts: verify` | Full end-to-end verification: Build → Unit Tests → Smoke Tests → Render Verify → targeted lint |
 | `scripts: clean` | Clean Ninja build artifacts |
 | `scripts: clean-all` | Clean both Ninja and MSBuild build directories |
 | `scripts: format` | Format C++ code with clang-format |
 | `scripts: lint` | Run all available linters (format, shaders, cppcheck, clang-tidy) |
+| `scripts: lint-changed` | Run targeted lint on the current git delta |
+| `scripts: lint-shaders` | Run shader validation only |
+| `scripts: lint-cppcheck` | Run cppcheck only |
+| `scripts: lint-clang-tidy` | Run clang-tidy only |
 | `scripts: run-vlauncher` | Launch VLauncher (Release config) |
 | `scripts: help` | Show quick help for all build scripts |
 
@@ -76,8 +80,11 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 | `test.ps1` | Run unit tests | `.\scripts\test.ps1 -Filter "CameraTest.*"` |
 | `smoke-test.ps1` | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Build` |
 | `render-verify.ps1` | Run golden-image comparison tests using FLIP | `.\scripts\render-verify.ps1` |
-| `verify.ps1` | Full end-to-end: build → unit tests → smoke → render verify | `.\scripts\verify.ps1` |
-| `lint.ps1` | Run all available linters in sequence | `.\scripts\lint.ps1` |
+| `verify.ps1` | Full end-to-end: build → unit tests → smoke → render verify → lint | `.\scripts\verify.ps1` |
+| `lint.ps1` | Run all available linters in sequence | `.\scripts\lint.ps1 -ChangedOnly` |
+| `lint-shaders.ps1` | Run shader validation only | `.\scripts\lint-shaders.ps1` |
+| `lint-cppcheck.ps1` | Run cppcheck only | `.\scripts\lint-cppcheck.ps1` |
+| `lint-clang-tidy.ps1` | Run clang-tidy only | `.\scripts\lint-clang-tidy.ps1 -Files src\BufferUtils.cpp` |
 | `format.ps1` | Format C++ code with clang-format | `.\scripts\format.ps1 -Check` |
 | `run-vlauncher.ps1` | Launch VLauncher (builds if missing) | `.\scripts\run-vlauncher.ps1` |
 | `help.ps1` | Show quick help for build scripts | `.\scripts\help.ps1` |
@@ -116,6 +123,16 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 **Format check without modifying files:**
 ```powershell
 .\scripts\format.ps1 -Check
+```
+
+**Targeted lint on changed files:**
+```powershell
+.\scripts\lint.ps1 -ChangedOnly
+```
+
+**Full verification with full-repo lint:**
+```powershell
+.\scripts\verify.ps1 -FullLint
 ```
 
 **Show quick help:**
@@ -165,6 +182,8 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-SkipBuild` - Skip the build stage (tests + smoke only)
 - `-SkipSmoke` - Skip the smoke test stage (build + unit tests only)
 - `-SkipRenderVerify` - Skip the render verification stage
+- `-SkipLint` - Skip the lint stage
+- `-FullLint` - Run full-repo lint instead of targeted changed-file lint
 - `-Filter` - GoogleTest filter pattern passed to test.ps1
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
 - `-SmokeExtended` - Include priority 2 examples in the smoke run
@@ -182,12 +201,29 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
 
 **lint.ps1**
+- `-ChangedOnly` - Lint files changed in the current git working tree
+- `-Files` - Explicit file list to lint
+- `-Since` - Git revision/range for changed-file linting (implies `-ChangedOnly`)
 - `-Quick` - Only run format check + cppcheck (fast)
 - `-Fix` - Auto-fix formatting issues (clang-format in fix mode)
 - `-Help` - Show detailed help
 
 **format.ps1**
+- `-Files` - Explicit file list to format/check
 - `-Check` - Check formatting without modifying files (CI/pre-commit)
+- `-Help` - Show detailed help
+
+**lint-shaders.ps1**
+- `-Files` - Explicit shader file list
+- `-Help` - Show detailed help
+
+**lint-cppcheck.ps1**
+- `-Files` - Explicit source/header file list
+- `-Help` - Show detailed help
+
+**lint-clang-tidy.ps1**
+- `-Files` - Explicit source/header file list
+- `-Generator` - Auto (default), Ninja, or MSBuild compile database preference
 - `-Help` - Show detailed help
 
 **run-vlauncher.ps1**

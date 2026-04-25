@@ -11,6 +11,7 @@
 #include <cmath>
 #include <iomanip>
 #include <sstream>
+#include <utility>
 
 using namespace vde;
 
@@ -24,6 +25,7 @@ Color fishColor(size_t index) {
         Color(0.95f, 0.45f, 0.30f, 1.0f), Color(0.45f, 0.88f, 0.58f, 1.0f),
         Color(0.72f, 0.58f, 0.95f, 1.0f),
     };
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     return colors[index % colors.size()];
 }
 
@@ -41,7 +43,7 @@ std::string lineStateLabel(FishingGameScene::LineState state) {
 
 }  // namespace
 
-FishingGameScene::FishingGameScene() : m_rng(1337) {}
+FishingGameScene::FishingGameScene() : m_rng(1337) {}  // NOLINT(bugprone-random-generator-seed)
 
 void FishingGameScene::onEnter() {
     printGameHeader();
@@ -83,7 +85,8 @@ void FishingGameScene::drawDebugUI() {
         ImGui::TextWrapped("Status: %s", m_status.c_str());
         ImGui::Separator();
         for (size_t index = 0; index < m_fish.size(); ++index) {
-            const auto& fish = m_fish[index];
+            const auto& fish = m_fish
+                [index];  // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             ImGui::Text("Fish %zu  x=%.2f y=%.2f nibble=%.2f", index, fish.x, fish.y,
                         fish.nibbleProgress);
         }
@@ -154,6 +157,7 @@ void FishingGameScene::createEnvironment() {
 
     m_fish.resize(5);
     for (size_t index = 0; index < m_fish.size(); ++index) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         auto& fish = m_fish[index];
         fish.entity = addEntity<SpriteEntity>();
         fish.entity->setScale(0.65f, 0.24f, 1.0f);
@@ -204,8 +208,9 @@ void FishingGameScene::resetRound() {
     m_boatHull->setPosition(m_boatX, 2.4f, 0.0f);
     m_boatCabin->setPosition(m_boatX, 2.78f, 0.0f);
 
-    m_rng.seed(1337);
+    m_rng.seed(1337);  // NOLINT(bugprone-random-generator-seed)
     for (size_t index = 0; index < m_fish.size(); ++index) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         respawnFish(m_fish[index], index == 0);
     }
 
@@ -287,7 +292,8 @@ void FishingGameScene::updateBobber(float deltaTime) {
         m_bobberDepth = std::clamp(m_bobberDepth + depthDelta, kMinDepth, kMaxDepth);
         m_bobber->setColor(Color(0.95f, 0.28f, 0.24f, 1.0f));
         m_bobber->setPosition(m_boatX, kWaterSurfaceY - m_bobberDepth, 0.0f);
-    } else if (m_hookedFishIndex >= 0 && m_hookedFishIndex < static_cast<int>(m_fish.size())) {
+    } else if (m_hookedFishIndex >= 0 && std::cmp_less(m_hookedFishIndex, m_fish.size())) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         const auto& hooked = m_fish[static_cast<size_t>(m_hookedFishIndex)];
         m_bobber->setColor(Color(0.98f, 0.88f, 0.16f, 1.0f));
         m_bobber->setPosition(hooked.x, hooked.y, 0.0f);
@@ -296,12 +302,13 @@ void FishingGameScene::updateBobber(float deltaTime) {
 
 void FishingGameScene::updateFish(float deltaTime) {
     for (size_t index = 0; index < m_fish.size(); ++index) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         auto& fish = m_fish[index];
         if (!fish.entity->isVisible()) {
             continue;
         }
 
-        if (m_lineState != LineState::Hooked || static_cast<int>(index) != m_hookedFishIndex) {
+        if (m_lineState != LineState::Hooked || std::cmp_not_equal(index, m_hookedFishIndex)) {
             float direction = fish.goingRight ? 1.0f : -1.0f;
             fish.x += direction * fish.speed * deltaTime;
 
@@ -330,7 +337,7 @@ void FishingGameScene::updateFish(float deltaTime) {
                 fish.entity->setColor(fishColor(index));
             }
         } else if (m_lineState != LineState::Hooked ||
-                   static_cast<int>(index) != m_hookedFishIndex) {
+                   std::cmp_not_equal(index, m_hookedFishIndex)) {
             fish.nibbleProgress = 0.0f;
             fish.entity->setColor(fishColor(index));
         } else {
@@ -365,7 +372,8 @@ void FishingGameScene::deployLine() {
 
 void FishingGameScene::reelLine() {
     if (m_lineState == LineState::Hooked && m_hookedFishIndex >= 0 &&
-        m_hookedFishIndex < static_cast<int>(m_fish.size())) {
+        std::cmp_less(m_hookedFishIndex, m_fish.size())) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         catchFish(m_fish[static_cast<size_t>(m_hookedFishIndex)]);
         return;
     }
@@ -374,7 +382,9 @@ void FishingGameScene::reelLine() {
     m_hookedFishIndex = -1;
     m_bobber->setVisible(false);
     for (size_t index = 0; index < m_fish.size(); ++index) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         m_fish[index].nibbleProgress = 0.0f;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         m_fish[index].entity->setColor(fishColor(index));
     }
     m_status = "Reeled in. Try another lane.";

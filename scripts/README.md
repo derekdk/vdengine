@@ -13,8 +13,11 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
 | **smoke-test.ps1** | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Extended -Filter "*physics*"` |
 | **render-verify.ps1** | Run golden-image comparison tests using FLIP | `.\scripts\render-verify.ps1` |
-| **verify.ps1** | Full end-to-end verification: build → tests → smoke → render | `.\scripts\verify.ps1` |
-| **lint.ps1** | Run all available linters | `.\scripts\lint.ps1` |
+| **verify.ps1** | Full end-to-end verification: build → tests → smoke → render → lint | `.\scripts\verify.ps1` |
+| **lint.ps1** | Run all available linters (full by default, targeted with `-ChangedOnly`) | `.\scripts\lint.ps1` |
+| **lint-shaders.ps1** | Run shader validation only | `.\scripts\lint-shaders.ps1` |
+| **lint-cppcheck.ps1** | Run cppcheck only | `.\scripts\lint-cppcheck.ps1` |
+| **lint-clang-tidy.ps1** | Run clang-tidy only | `.\scripts\lint-clang-tidy.ps1` |
 | **format.ps1** | Format C++ code with clang-format | `.\scripts\format.ps1` |
 | **show-log.ps1** | Display verification log output | `.\scripts\show-log.ps1` |
 | **run-vlauncher.ps1** | Launch VLauncher (builds target if missing) | `.\scripts\run-vlauncher.ps1` |
@@ -268,10 +271,11 @@ Format C++ source files using clang-format according to the project's style guid
 
 **Syntax:**
 ```powershell
-.\scripts\format.ps1 [-Check] [-Help]
+.\scripts\format.ps1 [-Files <paths>] [-Check] [-Help]
 ```
 
 **Parameters:**
+- `-Files <paths>` - Optional explicit source/header file list
 - `-Check` - Check formatting without modifying files
 - `-Help` - Show detailed help
 
@@ -282,6 +286,9 @@ Format C++ source files using clang-format according to the project's style guid
 
 # Check formatting (CI/pre-commit)
 .\scripts\format.ps1 -Check
+
+# Check one file
+.\scripts\format.ps1 -Files src\BufferUtils.cpp -Check
 
 # Show help
 .\scripts\format.ps1 -Help
@@ -300,34 +307,46 @@ Format C++ source files using clang-format according to the project's style guid
 
 ### lint.ps1
 
-Run all available linters in sequence. Each linter is skipped if its tool is not installed.
+Run all available linters in sequence. Full-repo lint remains the default, and `-ChangedOnly` targets the current git delta for regular local verification.
 
 **Syntax:**
 ```powershell
-.\scripts\lint.ps1 [-Quick] [-Fix] [-Help]
+.\scripts\lint.ps1 [-Quick] [-Fix] [-ChangedOnly] [-Files <paths>] [-Since <git-ref>] [-Help]
 ```
 
 **Parameters:**
 - `-Quick` - Only run format check + cppcheck (fast)
 - `-Fix` - Auto-fix formatting issues (runs clang-format in fix mode)
+- `-ChangedOnly` - Lint only files changed in the current git working tree
+- `-Files <paths>` - Lint an explicit file list (relative or absolute)
+- `-Since <git-ref>` - Lint files changed since a git revision or range (implies `-ChangedOnly`)
 - `-Help` - Show detailed help
 
 **Linters (in order):**
-1. **clang-format** — Verifies C++ formatting matches `.clang-format`
-2. **glslangValidator** — Validates GLSL shaders against the Vulkan spec
-3. **cppcheck** — Static analysis for bugs, performance, portability
-4. **clang-tidy** — Deep static analysis (needs `compile_commands.json`, generated automatically by `./scripts/build.ps1 -Generator Ninja`, or by configuring Ninja with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`)
+1. **clang-format** — Verifies C++ formatting matches `.clang-format` via `format.ps1`
+2. **glslangValidator** — Validates GLSL shaders against the Vulkan spec via `lint-shaders.ps1`
+3. **cppcheck** — Static analysis for bugs, performance, portability via `lint-cppcheck.ps1`
+4. **clang-tidy** — Deep static analysis via `lint-clang-tidy.ps1` (needs `compile_commands.json`, generated automatically by `./scripts/build.ps1 -Generator Ninja`, or by configuring Ninja with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`)
 
 **Examples:**
 ```powershell
 # Run all available linters
 .\scripts\lint.ps1
 
+# Target only changed files
+.\scripts\lint.ps1 -ChangedOnly
+
 # Quick lint (format + cppcheck only)
 .\scripts\lint.ps1 -Quick
 
+# Quick targeted lint
+.\scripts\lint.ps1 -Quick -ChangedOnly
+
 # Auto-fix formatting issues
 .\scripts\lint.ps1 -Fix
+
+# Lint one file explicitly
+.\scripts\lint.ps1 -Files src\BufferUtils.cpp
 
 # Show help
 .\scripts\lint.ps1 -Help
@@ -338,6 +357,73 @@ Run all available linters in sequence. Each linter is skipped if its tool is not
 - **glslangValidator:** Vulkan SDK
 - **cppcheck:** https://cppcheck.sourceforge.io/ or package manager
 - **clang-tidy:** Visual Studio C++ clang tools or LLVM distribution
+
+### lint-shaders.ps1
+
+Run the shader-validation stage directly.
+
+**Syntax:**
+```powershell
+.\scripts\lint-shaders.ps1 [-Files <paths>] [-Help]
+```
+
+**Parameters:**
+- `-Files <paths>` - Optional explicit shader file list
+- `-Help` - Show detailed help
+
+**Examples:**
+```powershell
+# Validate all shaders
+.\scripts\lint-shaders.ps1
+
+# Validate one shader
+.\scripts\lint-shaders.ps1 -Files shaders\sprite.vert
+```
+
+### lint-cppcheck.ps1
+
+Run the cppcheck stage directly.
+
+**Syntax:**
+```powershell
+.\scripts\lint-cppcheck.ps1 [-Files <paths>] [-Help]
+```
+
+**Parameters:**
+- `-Files <paths>` - Optional explicit source/header file list
+- `-Help` - Show detailed help
+
+**Examples:**
+```powershell
+# Run repo-wide cppcheck
+.\scripts\lint-cppcheck.ps1
+
+# Run cppcheck on one file list
+.\scripts\lint-cppcheck.ps1 -Files src\BufferUtils.cpp include\vde\Color.h
+```
+
+### lint-clang-tidy.ps1
+
+Run the clang-tidy stage directly.
+
+**Syntax:**
+```powershell
+.\scripts\lint-clang-tidy.ps1 [-Files <paths>] [-Generator Auto|Ninja|MSBuild] [-Help]
+```
+
+**Parameters:**
+- `-Files <paths>` - Optional explicit source/header file list
+- `-Generator` - Prefer compile database from `Auto` (default), `Ninja`, or `MSBuild`
+- `-Help` - Show detailed help
+
+**Examples:**
+```powershell
+# Run clang-tidy across all user translation units in the compile database
+.\scripts\lint-clang-tidy.ps1
+
+# Run clang-tidy for one file / nearby translation units
+.\scripts\lint-clang-tidy.ps1 -Files src\BufferUtils.cpp
+```
 
 ### install-hooks.ps1
 
@@ -423,11 +509,11 @@ Run golden-image comparison tests against examples that declare a `[render_verif
 
 ### verify.ps1
 
-Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Tests → Render Verification. Writes all output to `logs/verify-latest.log` (always overwritten) and a timestamped archive in `logs/`.
+Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Tests → Render Verification → Lint. By default, the lint stage targets only changed files for regular local verification. Writes all output to `logs/verify-latest.log` (always overwritten) and a timestamped archive in `logs/`.
 
 **Syntax:**
 ```powershell
-.\scripts\verify.ps1 [-SkipBuild] [-SkipSmoke] [-SkipRenderVerify]
+.\scripts\verify.ps1 [-SkipBuild] [-SkipSmoke] [-SkipRenderVerify] [-SkipLint] [-FullLint]
                      [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended]
                      [-Generator MSBuild|Ninja] [-Config Debug|Release]
 ```
@@ -436,6 +522,8 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 - `-SkipBuild` - Skip the build stage
 - `-SkipSmoke` - Skip the smoke test stage
 - `-SkipRenderVerify` - Skip the render verification stage
+- `-SkipLint` - Skip the lint stage
+- `-FullLint` - Run full-repo lint instead of targeted changed-file lint
 - `-Filter` - GoogleTest filter pattern passed to `test.ps1`
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
 - `-SmokeExtended` - Include priority 2 examples in the smoke run
@@ -447,11 +535,14 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 # Full verification (all stages)
 .\scripts\verify.ps1
 
-# Build + unit tests only (skip smoke and render)
+# Build + unit tests + targeted lint only (skip smoke and render)
 .\scripts\verify.ps1 -SkipSmoke -SkipRenderVerify
 
-# Tests + smoke only (project already built)
+# Tests + smoke + targeted lint only (project already built)
 .\scripts\verify.ps1 -SkipBuild -SkipRenderVerify
+
+# Full verification with full-repo lint at the end
+.\scripts\verify.ps1 -FullLint
 
 # Targeted smoke test
 .\scripts\verify.ps1 -SkipBuild -SkipRenderVerify -SmokeFilter "*emoji*"

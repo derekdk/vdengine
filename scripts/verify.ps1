@@ -1,5 +1,5 @@
 # VDE Verify Script
-# Orchestrates build -> unit tests -> smoke tests in sequence.
+# Orchestrates build -> unit tests -> smoke tests -> render verify -> lint in sequence.
 # Captures all output to logs/verify-latest.log (workspace-relative).
 #
 # AI AGENTS: Run this script for end-to-end verification.
@@ -7,14 +7,16 @@
 # No need to redirect to temp files or handle terminal truncation.
 #
 # Usage:
-#   .\scripts\verify.ps1                                           # Full verification
+#   .\scripts\verify.ps1                                           # Full verification with targeted lint
+#   .\scripts\verify.ps1 -FullLint                                # Full verification with full-repo lint
 #   .\scripts\verify.ps1 -SkipBuild                               # Tests + smoke only
-#   .\scripts\verify.ps1 -SkipSmoke                               # Build + unit tests only
+#   .\scripts\verify.ps1 -SkipSmoke                               # Build + unit tests + lint only
 #   .\scripts\verify.ps1 -SmokeExtended                           # Include priority 2 examples in smoke tests
 #   .\scripts\verify.ps1 -Filter "Suite.*"                        # Targeted unit tests
 #   .\scripts\verify.ps1 -SmokeFilter "*emoji*"                   # Targeted smoke test
-#   .\scripts\verify.ps1 -SkipBuild -SkipSmoke -Filter "Suite.*"  # Fast inner loop
+#   .\scripts\verify.ps1 -SkipBuild -SkipSmoke -Filter "Suite.*"  # Fast inner loop with targeted lint
 #   .\scripts\verify.ps1 -SkipRenderVerify                        # Skip render verification
+#   .\scripts\verify.ps1 -SkipLint                                # Skip lint stage
 #
 # Key output files (always overwritten):
 #   logs/verify-latest.log    -- full output of the latest run (read with read_file)
@@ -26,6 +28,10 @@ param(
     [switch]$SkipSmoke,
 
     [switch]$SkipRenderVerify,
+
+    [switch]$SkipLint,
+
+    [switch]$FullLint,
 
     # GoogleTest filter pattern (passed to test.ps1 -Filter)
     [string]$Filter = "",
@@ -183,6 +189,18 @@ if (-not $SkipRenderVerify) {
     $renderPass = Invoke-Stage "RENDER VERIFY" "render-verify.ps1" $renderArgs
     $stageResults["RENDER VERIFY"] = $renderPass
     if (-not $renderPass) { $overallPass = $false }
+}
+
+# Stage 5: Lint
+if (-not $SkipLint) {
+    $lintArgs = @()
+    if (-not $FullLint) {
+        $lintArgs += "-ChangedOnly"
+    }
+
+    $lintPass = Invoke-Stage "LINT" "lint.ps1" $lintArgs
+    $stageResults["LINT"] = $lintPass
+    if (-not $lintPass) { $overallPass = $false }
 }
 
 # --- Summary ----------------------------------------------------------------
