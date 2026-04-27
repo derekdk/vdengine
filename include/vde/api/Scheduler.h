@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -146,11 +147,11 @@ class Scheduler {
     TaskId findTaskByName(const std::string& name) const;
 
     /**
-     * @brief Get the descriptor for a task.
+     * @brief Get a copy of the descriptor for a task.
      * @param id Task ID
-     * @return Pointer to the TaskDescriptor, or nullptr if not found
+     * @return Copy of the TaskDescriptor, or std::nullopt if not found
      */
-    const TaskDescriptor* getTaskDescriptor(TaskId id) const;
+    std::optional<TaskDescriptor> getTaskDescriptor(TaskId id) const;
 
     /**
      * @brief Set the number of worker threads for parallel execution.

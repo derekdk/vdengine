@@ -256,12 +256,12 @@ TaskId Scheduler::findTaskByName(const std::string& name) const {
     return INVALID_TASK_ID;
 }
 
-const TaskDescriptor* Scheduler::getTaskDescriptor(TaskId id) const {
+std::optional<TaskDescriptor> Scheduler::getTaskDescriptor(TaskId id) const {
     auto it = m_tasks.find(id);
     if (it != m_tasks.end()) {
-        return &it->second.descriptor;
+        return it->second.descriptor;
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 void Scheduler::setWorkerThreadCount(size_t count) {
