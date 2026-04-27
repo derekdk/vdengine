@@ -247,6 +247,23 @@ const std::vector<TaskId>& Scheduler::getLastExecutionOrder() const {
     return m_lastExecutionOrder;
 }
 
+TaskId Scheduler::findTaskByName(const std::string& name) const {
+    for (const auto& [id, entry] : m_tasks) {
+        if (entry.descriptor.name == name) {
+            return id;
+        }
+    }
+    return INVALID_TASK_ID;
+}
+
+const TaskDescriptor* Scheduler::getTaskDescriptor(TaskId id) const {
+    auto it = m_tasks.find(id);
+    if (it != m_tasks.end()) {
+        return &it->second.descriptor;
+    }
+    return nullptr;
+}
+
 void Scheduler::setWorkerThreadCount(size_t count) {
     m_workerThreadCount = count;
     if (count > 0) {

@@ -32,15 +32,20 @@ constexpr TaskId INVALID_TASK_ID = 0;
  *
  * When two tasks have no dependency relationship, they are ordered
  * by phase. Lower-valued phases execute first.
+ *
+ * Effective per-frame order:
+ *   Input < GameLogic < Physics < PostPhysics < Timed < Audio < Visual < PreRender < Render
  */
 enum class TaskPhase : uint8_t {
-    Input = 0,        ///< Input processing
+    Input = 0,        ///< Input processing and scripted input dispatch
     GameLogic = 1,    ///< Game logic / scene update
-    Audio = 2,        ///< Audio processing
-    Physics = 3,      ///< Physics simulation
-    PostPhysics = 4,  ///< Post-physics sync (e.g., transform copy)
-    PreRender = 5,    ///< Pre-render setup (camera, lights)
-    Render = 6        ///< Rendering
+    Physics = 2,      ///< Physics simulation
+    PostPhysics = 3,  ///< Post-physics sync (e.g., transform copy, collision callback dispatch)
+    Timed = 4,        ///< Scene-owned timed callbacks and delayed triggers
+    Audio = 5,        ///< Audio processing
+    Visual = 6,       ///< Visual updates and animation playback (after post-physics)
+    PreRender = 7,    ///< Pre-render setup (camera, lights)
+    Render = 8        ///< Rendering
 };
 
 /**
@@ -132,6 +137,20 @@ class Scheduler {
      * @return Ordered list of task IDs as they were executed
      */
     const std::vector<TaskId>& getLastExecutionOrder() const;
+
+    /**
+     * @brief Find a task by name.
+     * @param name Task name to search for
+     * @return Task ID, or INVALID_TASK_ID if not found
+     */
+    TaskId findTaskByName(const std::string& name) const;
+
+    /**
+     * @brief Get the descriptor for a task.
+     * @param id Task ID
+     * @return Pointer to the TaskDescriptor, or nullptr if not found
+     */
+    const TaskDescriptor* getTaskDescriptor(TaskId id) const;
 
     /**
      * @brief Set the number of worker threads for parallel execution.
