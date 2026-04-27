@@ -76,7 +76,9 @@ class PhysicsWorldScene : public vde::Scene {
     PhysicsWorldScene(const std::string& name, const vde::Color& bgColor,
                       const vde::Color& groundColor, const vde::Color& boxColor, float gravityY)
         : m_sceneName(name), m_bgColor(bgColor), m_groundColor(groundColor), m_boxColor(boxColor),
-          m_gravityY(gravityY) {}
+          m_gravityY(gravityY) {
+        enablePhaseCallbacks();
+    }
 
     void onEnter() override {
         // Enable physics
@@ -113,8 +115,8 @@ class PhysicsWorldScene : public vde::Scene {
                   << std::endl;
     }
 
-    void update(float deltaTime) override {
-        Scene::update(deltaTime);
+    void updateGameLogic(float deltaTime) override {
+        Scene::updateGameLogic(deltaTime);
 
         m_statusTimer += deltaTime;
         if (m_statusTimer >= 3.0f) {
