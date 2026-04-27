@@ -2473,158 +2473,167 @@ void Game::rebuildSchedulerGraph() {
         }
     }
 
-    // Sort by update priority (lower value = earlier execution)
+    // Sort deterministically: priority ascending, then name lexicographically as tiebreaker.
+    // Deterministic ordering is required because execution order must not change across
+    // scheduler rebuilds when priority is equal — but it must NOT create false cross-scene
+    // task dependencies. Ordering only controls task registration sequence, not edges.
     std::sort(updateScenes.begin(), updateScenes.end(),
-              [](const SceneEntry& a, const SceneEntry& b) { return a.priority < b.priority; });
+              [](const SceneEntry& a, const SceneEntry& b) {
+                  if (a.priority != b.priority)
+                      return a.priority < b.priority;
+                  return a.name < b.name;
+              });
 
     // ---------------------------------------------------------------
     // Task 0: Input — process input script commands.
     //         Runs in the Input phase (before GameLogic) so scripted
     //         input is dispatched before any game logic reads it.
-    //         This avoids race conditions with worker threads: all
-    //         input is fully committed before game-logic tasks begin.
+    //         Main-thread-only: scripted input mutates input state.
     // ---------------------------------------------------------------
     TaskId inputScriptTask = m_scheduler.addTask(
-        {"input.script", TaskPhase::Input, [this]() { processInputScript(); }, {}, false});
+        {"input.script", TaskPhase::Input, [this]() { processInputScript(); }, {}, true});
 
     // ---------------------------------------------------------------
     // Task 0b: Window/OS operations — execute queued window changes.
-    //          This provides a scheduler-safe point for OS/window API
-    //          calls so swapchain-affecting work never runs mid-render.
+    //          Main-thread-only: window/OS APIs require the main thread.
     // ---------------------------------------------------------------
     TaskId windowOpsTask = m_scheduler.addTask({"window.ops",
                                                 TaskPhase::Input,
                                                 [this]() { executePendingWindowOperations(); },
                                                 {inputScriptTask},
-                                                false});
+                                                true});
 
     // ---------------------------------------------------------------
-    // Task 1: GameLogic — onUpdate hook + all scene updates
+    // Task 1: game.update — onUpdate hook.
+    //         Main-thread-only: onUpdate may touch scene objects.
     // ---------------------------------------------------------------
-    // Chain: inputScript -> onUpdate -> update(scene1) | gameLogic(scene1) -> ...
-    TaskId prevTask = m_scheduler.addTask({"game.update",
-                                           TaskPhase::GameLogic,
-                                           [this]() { onUpdate(m_deltaTime); },
-                                           {windowOpsTask},
-                                           false});
+    TaskId gameUpdateTask = m_scheduler.addTask({"game.update",
+                                                 TaskPhase::GameLogic,
+                                                 [this]() { onUpdate(m_deltaTime); },
+                                                 {windowOpsTask},
+                                                 true});
 
-    // Track per-scene audio tasks so audio.global can depend on all of them
-    std::vector<TaskId> audioTasks;
+    // Per-scene barrier collections:
+    //   audioBarrierTasks — tasks audio.global must wait for
+    //   finalVisualTasks  — tasks preRender must wait for (all final per-scene writes)
+    std::vector<TaskId> audioBarrierTasks;
+    std::vector<TaskId> finalVisualTasks;
 
+    // ---------------------------------------------------------------
+    // Per-scene task chains — no cross-scene prevTask chain.
+    // Each scene's chain depends only on game.update and its own
+    // prior phase tasks, so scenes are independent of each other.
+    // ---------------------------------------------------------------
     for (size_t i = 0; i < updateScenes.size(); ++i) {
         Scene* scene = updateScenes[i].scene;
         const std::string& sceneName = updateScenes[i].name;
 
         if (scene->usesPhaseCallbacks()) {
-            // --- Phase callbacks mode: three separate tasks ---
+            // --- Phase callbacks mode ---
 
-            // GameLogic task
+            // GameLogic — depends only on game.update (no cross-scene edge)
             TaskId gameLogicTask =
                 m_scheduler.addTask({"scene.gameLogic." + sceneName,
                                      TaskPhase::GameLogic,
                                      [this, scene]() { scene->updateGameLogic(m_deltaTime); },
-                                     {prevTask},
-                                     false});
+                                     {gameUpdateTask},
+                                     true});
 
-            // Audio task (depends on gameLogic so queued events are available)
-            TaskId audioTask =
+            // Audio — depends on this scene's gameLogic
+            TaskId sceneAudioTask =
                 m_scheduler.addTask({"scene.audio." + sceneName,
                                      TaskPhase::Audio,
                                      [this, scene]() { scene->updateAudio(m_deltaTime); },
                                      {gameLogicTask},
-                                     false});
-            audioTasks.push_back(audioTask);
+                                     true});
+            audioBarrierTasks.push_back(sceneAudioTask);
 
-            // Visuals task (depends on gameLogic; can run concurrently with audio in future)
+            // Physics chain (optional) — also depends only on this scene's gameLogic
+            TaskId visualDep = gameLogicTask;
+            if (scene->hasPhysics()) {
+                // Physics step — worker-eligible: operates only on this scene's physics data
+                TaskId physicsTask = m_scheduler.addTask({
+                    "scene.physics." + sceneName,
+                    TaskPhase::Physics,
+                    [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
+                    {gameLogicTask},
+                    false  // worker-eligible
+                });
+
+                // PostPhysics — main-thread: sync transforms, dispatch staged callbacks
+                TaskId postPhysicsTask = m_scheduler.addTask(
+                    {"scene.postPhysics." + sceneName,
+                     TaskPhase::PostPhysics,
+                     [scene]() {
+                         if (!scene->hasPhysics())
+                             return;
+                         float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
+                         for (auto& entityRef : scene->getEntities()) {
+                             auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
+                             if (pe && pe->getAutoSync()) {
+                                 pe->syncFromPhysics(alpha);
+                             }
+                         }
+                     },
+                     {physicsTask},
+                     true});
+
+                visualDep = postPhysicsTask;
+            }
+
+            // Visuals — Visual phase, after post-physics (or gameLogic when no physics).
+            // Main-thread-only: updateVisuals() may mutate entity state.
             TaskId visualsTask =
                 m_scheduler.addTask({"scene.visuals." + sceneName,
-                                     TaskPhase::GameLogic,
+                                     TaskPhase::Visual,
                                      [this, scene]() { scene->updateVisuals(m_deltaTime); },
-                                     {gameLogicTask},
-                                     false});
-
-            // The next scene's tasks depend on the last task of this scene
-            // (visuals, since it's the broadest output)
-            prevTask = visualsTask;
+                                     {visualDep},
+                                     true});
+            finalVisualTasks.push_back(visualsTask);
         } else {
             // --- Legacy mode: single update task ---
-            prevTask = m_scheduler.addTask({"scene.update." + sceneName,
-                                            TaskPhase::GameLogic,
-                                            [this, scene]() { scene->update(m_deltaTime); },
-                                            {prevTask},
-                                            false});
-        }
-    }
-
-    TaskId lastUpdateTask = prevTask;
-
-    // ---------------------------------------------------------------
-    // Task 1b: Physics — step physics for scenes that have it.
-    //          Physics depends on all game-logic/update tasks.
-    // ---------------------------------------------------------------
-    TaskId lastPhysicsTask = lastUpdateTask;
-    std::vector<TaskId> postPhysicsTasks;
-
-    for (size_t i = 0; i < updateScenes.size(); ++i) {
-        Scene* scene = updateScenes[i].scene;
-        const std::string& sceneName = updateScenes[i].name;
-
-        if (scene->hasPhysics()) {
-            TaskId physicsTask = m_scheduler.addTask({
-                "scene.physics." + sceneName,
-                TaskPhase::Physics,
-                [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
-                {lastUpdateTask},
-                false  // Physics step can run on worker threads
-            });
-
-            // PostPhysics: sync physics entity transforms with interpolation
-            TaskId postPhysicsTask = m_scheduler.addTask(
-                {"scene.postPhysics." + sceneName,
-                 TaskPhase::PostPhysics,
-                 [scene]() {
-                     if (!scene->hasPhysics())
-                         return;
-                     float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
-                     for (auto& entityRef : scene->getEntities()) {
-                         auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
-                         if (pe && pe->getAutoSync()) {
-                             pe->syncFromPhysics(alpha);
-                         }
-                     }
-                 },
-                 {physicsTask},
-                 false});
-
-            postPhysicsTasks.push_back(postPhysicsTask);
-            lastPhysicsTask = postPhysicsTask;
+            // update() covers logic + audio + visuals in one call.
+            TaskId updateTask =
+                m_scheduler.addTask({"scene.update." + sceneName,
+                                     TaskPhase::GameLogic,
+                                     [this, scene]() { scene->update(m_deltaTime); },
+                                     {gameUpdateTask},
+                                     true});
+            // Legacy update acts as both the audio barrier and the final visual write.
+            audioBarrierTasks.push_back(updateTask);
+            finalVisualTasks.push_back(updateTask);
         }
     }
 
     // ---------------------------------------------------------------
-    // Task 2: Audio — global audio system update
-    //         Depends on all per-scene audio tasks AND the last
-    //         physics/update task so it always runs after all scene work.
+    // audio.global — flush the audio manager after all per-scene audio.
+    //   If no per-scene audio tasks exist (no phase-callback scenes),
+    //   depend on game.update so this task is not orphaned.
     // ---------------------------------------------------------------
-    std::vector<TaskId> audioDeps = {lastPhysicsTask};
-    for (TaskId id : audioTasks) {
-        audioDeps.push_back(id);
-    }
-    for (TaskId id : postPhysicsTasks) {
-        audioDeps.push_back(id);
+    if (audioBarrierTasks.empty()) {
+        audioBarrierTasks.push_back(gameUpdateTask);
     }
 
     TaskId audioTask = m_scheduler.addTask(
         {"audio.global", TaskPhase::Audio,
-         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioDeps, false});
+         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioBarrierTasks, true});
 
     // ---------------------------------------------------------------
     // Task 3: PreRender — apply clear color from primary scene.
-    //         Camera apply moves into the render loop (per-scene).
+    //         Depends on audio.global AND all final per-scene visual tasks.
     // ---------------------------------------------------------------
+    std::vector<TaskId> preRenderDeps = {audioTask};
+    for (TaskId id : finalVisualTasks) {
+        // Deduplicate: legacy update tasks are already in audioBarrierTasks so
+        // audio.global transitively covers them, but explicit edges make the
+        // graph shape obvious and safe when audio tasks are empty.
+        if (std::find(preRenderDeps.begin(), preRenderDeps.end(), id) == preRenderDeps.end()) {
+            preRenderDeps.push_back(id);
+        }
+    }
+
     TaskId preRenderTask = m_scheduler.addTask(
-        {"scene.preRender",
-         TaskPhase::PreRender,
+        {"scene.preRender", TaskPhase::PreRender,
          [this]() {
              if (m_activeScene && m_vulkanContext) {
                  // Apply scene background color to Vulkan context
@@ -2632,8 +2641,7 @@ void Game::rebuildSchedulerGraph() {
                  m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
              }
          },
-         {audioTask},
-         false});
+         preRenderDeps, true});
 
     // ---------------------------------------------------------------
     // Task 3b: Transition update — advance transition progress.
@@ -2646,7 +2654,7 @@ void Game::rebuildSchedulerGraph() {
                                  TaskPhase::PreRender,
                                  [this]() { m_transitionManager->update(m_deltaTime); },
                                  {preRenderTask},
-                                 false});
+                                 true});
         renderDep = transitionUpdateTask;
     }
 
@@ -2690,7 +2698,7 @@ void Game::rebuildSchedulerGraph() {
                              }
                          },
                          {renderDep},
-                         false});
+                         true});
 }
 
 }  // namespace vde

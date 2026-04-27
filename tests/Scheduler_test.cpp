@@ -3,8 +3,12 @@
  * @brief Unit tests for the Scheduler task graph system
  */
 
+#include <vde/api/Game.h>
+#include <vde/api/Scene.h>
+#include <vde/api/SceneGroup.h>
 #include <vde/api/Scheduler.h>
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -336,11 +340,248 @@ TEST_F(SchedulerTest, AllPhasesOrderedCorrectly) {
     ASSERT_EQ(executionLog.size(), 7u);
     EXPECT_EQ(executionLog[0], "input");
     EXPECT_EQ(executionLog[1], "gameLogic");
-    EXPECT_EQ(executionLog[2], "audio");
-    EXPECT_EQ(executionLog[3], "physics");
-    EXPECT_EQ(executionLog[4], "postPhysics");
+    EXPECT_EQ(executionLog[2], "physics");
+    EXPECT_EQ(executionLog[3], "postPhysics");
+    EXPECT_EQ(executionLog[4], "audio");
     EXPECT_EQ(executionLog[5], "preRender");
     EXPECT_EQ(executionLog[6], "render");
+}
+
+// ============================================================================
+// Phase 1 — New phase ordinals
+// ============================================================================
+
+TEST_F(SchedulerTest, PhaseOrder_TimedAfterPostPhysics) {
+    EXPECT_GT(static_cast<uint8_t>(TaskPhase::Timed), static_cast<uint8_t>(TaskPhase::PostPhysics));
+}
+
+TEST_F(SchedulerTest, PhaseOrder_VisualAfterTimed) {
+    EXPECT_GT(static_cast<uint8_t>(TaskPhase::Visual), static_cast<uint8_t>(TaskPhase::Timed));
+}
+
+TEST_F(SchedulerTest, PhaseOrder_VisualBeforePreRender) {
+    EXPECT_LT(static_cast<uint8_t>(TaskPhase::Visual), static_cast<uint8_t>(TaskPhase::PreRender));
+}
+
+TEST_F(SchedulerTest, AllPhasesFullOrderCorrect) {
+    // Verifies the complete canonical ordering including new phases
+    scheduler.addTask(makeLoggingTask("timed", TaskPhase::Timed));
+    scheduler.addTask(makeLoggingTask("visual", TaskPhase::Visual));
+    scheduler.addTask(makeLoggingTask("postPhysics", TaskPhase::PostPhysics));
+    scheduler.addTask(makeLoggingTask("physics", TaskPhase::Physics));
+    scheduler.addTask(makeLoggingTask("render", TaskPhase::Render));
+    scheduler.addTask(makeLoggingTask("input", TaskPhase::Input));
+    scheduler.addTask(makeLoggingTask("audio", TaskPhase::Audio));
+    scheduler.addTask(makeLoggingTask("gameLogic", TaskPhase::GameLogic));
+    scheduler.addTask(makeLoggingTask("preRender", TaskPhase::PreRender));
+
+    scheduler.execute();
+
+    ASSERT_EQ(executionLog.size(), 9u);
+    EXPECT_EQ(executionLog[0], "input");
+    EXPECT_EQ(executionLog[1], "gameLogic");
+    EXPECT_EQ(executionLog[2], "physics");
+    EXPECT_EQ(executionLog[3], "postPhysics");
+    EXPECT_EQ(executionLog[4], "timed");
+    EXPECT_EQ(executionLog[5], "audio");
+    EXPECT_EQ(executionLog[6], "visual");
+    EXPECT_EQ(executionLog[7], "preRender");
+    EXPECT_EQ(executionLog[8], "render");
+}
+
+// ============================================================================
+// Phase 1 — Scheduler graph shape tests using Game
+// ============================================================================
+
+namespace {
+
+/// Minimal scene that uses phase callbacks — no GPU needed.
+class PhaseCallbackTestScene : public Scene {
+  public:
+    int gameLogicCallCount = 0;
+    int visualsCallCount = 0;
+
+    PhaseCallbackTestScene() { enablePhaseCallbacks(); }
+
+    void updateGameLogic(float) override { gameLogicCallCount++; }
+    void updateAudio(float) override {}
+    void updateVisuals(float) override { visualsCallCount++; }
+};
+
+/// Minimal legacy scene (single update()).
+class LegacyTestScene : public Scene {
+  public:
+    int updateCallCount = 0;
+
+    void update(float) override { updateCallCount++; }
+};
+
+}  // anonymous namespace
+
+class GameSchedulerTest : public ::testing::Test {
+  protected:
+    Game game;
+
+    /// Helper: find a task index in an execution order vector.
+    static int findIndex(const std::vector<TaskId>& order, TaskId id) {
+        for (int i = 0; i < static_cast<int>(order.size()); ++i) {
+            if (order[i] == id)
+                return i;
+        }
+        return -1;
+    }
+};
+
+TEST_F(GameSchedulerTest, MultiScene_NoFalseDependency) {
+    // Two phase-callback scenes: their logic tasks must not depend on each other.
+    game.addScene("A", std::make_unique<PhaseCallbackTestScene>());
+    game.addScene("B", std::make_unique<PhaseCallbackTestScene>());
+
+    SceneGroup group;
+    group.sceneNames = {"A", "B"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    TaskId logicA = sched.findTaskByName("scene.gameLogic.A");
+    TaskId logicB = sched.findTaskByName("scene.gameLogic.B");
+
+    ASSERT_NE(logicA, INVALID_TASK_ID);
+    ASSERT_NE(logicB, INVALID_TASK_ID);
+
+    auto descA = sched.getTaskDescriptor(logicA);
+    auto descB = sched.getTaskDescriptor(logicB);
+
+    ASSERT_TRUE(descA.has_value());
+    ASSERT_TRUE(descB.has_value());
+
+    // A must not depend on B
+    EXPECT_EQ(std::find(descA->dependsOn.begin(), descA->dependsOn.end(), logicB),
+              descA->dependsOn.end())
+        << "scene.gameLogic.A must not depend on scene.gameLogic.B";
+
+    // B must not depend on A
+    EXPECT_EQ(std::find(descB->dependsOn.begin(), descB->dependsOn.end(), logicA),
+              descB->dependsOn.end())
+        << "scene.gameLogic.B must not depend on scene.gameLogic.A";
+}
+
+TEST_F(GameSchedulerTest, MultiScene_DeterministicOrder) {
+    // Two scenes with equal priority — registration order (TaskId) tiebreak must be stable.
+    auto sceneA = std::make_unique<PhaseCallbackTestScene>();
+    auto sceneB = std::make_unique<PhaseCallbackTestScene>();
+    sceneA->setUpdatePriority(0);
+    sceneB->setUpdatePriority(0);
+    game.addScene("A", std::move(sceneA));
+    game.addScene("B", std::move(sceneB));
+
+    SceneGroup group;
+    group.sceneNames = {"A", "B"};
+
+    // Helper: translate an execution order (TaskIds) to task names for stable cross-rebuild
+    // comparison.
+    auto toNameOrder = [&](const std::vector<TaskId>& order) {
+        std::vector<std::string> names;
+        names.reserve(order.size());
+        for (TaskId id : order) {
+            names.push_back(game.getScheduler().getTaskName(id));
+        }
+        return names;
+    };
+
+    // First build + execute — capture names while the first scheduler is still active.
+    game.setActiveSceneGroup(group);
+    game.getScheduler().execute();
+    const auto nameOrder1 = toNameOrder(game.getScheduler().getLastExecutionOrder());
+
+    // Rebuild + execute again — capture names from the rebuilt scheduler.
+    game.setActiveSceneGroup(group);
+    game.getScheduler().execute();
+    const auto nameOrder2 = toNameOrder(game.getScheduler().getLastExecutionOrder());
+
+    // Execution order must be identical by name across scheduler rebuilds.
+    ASSERT_EQ(nameOrder1, nameOrder2)
+        << "Execution order must be deterministic across scheduler rebuilds";
+
+    // With A registered before B, A gets a smaller TaskId and executes first (registration-order
+    // tiebreak).
+    auto nameIdx = [](const std::vector<std::string>& names, const std::string& n) {
+        auto it = std::find(names.begin(), names.end(), n);
+        return (it != names.end()) ? static_cast<int>(it - names.begin()) : -1;
+    };
+    int aIdx = nameIdx(nameOrder1, "scene.gameLogic.A");
+    int bIdx = nameIdx(nameOrder1, "scene.gameLogic.B");
+    EXPECT_GE(aIdx, 0);
+    EXPECT_GE(bIdx, 0);
+    EXPECT_LT(aIdx, bIdx) << "scene A should execute before scene B (registration order tiebreak)";
+}
+
+TEST_F(GameSchedulerTest, LegacyScene_UpdateCallbackFires) {
+    auto rawScene = std::make_unique<LegacyTestScene>();
+    LegacyTestScene* scenePtr = rawScene.get();
+    game.addScene("legacy", std::move(rawScene));
+
+    SceneGroup group;
+    group.sceneNames = {"legacy"};
+    game.setActiveSceneGroup(group);
+
+    EXPECT_EQ(scenePtr->updateCallCount, 0);
+    game.getScheduler().execute();
+    EXPECT_EQ(scenePtr->updateCallCount, 1);
+}
+
+TEST_F(GameSchedulerTest, VisualPhase_AfterPostPhysics) {
+    // For a phase-callback scene without physics, the visuals task must:
+    //   - be in the Visual phase
+    //   - depend on the scene's own gameLogic task (no physics dep)
+    game.addScene("phased", std::make_unique<PhaseCallbackTestScene>());
+
+    SceneGroup group;
+    group.sceneNames = {"phased"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    TaskId logicTask = sched.findTaskByName("scene.gameLogic.phased");
+    TaskId visualTask = sched.findTaskByName("scene.visuals.phased");
+
+    ASSERT_NE(logicTask, INVALID_TASK_ID);
+    ASSERT_NE(visualTask, INVALID_TASK_ID);
+
+    auto visualDesc = sched.getTaskDescriptor(visualTask);
+    ASSERT_TRUE(visualDesc.has_value());
+
+    EXPECT_EQ(visualDesc->phase, TaskPhase::Visual)
+        << "updateVisuals() must be scheduled in the Visual phase";
+
+    EXPECT_NE(std::find(visualDesc->dependsOn.begin(), visualDesc->dependsOn.end(), logicTask),
+              visualDesc->dependsOn.end())
+        << "scene.visuals.phased must depend on scene.gameLogic.phased";
+}
+
+TEST_F(GameSchedulerTest, MainThreadOnly_SceneCallbacks) {
+    // scene.gameLogic, scene.audio, and scene.visuals must all be main-thread-only.
+    game.addScene("mt_scene", std::make_unique<PhaseCallbackTestScene>());
+
+    SceneGroup group;
+    group.sceneNames = {"mt_scene"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    const std::vector<std::string> requiredMainThread = {
+        "scene.gameLogic.mt_scene",
+        "scene.audio.mt_scene",
+        "scene.visuals.mt_scene",
+    };
+
+    for (const auto& name : requiredMainThread) {
+        TaskId id = sched.findTaskByName(name);
+        ASSERT_NE(id, INVALID_TASK_ID) << "Task not found: " << name;
+        auto desc = sched.getTaskDescriptor(id);
+        ASSERT_TRUE(desc.has_value());
+        EXPECT_TRUE(desc->mainThreadOnly) << "Task must be main-thread-only: " << name;
+    }
 }
 
 }  // namespace vde::test
