@@ -250,4 +250,13 @@ TEST_F(PlaybackClockTest, PlaybackClock_StopResetsState) {
     EXPECT_FALSE(clock.isPaused());
 }
 
+TEST_F(PlaybackClockTest, PlaybackClock_HasStartedTrueAfterOnceCompletion) {
+    // hasStarted() should remain true after Once-mode clock finishes
+    clock.setDuration(1.0f);
+    clock.start();
+    clock.tick(1.5f);  // completes
+    EXPECT_TRUE(clock.isComplete());
+    EXPECT_TRUE(clock.hasStarted());
+}
+
 }  // namespace vde::test

@@ -179,6 +179,7 @@ set(VDE_SOURCES
     src/stb_impl.cpp
     src/HexGeometry.cpp
     src/HexPrismMesh.cpp
+    src/PlaybackClock.cpp
     # Game API
     src/api/Entity.cpp
     src/api/Game.cpp
@@ -194,6 +195,7 @@ set(VDE_SOURCES
     src/api/PhysicsScene.cpp
     src/api/PhysicsEntity.cpp
     src/api/ThreadPool.cpp
+    src/api/TimedEvents.cpp
     # Transitions
     src/api/Transition.cpp
     src/api/FadeTransition.cpp
@@ -243,6 +245,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/HexPrismMesh.h
     include/vde/QueueFamilyIndices.h
     include/vde/SwapChainSupportDetails.h
+    include/vde/PlaybackClock.h
     # Game API headers
     include/vde/api/GameAPI.h
     include/vde/api/Game.h
@@ -267,6 +270,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/PhysicsScene.h
     include/vde/api/PhysicsEntity.h
     include/vde/api/ThreadPool.h
+    include/vde/api/TimedEvents.h
     # Transition headers
     include/vde/api/Transition.h
     include/vde/api/FadeTransition.h

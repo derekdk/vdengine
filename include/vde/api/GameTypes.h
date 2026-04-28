@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string>
 
+// cppcheck-suppress syntaxError -- cppcheck misparses C++20 namespace syntax in header-only mode
 namespace vde {
 
 /**

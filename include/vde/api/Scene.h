@@ -26,9 +26,11 @@
 #include "LightBox.h"
 #include "PhysicsTypes.h"
 #include "Resource.h"
+#include "TimedEvents.h"
 #include "ViewportRect.h"
 #include "WorldBounds.h"
 
+// cppcheck-suppress syntaxError -- cppcheck misparses C++20 namespace syntax in header-only mode
 namespace vde {
 
 // Forward declarations
@@ -183,6 +185,27 @@ class Scene {
      * @param deltaTime Time since last update in seconds
      */
     virtual void updateVisuals(float deltaTime);
+
+    // Timed events
+
+    /**
+     * @brief Get the scene-owned timed-event service.
+     *
+     * Use this to schedule one-shot delayed callbacks and fixed-interval
+     * repeating callbacks.  Events are ticked automatically in the Timed
+     * scheduler phase and cancelled automatically when the scene is destroyed.
+     *
+     * @example
+     * @code
+     * // Fire once after 1 second:
+     * getTimedEvents().after(1.0f, [this]() { spawnEnemy(); });
+     *
+     * // Fire every 0.5 seconds:
+     * m_handle = getTimedEvents().every(0.5f, [this]() { toggleBlink(); });
+     * @endcode
+     */
+    TimedEvents& getTimedEvents() { return m_timedEvents; }
+    const TimedEvents& getTimedEvents() const { return m_timedEvents; }
 
     // Audio event queue
 
@@ -681,6 +704,9 @@ class Scene {
 
     // Phase callbacks
     bool m_usePhaseCallbacks = false;
+
+    // Timed events service (ticked in the Timed scheduler phase)
+    TimedEvents m_timedEvents;
 
     // Deferred command queue (flushed at the start of update / updateGameLogic)
     std::vector<std::function<void()>> m_deferredCommands;

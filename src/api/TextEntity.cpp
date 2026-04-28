@@ -15,9 +15,7 @@ namespace vde {
 // Construction
 // ============================================================================
 
-TextEntity::TextEntity() : SpriteEntity() {
-    m_bitmapFont = &BitmapFont::small();
-}
+TextEntity::TextEntity() : SpriteEntity(), m_bitmapFont(&BitmapFont::small()) {}
 
 // ============================================================================
 // Property setters

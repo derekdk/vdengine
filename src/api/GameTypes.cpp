@@ -11,7 +11,7 @@ namespace vde {
 
 glm::mat4 Transform::getMatrix() const {
     // Build TRS matrix: Translation * Rotation * Scale
-    glm::mat4 model = glm::mat4(1.0f);
+    auto model = glm::mat4(1.0f);
 
     // Translation
     model = glm::translate(model, position.toVec3());

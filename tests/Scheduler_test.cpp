@@ -17,6 +17,8 @@
 
 namespace vde::test {
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,bugprone-unchecked-optional-access)
+
 // ============================================================================
 // Test Fixture
 // ============================================================================
@@ -29,7 +31,12 @@ class SchedulerTest : public ::testing::Test {
     /// Helper: create a task that logs its name when executed
     TaskDescriptor makeLoggingTask(const std::string& name, TaskPhase phase,
                                    const std::vector<TaskId>& deps = {}) {
-        return {name, phase, [this, name]() { executionLog.push_back(name); }, deps};
+        // NOLINTBEGIN(bugprone-exception-escape)
+        return {.name = name,
+                .phase = phase,
+                .work = [this, name]() { executionLog.push_back(name); },
+                .dependsOn = deps};
+        // NOLINTEND(bugprone-exception-escape)
     }
 };
 
@@ -424,11 +431,11 @@ class GameSchedulerTest : public ::testing::Test {
 
     /// Helper: find a task index in an execution order vector.
     static int findIndex(const std::vector<TaskId>& order, TaskId id) {
-        for (int i = 0; i < static_cast<int>(order.size()); ++i) {
-            if (order[i] == id)
-                return i;
+        auto it = std::ranges::find(order, id);
+        if (it == order.end()) {
+            return -1;
         }
-        return -1;
+        return static_cast<int>(std::distance(order.begin(), it));
     }
 };
 
@@ -506,7 +513,7 @@ TEST_F(GameSchedulerTest, MultiScene_DeterministicOrder) {
     // With A registered before B, A gets a smaller TaskId and executes first (registration-order
     // tiebreak).
     auto nameIdx = [](const std::vector<std::string>& names, const std::string& n) {
-        auto it = std::find(names.begin(), names.end(), n);
+        auto it = std::ranges::find(names, n);
         return (it != names.end()) ? static_cast<int>(it - names.begin()) : -1;
     };
     int aIdx = nameIdx(nameOrder1, "scene.gameLogic.A");
@@ -533,7 +540,8 @@ TEST_F(GameSchedulerTest, LegacyScene_UpdateCallbackFires) {
 TEST_F(GameSchedulerTest, VisualPhase_AfterPostPhysics) {
     // For a phase-callback scene without physics, the visuals task must:
     //   - be in the Visual phase
-    //   - depend on the scene's own gameLogic task (no physics dep)
+    //   - depend on the scene's own timed task (which itself depends on gameLogic)
+    // This ensures the visual pass observes both game logic and timed-event mutations.
     game.addScene("phased", std::make_unique<PhaseCallbackTestScene>());
 
     SceneGroup group;
@@ -542,10 +550,10 @@ TEST_F(GameSchedulerTest, VisualPhase_AfterPostPhysics) {
 
     const Scheduler& sched = game.getScheduler();
 
-    TaskId logicTask = sched.findTaskByName("scene.gameLogic.phased");
+    TaskId timedTask = sched.findTaskByName("scene.timed.phased");
     TaskId visualTask = sched.findTaskByName("scene.visuals.phased");
 
-    ASSERT_NE(logicTask, INVALID_TASK_ID);
+    ASSERT_NE(timedTask, INVALID_TASK_ID);
     ASSERT_NE(visualTask, INVALID_TASK_ID);
 
     auto visualDesc = sched.getTaskDescriptor(visualTask);
@@ -554,9 +562,9 @@ TEST_F(GameSchedulerTest, VisualPhase_AfterPostPhysics) {
     EXPECT_EQ(visualDesc->phase, TaskPhase::Visual)
         << "updateVisuals() must be scheduled in the Visual phase";
 
-    EXPECT_NE(std::find(visualDesc->dependsOn.begin(), visualDesc->dependsOn.end(), logicTask),
+    EXPECT_NE(std::find(visualDesc->dependsOn.begin(), visualDesc->dependsOn.end(), timedTask),
               visualDesc->dependsOn.end())
-        << "scene.visuals.phased must depend on scene.gameLogic.phased";
+        << "scene.visuals.phased must depend on scene.timed.phased";
 }
 
 TEST_F(GameSchedulerTest, MainThreadOnly_SceneCallbacks) {
@@ -585,3 +593,4 @@ TEST_F(GameSchedulerTest, MainThreadOnly_SceneCallbacks) {
 }
 
 }  // namespace vde::test
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,bugprone-unchecked-optional-access)

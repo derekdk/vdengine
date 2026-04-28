@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <functional>
 
+// cppcheck-suppress syntaxError -- cppcheck misparses C++20 namespace syntax in header-only mode
 namespace vde {
 
 /**
@@ -119,7 +120,7 @@ class PlaybackClock {
     /**
      * @brief Returns true if the delay window has elapsed and playback has begun.
      */
-    bool hasStarted() const { return m_active && m_delayConsumed; }
+    bool hasStarted() const { return (m_active || m_complete) && m_delayConsumed; }
 
     /**
      * @brief Returns true if the clock has completed (Once mode after reaching 1.0).

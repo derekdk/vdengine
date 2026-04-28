@@ -23,6 +23,7 @@ namespace vde {
 EntityId Entity::s_nextId = 1;
 
 // Static sprite quad mesh (shared by all SpriteEntity instances)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::shared_ptr<Mesh> s_spriteQuad = nullptr;
 
 // Per-frame descriptor-set cache with staleness detection.
@@ -37,7 +38,9 @@ struct CachedDescriptor {
 };
 
 static constexpr uint32_t MAX_FRAMES = 2;
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization,cppcoreguidelines-avoid-non-const-global-variables)
 static std::unordered_map<Texture*, CachedDescriptor> s_textureDescriptorSets[MAX_FRAMES];
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization,cppcoreguidelines-avoid-non-const-global-variables)
 static std::unordered_map<Texture*, CachedDescriptor> s_meshTextureDescriptorSets[MAX_FRAMES];
 
 /**
@@ -65,10 +68,18 @@ static std::shared_ptr<Mesh> getSpriteQuadMesh() {
         // Vertices: position, color (unused), texCoord
         std::vector<Vertex> vertices = {
             // Position             Color (unused)      TexCoord
-            {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},  // bottom-left
-            {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // bottom-right
-            {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},    // top-right
-            {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},   // top-left
+            {.position = {-0.5f, -0.5f, 0.0f},
+             .color = {1.0f, 1.0f, 1.0f},
+             .texCoord = {0.0f, 1.0f}},  // bottom-left
+            {.position = {0.5f, -0.5f, 0.0f},
+             .color = {1.0f, 1.0f, 1.0f},
+             .texCoord = {1.0f, 1.0f}},  // bottom-right
+            {.position = {0.5f, 0.5f, 0.0f},
+             .color = {1.0f, 1.0f, 1.0f},
+             .texCoord = {1.0f, 0.0f}},  // top-right
+            {.position = {-0.5f, 0.5f, 0.0f},
+             .color = {1.0f, 1.0f, 1.0f},
+             .texCoord = {0.0f, 0.0f}},  // top-left
         };
 
         std::vector<uint32_t> indices = {
@@ -85,7 +96,7 @@ static std::shared_ptr<Mesh> getSpriteQuadMesh() {
 // Entity Implementation
 // ============================================================================
 
-Entity::Entity() : m_id(s_nextId++), m_name(""), m_transform(), m_visible(true), m_scene(nullptr) {}
+Entity::Entity() : m_id(s_nextId++), m_name(""), m_transform() {}
 
 void Entity::setPosition(float x, float y, float z) {
     m_transform.position = Position(x, y, z);
@@ -121,7 +132,7 @@ void Entity::setScale(const Scale& scl) {
 
 glm::mat4 Entity::getModelMatrix() const {
     // Build TRS matrix: Translation * Rotation * Scale
-    glm::mat4 model = glm::mat4(1.0f);
+    auto model = glm::mat4(1.0f);
 
     // Translation
     model = glm::translate(model, m_transform.position.toVec3());
@@ -144,8 +155,7 @@ glm::mat4 Entity::getModelMatrix() const {
 // ============================================================================
 
 MeshEntity::MeshEntity()
-    : Entity(), m_mesh(nullptr), m_texture(nullptr), m_material(nullptr),
-      m_meshId(INVALID_RESOURCE_ID), m_textureId(INVALID_RESOURCE_ID), m_color(Color::white()) {}
+    : Entity(), m_mesh(nullptr), m_texture(nullptr), m_material(nullptr), m_color(Color::white()) {}
 
 void MeshEntity::setTexture(std::shared_ptr<Texture> texture) {
     if (m_texture && m_texture != texture) {
@@ -266,8 +276,9 @@ void MeshEntity::render() {
             if (meshTextureDescSet != VK_NULL_HANDLE) {
                 game->updateMeshTextureDescriptor(meshTextureDescSet, texturePtr->getImageView(),
                                                   texturePtr->getSampler());
-                frameCache[texturePtr] = {meshTextureDescSet, texturePtr->getImageView(),
-                                          texturePtr->getSampler()};
+                frameCache[texturePtr] = {.descriptorSet = meshTextureDescSet,
+                                          .imageView = texturePtr->getImageView(),
+                                          .sampler = texturePtr->getSampler()};
             }
         }
     }
@@ -281,7 +292,7 @@ void MeshEntity::render() {
     struct MeshPushConstants {
         glm::mat4 model;
         MaterialPushConstants material;
-    } pushData;
+    } pushData{};
 
     pushData.model = getModelMatrix();
 
@@ -324,15 +335,10 @@ void MeshEntity::render() {
 // SpriteEntity Implementation (Phase 3)
 // ============================================================================
 
-SpriteEntity::SpriteEntity()
-    : Entity(), m_texture(nullptr), m_textureId(INVALID_RESOURCE_ID), m_color(Color::white()),
-      m_uvX(0.0f), m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f), m_anchorY(0.5f),
-      m_flipX(false), m_flipY(false) {}
+SpriteEntity::SpriteEntity() : Entity(), m_texture(nullptr), m_color(Color::white()) {}
 
 SpriteEntity::SpriteEntity(ResourceId textureId)
-    : Entity(), m_texture(nullptr), m_textureId(textureId), m_color(Color::white()), m_uvX(0.0f),
-      m_uvY(0.0f), m_uvWidth(1.0f), m_uvHeight(1.0f), m_anchorX(0.5f), m_anchorY(0.5f),
-      m_flipX(false), m_flipY(false) {}
+    : Entity(), m_texture(nullptr), m_textureId(textureId), m_color(Color::white()) {}
 
 void SpriteEntity::setTexture(std::shared_ptr<Texture> texture) {
     if (m_texture && m_texture != texture) {
@@ -457,8 +463,9 @@ void SpriteEntity::render() {
             }
             game->updateSpriteDescriptor(spriteDescSet, uboBuffer, 192, texturePtr->getImageView(),
                                          texturePtr->getSampler());
-            frameCache[texturePtr] = {spriteDescSet, texturePtr->getImageView(),
-                                      texturePtr->getSampler()};
+            frameCache[texturePtr] = {.descriptorSet = spriteDescSet,
+                                      .imageView = texturePtr->getImageView(),
+                                      .sampler = texturePtr->getSampler()};
         }
     }
 
@@ -481,7 +488,7 @@ void SpriteEntity::render() {
         glm::mat4 model;
         glm::vec4 tint;
         glm::vec4 uvRect;
-    } pushData;
+    } pushData{};
 
     // Apply anchor offset to model matrix
     glm::mat4 anchorOffset =

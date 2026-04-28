@@ -287,3 +287,6 @@ add_vde_example(vde_spritesheet_multiscene_demo "spritesheet_multiscene_demo/mai
 add_vde_example(vde_text_rendering_demo "text_rendering_demo/main.cpp")
 
 
+
+# Timed Events Demo example
+add_vde_example(vde_timed_events_demo "timed_events_demo/main.cpp")

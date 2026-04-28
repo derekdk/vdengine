@@ -20,6 +20,7 @@
 namespace vde {
 
 // Default lighting instance (used when no LightBox is set)
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization,cppcoreguidelines-avoid-non-const-global-variables)
 static SimpleColorLightBox s_defaultLightBox(Color::white());
 
 // ============================================================================
@@ -27,8 +28,7 @@ static SimpleColorLightBox s_defaultLightBox(Color::white());
 // ============================================================================
 
 Scene::Scene()
-    : m_name(""), m_game(nullptr), m_nextResourceId(1), m_lightBox(nullptr), m_camera(nullptr),
-      m_inputHandler(nullptr), m_backgroundColor(Color::black()) {}
+    : m_name(""), m_lightBox(nullptr), m_camera(nullptr), m_backgroundColor(Color::black()) {}
 
 Scene::~Scene() {
     // Clear all entities, calling their onDetach
@@ -137,6 +137,7 @@ void Scene::playSFXAt(std::shared_ptr<AudioClip> clip, float x, float y, float z
     m_audioEventQueue.push_back(AudioEvent::playSFXAt(std::move(clip), x, y, z, volume, pitch));
 }
 
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 EntityId Scene::addEntity(Entity::Ref entity) {
     if (!entity) {
         return INVALID_ENTITY_ID;
@@ -159,9 +160,11 @@ EntityId Scene::addEntity(Entity::Ref entity) {
 
 Entity* Scene::getEntity(EntityId id) {
     auto it = m_entityIndex.find(id);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     if (it != m_entityIndex.end() && it->second < m_entities.size()) {
         return m_entities[it->second].get();
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     return nullptr;
 }
 
@@ -185,6 +188,7 @@ void Scene::removeEntity(EntityId id) {
         return;
     }
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     // Track entity type diagnostics before removal
     if (m_entities[index]) {
         classifyAndDecrementEntity(m_entities[index].get());
@@ -202,6 +206,7 @@ void Scene::removeEntity(EntityId id) {
         m_entityIndex[swappedId] = index;
         std::swap(m_entities[index], m_entities.back());
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     m_entities.pop_back();
     m_entityIndex.erase(it);
@@ -261,27 +266,35 @@ void Scene::removeResource(ResourceId id) {
 void Scene::classifyAndIncrementEntity(Entity* e) {
     m_diagnostics.totalEntityCount = m_entities.size();
     m_diagnostics.entitiesCreated++;
-    if (dynamic_cast<TextEntity*>(e))
+    if (dynamic_cast<TextEntity*>(e)) {
         m_diagnostics.textEntityCount++;
-    if (dynamic_cast<PhysicsEntity*>(e))
+    }
+    if (dynamic_cast<PhysicsEntity*>(e)) {
         m_diagnostics.physicsEntityCount++;
-    if (dynamic_cast<MeshEntity*>(e))
+    }
+    if (dynamic_cast<MeshEntity*>(e)) {
         m_diagnostics.meshEntityCount++;
-    if (dynamic_cast<SpriteEntity*>(e))
+    }
+    if (dynamic_cast<SpriteEntity*>(e)) {
         m_diagnostics.spriteEntityCount++;
+    }
 }
 
 void Scene::classifyAndDecrementEntity(Entity* e) {
     m_diagnostics.totalEntityCount = m_entities.size() - 1;  // size before pop
     m_diagnostics.entitiesRemoved++;
-    if (dynamic_cast<TextEntity*>(e))
+    if (dynamic_cast<TextEntity*>(e)) {
         m_diagnostics.textEntityCount--;
-    if (dynamic_cast<PhysicsEntity*>(e))
+    }
+    if (dynamic_cast<PhysicsEntity*>(e)) {
         m_diagnostics.physicsEntityCount--;
-    if (dynamic_cast<MeshEntity*>(e))
+    }
+    if (dynamic_cast<MeshEntity*>(e)) {
         m_diagnostics.meshEntityCount--;
-    if (dynamic_cast<SpriteEntity*>(e))
+    }
+    if (dynamic_cast<SpriteEntity*>(e)) {
         m_diagnostics.spriteEntityCount--;
+    }
 }
 
 // ============================================================================
@@ -293,8 +306,9 @@ Entity* Scene::getEntityByPhysicsBody(PhysicsBodyId bodyId) {
         return nullptr;
     }
     for (auto& entity : m_entities) {
-        if (!entity)
+        if (!entity) {
             continue;
+        }
         // Try PhysicsSpriteEntity
         if (auto* pse = dynamic_cast<PhysicsSpriteEntity*>(entity.get())) {
             if (pse->getPhysicsBodyId() == bodyId) {
