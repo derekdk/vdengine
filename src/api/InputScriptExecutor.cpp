@@ -279,14 +279,14 @@ void InputScriptExecutor::loadScript(const std::string& scriptPath) {
     std::string errorMsg;
 
     if (!parseInputScript(scriptPath, m_state->commands, m_state->labels, errorMsg)) {
-        std::cerr << "[VDE:InputScript] " << errorMsg << '\\n';
+        std::cerr << "[VDE:InputScript] " << errorMsg << '\n';
         m_state.reset();
         return;
     }
 
     m_state->scriptPath = scriptPath;
     std::cout << "[VDE:InputScript] Loaded " << m_state->commands.size() << " commands from "
-              << scriptPath << '\\n';
+              << scriptPath << '\n';
 }
 
 bool InputScriptExecutor::processFrame(float deltaTime) {
@@ -503,7 +503,7 @@ bool InputScriptExecutor::handleScreenshot(InputScriptState& state, const Script
 }
 
 bool InputScriptExecutor::handlePrint(InputScriptState& state, const ScriptCommand& cmd) {
-    std::cout << "[VDE:InputScript] " << cmd.argument << '\\n';
+    std::cout << "[VDE:InputScript] " << cmd.argument << '\n';
     state.currentCommand++;
     return true;
 }
@@ -517,7 +517,7 @@ bool InputScriptExecutor::handleLoop(InputScriptState& state, const ScriptComman
     auto labelIt = state.labels.find(cmd.argument);
     if (labelIt == state.labels.end()) {
         std::cerr << "[VDE:InputScript] Error at line " << cmd.lineNumber << ": undefined label '"
-                  << cmd.argument << "'" << '\\n';
+                  << cmd.argument << "'" << '\n';
         state.finished = true;
         return false;
     }
@@ -541,7 +541,7 @@ bool InputScriptExecutor::handleLoop(InputScriptState& state, const ScriptComman
 }
 
 bool InputScriptExecutor::handleExit(InputScriptState& state, const ScriptCommand&) {
-    std::cout << "[VDE:InputScript] exit" << '\\n';
+    std::cout << "[VDE:InputScript] exit" << '\n';
     if (state.assertionFailed) {
         m_env.setExitCode(1);
     }
@@ -573,7 +573,7 @@ bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
         auto varIt = state.variables.find(cmd.assertVarRef);
         if (varIt == state.variables.end()) {
             std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
-                      << ": undefined variable '$" << cmd.assertVarRef << "'" << '\\n';
+                      << ": undefined variable '$" << cmd.assertVarRef << "'" << '\n';
             state.assertionFailed = true;
             state.currentCommand++;
             return true;
@@ -595,7 +595,7 @@ bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
         fieldLabel = "scenes_removed";
     } else {
         std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
-                  << ": unknown scene count field '" << cmd.assertField << "'" << '\\n';
+                  << ": unknown scene count field '" << cmd.assertField << "'" << '\n';
         state.assertionFailed = true;
         state.currentCommand++;
         return true;
@@ -605,7 +605,7 @@ bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
         std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber << ": "
                   << fieldLabel << " (" << static_cast<int>(count) << ") "
                   << compareOpToString(cmd.assertOp) << " " << static_cast<int>(assertValue)
-                  << '\\n';
+                  << '\n';
         state.assertionFailed = true;
     }
 
@@ -625,7 +625,7 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
         auto varIt = state.variables.find(cmd.assertVarRef);
         if (varIt == state.variables.end()) {
             std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
-                      << ": undefined variable '$" << cmd.assertVarRef << "'" << '\\n';
+                      << ": undefined variable '$" << cmd.assertVarRef << "'" << '\n';
             state.assertionFailed = true;
             state.currentCommand++;
             return true;
@@ -636,12 +636,12 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
     if (!tryResolveAssertSceneFieldValue(m_env.getSwapChainExtent(), targetScene, inActiveGroup,
                                          cmd, fieldValue)) {
         std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
-                  << ": unknown field '" << cmd.assertField << "'" << '\\n';
+                  << ": unknown field '" << cmd.assertField << "'" << '\n';
         state.assertionFailed = true;
     } else if (!evaluateComparison(fieldValue, cmd.assertOp, assertValue)) {
         std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber << ": scene \""
                   << cmd.assertSceneName << "\" " << cmd.assertField << " (" << fieldValue << ") "
-                  << compareOpToString(cmd.assertOp) << " " << assertValue << '\\n';
+                  << compareOpToString(cmd.assertOp) << " " << assertValue << '\n';
         state.assertionFailed = true;
     }
 
@@ -651,7 +651,7 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
 
 bool InputScriptExecutor::handleCompare(InputScriptState& state, const ScriptCommand& cmd) {
     std::cout << "[VDE:InputScript] compare " << cmd.argument << " vs " << cmd.comparePath
-              << " (threshold " << cmd.compareThreshold << ")" << '\\n';
+              << " (threshold " << cmd.compareThreshold << ")" << '\n';
 
     int actualWidth = 0, actualHeight = 0, actualChannels = 0;
     int goldenWidth = 0, goldenHeight = 0, goldenChannels = 0;
@@ -662,16 +662,16 @@ bool InputScriptExecutor::handleCompare(InputScriptState& state, const ScriptCom
 
     if (!actualImage) {
         std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
-                  << ": cannot load image '" << cmd.argument << "'" << '\\n';
+                  << ": cannot load image '" << cmd.argument << "'" << '\n';
         state.assertionFailed = true;
     } else if (!goldenImage) {
         std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
-                  << ": cannot load golden image '" << cmd.comparePath << "'" << '\\n';
+                  << ": cannot load golden image '" << cmd.comparePath << "'" << '\n';
         state.assertionFailed = true;
     } else if (actualWidth != goldenWidth || actualHeight != goldenHeight) {
         std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
                   << ": dimension mismatch — actual (" << actualWidth << "x" << actualHeight
-                  << ") vs golden (" << goldenWidth << "x" << goldenHeight << ")" << '\\n';
+                  << ") vs golden (" << goldenWidth << "x" << goldenHeight << ")" << '\n';
         state.assertionFailed = true;
     } else {
         const double error =
@@ -679,11 +679,11 @@ bool InputScriptExecutor::handleCompare(InputScriptState& state, const ScriptCom
         if (error > cmd.compareThreshold) {
             std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber
                       << ": image mismatch — FLIP " << error << " > threshold "
-                      << cmd.compareThreshold << '\\n';
+                      << cmd.compareThreshold << '\n';
             state.assertionFailed = true;
         } else {
             std::cout << "[VDE:InputScript] compare PASSED (FLIP " << error
-                      << " <= " << cmd.compareThreshold << ")" << '\\n';
+                      << " <= " << cmd.compareThreshold << ")" << '\n';
         }
     }
 
