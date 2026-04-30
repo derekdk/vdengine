@@ -377,7 +377,7 @@ The rule remains: a task starts as main-thread-only and opts out only with evide
 
 ## Implementation Phases
 
-## Phase 1: Scheduler Correction
+## Phase 1: Scheduler Correction **Complete**
 
 **Goal:** Fix the frame graph before adding new runtime services.
 

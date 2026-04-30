@@ -1,0 +1,10 @@
+# Render verification: Timed Events Demo
+# Compares current output against the golden image.
+wait startup
+wait_frames 20
+
+screenshot render_verify_output/timed_events_demo.png
+wait 100
+compare render_verify_output/timed_events_demo.png ../../smoketests/golden/timed_events_demo.png 0.05
+
+exit

@@ -1,0 +1,7 @@
+# Smoke test: Timed Events Demo
+# Verifies that one-shot and repeating callbacks fire within 2.5 seconds.
+# Scene A: one-shot at 1.0s, repeating every 500ms (>= 4 ticks by 2.5s)
+# Scene B: repeating every 400ms (>= 4 ticks by 2.5s)
+wait startup
+wait 2.5s
+exit

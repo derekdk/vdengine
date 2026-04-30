@@ -41,12 +41,9 @@ extern void clearSpriteDescriptorCache();
 // Game Implementation
 // ============================================================================
 
-Game::Game()
-    : m_initialized(false), m_running(false), m_settings(), m_window(nullptr),
-      m_vulkanContext(nullptr), m_activeScene(nullptr), m_sceneSwitchPending(false),
-      m_inputHandler(nullptr), m_deltaTime(0.0f), m_totalTime(0.0), m_fps(0.0f), m_frameCount(0),
-      m_lastFrameTime(0.0), m_fpsAccumulator(0.0), m_fpsFrameCount(0) {}
+Game::Game() = default;
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 Game::~Game() {
     if (m_initialized) {
         shutdown();
@@ -135,12 +132,12 @@ bool Game::initialize(const GameSettings& settings) {
                         m_inputScriptFile = canonical.string();
                     } else {
                         std::cerr << "[VDE] VDE_INPUT_SCRIPT path could not be resolved: "
-                                  << envScript << std::endl;
+                                  << envScript << '\n';
                     }
                 } else {
                     std::cerr << "[VDE] VDE_INPUT_SCRIPT rejected: path must have a .vdescript "
                                  "extension"
-                              << std::endl;
+                              << '\n';
                 }
             }
         }
@@ -152,7 +149,7 @@ bool Game::initialize(const GameSettings& settings) {
 
     } catch (const std::exception& e) {
         // Clean up on failure
-        std::cerr << "Game initialization failed: " << e.what() << std::endl;
+        std::cerr << "Game initialization failed: " << e.what() << '\n';
         m_vulkanContext.reset();
         m_window.reset();
         throw;
@@ -165,6 +162,7 @@ void Game::shutdown() {
     }
 
     // Call shutdown hook
+    // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
     onShutdown();
 
     // Deactivate all currently active scenes
@@ -297,7 +295,7 @@ void Game::setExitCode(int code) {
 
 bool Game::captureScreenshot(const std::string& outputPath) {
     if (!m_vulkanContext) {
-        std::cerr << "[VDE:InputScript] screenshot failed: no Vulkan context" << std::endl;
+        std::cerr << "[VDE:InputScript] screenshot failed: no Vulkan context" << '\n';
         return false;
     }
 
@@ -305,7 +303,7 @@ bool Game::captureScreenshot(const std::string& outputPath) {
     auto pixels = m_vulkanContext->captureFramebuffer(width, height);
     if (pixels.empty() || width == 0 || height == 0) {
         std::cerr << "[VDE:InputScript] screenshot failed: framebuffer capture returned no data"
-                  << std::endl;
+                  << '\n';
         return false;
     }
 
@@ -316,7 +314,7 @@ bool Game::captureScreenshot(const std::string& outputPath) {
         std::filesystem::create_directories(parentPath, ec);
         if (ec) {
             std::cerr << "[VDE:InputScript] screenshot warning: could not create directory '"
-                      << parentPath.string() << "'" << std::endl;
+                      << parentPath.string() << "'" << '\n';
         }
     }
 
@@ -328,12 +326,12 @@ bool Game::captureScreenshot(const std::string& outputPath) {
 
     if (result == 0) {
         std::cerr << "[VDE:InputScript] screenshot failed: could not write '" << outputPath << "'"
-                  << std::endl;
+                  << '\n';
         return false;
     }
 
     std::cout << "[VDE:InputScript] screenshot saved: " << outputPath << " (" << width << "x"
-              << height << ")" << std::endl;
+              << height << ")" << '\n';
     return true;
 }
 
@@ -409,8 +407,7 @@ void Game::removeScene(const std::string& name) {
     }
 
     // Remove from stack if present
-    m_sceneStack.erase(std::remove(m_sceneStack.begin(), m_sceneStack.end(), name),
-                       m_sceneStack.end());
+    std::erase(m_sceneStack, name);
 
     m_scenes.erase(it);
     m_scenesRemoved++;
@@ -458,6 +455,7 @@ void Game::setActiveSceneGroup(const SceneGroup& group) {
 
     // Set primary scene (first in the group)
     if (!group.sceneNames.empty()) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         auto it = m_scenes.find(group.sceneNames[0]);
         if (it != m_scenes.end()) {
             m_activeScene = it->second.get();
@@ -735,8 +733,9 @@ void Game::scheduleWindowOperation(std::function<void(Window&)> operation) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
-    m_pendingWindowOperations.push_back({WindowOperationKind::Generic, std::move(operation)});
+    std::scoped_lock lock(m_pendingWindowOperationsMutex);
+    m_pendingWindowOperations.push_back(
+        {.kind = WindowOperationKind::Generic, .operation = std::move(operation)});
 }
 
 void Game::scheduleWindowResize(uint32_t width, uint32_t height) {
@@ -749,10 +748,10 @@ void Game::scheduleWindowResize(uint32_t width, uint32_t height) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
+    std::scoped_lock lock(m_pendingWindowOperationsMutex);
     m_pendingWindowOperations.push_back(
-        {WindowOperationKind::Resize,
-         [width, height](Window& window) { window.setResolution(width, height); }});
+        {.kind = WindowOperationKind::Resize,
+         .operation = [width, height](Window& window) { window.setResolution(width, height); }});
 }
 
 void Game::scheduleWindowFullscreen(bool fullscreen) {
@@ -815,12 +814,14 @@ void Game::pollGamepads() {
 
         // Connection/disconnection is handled by the joystick callback
         // (set in setupInputCallbacks). Here we only poll state for gamepads.
-        if (!isGamepad)
+        if (!isGamepad) {
             continue;
+        }
 
         GLFWgamepadstate state;
-        if (glfwGetGamepadState(jid, &state) != GLFW_TRUE)
+        if (glfwGetGamepadState(jid, &state) != GLFW_TRUE) {
             continue;
+        }
 
         // Dispatch button press/release events by comparing with previous state
         dispatchToHandlers([&](InputHandler* handler) {
@@ -888,8 +889,9 @@ void Game::processPendingSceneChange() {
     // Exit currently active scenes that are NOT the pending scene
     std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
     for (const auto& sceneName : activeScenes) {
-        if (sceneName == m_pendingScene)
+        if (sceneName == m_pendingScene) {
             continue;  // Will stay active — don't exit
+        }
         deactivateScene(sceneName);
     }
 
@@ -917,7 +919,7 @@ void Game::executePendingWindowOperations() {
 
     std::vector<PendingWindowOperation> pending;
     {
-        std::lock_guard<std::mutex> lock(m_pendingWindowOperationsMutex);
+        std::scoped_lock lock(m_pendingWindowOperationsMutex);
         if (m_pendingWindowOperations.empty()) {
             return;
         }
@@ -925,6 +927,7 @@ void Game::executePendingWindowOperations() {
     }
 
     size_t lastResizeIndex = pending.size();
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     for (size_t index = 0; index < pending.size(); ++index) {
         if (pending[index].kind == WindowOperationKind::Resize) {
             lastResizeIndex = index;
@@ -941,11 +944,13 @@ void Game::executePendingWindowOperations() {
             pendingOperation.operation(*m_window);
         }
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 }
 
 void Game::setupInputCallbacks() {
-    if (!m_window)
+    if (!m_window) {
         return;
+    }
 
     GLFWwindow* handle = m_window->getHandle();
 
@@ -957,8 +962,9 @@ void Game::setupInputCallbacks() {
         (void)scancode;  // Unused
 
         Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
-        if (!game)
+        if (!game) {
             return;
+        }
 
         // Determine which input handler to use — focused scene for split-screen
         InputHandler* handler = nullptr;
@@ -984,8 +990,9 @@ void Game::setupInputCallbacks() {
     // Character input callback (for text entry)
     glfwSetCharCallback(handle, [](GLFWwindow* window, unsigned int codepoint) {
         Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
-        if (!game)
+        if (!game) {
             return;
+        }
 
         InputHandler* handler = nullptr;
         Scene* focusedScene = game->getFocusedScene();
@@ -1003,8 +1010,9 @@ void Game::setupInputCallbacks() {
     // Mouse button callback
     glfwSetMouseButtonCallback(handle, [](GLFWwindow* window, int button, int action, int mods) {
         Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
-        if (!game)
+        if (!game) {
             return;
+        }
 
         InputHandler* handler = nullptr;
         if (game->m_activeScene && game->m_activeScene->getInputHandler()) {
@@ -1029,8 +1037,9 @@ void Game::setupInputCallbacks() {
     // Mouse move callback
     glfwSetCursorPosCallback(handle, [](GLFWwindow* window, double xpos, double ypos) {
         Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
-        if (!game)
+        if (!game) {
             return;
+        }
 
         InputHandler* handler = nullptr;
         if (game->m_activeScene && game->m_activeScene->getInputHandler()) {
@@ -1047,8 +1056,9 @@ void Game::setupInputCallbacks() {
     // Mouse scroll callback
     glfwSetScrollCallback(handle, [](GLFWwindow* window, double xoffset, double yoffset) {
         Game* game = static_cast<Game*>(glfwGetWindowUserPointer(window));
-        if (!game)
+        if (!game) {
             return;
+        }
 
         InputHandler* handler = nullptr;
         if (game->m_activeScene && game->m_activeScene->getInputHandler()) {
@@ -1093,8 +1103,9 @@ void Game::setupInputCallbacks() {
 
     glfwSetJoystickCallback([](int jid, int event) {
         Game* game = s_gameForJoystick;
-        if (!game)
+        if (!game) {
             return;
+        }
 
         auto notifyHandler = [&](InputHandler* handler) {
             if (event == GLFW_CONNECTED) {
@@ -1107,10 +1118,12 @@ void Game::setupInputCallbacks() {
                 handler->_setGamepadConnected(jid, false);
                 handler->onGamepadDisconnect(jid);
                 // Clear the state for this gamepad
-                for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn)
+                for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn) {
                     handler->_setGamepadButton(jid, btn, false);
-                for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis)
+                }
+                for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis) {
                     handler->_setGamepadAxis(jid, axis, 0.0f);
+                }
             }
         };
 
@@ -1144,29 +1157,28 @@ void Game::setupInputCallbacks() {
 }
 
 void Game::createMeshRenderingPipeline() {
-    std::cout << "Creating mesh rendering pipeline..." << std::endl;
+    std::cout << "Creating mesh rendering pipeline..." << '\n';
 
     if (!m_vulkanContext) {
-        std::cout << "No Vulkan context!" << std::endl;
+        std::cout << "No Vulkan context!" << '\n';
         return;
     }
 
     VkDevice device = m_vulkanContext->getDevice();
-    std::cout << "Got device" << std::endl;
+    std::cout << "Got device" << '\n';
 
     // Compile shaders
     ShaderCompiler compiler;
     std::vector<uint32_t> vertSpv, fragSpv;
 
-    std::cout << "Compiling vertex shader..." << std::endl;
+    std::cout << "Compiling vertex shader..." << '\n';
     auto vertResult = compiler.compileFile("shaders/mesh.vert", ShaderStage::Vertex);
     if (!vertResult.success) {
-        std::cerr << "Vertex shader compilation failed: " << vertResult.errorLog << std::endl;
+        std::cerr << "Vertex shader compilation failed: " << vertResult.errorLog << '\n';
         throw std::runtime_error("Failed to compile mesh vertex shader: " + vertResult.errorLog);
     }
     vertSpv = vertResult.spirv;
-    std::cout << "Vertex shader compiled successfully (" << vertSpv.size() << " words)"
-              << std::endl;
+    std::cout << "Vertex shader compiled successfully (" << vertSpv.size() << " words)" << '\n';
 
     auto fragResult = compiler.compileFile("shaders/mesh.frag", ShaderStage::Fragment);
     if (!fragResult.success) {
@@ -1183,12 +1195,14 @@ void Game::createMeshRenderingPipeline() {
         reinterpret_cast<char*>(fragSpv.data()) + fragSpv.size() * sizeof(uint32_t)));
 
     // Shader stage creation
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization)
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertShaderStageInfo.module = vertShaderModule;
     vertShaderStageInfo.pName = "main";
 
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization)
     VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1233,6 +1247,7 @@ void Game::createMeshRenderingPipeline() {
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisampling
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization)
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
@@ -1404,10 +1419,10 @@ void Game::destroyMeshRenderingPipeline() {
 }
 
 void Game::createSpriteRenderingPipeline() {
-    std::cout << "Creating sprite rendering pipeline..." << std::endl;
+    std::cout << "Creating sprite rendering pipeline..." << '\n';
 
     if (!m_vulkanContext) {
-        std::cout << "No Vulkan context!" << std::endl;
+        std::cout << "No Vulkan context!" << '\n';
         return;
     }
 
@@ -1439,14 +1454,13 @@ void Game::createSpriteRenderingPipeline() {
     // Compile shaders
     ShaderCompiler compiler;
 
-    std::cout << "Compiling sprite vertex shader..." << std::endl;
+    std::cout << "Compiling sprite vertex shader..." << '\n';
     auto vertResult = compiler.compileFile("shaders/simple_sprite.vert", ShaderStage::Vertex);
     if (!vertResult.success) {
-        std::cerr << "Sprite vertex shader compilation failed: " << vertResult.errorLog
-                  << std::endl;
+        std::cerr << "Sprite vertex shader compilation failed: " << vertResult.errorLog << '\n';
         throw std::runtime_error("Failed to compile sprite vertex shader: " + vertResult.errorLog);
     }
-    std::cout << "Sprite vertex shader compiled successfully" << std::endl;
+    std::cout << "Sprite vertex shader compiled successfully" << '\n';
 
     auto fragResult = compiler.compileFile("shaders/simple_sprite.frag", ShaderStage::Fragment);
     if (!fragResult.success) {
@@ -1465,12 +1479,14 @@ void Game::createSpriteRenderingPipeline() {
                               fragResult.spirv.size() * sizeof(uint32_t)));
 
     // Shader stage creation
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization)
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertShaderStageInfo.module = vertShaderModule;
     vertShaderStageInfo.pName = "main";
 
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization)
     VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1515,6 +1531,7 @@ void Game::createSpriteRenderingPipeline() {
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisampling
+    // NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization)
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
@@ -1556,6 +1573,7 @@ void Game::createSpriteRenderingPipeline() {
     // Descriptor set layout (for UBO and texture sampler)
     std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     // Binding 0: UBO (view/projection)
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1567,6 +1585,7 @@ void Game::createSpriteRenderingPipeline() {
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1580,10 +1599,12 @@ void Game::createSpriteRenderingPipeline() {
 
     // Create descriptor pool for sprite descriptor sets
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = 1024;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = 1024;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1648,11 +1669,11 @@ void Game::createSpriteRenderingPipeline() {
     if (!m_defaultWhiteTexture->createFromData(
             whitePixel, 1, 1, device, m_vulkanContext->getPhysicalDevice(),
             m_vulkanContext->getCommandPool(), m_vulkanContext->getGraphicsQueue())) {
-        std::cerr << "Warning: Failed to create default white texture" << std::endl;
+        std::cerr << "Warning: Failed to create default white texture" << '\n';
         m_defaultWhiteTexture.reset();
     }
 
-    std::cout << "Sprite rendering pipeline created successfully" << std::endl;
+    std::cout << "Sprite rendering pipeline created successfully" << '\n';
 }
 
 void Game::destroySpriteRenderingPipeline() {
@@ -1732,6 +1753,7 @@ void Game::updateSpriteDescriptor(VkDescriptorSet descriptorSet, VkBuffer uboBuf
 
     std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     // Binding 0: UBO
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet;
@@ -1749,6 +1771,7 @@ void Game::updateSpriteDescriptor(VkDescriptorSet descriptorSet, VkBuffer uboBuf
     descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptorWrites[1].descriptorCount = 1;
     descriptorWrites[1].pImageInfo = &imageInfo;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     vkUpdateDescriptorSets(m_vulkanContext->getDevice(),
                            static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(),
@@ -1804,10 +1827,10 @@ void Game::updateMeshTextureDescriptor(VkDescriptorSet descriptorSet, VkImageVie
 // ============================================================================
 
 void Game::createLightingResources() {
-    std::cout << "Creating lighting resources..." << std::endl;
+    std::cout << "Creating lighting resources..." << '\n';
 
     if (!m_vulkanContext) {
-        std::cout << "No Vulkan context!" << std::endl;
+        std::cout << "No Vulkan context!" << '\n';
         return;
     }
 
@@ -1853,6 +1876,7 @@ void Game::createLightingResources() {
     m_lightingUBOMemory.resize(framesInFlight);
     m_lightingUBOMapped.resize(framesInFlight);
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     for (uint32_t i = 0; i < framesInFlight; i++) {
         BufferUtils::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -1862,6 +1886,7 @@ void Game::createLightingResources() {
         // Persistently map the buffer
         vkMapMemory(device, m_lightingUBOMemory[i], 0, bufferSize, 0, &m_lightingUBOMapped[i]);
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     // Allocate descriptor sets
     std::vector<VkDescriptorSetLayout> layouts(framesInFlight, m_lightingDescriptorSetLayout);
@@ -1878,6 +1903,7 @@ void Game::createLightingResources() {
     }
 
     // Update descriptor sets to point to UBO buffers
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     for (uint32_t i = 0; i < framesInFlight; i++) {
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = m_lightingUBOBuffers[i];
@@ -1904,8 +1930,9 @@ void Game::createLightingResources() {
     for (uint32_t i = 0; i < framesInFlight; i++) {
         memcpy(m_lightingUBOMapped[i], &defaultLighting, sizeof(LightingUBO));
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
-    std::cout << "Lighting resources created successfully" << std::endl;
+    std::cout << "Lighting resources created successfully" << '\n';
 }
 
 void Game::destroyLightingResources() {
@@ -1916,6 +1943,7 @@ void Game::destroyLightingResources() {
     VkDevice device = m_vulkanContext->getDevice();
 
     // Unmap and destroy UBO buffers
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     for (size_t i = 0; i < m_lightingUBOBuffers.size(); i++) {
         if (m_lightingUBOMapped[i]) {
             vkUnmapMemory(device, m_lightingUBOMemory[i]);
@@ -1927,6 +1955,7 @@ void Game::destroyLightingResources() {
             vkFreeMemory(device, m_lightingUBOMemory[i], nullptr);
         }
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     m_lightingUBOBuffers.clear();
     m_lightingUBOMemory.clear();
     m_lightingUBOMapped.clear();
@@ -1953,6 +1982,7 @@ VkDescriptorSet Game::getCurrentLightingDescriptorSet() const {
     if (currentFrame >= m_lightingDescriptorSets.size()) {
         currentFrame = 0;
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     return m_lightingDescriptorSets[currentFrame];
 }
 
@@ -1983,7 +2013,9 @@ void Game::updateLightingUBO(const Scene* scene) {
         ubo.lightCounts = glm::ivec4(static_cast<int>(numLights), 0, 0, 0);
 
         for (uint32_t i = 0; i < numLights; i++) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             const Light& light = lights[i];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             GPULight& gpuLight = ubo.lights[i];
 
             // Position/direction and type
@@ -2015,6 +2047,7 @@ void Game::updateLightingUBO(const Scene* scene) {
         ubo.lightCounts = glm::ivec4(0, 0, 0, 0);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     memcpy(m_lightingUBOMapped[currentFrame], &ubo, sizeof(LightingUBO));
 }
 
@@ -2118,6 +2151,7 @@ void Game::renderMultiViewport() {
     std::vector<VulkanContext::SceneRenderInfo> renderInfos;
 
     for (size_t i = 0; i < m_activeSceneGroup.sceneNames.size(); ++i) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         const auto& sceneName = m_activeSceneGroup.sceneNames[i];
         auto it = m_scenes.find(sceneName);
         if (it == m_scenes.end()) {
@@ -2227,13 +2261,15 @@ void Game::renderTransition() {
             rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             rpInfo.renderPass = m_vulkanContext->getOffscreenRenderPass();
             rpInfo.framebuffer = framebuffer;
-            rpInfo.renderArea.offset = {0, 0};
+            rpInfo.renderArea.offset = {.x = 0, .y = 0};
             rpInfo.renderArea.extent = extent;
 
             std::array<VkClearValue, 2> clearValues{};
             const Color& bg = scene->getBackgroundColor();
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             clearValues[0].color = {{bg.r, bg.g, bg.b, bg.a}};
-            clearValues[1].depthStencil = {1.0f, 0};
+            clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
+            // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
             rpInfo.pClearValues = clearValues.data();
 
@@ -2250,7 +2286,7 @@ void Game::renderTransition() {
             vkCmdSetViewport(cmd, 0, 1, &viewport);
 
             VkRect2D scissor{};
-            scissor.offset = {0, 0};
+            scissor.offset = {.x = 0, .y = 0};
             scissor.extent = extent;
             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
@@ -2274,12 +2310,14 @@ void Game::renderTransition() {
         rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         rpInfo.renderPass = m_vulkanContext->getRenderPass();
         rpInfo.framebuffer = swapchainFB;
-        rpInfo.renderArea.offset = {0, 0};
+        rpInfo.renderArea.offset = {.x = 0, .y = 0};
         rpInfo.renderArea.extent = extent;
 
         std::array<VkClearValue, 2> clearValues{};
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        clearValues[1].depthStencil = {1.0f, 0};
+        clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
+        // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         rpInfo.pClearValues = clearValues.data();
 
@@ -2433,7 +2471,9 @@ void Game::rebuildSchedulerGraph() {
         }
         auto it = m_scenes.find(sceneName);
         if (it != m_scenes.end()) {
-            updateScenes.push_back({it->second.get(), sceneName, it->second->getUpdatePriority()});
+            updateScenes.push_back({.scene = it->second.get(),
+                                    .name = sceneName,
+                                    .priority = it->second->getUpdatePriority()});
         }
     }
 
@@ -2451,7 +2491,8 @@ void Game::rebuildSchedulerGraph() {
             }
         }
         if (!inGroup) {
-            updateScenes.push_back({scenePtr.get(), name, scenePtr->getUpdatePriority()});
+            updateScenes.push_back(
+                {.scene = scenePtr.get(), .name = name, .priority = scenePtr->getUpdatePriority()});
         }
     }
 
@@ -2467,8 +2508,9 @@ void Game::rebuildSchedulerGraph() {
         if (!destAlreadyListed) {
             auto it = m_scenes.find(m_transitionDestScene);
             if (it != m_scenes.end()) {
-                updateScenes.push_back(
-                    {it->second.get(), m_transitionDestScene, it->second->getUpdatePriority()});
+                updateScenes.push_back({.scene = it->second.get(),
+                                        .name = m_transitionDestScene,
+                                        .priority = it->second->getUpdatePriority()});
             }
         }
     }
@@ -2477,12 +2519,12 @@ void Game::rebuildSchedulerGraph() {
     // Deterministic ordering is required because execution order must not change across
     // scheduler rebuilds when priority is equal — but it must NOT create false cross-scene
     // task dependencies. Ordering only controls task registration sequence, not edges.
-    std::sort(updateScenes.begin(), updateScenes.end(),
-              [](const SceneEntry& a, const SceneEntry& b) {
-                  if (a.priority != b.priority)
-                      return a.priority < b.priority;
-                  return a.name < b.name;
-              });
+    std::ranges::sort(updateScenes, [](const SceneEntry& a, const SceneEntry& b) {
+        if (a.priority != b.priority) {
+            return a.priority < b.priority;
+        }
+        return a.name < b.name;
+    });
 
     // ---------------------------------------------------------------
     // Task 0: Input — process input script commands.
@@ -2490,28 +2532,32 @@ void Game::rebuildSchedulerGraph() {
     //         input is dispatched before any game logic reads it.
     //         Main-thread-only: scripted input mutates input state.
     // ---------------------------------------------------------------
-    TaskId inputScriptTask = m_scheduler.addTask(
-        {"input.script", TaskPhase::Input, [this]() { processInputScript(); }, {}, true});
+    TaskId inputScriptTask = m_scheduler.addTask({.name = "input.script",
+                                                  .phase = TaskPhase::Input,
+                                                  .work = [this]() { processInputScript(); },
+                                                  .dependsOn = {},
+                                                  .mainThreadOnly = true});
 
     // ---------------------------------------------------------------
     // Task 0b: Window/OS operations — execute queued window changes.
     //          Main-thread-only: window/OS APIs require the main thread.
     // ---------------------------------------------------------------
-    TaskId windowOpsTask = m_scheduler.addTask({"window.ops",
-                                                TaskPhase::Input,
-                                                [this]() { executePendingWindowOperations(); },
-                                                {inputScriptTask},
-                                                true});
+    TaskId windowOpsTask =
+        m_scheduler.addTask({.name = "window.ops",
+                             .phase = TaskPhase::Input,
+                             .work = [this]() { executePendingWindowOperations(); },
+                             .dependsOn = {inputScriptTask},
+                             .mainThreadOnly = true});
 
     // ---------------------------------------------------------------
     // Task 1: game.update — onUpdate hook.
     //         Main-thread-only: onUpdate may touch scene objects.
     // ---------------------------------------------------------------
-    TaskId gameUpdateTask = m_scheduler.addTask({"game.update",
-                                                 TaskPhase::GameLogic,
-                                                 [this]() { onUpdate(m_deltaTime); },
-                                                 {windowOpsTask},
-                                                 true});
+    TaskId gameUpdateTask = m_scheduler.addTask({.name = "game.update",
+                                                 .phase = TaskPhase::GameLogic,
+                                                 .work = [this]() { onUpdate(m_deltaTime); },
+                                                 .dependsOn = {windowOpsTask},
+                                                 .mainThreadOnly = true});
 
     // Per-scene barrier collections:
     //   audioBarrierTasks — tasks audio.global must wait for
@@ -2524,84 +2570,106 @@ void Game::rebuildSchedulerGraph() {
     // Each scene's chain depends only on game.update and its own
     // prior phase tasks, so scenes are independent of each other.
     // ---------------------------------------------------------------
-    for (size_t i = 0; i < updateScenes.size(); ++i) {
-        Scene* scene = updateScenes[i].scene;
-        const std::string& sceneName = updateScenes[i].name;
+    for (auto& updateScene : updateScenes) {
+        Scene* scene = updateScene.scene;
+        const std::string& sceneName = updateScene.name;
 
         if (scene->usesPhaseCallbacks()) {
             // --- Phase callbacks mode ---
 
             // GameLogic — depends only on game.update (no cross-scene edge)
-            TaskId gameLogicTask =
-                m_scheduler.addTask({"scene.gameLogic." + sceneName,
-                                     TaskPhase::GameLogic,
-                                     [this, scene]() { scene->updateGameLogic(m_deltaTime); },
-                                     {gameUpdateTask},
-                                     true});
+            TaskId gameLogicTask = m_scheduler.addTask(
+                {.name = "scene.gameLogic." + sceneName,
+                 .phase = TaskPhase::GameLogic,
+                 .work = [this, scene]() { scene->updateGameLogic(m_deltaTime); },
+                 .dependsOn = {gameUpdateTask},
+                 .mainThreadOnly = true});
 
-            // Audio — depends on this scene's gameLogic
-            TaskId sceneAudioTask =
-                m_scheduler.addTask({"scene.audio." + sceneName,
-                                     TaskPhase::Audio,
-                                     [this, scene]() { scene->updateAudio(m_deltaTime); },
-                                     {gameLogicTask},
-                                     true});
-            audioBarrierTasks.push_back(sceneAudioTask);
-
-            // Physics chain (optional) — also depends only on this scene's gameLogic
+            // Physics chain (optional) — depends only on this scene's gameLogic
             TaskId visualDep = gameLogicTask;
             if (scene->hasPhysics()) {
                 // Physics step — worker-eligible: operates only on this scene's physics data
                 TaskId physicsTask = m_scheduler.addTask({
-                    "scene.physics." + sceneName,
-                    TaskPhase::Physics,
-                    [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
-                    {gameLogicTask},
-                    false  // worker-eligible
+                    .name = "scene.physics." + sceneName,
+                    .phase = TaskPhase::Physics,
+                    .work = [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
+                    .dependsOn = {gameLogicTask},
+                    .mainThreadOnly = false  // worker-eligible
                 });
 
                 // PostPhysics — main-thread: sync transforms, dispatch staged callbacks
                 TaskId postPhysicsTask = m_scheduler.addTask(
-                    {"scene.postPhysics." + sceneName,
-                     TaskPhase::PostPhysics,
-                     [scene]() {
-                         if (!scene->hasPhysics())
-                             return;
-                         float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
-                         for (auto& entityRef : scene->getEntities()) {
-                             auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
-                             if (pe && pe->getAutoSync()) {
-                                 pe->syncFromPhysics(alpha);
+                    {.name = "scene.postPhysics." + sceneName,
+                     .phase = TaskPhase::PostPhysics,
+                     .work =
+                         [scene]() {
+                             if (!scene->hasPhysics()) {
+                                 return;
                              }
-                         }
-                     },
-                     {physicsTask},
-                     true});
+                             float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
+                             for (auto& entityRef : scene->getEntities()) {
+                                 auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
+                                 if (pe && pe->getAutoSync()) {
+                                     pe->syncFromPhysics(alpha);
+                                 }
+                             }
+                         },
+                     .dependsOn = {physicsTask},
+                     .mainThreadOnly = true});
 
                 visualDep = postPhysicsTask;
             }
 
-            // Visuals — Visual phase, after post-physics (or gameLogic when no physics).
+            // Timed events — Timed phase, after post-physics (or gameLogic when no physics).
+            // Main-thread-only: timed callbacks may mutate scene state.
+            TaskId timedTask = m_scheduler.addTask(
+                {.name = "scene.timed." + sceneName,
+                 .phase = TaskPhase::Timed,
+                 .work = [this, scene]() { scene->getTimedEvents().tick(m_deltaTime); },
+                 .dependsOn = {visualDep},
+                 .mainThreadOnly = true});
+
+            // Audio — depends on this scene's timed task (after post-physics).
+            // Main-thread-only: audio callbacks may inspect scene state.
+            TaskId sceneAudioTask =
+                m_scheduler.addTask({.name = "scene.audio." + sceneName,
+                                     .phase = TaskPhase::Audio,
+                                     .work = [this, scene]() { scene->updateAudio(m_deltaTime); },
+                                     .dependsOn = {timedTask},
+                                     .mainThreadOnly = true});
+            audioBarrierTasks.push_back(sceneAudioTask);
+
+            // Visuals — Visual phase, after timed events.
             // Main-thread-only: updateVisuals() may mutate entity state.
             TaskId visualsTask =
-                m_scheduler.addTask({"scene.visuals." + sceneName,
-                                     TaskPhase::Visual,
-                                     [this, scene]() { scene->updateVisuals(m_deltaTime); },
-                                     {visualDep},
-                                     true});
+                m_scheduler.addTask({.name = "scene.visuals." + sceneName,
+                                     .phase = TaskPhase::Visual,
+                                     .work = [this, scene]() { scene->updateVisuals(m_deltaTime); },
+                                     .dependsOn = {timedTask},
+                                     .mainThreadOnly = true});
             finalVisualTasks.push_back(visualsTask);
         } else {
             // --- Legacy mode: single update task ---
             // update() covers logic + audio + visuals in one call.
             TaskId updateTask =
-                m_scheduler.addTask({"scene.update." + sceneName,
-                                     TaskPhase::GameLogic,
-                                     [this, scene]() { scene->update(m_deltaTime); },
-                                     {gameUpdateTask},
-                                     true});
-            // Legacy update acts as both the audio barrier and the final visual write.
-            audioBarrierTasks.push_back(updateTask);
-            finalVisualTasks.push_back(updateTask);
+                m_scheduler.addTask({.name = "scene.update." + sceneName,
+                                     .phase = TaskPhase::GameLogic,
+                                     .work = [this, scene]() { scene->update(m_deltaTime); },
+                                     .dependsOn = {gameUpdateTask},
+                                     .mainThreadOnly = true});
+
+            // Timed events — run after the legacy update task.
+            // Main-thread-only: timed callbacks may mutate scene state.
+            TaskId timedTask = m_scheduler.addTask(
+                {.name = "scene.timed." + sceneName,
+                 .phase = TaskPhase::Timed,
+                 .work = [this, scene]() { scene->getTimedEvents().tick(m_deltaTime); },
+                 .dependsOn = {updateTask},
+                 .mainThreadOnly = true});
+
+            // Timed task acts as both the audio barrier and the final visual write.
+            audioBarrierTasks.push_back(timedTask);
+            finalVisualTasks.push_back(timedTask);
         }
     }
 
@@ -2614,9 +2682,12 @@ void Game::rebuildSchedulerGraph() {
         audioBarrierTasks.push_back(gameUpdateTask);
     }
 
-    TaskId audioTask = m_scheduler.addTask(
-        {"audio.global", TaskPhase::Audio,
-         [this]() { AudioManager::getInstance().update(m_deltaTime); }, audioBarrierTasks, true});
+    TaskId audioTask =
+        m_scheduler.addTask({.name = "audio.global",
+                             .phase = TaskPhase::Audio,
+                             .work = [this]() { AudioManager::getInstance().update(m_deltaTime); },
+                             .dependsOn = audioBarrierTasks,
+                             .mainThreadOnly = true});
 
     // ---------------------------------------------------------------
     // Task 3: PreRender — apply clear color from primary scene.
@@ -2627,21 +2698,24 @@ void Game::rebuildSchedulerGraph() {
         // Deduplicate: legacy update tasks are already in audioBarrierTasks so
         // audio.global transitively covers them, but explicit edges make the
         // graph shape obvious and safe when audio tasks are empty.
-        if (std::find(preRenderDeps.begin(), preRenderDeps.end(), id) == preRenderDeps.end()) {
+        if (std::ranges::find(preRenderDeps, id) == preRenderDeps.end()) {
             preRenderDeps.push_back(id);
         }
     }
 
     TaskId preRenderTask = m_scheduler.addTask(
-        {"scene.preRender", TaskPhase::PreRender,
-         [this]() {
-             if (m_activeScene && m_vulkanContext) {
-                 // Apply scene background color to Vulkan context
-                 const Color& bg = m_activeScene->getBackgroundColor();
-                 m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
-             }
-         },
-         preRenderDeps, true});
+        {.name = "scene.preRender",
+         .phase = TaskPhase::PreRender,
+         .work =
+             [this]() {
+                 if (m_activeScene && m_vulkanContext) {
+                     // Apply scene background color to Vulkan context
+                     const Color& bg = m_activeScene->getBackgroundColor();
+                     m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
+                 }
+             },
+         .dependsOn = preRenderDeps,
+         .mainThreadOnly = true});
 
     // ---------------------------------------------------------------
     // Task 3b: Transition update — advance transition progress.
@@ -2650,11 +2724,11 @@ void Game::rebuildSchedulerGraph() {
     TaskId renderDep = preRenderTask;
     if (m_transitionManager && m_transitionManager->isActive()) {
         TaskId transitionUpdateTask =
-            m_scheduler.addTask({"transition.update",
-                                 TaskPhase::PreRender,
-                                 [this]() { m_transitionManager->update(m_deltaTime); },
-                                 {preRenderTask},
-                                 true});
+            m_scheduler.addTask({.name = "transition.update",
+                                 .phase = TaskPhase::PreRender,
+                                 .work = [this]() { m_transitionManager->update(m_deltaTime); },
+                                 .dependsOn = {preRenderTask},
+                                 .mainThreadOnly = true});
         renderDep = transitionUpdateTask;
     }
 
@@ -2663,42 +2737,43 @@ void Game::rebuildSchedulerGraph() {
     //         scenes to offscreen targets and composite.  Otherwise,
     //         use the normal single/multi-viewport path.
     // ---------------------------------------------------------------
-    m_scheduler.addTask({"scene.render",
-                         TaskPhase::Render,
-                         [this]() {
-                             if (!m_vulkanContext) {
-                                 return;
-                             }
+    m_scheduler.addTask({.name = "scene.render",
+                         .phase = TaskPhase::Render,
+                         .work =
+                             [this]() {
+                                 if (!m_vulkanContext) {
+                                     return;
+                                 }
 
-                             // Transition rendering path
-                             if (m_transitionManager && m_transitionManager->isActive()) {
-                                 renderTransition();
-                                 return;
-                             }
+                                 // Transition rendering path
+                                 if (m_transitionManager && m_transitionManager->isActive()) {
+                                     renderTransition();
+                                     return;
+                                 }
 
-                             // Check if we need multi-viewport rendering
-                             bool needsMultiViewport = false;
-                             for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-                                 auto it = m_scenes.find(sceneName);
-                                 if (it != m_scenes.end()) {
-                                     if (it->second->getViewportRect() !=
-                                         ViewportRect::fullWindow()) {
-                                         needsMultiViewport = true;
-                                         break;
+                                 // Check if we need multi-viewport rendering
+                                 bool needsMultiViewport = false;
+                                 for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+                                     auto it = m_scenes.find(sceneName);
+                                     if (it != m_scenes.end()) {
+                                         if (it->second->getViewportRect() !=
+                                             ViewportRect::fullWindow()) {
+                                             needsMultiViewport = true;
+                                             break;
+                                         }
                                      }
                                  }
-                             }
 
-                             if (needsMultiViewport) {
-                                 // Multi-pass per-scene rendering
-                                 renderMultiViewport();
-                             } else {
-                                 // Original single-pass rendering (backwards compatible)
-                                 renderSingleViewport();
-                             }
-                         },
-                         {renderDep},
-                         true});
+                                 if (needsMultiViewport) {
+                                     // Multi-pass per-scene rendering
+                                     renderMultiViewport();
+                                 } else {
+                                     // Original single-pass rendering (backwards compatible)
+                                     renderSingleViewport();
+                                 }
+                             },
+                         .dependsOn = {renderDep},
+                         .mainThreadOnly = true});
 }
 
 }  // namespace vde

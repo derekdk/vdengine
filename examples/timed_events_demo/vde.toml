@@ -1,0 +1,10 @@
+[smoke]
+scripts = ["smoke_timed_events_demo.vdescript"]
+sections = ["timed_events", "multi_scene"]
+
+[render_verify]
+scripts = ["verify_timed_events_demo.vdescript"]
+capture_script = "capture_timed_events_demo.vdescript"
+priority = 2
+golden = "timed_events_demo.png"
+threshold = 0.05

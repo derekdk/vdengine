@@ -69,6 +69,9 @@ set(VDE_TEST_SOURCES
     Math2D_test.cpp
     Timing_test.cpp
     Random_test.cpp
+    # Phase 2 animation engine tests
+    PlaybackClock_test.cpp
+    TimedEvents_test.cpp
     # Text rendering tests
     TextRenderer_test.cpp
     TrueTypeFont_test.cpp
