@@ -246,6 +246,20 @@ TEST_F(AnimatorTest, Animator_CancelInsideCallback_Safe) {
     EXPECT_FALSE(crashed);
 }
 
+TEST_F(AnimatorTest, Animator_CancelInsideCompletionTick_SuppressesCompletion) {
+    AnimationHandle capturedHandle;
+    bool completed = false;
+
+    capturedHandle = anim.schedule(
+        {.duration = 0.5f}, {.onUpdate = [&](const AnimationContext&) { capturedHandle.cancel(); },
+                             .onComplete = [&](const AnimationContext&) { completed = true; }});
+
+    anim.update(0.5f);
+
+    EXPECT_FALSE(completed);
+    EXPECT_FALSE(capturedHandle.isActive());
+}
+
 // ---------------------------------------------------------------------------
 // Global speed
 // ---------------------------------------------------------------------------
@@ -302,9 +316,10 @@ TEST_F(AnimatorTest, Animator_BindingLifetime_StopsOnTargetDestroy) {
     // Use a resolver binding so we don't need a real entity.
     auto binding = AnimationBinding<FakeTarget>::resolver([&targetPtr]() { return targetPtr; });
 
-    anim.schedule(scene, binding, {.duration = 2.0f},
-                  BoundAnimationCallbacks<FakeTarget>{
-                      .onUpdate = [](FakeTarget& t, const AnimationContext&) { t.updateCount++; }});
+    auto handle = anim.schedule(
+        scene, binding, {.duration = 2.0f, .playback = AnimationPlayback::Loop},
+        BoundAnimationCallbacks<FakeTarget>{
+            .onUpdate = [](FakeTarget& t, const AnimationContext&) { t.updateCount++; }});
 
     anim.update(0.3f);
     EXPECT_EQ(target.updateCount, 1);
@@ -312,7 +327,7 @@ TEST_F(AnimatorTest, Animator_BindingLifetime_StopsOnTargetDestroy) {
     // Simulate target destruction by making the resolver return nullptr.
     targetPtr = nullptr;
 
-    // No crash; callback simply doesn't fire when resolve returns nullptr.
+    // Missing targets cancel the animation instead of leaving a silent zombie job.
     bool crashed = false;
     try {
         anim.update(0.3f);
@@ -321,6 +336,8 @@ TEST_F(AnimatorTest, Animator_BindingLifetime_StopsOnTargetDestroy) {
     }
     EXPECT_FALSE(crashed);
     EXPECT_EQ(target.updateCount, 1);  // not called again
+    EXPECT_EQ(anim.activeCount(), 0u);
+    EXPECT_FALSE(handle.isActive());
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +356,54 @@ TEST_F(AnimatorTest, Animator_SceneTeardown_CancelsAll) {
     }
 
     EXPECT_EQ(completions, 0);
+}
+
+TEST_F(AnimatorTest, Animator_HandleExpiresAfterAnimatorDestroy) {
+    AnimationHandle handle;
+
+    {
+        Animator local;
+        handle = local.schedule({.duration = 1.0f}, {.onUpdate = [](const AnimationContext&) {}});
+        EXPECT_TRUE(handle.isValid());
+        EXPECT_TRUE(handle.isActive());
+    }
+
+    EXPECT_FALSE(handle.isValid());
+    EXPECT_FALSE(handle.isActive());
+    handle.cancel();
+    handle.pause();
+    handle.resume();
+    EXPECT_FLOAT_EQ(handle.getSpeed(), 1.0f);
+}
+
+TEST_F(AnimatorTest, Animator_HandleFollowsMoveAssignment) {
+    AnimationHandle handle;
+    int updates = 0;
+
+    Animator source;
+    handle = source.schedule({.duration = 1.0f},
+                             {.onUpdate = [&](const AnimationContext&) { ++updates; }});
+
+    Animator destination;
+    destination = std::move(source);
+
+    EXPECT_TRUE(handle.isValid());
+    EXPECT_TRUE(handle.isActive());
+    EXPECT_EQ(destination.activeCount(), 1u);
+
+    handle.pause();
+    destination.update(0.5f);
+    EXPECT_EQ(updates, 0);
+    EXPECT_TRUE(handle.isActive());
+
+    handle.resume();
+    destination.update(0.5f);
+    EXPECT_EQ(updates, 1);
+    EXPECT_TRUE(handle.isActive());
+
+    handle.cancel();
+    EXPECT_FALSE(handle.isActive());
+    EXPECT_EQ(destination.activeCount(), 0u);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,6 +492,25 @@ TEST_F(AnimatorTest, Animator_LinearEasing_MatchesProgress) {
     EXPECT_NEAR(eased, 0.5f, 1e-5f);  // linear easing: eased == linear
 }
 
+TEST_F(AnimatorTest, Animator_LoopElapsed_RemainsMonotonic) {
+    float lastElapsed = 0.0f;
+    uint32_t lastCycle = 0;
+
+    anim.schedule({.duration = 1.0f, .playback = AnimationPlayback::Loop},
+                  {.onUpdate = [&](const AnimationContext& ctx) {
+                      lastElapsed = ctx.elapsed;
+                      lastCycle = ctx.cycleIndex;
+                  }});
+
+    anim.update(1.1f);
+    EXPECT_NEAR(lastElapsed, 1.1f, 1e-5f);
+    EXPECT_EQ(lastCycle, 1u);
+
+    anim.update(0.5f);
+    EXPECT_NEAR(lastElapsed, 1.6f, 1e-5f);
+    EXPECT_EQ(lastCycle, 1u);
+}
+
 // ============================================================================
 // Scheduler ordering tests — require Game / Scheduler
 // ============================================================================
@@ -444,8 +528,9 @@ class AnimOrderTestScene : public Scene {
     }
 
     void updateVisuals(float) override {
-        if (log)
+        if (log) {
             log->push_back(tag + ".visuals");
+        }
     }
 };
 

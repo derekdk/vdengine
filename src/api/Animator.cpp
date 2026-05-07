@@ -14,43 +14,123 @@ namespace vde {
 // AnimationHandle
 // ---------------------------------------------------------------------------
 
+Animator* AnimationHandle::resolveAnimator() const {
+    if (m_id == INVALID_ANIMATION_ID) {
+        return nullptr;
+    }
+
+    auto handleControl = m_handleControl.lock();
+    if (!handleControl) {
+        return nullptr;
+    }
+
+    return handleControl->animator;
+}
+
+bool AnimationHandle::isValid() const {
+    return isActive();
+}
+
 bool AnimationHandle::isActive() const {
-    if (!m_animator || m_id == INVALID_ANIMATION_ID)
+    Animator* animator = resolveAnimator();
+    if (!animator) {
         return false;
-    return m_animator->isActive(m_id);
+    }
+    return animator->isActive(m_id);
 }
 
 void AnimationHandle::cancel() {
-    if (m_animator && m_id != INVALID_ANIMATION_ID) {
-        m_animator->cancel(m_id);
+    Animator* animator = resolveAnimator();
+    if (animator && m_id != INVALID_ANIMATION_ID) {
+        animator->cancel(m_id);
         m_id = INVALID_ANIMATION_ID;
+        m_handleControl.reset();
     }
 }
 
 void AnimationHandle::pause() {
-    if (m_animator && m_id != INVALID_ANIMATION_ID)
-        m_animator->pause(m_id);
+    Animator* animator = resolveAnimator();
+    if (animator && m_id != INVALID_ANIMATION_ID) {
+        animator->pause(m_id);
+    }
 }
 
 void AnimationHandle::resume() {
-    if (m_animator && m_id != INVALID_ANIMATION_ID)
-        m_animator->resume(m_id);
+    Animator* animator = resolveAnimator();
+    if (animator && m_id != INVALID_ANIMATION_ID) {
+        animator->resume(m_id);
+    }
 }
 
 void AnimationHandle::setSpeed(float speed) {
-    if (m_animator && m_id != INVALID_ANIMATION_ID)
-        m_animator->setSpeed(m_id, speed);
+    Animator* animator = resolveAnimator();
+    if (animator && m_id != INVALID_ANIMATION_ID) {
+        animator->setSpeed(m_id, speed);
+    }
 }
 
 float AnimationHandle::getSpeed() const {
-    if (!m_animator || m_id == INVALID_ANIMATION_ID)
+    Animator* animator = resolveAnimator();
+    if (!animator) {
         return 1.0f;
-    return m_animator->getSpeed(m_id);
+    }
+    return animator->getSpeed(m_id);
 }
 
 // ---------------------------------------------------------------------------
 // Animator — internal helpers
 // ---------------------------------------------------------------------------
+
+Animator::Animator() {
+    resetHandleControl();
+}
+
+Animator::Animator(Animator&& other) noexcept
+    : m_nextId(other.m_nextId), m_globalSpeed(other.m_globalSpeed), m_ticking(other.m_ticking),
+      m_handleControl(std::move(other.m_handleControl)), m_jobs(std::move(other.m_jobs)) {
+    if (!m_handleControl) {
+        resetHandleControl();
+    } else {
+        m_handleControl->animator = this;
+    }
+
+    other.m_nextId = 1;
+    other.m_globalSpeed = 1.0f;
+    other.m_ticking = false;
+    other.m_jobs.clear();
+    other.resetHandleControl();
+}
+
+Animator& Animator::operator=(Animator&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    m_nextId = other.m_nextId;
+    m_globalSpeed = other.m_globalSpeed;
+    m_ticking = other.m_ticking;
+    m_handleControl = std::move(other.m_handleControl);
+    m_jobs = std::move(other.m_jobs);
+
+    if (!m_handleControl) {
+        resetHandleControl();
+    } else {
+        m_handleControl->animator = this;
+    }
+
+    other.m_nextId = 1;
+    other.m_globalSpeed = 1.0f;
+    other.m_ticking = false;
+    other.m_jobs.clear();
+    other.resetHandleControl();
+
+    return *this;
+}
+
+void Animator::resetHandleControl() {
+    m_handleControl = std::make_shared<AnimatorHandleControl>();
+    m_handleControl->animator = this;
+}
 
 AnimationId Animator::allocateId() {
     return m_nextId++;
@@ -58,16 +138,18 @@ AnimationId Animator::allocateId() {
 
 Animator::Job* Animator::findJob(AnimationId id) {
     for (auto& job : m_jobs) {
-        if (job.id == id)
+        if (job.id == id) {
             return &job;
+        }
     }
     return nullptr;
 }
 
 const Animator::Job* Animator::findJob(AnimationId id) const {
     for (const auto& job : m_jobs) {
-        if (job.id == id)
+        if (job.id == id) {
             return &job;
+        }
     }
     return nullptr;
 }
@@ -110,10 +192,9 @@ AnimationHandle Animator::schedule(const AnimationOptions& options, AnimationCal
     job.onUpdate = std::move(callbacks.onUpdate);
     job.onComplete = std::move(callbacks.onComplete);
 
-    AnimationId id = job.id;
     m_jobs.push_back(std::move(job));
 
-    return AnimationHandle(id, this);
+    return {m_jobs.back().id, m_handleControl};
 }
 
 // ---------------------------------------------------------------------------
@@ -148,8 +229,9 @@ void Animator::setGlobalSpeed(float speed) {
 size_t Animator::activeCount() const {
     size_t count = 0;
     for (const auto& job : m_jobs) {
-        if (job.active)
+        if (job.active) {
             ++count;
+        }
     }
     return count;
 }
@@ -167,27 +249,31 @@ void Animator::cancel(AnimationId id) {
     Job* job = findJob(id);
     if (job) {
         job->active = false;
-        if (!m_ticking)
+        if (!m_ticking) {
             compactJobs();
+        }
     }
 }
 
 void Animator::pause(AnimationId id) {
     Job* job = findJob(id);
-    if (job)
+    if (job) {
         job->paused = true;
+    }
 }
 
 void Animator::resume(AnimationId id) {
     Job* job = findJob(id);
-    if (job)
+    if (job) {
         job->paused = false;
+    }
 }
 
 void Animator::setSpeed(AnimationId id, float speed) {
     Job* job = findJob(id);
-    if (job)
+    if (job) {
         job->speed = std::max(speed, 0.0001f);
+    }
 }
 
 float Animator::getSpeed(AnimationId id) const {
@@ -200,8 +286,9 @@ float Animator::getSpeed(AnimationId id) const {
 // ---------------------------------------------------------------------------
 
 bool Animator::tickJob(Job& job, float dt) {
-    if (!job.active || job.paused)
+    if (!job.active || job.paused) {
         return false;
+    }
 
     // Apply per-job speed multiplier.
     dt *= job.speed;
@@ -223,6 +310,9 @@ bool Animator::tickJob(Job& job, float dt) {
         job.started = true;
         if (job.onStart) {
             job.onStart(makeContext(job, dt));
+            if (!job.active) {
+                return false;
+            }
         }
     }
 
@@ -240,36 +330,23 @@ bool Animator::tickJob(Job& job, float dt) {
         job.progress = raw;
     } else if (job.playback == AnimationPlayback::Loop) {
         float raw = job.elapsed / job.duration;
-        // Count completed cycles.
-        if (raw >= 1.0f) {
-            uint32_t newCycles = static_cast<uint32_t>(std::floor(raw));
-            job.cycleIndex += newCycles;
-            // Wrap elapsed into the current cycle.
-            job.elapsed = std::fmod(job.elapsed, job.duration);
-            raw = job.elapsed / job.duration;
-        }
-        job.progress = raw;
+        job.cycleIndex = static_cast<uint32_t>(std::floor(raw));
+        job.progress = raw - static_cast<float>(job.cycleIndex);
     } else {
         // PingPong
         float raw = job.elapsed / job.duration;
-        // Each pass (forward or reverse) is one duration.
-        if (raw >= 1.0f) {
-            job.cycleIndex += static_cast<uint32_t>(std::floor(raw));
-            job.elapsed = std::fmod(job.elapsed, job.duration);
-            raw = job.elapsed / job.duration;
-            // Flip direction each pass.
-            if (job.cycleIndex % 2 == 1) {
-                job.forward = false;
-            } else {
-                job.forward = true;
-            }
-        }
-        job.progress = job.forward ? raw : (1.0f - raw);
+        job.cycleIndex = static_cast<uint32_t>(std::floor(raw));
+        float cycleProgress = raw - static_cast<float>(job.cycleIndex);
+        job.forward = (job.cycleIndex % 2u) == 0u;
+        job.progress = job.forward ? cycleProgress : (1.0f - cycleProgress);
     }
 
     // Fire onUpdate.
     if (job.onUpdate) {
         job.onUpdate(makeContext(job, dt));
+        if (!job.active) {
+            return false;
+        }
     }
 
     // Fire onComplete and deactivate for Once mode.
@@ -289,8 +366,9 @@ bool Animator::tickJob(Job& job, float dt) {
 // ---------------------------------------------------------------------------
 
 void Animator::update(float deltaTime) {
-    if (deltaTime <= 0.0f || m_jobs.empty())
+    if (deltaTime <= 0.0f || m_jobs.empty()) {
         return;
+    }
 
     float dt = deltaTime * m_globalSpeed;
 
@@ -300,7 +378,7 @@ void Animator::update(float deltaTime) {
     // (appended to m_jobs) are not visited this tick.
     size_t count = m_jobs.size();
     for (size_t i = 0; i < count; ++i) {
-        tickJob(m_jobs[i], dt);
+        tickJob(m_jobs.at(i), dt);
     }
 
     m_ticking = false;

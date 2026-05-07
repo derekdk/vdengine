@@ -56,38 +56,65 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
     // so that the target cannot be destroyed mid-callback even if the last external
     // owner releases the shared_ptr during the callback.
     AnimationCallbacks unbound;
+    auto idHolder = std::make_shared<AnimationId>(INVALID_ANIMATION_ID);
+    auto handleControl = m_handleControl;
+
+    auto cancelOnMissingTarget = [idHolder, handleControl]() {
+        if (*idHolder == INVALID_ANIMATION_ID || !handleControl || !handleControl->animator)
+            return;
+        handleControl->animator->cancel(*idHolder);
+    };
+
+    auto resolveBoundTarget = [&scene, binding,
+                               cancelOnMissingTarget]() -> std::pair<std::shared_ptr<T>, T*> {
+        std::shared_ptr<T> lockedTarget;
+        T* target = nullptr;
+
+        if (binding.kind() == AnimationBindingKind::Weak) {
+            lockedTarget = binding.lockWeak();
+            target = lockedTarget.get();
+        } else {
+            target = binding.resolve(scene);
+        }
+
+        if (!target) {
+            cancelOnMissingTarget();
+            return {{}, nullptr};
+        }
+
+        return {std::move(lockedTarget), target};
+    };
 
     if (callbacks.onStart) {
-        unbound.onStart = [&scene, binding,
-                           cb = std::move(callbacks.onStart)](const AnimationContext& ctx) mutable {
-            auto lock = binding.lockWeak();  // keeps Weak target alive; empty for non-Weak
-            T* target = lock ? lock.get() : binding.resolve(scene);
+        unbound.onStart = [&scene, binding, cb = std::move(callbacks.onStart),
+                           resolveBoundTarget](const AnimationContext& ctx) mutable {
+            auto [lock, target] = resolveBoundTarget();
             if (target)
                 cb(*target, ctx);
         };
     }
 
     if (callbacks.onUpdate) {
-        unbound.onUpdate = [&scene, binding, cb = std::move(callbacks.onUpdate)](
-                               const AnimationContext& ctx) mutable {
-            auto lock = binding.lockWeak();  // keeps Weak target alive; empty for non-Weak
-            T* target = lock ? lock.get() : binding.resolve(scene);
+        unbound.onUpdate = [&scene, binding, cb = std::move(callbacks.onUpdate),
+                            resolveBoundTarget](const AnimationContext& ctx) mutable {
+            auto [lock, target] = resolveBoundTarget();
             if (target)
                 cb(*target, ctx);
         };
     }
 
     if (callbacks.onComplete) {
-        unbound.onComplete = [&scene, binding, cb = std::move(callbacks.onComplete)](
-                                 const AnimationContext& ctx) mutable {
-            auto lock = binding.lockWeak();  // keeps Weak target alive; empty for non-Weak
-            T* target = lock ? lock.get() : binding.resolve(scene);
+        unbound.onComplete = [&scene, binding, cb = std::move(callbacks.onComplete),
+                              resolveBoundTarget](const AnimationContext& ctx) mutable {
+            auto [lock, target] = resolveBoundTarget();
             if (target)
                 cb(*target, ctx);
         };
     }
 
-    return schedule(options, std::move(unbound));
+    AnimationHandle handle = schedule(options, std::move(unbound));
+    *idHolder = handle.getId();
+    return handle;
 }
 
 // ---------------------------------------------------------------------------

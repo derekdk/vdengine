@@ -99,13 +99,15 @@ class SceneA : public vde::examples::BaseExampleScene {
             if (m_paused) {
                 anim.resumeAll();
                 m_paused = false;
-                if (m_statusText)
+                if (m_statusText) {
                     m_statusText->setText("RUNNING");
+                }
             } else {
                 anim.pauseAll();
                 m_paused = true;
-                if (m_statusText)
+                if (m_statusText) {
                     m_statusText->setText("PAUSED");
+                }
             }
         }
 
@@ -219,8 +221,9 @@ class SceneA : public vde::examples::BaseExampleScene {
 
         animations().schedule<SpriteEntity>(
             *this, AnimationBinding<SpriteEntity>::entity(boxId),
-            {.duration = 1.0f, .easing = AnimationEasing::EaseInOutCubic},
-            {.onUpdate =
+            {.duration = 1.0f, .easing = AnimationEasing::EaseInOutCubic, .customEasing = nullptr},
+            {.onStart = nullptr,
+             .onUpdate =
                  [](SpriteEntity& e, const AnimationContext& ctx) {
                      float y = 1.8f + (0.05f - 1.8f) * ctx.easedProgress;
                      e.setPosition(-2.5f, y, 0.0f);
@@ -232,8 +235,11 @@ class SceneA : public vde::examples::BaseExampleScene {
                      // Chain: slide back up.
                      animations().schedule<SpriteEntity>(
                          *this, AnimationBinding<SpriteEntity>::entity(boxId),
-                         {.duration = 1.0f, .easing = AnimationEasing::EaseInOutCubic},
-                         {.onUpdate =
+                         {.duration = 1.0f,
+                          .easing = AnimationEasing::EaseInOutCubic,
+                          .customEasing = nullptr},
+                         {.onStart = nullptr,
+                          .onUpdate =
                               [](SpriteEntity& e2, const AnimationContext& ctx) {
                                   float y = 0.05f + (1.8f - 0.05f) * ctx.easedProgress;
                                   e2.setPosition(-2.5f, y, 0.0f);
@@ -258,8 +264,10 @@ class SceneA : public vde::examples::BaseExampleScene {
                                             AnimationBinding<SpriteEntity>::entity(scaleBoxId),
                                             {.duration = 0.65f,
                                              .playback = AnimationPlayback::PingPong,
-                                             .easing = AnimationEasing::EaseInOutSine},
-                                            {.onUpdate =
+                                             .easing = AnimationEasing::EaseInOutSine,
+                                             .customEasing = nullptr},
+                                            {.onStart = nullptr,
+                                             .onUpdate =
                                                  [](SpriteEntity& e, const AnimationContext& ctx) {
                                                      float s = 0.35f + 0.35f * ctx.easedProgress;
                                                      e.setScale(s, s, 1.0f);
@@ -267,14 +275,18 @@ class SceneA : public vde::examples::BaseExampleScene {
                                              .onComplete = nullptr});
 
         // Track ping-pong cycles via a separate unbound scheduler.
-        animations().schedule({.duration = 0.65f, .playback = AnimationPlayback::PingPong},
-                              {.onUpdate = [this](const AnimationContext& ctx) {
-                                  // Each forward→reverse pass counts.
-                                  if (ctx.reversePass && ctx.cycleIndex > m_lastCycleIndex) {
-                                      m_pingPongCycles = ctx.cycleIndex;
-                                      m_lastCycleIndex = ctx.cycleIndex;
-                                  }
-                              }});
+        animations().schedule(
+            {.duration = 0.65f, .playback = AnimationPlayback::PingPong, .customEasing = nullptr},
+            {.onStart = nullptr,
+             .onUpdate =
+                 [this](const AnimationContext& ctx) {
+                     // Each forward→reverse pass counts.
+                     if (ctx.reversePass && ctx.cycleIndex > m_lastCycleIndex) {
+                         m_pingPongCycles = ctx.cycleIndex;
+                         m_lastCycleIndex = ctx.cycleIndex;
+                     }
+                 },
+             .onComplete = nullptr});
     }
 
     // -----------------------------------------------------------------------
@@ -385,35 +397,47 @@ class SceneB : public vde::Scene {
             *this, AnimationBinding<SpriteEntity>::entity(colorBoxId),
             {.duration = 0.80f,
              .playback = AnimationPlayback::Loop,
-             .easing = AnimationEasing::EaseInOutSine},
-            {.onUpdate = [](SpriteEntity& e, const AnimationContext& ctx) {
-                Color from{0.40f, 0.15f, 0.85f, 1.0f};
-                Color to{0.15f, 0.85f, 0.80f, 1.0f};
-                float t = ctx.easedProgress;
-                e.setColor({from.r + (to.r - from.r) * t, from.g + (to.g - from.g) * t,
-                            from.b + (to.b - from.b) * t, 1.0f});
-            }});
+             .easing = AnimationEasing::EaseInOutSine,
+             .customEasing = nullptr},
+            {.onStart = nullptr,
+             .onUpdate =
+                 [](SpriteEntity& e, const AnimationContext& ctx) {
+                     Color from{0.40f, 0.15f, 0.85f, 1.0f};
+                     Color to{0.15f, 0.85f, 0.80f, 1.0f};
+                     float t = ctx.easedProgress;
+                     e.setColor({from.r + (to.r - from.r) * t, from.g + (to.g - from.g) * t,
+                                 from.b + (to.b - from.b) * t, 1.0f});
+                 },
+             .onComplete = nullptr});
 
         // Track loop cycle count.
-        animations().schedule({.duration = 0.80f, .playback = AnimationPlayback::Loop},
-                              {.onUpdate = [this](const AnimationContext& ctx) {
-                                  if (ctx.cycleIndex > m_loopCycles) {
-                                      m_loopCycles = ctx.cycleIndex;
-                                  }
-                              }});
+        animations().schedule(
+            {.duration = 0.80f, .playback = AnimationPlayback::Loop, .customEasing = nullptr},
+            {.onStart = nullptr,
+             .onUpdate =
+                 [this](const AnimationContext& ctx) {
+                     if (ctx.cycleIndex > m_loopCycles) {
+                         m_loopCycles = ctx.cycleIndex;
+                     }
+                 },
+             .onComplete = nullptr});
 
         // 2. Speed-scaled ping-pong scale animation (speed = 2.0).
         EntityId fastBoxId = m_fastBox->getId();
-        animations().schedule<SpriteEntity>(
-            *this, AnimationBinding<SpriteEntity>::entity(fastBoxId),
-            {.duration = 0.65f,
-             .speed = 2.0f,
-             .playback = AnimationPlayback::PingPong,
-             .easing = AnimationEasing::EaseOutCubic},
-            {.onUpdate = [](SpriteEntity& e, const AnimationContext& ctx) {
-                float s = 0.30f + 0.45f * ctx.easedProgress;
-                e.setScale(s, s, 1.0f);
-            }});
+        animations().schedule<SpriteEntity>(*this,
+                                            AnimationBinding<SpriteEntity>::entity(fastBoxId),
+                                            {.duration = 0.65f,
+                                             .speed = 2.0f,
+                                             .playback = AnimationPlayback::PingPong,
+                                             .easing = AnimationEasing::EaseOutCubic,
+                                             .customEasing = nullptr},
+                                            {.onStart = nullptr,
+                                             .onUpdate =
+                                                 [](SpriteEntity& e, const AnimationContext& ctx) {
+                                                     float s = 0.30f + 0.45f * ctx.easedProgress;
+                                                     e.setScale(s, s, 1.0f);
+                                                 },
+                                             .onComplete = nullptr});
     }
 
     std::shared_ptr<SpriteEntity> m_colorBox;
@@ -478,8 +502,9 @@ class AnimationDemoGame : public vde::Game {
     }
 
     [[nodiscard]] int getExitCode() const override {
-        if (m_exitCode != 0)
+        if (m_exitCode != 0) {
             return m_exitCode;
+        }
         return Game::getExitCode();
     }
 

@@ -1,0 +1,10 @@
+# Render verification: animation demo
+# Captures the startup layout and compares it against the committed golden.
+wait startup
+wait_frames 1
+
+screenshot render_verify_output/animation_demo.png
+wait 100
+compare render_verify_output/animation_demo.png ../../smoketests/golden/animation_demo.png 0.05
+
+exit

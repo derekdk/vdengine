@@ -120,6 +120,10 @@ constexpr AnimationId INVALID_ANIMATION_ID = 0;
 
 class Animator;
 
+struct AnimatorHandleControl {
+    Animator* animator = nullptr;
+};
+
 /**
  * @brief Lightweight handle to a single running animation.
  *
@@ -132,9 +136,9 @@ class AnimationHandle {
     AnimationHandle() = default;
 
     /**
-     * @brief Returns true if this handle refers to a known animation slot.
+     * @brief Returns true if this handle still refers to a live animation.
      */
-    bool isValid() const { return m_id != INVALID_ANIMATION_ID; }
+    bool isValid() const;
 
     /**
      * @brief Returns true if the animation is still running (not cancelled or complete).
@@ -171,10 +175,13 @@ class AnimationHandle {
   private:
     friend class Animator;
 
-    AnimationHandle(AnimationId id, Animator* animator) : m_id(id), m_animator(animator) {}
+    AnimationHandle(AnimationId id, std::weak_ptr<AnimatorHandleControl> handleControl)
+        : m_id(id), m_handleControl(std::move(handleControl)) {}
+
+    Animator* resolveAnimator() const;
 
     AnimationId m_id = INVALID_ANIMATION_ID;
-    Animator* m_animator = nullptr;
+    std::weak_ptr<AnimatorHandleControl> m_handleControl;
 };
 
 // ---------------------------------------------------------------------------
@@ -299,15 +306,15 @@ struct BoundAnimationCallbacks {
  */
 class Animator {
   public:
-    Animator() = default;
+    Animator();
     ~Animator() = default;
 
     // Non-copyable; each Scene owns exactly one Animator.
     Animator(const Animator&) = delete;
     Animator& operator=(const Animator&) = delete;
 
-    Animator(Animator&&) = default;
-    Animator& operator=(Animator&&) = default;
+    Animator(Animator&& other) noexcept;
+    Animator& operator=(Animator&& other) noexcept;
 
     // -----------------------------------------------------------------------
     // Scheduling — unbound (no target)
@@ -438,7 +445,7 @@ class Animator {
         AnimationId id = INVALID_ANIMATION_ID;
 
         // Playback state
-        float elapsed = 0.0f;       ///< Time elapsed since delay ended.
+        float elapsed = 0.0f;       ///< Total time elapsed since delay ended.
         float delayElapsed = 0.0f;  ///< Time consumed in the delay window.
         float progress = 0.0f;      ///< Linear [0, 1] progress.
         uint32_t cycleIndex = 0;
@@ -466,11 +473,14 @@ class Animator {
     float m_globalSpeed = 1.0f;
     bool m_ticking = false;
 
+    std::shared_ptr<AnimatorHandleControl> m_handleControl;
     std::vector<Job> m_jobs;
 
     AnimationId allocateId();
     Job* findJob(AnimationId id);
     const Job* findJob(AnimationId id) const;
+
+    void resetHandleControl();
 
     /// Build an AnimationContext snapshot from a job's current state.
     static AnimationContext makeContext(const Job& job, float deltaTime);
