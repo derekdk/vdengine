@@ -20,6 +20,46 @@ namespace vde::test {
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,bugprone-unchecked-optional-access)
 
+namespace {
+
+AnimationOptions makeOptions(float duration, float delay = 0.0f, float speed = 1.0f,
+                             AnimationPlayback playback = AnimationPlayback::Once,
+                             AnimationEasing easing = AnimationEasing::EaseOutCubic,
+                             bool startPaused = false) {
+    AnimationOptions options{};
+    options.duration = duration;
+    options.delay = delay;
+    options.speed = speed;
+    options.playback = playback;
+    options.easing = easing;
+    options.startPaused = startPaused;
+    return options;
+}
+
+AnimationCallbacks makeCallbacks(std::function<void(const AnimationContext&)> onStart = {},
+                                 std::function<void(const AnimationContext&)> onUpdate = {},
+                                 std::function<void(const AnimationContext&)> onComplete = {}) {
+    AnimationCallbacks callbacks{};
+    callbacks.onStart = onStart;
+    callbacks.onUpdate = onUpdate;
+    callbacks.onComplete = onComplete;
+    return callbacks;
+}
+
+template <typename T>
+BoundAnimationCallbacks<T>
+makeBoundCallbacks(std::function<void(T&, const AnimationContext&)> onStart = {},
+                   std::function<void(T&, const AnimationContext&)> onUpdate = {},
+                   std::function<void(T&, const AnimationContext&)> onComplete = {}) {
+    BoundAnimationCallbacks<T> callbacks{};
+    callbacks.onStart = onStart;
+    callbacks.onUpdate = onUpdate;
+    callbacks.onComplete = onComplete;
+    return callbacks;
+}
+
+}  // anonymous namespace
+
 // ============================================================================
 // Pure Animator tests — no Scene or GPU required
 // ============================================================================
@@ -37,10 +77,10 @@ TEST_F(AnimatorTest, Animator_SingleAnim_Completes) {
     float lastProgress = 0.0f;
     bool completionFired = false;
 
-    anim.schedule(
-        {.duration = 1.0f},
-        {.onUpdate = [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; },
-         .onComplete = [&](const AnimationContext&) { completionFired = true; }});
+    anim.schedule(makeOptions(1.0f),
+                  makeCallbacks(
+                      {}, [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; },
+                      [&](const AnimationContext&) { completionFired = true; }));
 
     anim.update(0.5f);
     EXPECT_NEAR(lastProgress, 0.5f, 1e-5f);
@@ -59,13 +99,13 @@ TEST_F(AnimatorTest, Animator_MultipleAnims_IndependentProgress) {
     float progressA = 0.0f;
     float progressB = 0.0f;
 
-    anim.schedule({.duration = 1.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(1.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
                       progressA = ctx.linearProgress;
-                  }});
+                  }));
 
-    anim.schedule({.duration = 2.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(2.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
                       progressB = ctx.linearProgress;
-                  }});
+                  }));
 
     anim.update(0.5f);
     EXPECT_NEAR(progressA, 0.5f, 1e-5f);
@@ -80,11 +120,11 @@ TEST_F(AnimatorTest, Animator_LoopMode_Wraps) {
     float lastProgress = 0.0f;
     uint32_t lastCycle = 0;
 
-    anim.schedule({.duration = 1.0f, .playback = AnimationPlayback::Loop},
-                  {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(1.0f, 0.0f, 1.0f, AnimationPlayback::Loop),
+                  makeCallbacks({}, [&](const AnimationContext& ctx) {
                       lastProgress = ctx.linearProgress;
                       lastCycle = ctx.cycleIndex;
-                  }});
+                  }));
 
     // After 1.0s — first cycle complete, progress wraps to near 0.
     anim.update(1.1f);
@@ -109,11 +149,11 @@ TEST_F(AnimatorTest, Animator_PingPongMode_Reverses) {
     float lastProgress = 0.0f;
     bool lastReverse = false;
 
-    anim.schedule({.duration = 1.0f, .playback = AnimationPlayback::PingPong},
-                  {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(1.0f, 0.0f, 1.0f, AnimationPlayback::PingPong),
+                  makeCallbacks({}, [&](const AnimationContext& ctx) {
                       lastProgress = ctx.linearProgress;
                       lastReverse = ctx.reversePass;
-                  }});
+                  }));
 
     // First half (0→0.5): forward pass.
     anim.update(0.5f);
@@ -134,9 +174,9 @@ TEST_F(AnimatorTest, Animator_PingPongMode_Reverses) {
 TEST_F(AnimatorTest, Animator_PauseResume) {
     float lastProgress = 0.0f;
 
-    auto handle = anim.schedule({.duration = 2.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
-                                    lastProgress = ctx.linearProgress;
-                                }});
+    auto handle = anim.schedule(
+        makeOptions(2.0f),
+        makeCallbacks({}, [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; }));
 
     anim.update(0.5f);
     float progressBeforePause = lastProgress;
@@ -159,10 +199,10 @@ TEST_F(AnimatorTest, Animator_SpeedScaling) {
     float lastProgress = 0.0f;
     bool completed = false;
 
-    anim.schedule(
-        {.duration = 1.0f, .speed = 2.0f},
-        {.onUpdate = [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; },
-         .onComplete = [&](const AnimationContext&) { completed = true; }});
+    anim.schedule(makeOptions(1.0f, 0.0f, 2.0f),
+                  makeCallbacks(
+                      {}, [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; },
+                      [&](const AnimationContext&) { completed = true; }));
 
     // With speed = 2, 0.5 wall-clock seconds = 1.0 effective seconds (full duration).
     anim.update(0.5f);
@@ -179,9 +219,9 @@ TEST_F(AnimatorTest, Animator_Delay_HoldsAtZero) {
     bool startFired = false;
 
     anim.schedule(
-        {.duration = 1.0f, .delay = 0.5f},
-        {.onStart = [&](const AnimationContext&) { startFired = true; },
-         .onUpdate = [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; }});
+        makeOptions(1.0f, 0.5f),
+        makeCallbacks([&](const AnimationContext&) { startFired = true; },
+                      [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; }));
 
     // During delay — no callbacks should fire.
     anim.update(0.3f);
@@ -201,8 +241,8 @@ TEST_F(AnimatorTest, Animator_Delay_HoldsAtZero) {
 TEST_F(AnimatorTest, Animator_OnStart_FiresOnce) {
     int startCount = 0;
 
-    anim.schedule({.duration = 1.0f}, {.onStart = [&](const AnimationContext&) { ++startCount; },
-                                       .onUpdate = [](const AnimationContext&) {}});
+    anim.schedule(makeOptions(1.0f), makeCallbacks([&](const AnimationContext&) { ++startCount; },
+                                                   [](const AnimationContext&) {}));
 
     anim.update(0.2f);
     anim.update(0.2f);
@@ -218,9 +258,10 @@ TEST_F(AnimatorTest, Animator_OnStart_FiresOnce) {
 
 TEST_F(AnimatorTest, Animator_Cancel_SuppressesCompletion) {
     bool completed = false;
-    auto handle = anim.schedule({.duration = 1.0f},
-                                {.onUpdate = [](const AnimationContext&) {},
-                                 .onComplete = [&](const AnimationContext&) { completed = true; }});
+    auto handle =
+        anim.schedule(makeOptions(1.0f), makeCallbacks(
+                                             {}, [](const AnimationContext&) {},
+                                             [&](const AnimationContext&) { completed = true; }));
 
     anim.update(0.5f);
     handle.cancel();
@@ -235,9 +276,9 @@ TEST_F(AnimatorTest, Animator_CancelInsideCallback_Safe) {
 
     // Cancel self from inside onUpdate — must not crash.
     try {
-        capturedHandle =
-            anim.schedule({.duration = 2.0f},
-                          {.onUpdate = [&](const AnimationContext&) { capturedHandle.cancel(); }});
+        capturedHandle = anim.schedule(
+            makeOptions(2.0f),
+            makeCallbacks({}, [&](const AnimationContext&) { capturedHandle.cancel(); }));
         anim.update(0.5f);
     } catch (...) {
         crashed = true;
@@ -251,8 +292,9 @@ TEST_F(AnimatorTest, Animator_CancelInsideCompletionTick_SuppressesCompletion) {
     bool completed = false;
 
     capturedHandle = anim.schedule(
-        {.duration = 0.5f}, {.onUpdate = [&](const AnimationContext&) { capturedHandle.cancel(); },
-                             .onComplete = [&](const AnimationContext&) { completed = true; }});
+        makeOptions(0.5f), makeCallbacks(
+                               {}, [&](const AnimationContext&) { capturedHandle.cancel(); },
+                               [&](const AnimationContext&) { completed = true; }));
 
     anim.update(0.5f);
 
@@ -268,9 +310,9 @@ TEST_F(AnimatorTest, Animator_GlobalSpeed) {
     float lastProgress = 0.0f;
 
     anim.setGlobalSpeed(2.0f);
-    anim.schedule({.duration = 1.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(1.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
                       lastProgress = ctx.linearProgress;
-                  }});
+                  }));
 
     // Global speed = 2 → 0.5 wall-clock seconds reaches progress 1.0.
     anim.update(0.5f);
@@ -284,10 +326,10 @@ TEST_F(AnimatorTest, Animator_GlobalSpeed) {
 TEST_F(AnimatorTest, Animator_CancelAll_NoCompletionCallbacks) {
     int completions = 0;
 
-    anim.schedule({.duration = 1.0f},
-                  {.onComplete = [&](const AnimationContext&) { ++completions; }});
-    anim.schedule({.duration = 2.0f},
-                  {.onComplete = [&](const AnimationContext&) { ++completions; }});
+    anim.schedule(makeOptions(1.0f),
+                  makeCallbacks({}, {}, [&](const AnimationContext&) { ++completions; }));
+    anim.schedule(makeOptions(2.0f),
+                  makeCallbacks({}, {}, [&](const AnimationContext&) { ++completions; }));
 
     anim.update(0.5f);
     anim.cancelAll();
@@ -316,10 +358,10 @@ TEST_F(AnimatorTest, Animator_BindingLifetime_StopsOnTargetDestroy) {
     // Use a resolver binding so we don't need a real entity.
     auto binding = AnimationBinding<FakeTarget>::resolver([&targetPtr]() { return targetPtr; });
 
-    auto handle = anim.schedule(
-        scene, binding, {.duration = 2.0f, .playback = AnimationPlayback::Loop},
-        BoundAnimationCallbacks<FakeTarget>{
-            .onUpdate = [](FakeTarget& t, const AnimationContext&) { t.updateCount++; }});
+    auto handle =
+        anim.schedule(scene, binding, makeOptions(2.0f, 0.0f, 1.0f, AnimationPlayback::Loop),
+                      makeBoundCallbacks<FakeTarget>(
+                          {}, [](FakeTarget& t, const AnimationContext&) { t.updateCount++; }));
 
     anim.update(0.3f);
     EXPECT_EQ(target.updateCount, 1);
@@ -349,8 +391,8 @@ TEST_F(AnimatorTest, Animator_SceneTeardown_CancelsAll) {
 
     {
         Animator local;
-        local.schedule({.duration = 1.0f},
-                       {.onComplete = [&](const AnimationContext&) { ++completions; }});
+        local.schedule(makeOptions(1.0f),
+                       makeCallbacks({}, {}, [&](const AnimationContext&) { ++completions; }));
         local.update(0.3f);
         // local goes out of scope — destructor should not fire onComplete.
     }
@@ -363,7 +405,8 @@ TEST_F(AnimatorTest, Animator_HandleExpiresAfterAnimatorDestroy) {
 
     {
         Animator local;
-        handle = local.schedule({.duration = 1.0f}, {.onUpdate = [](const AnimationContext&) {}});
+        handle =
+            local.schedule(makeOptions(1.0f), makeCallbacks({}, [](const AnimationContext&) {}));
         EXPECT_TRUE(handle.isValid());
         EXPECT_TRUE(handle.isActive());
     }
@@ -381,8 +424,8 @@ TEST_F(AnimatorTest, Animator_HandleFollowsMoveAssignment) {
     int updates = 0;
 
     Animator source;
-    handle = source.schedule({.duration = 1.0f},
-                             {.onUpdate = [&](const AnimationContext&) { ++updates; }});
+    handle = source.schedule(makeOptions(1.0f),
+                             makeCallbacks({}, [&](const AnimationContext&) { ++updates; }));
 
     Animator destination;
     destination = std::move(source);
@@ -417,13 +460,13 @@ TEST_F(AnimatorTest, Animator_MultiScene_Independent) {
     float progressA = 0.0f;
     float progressB = 0.0f;
 
-    animA.schedule({.duration = 1.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
+    animA.schedule(makeOptions(1.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
                        progressA = ctx.linearProgress;
-                   }});
+                   }));
 
-    animB.schedule({.duration = 2.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
+    animB.schedule(makeOptions(2.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
                        progressB = ctx.linearProgress;
-                   }});
+                   }));
 
     animA.update(0.5f);
     EXPECT_NEAR(progressA, 0.5f, 1e-5f);
@@ -441,9 +484,9 @@ TEST_F(AnimatorTest, Animator_MultiScene_Independent) {
 TEST_F(AnimatorTest, Animator_TransitionSourceFreeze) {
     float lastProgress = 0.0f;
 
-    anim.schedule({.duration = 2.0f}, {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(2.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
                       lastProgress = ctx.linearProgress;
-                  }});
+                  }));
 
     anim.update(0.5f);
     float frozen = lastProgress;
@@ -466,8 +509,8 @@ TEST_F(AnimatorTest, Animator_StartPaused_DoesNotAdvance) {
     float lastProgress = 0.0f;
 
     anim.schedule(
-        {.duration = 1.0f, .startPaused = true},
-        {.onUpdate = [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; }});
+        makeOptions(1.0f, 0.0f, 1.0f, AnimationPlayback::Once, AnimationEasing::EaseOutCubic, true),
+        makeCallbacks({}, [&](const AnimationContext& ctx) { lastProgress = ctx.linearProgress; }));
 
     anim.update(0.5f);
     EXPECT_FLOAT_EQ(lastProgress, 0.0f);
@@ -481,11 +524,11 @@ TEST_F(AnimatorTest, Animator_LinearEasing_MatchesProgress) {
     float linear = 0.0f;
     float eased = 0.0f;
 
-    anim.schedule({.duration = 1.0f, .easing = AnimationEasing::Linear},
-                  {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(1.0f, 0.0f, 1.0f, AnimationPlayback::Once, AnimationEasing::Linear),
+                  makeCallbacks({}, [&](const AnimationContext& ctx) {
                       linear = ctx.linearProgress;
                       eased = ctx.easedProgress;
-                  }});
+                  }));
 
     anim.update(0.5f);
     EXPECT_NEAR(linear, 0.5f, 1e-5f);
@@ -496,11 +539,11 @@ TEST_F(AnimatorTest, Animator_LoopElapsed_RemainsMonotonic) {
     float lastElapsed = 0.0f;
     uint32_t lastCycle = 0;
 
-    anim.schedule({.duration = 1.0f, .playback = AnimationPlayback::Loop},
-                  {.onUpdate = [&](const AnimationContext& ctx) {
+    anim.schedule(makeOptions(1.0f, 0.0f, 1.0f, AnimationPlayback::Loop),
+                  makeCallbacks({}, [&](const AnimationContext& ctx) {
                       lastElapsed = ctx.elapsed;
                       lastCycle = ctx.cycleIndex;
-                  }});
+                  }));
 
     anim.update(1.1f);
     EXPECT_NEAR(lastElapsed, 1.1f, 1e-5f);
@@ -523,7 +566,7 @@ class AnimOrderTestScene : public Scene {
     std::vector<std::string>* log = nullptr;
     std::string tag;
 
-    AnimOrderTestScene(std::string t, std::vector<std::string>* l) : tag(std::move(t)), log(l) {
+    AnimOrderTestScene(std::string t, std::vector<std::string>* l) : log(l), tag(std::move(t)) {
         enablePhaseCallbacks();
     }
 
