@@ -72,6 +72,8 @@ set(VDE_TEST_SOURCES
     # Phase 2 animation engine tests
     PlaybackClock_test.cpp
     TimedEvents_test.cpp
+    # Phase 3 animation engine tests
+    Animator_test.cpp
     # Text rendering tests
     TextRenderer_test.cpp
     TrueTypeFont_test.cpp

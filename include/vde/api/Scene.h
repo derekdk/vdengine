@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Animator.h"
 #include "AudioEvent.h"
 #include "CameraBounds.h"
 #include "Entity.h"
@@ -206,6 +207,30 @@ class Scene {
      */
     TimedEvents& getTimedEvents() { return m_timedEvents; }
     const TimedEvents& getTimedEvents() const { return m_timedEvents; }
+
+    // Animation service
+
+    /**
+     * @brief Get the scene-owned animation service.
+     *
+     * Use this to schedule value animations, entity tweens, and other
+     * time-driven visual changes.  Animations are ticked automatically
+     * in the Visual scheduler phase after updateVisuals() and cancelled
+     * automatically when the scene is destroyed.
+     *
+     * @example
+     * @code
+     * // Slide a cube from y=0 to y=3 over 1 second:
+     * animations().tween(
+     *     *this,
+     *     AnimationBinding<MeshEntity>::entity(cubeId),
+     *     Position{0, 0, 0}, Position{0, 3, 0},
+     *     { .duration = 1.0f, .easing = AnimationEasing::EaseOutCubic },
+     *     [](MeshEntity& e, const Position& p) { e.setPosition(p.x, p.y, p.z); });
+     * @endcode
+     */
+    Animator& animations() { return m_animator; }
+    const Animator& animations() const { return m_animator; }
 
     // Audio event queue
 
@@ -708,6 +733,9 @@ class Scene {
     // Timed events service (ticked in the Timed scheduler phase)
     TimedEvents m_timedEvents;
 
+    // Animation service (ticked in the Visual scheduler phase after updateVisuals)
+    Animator m_animator;
+
     // Deferred command queue (flushed at the start of update / updateGameLogic)
     std::vector<std::function<void()>> m_deferredCommands;
 
@@ -816,3 +844,9 @@ std::vector<std::shared_ptr<T>> Scene::getEntitiesOfType() {
 }
 
 }  // namespace vde
+
+// AnimatorImpl.h must be included after Scene is fully defined because its
+// template bodies call Scene::getEntity(). Placed outside namespace vde so that
+// AnimatorImpl.h's own namespace vde block does not create a nested vde::vde.
+// cppcheck-suppress preprocessorErrorDirective
+#include "AnimatorImpl.h"
