@@ -221,7 +221,7 @@ class AnimationBinding {
     static AnimationBinding<T> weak(std::weak_ptr<T> obj) {
         AnimationBinding<T> b;
         b.m_kind = AnimationBindingKind::Weak;
-        b.m_weak = std::make_shared<std::weak_ptr<T>>(std::move(obj));
+        b.m_weak = std::move(obj);
         return b;
     }
 
@@ -253,9 +253,9 @@ class AnimationBinding {
      * Returns an empty shared_ptr for Entity, Resolver, and None bindings.
      */
     std::shared_ptr<T> lockWeak() const {
-        if (m_kind != AnimationBindingKind::Weak || !m_weak)
+        if (m_kind != AnimationBindingKind::Weak)
             return {};
-        return m_weak->lock();
+        return m_weak.lock();
     }
 
     AnimationBindingKind kind() const { return m_kind; }
@@ -263,7 +263,7 @@ class AnimationBinding {
   private:
     AnimationBindingKind m_kind = AnimationBindingKind::None;
     EntityId m_entityId = INVALID_ENTITY_ID;
-    std::shared_ptr<std::weak_ptr<T>> m_weak;  // shared so the binding is copyable
+    std::weak_ptr<T> m_weak;
     std::function<T*()> m_resolver;
 };
 

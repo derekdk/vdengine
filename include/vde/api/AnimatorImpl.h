@@ -27,9 +27,7 @@ T* AnimationBinding<T>::resolve(Scene& scene) const {
         return dynamic_cast<T*>(e);
     }
     case AnimationBindingKind::Weak: {
-        if (!m_weak)
-            return nullptr;
-        auto locked = m_weak->lock();
+        auto locked = m_weak.lock();
         return locked ? locked.get() : nullptr;
     }
     case AnimationBindingKind::Resolver:
