@@ -302,7 +302,8 @@ bool Animator::tickJob(Job& job, float dt) {
         job.delayElapsed = job.delay;
     }
 
-    // Apply speed multipliers only to active playback (delay is wall-clock).
+    // Apply speed multipliers only to active playback (delay is wall-clock)
+    // so staggered/queued starts stay predictable regardless of speed changes.
     float playbackDt = dt * m_globalSpeed * job.speed;
 
     // Fire onStart once.

@@ -16,7 +16,6 @@
 
 #include <gtest/gtest.h>
 
-#include <chrono>
 #include <thread>
 
 namespace vde::test {
@@ -511,7 +510,9 @@ TEST_F(AnimatorTest, Animator_TransitionSourceFreeze) {
 
     // "Stopping scene updates" = no longer calling update().
     // Progress/callbacks must not advance without explicit ticks.
-    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    for (int i = 0; i < 1000; ++i) {
+        std::this_thread::yield();
+    }
     EXPECT_FLOAT_EQ(lastProgress, frozen);
     EXPECT_EQ(updateCount, updatesBeforeWait);
     EXPECT_NEAR(lastProgress, 0.25f, 1e-5f);
