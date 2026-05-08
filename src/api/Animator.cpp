@@ -290,9 +290,6 @@ bool Animator::tickJob(Job& job, float dt) {
         return false;
     }
 
-    // Apply per-job speed multiplier.
-    dt *= job.speed;
-
     // Consume the initial delay window.
     if (!job.delayDone) {
         job.delayElapsed += dt;
@@ -305,18 +302,21 @@ bool Animator::tickJob(Job& job, float dt) {
         job.delayElapsed = job.delay;
     }
 
+    // Apply speed multipliers only to active playback (delay is wall-clock).
+    float playbackDt = dt * m_globalSpeed * job.speed;
+
     // Fire onStart once.
     if (!job.started) {
         job.started = true;
         if (job.onStart) {
-            job.onStart(makeContext(job, dt));
+            job.onStart(makeContext(job, playbackDt));
             if (!job.active) {
                 return false;
             }
         }
     }
 
-    job.elapsed += dt;
+    job.elapsed += playbackDt;
 
     // Compute progress based on loop mode.
     bool completed = false;
@@ -343,7 +343,7 @@ bool Animator::tickJob(Job& job, float dt) {
 
     // Fire onUpdate.
     if (job.onUpdate) {
-        job.onUpdate(makeContext(job, dt));
+        job.onUpdate(makeContext(job, playbackDt));
         if (!job.active) {
             return false;
         }
@@ -353,7 +353,7 @@ bool Animator::tickJob(Job& job, float dt) {
     if (completed) {
         job.active = false;
         if (job.onComplete) {
-            job.onComplete(makeContext(job, dt));
+            job.onComplete(makeContext(job, playbackDt));
         }
         return true;
     }
@@ -370,15 +370,13 @@ void Animator::update(float deltaTime) {
         return;
     }
 
-    float dt = deltaTime * m_globalSpeed;
-
     m_ticking = true;
 
     // Iterate by index so that animations scheduled from inside callbacks
     // (appended to m_jobs) are not visited this tick.
     size_t count = m_jobs.size();
     for (size_t i = 0; i < count; ++i) {
-        tickJob(m_jobs.at(i), dt);
+        tickJob(m_jobs.at(i), deltaTime);
     }
 
     m_ticking = false;

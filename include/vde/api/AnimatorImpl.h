@@ -49,7 +49,7 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
                                    const AnimationOptions& options,
                                    BoundAnimationCallbacks<T> callbacks) {
     // Wrap bound callbacks into unbound ones that resolve the target each frame.
-    // Cancellation on missing target: if resolution fails, the callback is simply skipped.
+    // Cancellation on missing target: if resolution fails, the animation is cancelled.
     // For Weak bindings, the shared_ptr lock is held for the entire callback invocation
     // so that the target cannot be destroyed mid-callback even if the last external
     // owner releases the shared_ptr during the callback.

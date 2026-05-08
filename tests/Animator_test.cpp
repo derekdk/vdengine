@@ -16,6 +16,9 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <thread>
+
 namespace vde::test {
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,bugprone-unchecked-optional-access)
@@ -234,6 +237,29 @@ TEST_F(AnimatorTest, Animator_Delay_HoldsAtZero) {
     EXPECT_GE(lastProgress, 0.0f);
 }
 
+TEST_F(AnimatorTest, Animator_Delay_IsWallClock_NotSpeedScaled) {
+    bool startFired = false;
+    int updateCount = 0;
+
+    anim.setGlobalSpeed(3.0f);
+    anim.schedule(makeOptions(1.0f, 0.5f, 2.0f),
+                  makeCallbacks([&](const AnimationContext&) { startFired = true; },
+                                [&](const AnimationContext&) { ++updateCount; }));
+
+    // Delay should use wall-clock time, unaffected by global/per-animation speed.
+    anim.update(0.25f);
+    EXPECT_FALSE(startFired);
+    EXPECT_EQ(updateCount, 0);
+
+    anim.update(0.24f);
+    EXPECT_FALSE(startFired);
+    EXPECT_EQ(updateCount, 0);
+
+    anim.update(0.01f);
+    EXPECT_TRUE(startFired);
+    EXPECT_GE(updateCount, 1);
+}
+
 // ---------------------------------------------------------------------------
 // onStart fires exactly once
 // ---------------------------------------------------------------------------
@@ -272,19 +298,14 @@ TEST_F(AnimatorTest, Animator_Cancel_SuppressesCompletion) {
 
 TEST_F(AnimatorTest, Animator_CancelInsideCallback_Safe) {
     AnimationHandle capturedHandle;
-    bool crashed = false;
 
     // Cancel self from inside onUpdate — must not crash.
-    try {
+    EXPECT_NO_THROW({
         capturedHandle = anim.schedule(
             makeOptions(2.0f),
             makeCallbacks({}, [&](const AnimationContext&) { capturedHandle.cancel(); }));
         anim.update(0.5f);
-    } catch (...) {
-        crashed = true;
-    }
-
-    EXPECT_FALSE(crashed);
+    });
 }
 
 TEST_F(AnimatorTest, Animator_CancelInsideCompletionTick_SuppressesCompletion) {
@@ -370,13 +391,7 @@ TEST_F(AnimatorTest, Animator_BindingLifetime_StopsOnTargetDestroy) {
     targetPtr = nullptr;
 
     // Missing targets cancel the animation instead of leaving a silent zombie job.
-    bool crashed = false;
-    try {
-        anim.update(0.3f);
-    } catch (...) {
-        crashed = true;
-    }
-    EXPECT_FALSE(crashed);
+    EXPECT_NO_THROW({ anim.update(0.3f); });
     EXPECT_EQ(target.updateCount, 1);  // not called again
     EXPECT_EQ(anim.activeCount(), 0u);
     EXPECT_FALSE(handle.isActive());
@@ -483,21 +498,22 @@ TEST_F(AnimatorTest, Animator_MultiScene_Independent) {
 
 TEST_F(AnimatorTest, Animator_TransitionSourceFreeze) {
     float lastProgress = 0.0f;
+    int updateCount = 0;
 
     anim.schedule(makeOptions(2.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
-                      lastProgress = ctx.linearProgress;
-                  }));
+                       lastProgress = ctx.linearProgress;
+                       ++updateCount;
+                   }));
 
     anim.update(0.5f);
     float frozen = lastProgress;
+    int updatesBeforeWait = updateCount;
 
     // "Stopping scene updates" = no longer calling update().
-    // Progress must not advance without explicit ticks.
+    // Progress/callbacks must not advance without explicit ticks.
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
     EXPECT_FLOAT_EQ(lastProgress, frozen);
-    EXPECT_FLOAT_EQ(lastProgress, frozen);  // sanity
-
-    // The test verifies there is no background thread or self-advancing timer.
-    // After a moment without calls, progress is still frozen.
+    EXPECT_EQ(updateCount, updatesBeforeWait);
     EXPECT_NEAR(lastProgress, 0.25f, 1e-5f);
 }
 

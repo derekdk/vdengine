@@ -16,7 +16,7 @@
  *
  * Self-validation:
  *   Scene A verifies the position tween completed at least one round trip and
- *   the ping-pong scale animation completed at least one full cycle.
+ *   the ping-pong scale animation completed at least one full cycle (0→1→0).
  *   Scene B verifies the looping animation has completed at least two cycles.
  *   All scenes must pass within the auto-terminate window for exit code 0.
  *   Exit code 1 means one or more checks failed.
@@ -77,8 +77,8 @@ class SceneA : public vde::examples::BaseExampleScene {
 
     [[nodiscard]] bool didValidationPass() const {
         // Position tween must have completed at least one round trip.
-        // Ping-pong scale must have advanced (cycleIndex > 0).
-        return m_positionRoundTrips >= 1 && m_pingPongCycles >= 1;
+        // Ping-pong "full cycle" means forward + reverse pass (cycleIndex >= 2).
+        return m_positionRoundTrips >= 1 && m_pingPongCycles >= 2;
     }
 
     void onEnter() override {
