@@ -14,9 +14,9 @@
 #include <vde/api/SceneGroup.h>
 #include <vde/api/Scheduler.h>
 
-#include <gtest/gtest.h>
-
 #include <thread>
+
+#include <gtest/gtest.h>
 
 namespace vde::test {
 
@@ -500,9 +500,9 @@ TEST_F(AnimatorTest, Animator_TransitionSourceFreeze) {
     int updateCount = 0;
 
     anim.schedule(makeOptions(2.0f), makeCallbacks({}, [&](const AnimationContext& ctx) {
-                       lastProgress = ctx.linearProgress;
-                       ++updateCount;
-                   }));
+                      lastProgress = ctx.linearProgress;
+                      ++updateCount;
+                  }));
 
     anim.update(0.5f);
     float frozen = lastProgress;
