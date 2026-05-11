@@ -1,0 +1,9 @@
+[smoke]
+scripts = ["smoke_animation_demo.vdescript"]
+
+[render_verify]
+scripts = ["verify_animation_demo.vdescript"]
+capture_script = "capture_animation_demo.vdescript"
+priority = 2
+golden = "animation_demo.png"
+threshold = 0.05

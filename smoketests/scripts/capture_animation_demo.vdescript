@@ -1,0 +1,10 @@
+# Golden image capture: animation demo
+# Captures the startup layout before the animated entities drift far enough to
+# make the comparison frame-dependent.
+wait startup
+wait_frames 1
+
+screenshot render_verify_output/animation_demo.png
+wait 100
+
+exit

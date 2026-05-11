@@ -196,6 +196,7 @@ set(VDE_SOURCES
     src/api/PhysicsEntity.cpp
     src/api/ThreadPool.cpp
     src/api/TimedEvents.cpp
+    src/api/Animator.cpp
     # Transitions
     src/api/Transition.cpp
     src/api/FadeTransition.cpp
@@ -246,6 +247,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/QueueFamilyIndices.h
     include/vde/SwapChainSupportDetails.h
     include/vde/PlaybackClock.h
+    include/vde/Easing.h
+    include/vde/Tween.h
     # Game API headers
     include/vde/api/GameAPI.h
     include/vde/api/Game.h
@@ -271,6 +274,9 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/PhysicsEntity.h
     include/vde/api/ThreadPool.h
     include/vde/api/TimedEvents.h
+    # Animator
+    include/vde/api/Animator.h
+    include/vde/api/AnimatorImpl.h
     # Transition headers
     include/vde/api/Transition.h
     include/vde/api/FadeTransition.h

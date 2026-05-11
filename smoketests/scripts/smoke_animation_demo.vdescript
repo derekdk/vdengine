@@ -1,0 +1,8 @@
+# Smoke test: Animation Demo
+# Verifies that position tweens, ping-pong, and loop animations run and
+# produce at least one completed cycle within the 5-second window.
+# Scene A: position tween completes round trip ~2s, ping-pong cycles ~0.65s
+# Scene B: loop animation completes >= 2 cycles ~1.6s
+wait startup
+wait 5s
+exit

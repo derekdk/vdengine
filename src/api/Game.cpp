@@ -2647,7 +2647,16 @@ void Game::rebuildSchedulerGraph() {
                                      .work = [this, scene]() { scene->updateVisuals(m_deltaTime); },
                                      .dependsOn = {timedTask},
                                      .mainThreadOnly = true});
-            finalVisualTasks.push_back(visualsTask);
+
+            // Animations — Visual phase, immediately after updateVisuals().
+            // Main-thread-only: animation callbacks may mutate entity state.
+            TaskId animationsTask = m_scheduler.addTask(
+                {.name = "scene.animations." + sceneName,
+                 .phase = TaskPhase::Visual,
+                 .work = [this, scene]() { scene->animations().update(m_deltaTime); },
+                 .dependsOn = {visualsTask},
+                 .mainThreadOnly = true});
+            finalVisualTasks.push_back(animationsTask);
         } else {
             // --- Legacy mode: single update task ---
             // update() covers logic + audio + visuals in one call.
@@ -2667,9 +2676,18 @@ void Game::rebuildSchedulerGraph() {
                  .dependsOn = {updateTask},
                  .mainThreadOnly = true});
 
-            // Timed task acts as both the audio barrier and the final visual write.
+            // Animations — Visual phase, after timed events (legacy: after update+timed).
+            // Main-thread-only: animation callbacks may mutate entity state.
+            TaskId animationsTask = m_scheduler.addTask(
+                {.name = "scene.animations." + sceneName,
+                 .phase = TaskPhase::Visual,
+                 .work = [this, scene]() { scene->animations().update(m_deltaTime); },
+                 .dependsOn = {timedTask},
+                 .mainThreadOnly = true});
+
+            // Audio barrier: legacy update task + timed task covers audio timing.
             audioBarrierTasks.push_back(timedTask);
-            finalVisualTasks.push_back(timedTask);
+            finalVisualTasks.push_back(animationsTask);
         }
     }
 
