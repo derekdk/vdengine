@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_pac_man.vdescript"]
+priority = 2
+sections = ["entity,input,text"]

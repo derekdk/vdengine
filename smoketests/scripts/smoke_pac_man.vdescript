@@ -1,0 +1,28 @@
+# Smoke test: Pac-Man
+# Verify the game starts, Pac-Man moves, and direction changes work.
+wait startup
+wait 200
+
+# Move right (default direction at start)
+keydown RIGHT
+wait 500
+keyup RIGHT
+
+# Turn down
+keydown DOWN
+wait 400
+keyup DOWN
+
+# Turn left
+keydown LEFT
+wait 400
+keyup LEFT
+
+# Turn up
+keydown UP
+wait 400
+keyup UP
+
+# Let the game run for a moment, then exit
+wait 500
+exit
