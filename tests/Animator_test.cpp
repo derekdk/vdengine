@@ -681,6 +681,66 @@ TEST_F(AnimatorSchedulerTest, Animator_AnimationsTask_IsMainThreadOnly) {
     EXPECT_TRUE(desc->mainThreadOnly) << "scene.animations must be main-thread-only";
 }
 
+// ---------------------------------------------------------------------------
+// Phase 4 — Callback order same frame and weak-object binding
+// ---------------------------------------------------------------------------
+
+TEST_F(AnimatorTest, Animator_CallbackOrder_SameFrame) {
+    // Multiple animations completing in the same update() tick must fire their
+    // onComplete callbacks in the order they were registered.
+    std::vector<int> order;
+
+    anim.schedule(makeOptions(0.5f),
+                  makeCallbacks({}, {}, [&](const AnimationContext&) { order.push_back(1); }));
+    anim.schedule(makeOptions(0.5f),
+                  makeCallbacks({}, {}, [&](const AnimationContext&) { order.push_back(2); }));
+    anim.schedule(makeOptions(0.5f),
+                  makeCallbacks({}, {}, [&](const AnimationContext&) { order.push_back(3); }));
+
+    // All three complete in the same tick.
+    anim.update(0.5f);
+
+    ASSERT_EQ(order.size(), 3u);
+    EXPECT_EQ(order[0], 1);
+    EXPECT_EQ(order[1], 2);
+    EXPECT_EQ(order[2], 3);
+}
+
+TEST_F(AnimatorTest, Animator_WeakObjectBinding_DropsCleanly) {
+    // When the weak_ptr target is destroyed before the animation completes, the
+    // animation must be cancelled silently — no onComplete callback must fire.
+    struct FakeTarget {
+        int updateCount = 0;
+    };
+
+    bool completeFired = false;
+    auto target = std::make_shared<FakeTarget>();
+
+    Scene scene;
+
+    auto binding = AnimationBinding<FakeTarget>::weak(std::weak_ptr<FakeTarget>(target));
+
+    anim.schedule<FakeTarget>(scene, binding, makeOptions(2.0f),
+                              makeBoundCallbacks<FakeTarget>(
+                                  {},
+                                  [](FakeTarget& t, const AnimationContext&) { t.updateCount++; },
+                                  [&completeFired](FakeTarget&, const AnimationContext&) {
+                                      completeFired = true;
+                                  }));
+
+    // First tick — target alive, update should run.
+    anim.update(0.3f);
+    EXPECT_EQ(target->updateCount, 1);
+
+    // Destroy the shared_ptr — weak_ptr now expired.
+    target.reset();
+
+    // Subsequent tick must cancel the animation without calling onComplete.
+    EXPECT_NO_THROW({ anim.update(2.0f); });
+    EXPECT_FALSE(completeFired);
+    EXPECT_EQ(anim.activeCount(), 0u);
+}
+
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,bugprone-unchecked-optional-access)
 
 }  // namespace vde::test

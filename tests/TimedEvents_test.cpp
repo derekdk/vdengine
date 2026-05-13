@@ -293,4 +293,51 @@ TEST_F(TimedEventsTest, MultipleEventsFireInOrder) {
     EXPECT_EQ(order.at(2), 3);
 }
 
+// ---------------------------------------------------------------------------
+// Phase 4 — Pause/resume elapsed preservation and interleaved multi-scene
+// ---------------------------------------------------------------------------
+
+TEST_F(TimedEventsTest, TimedEvent_PauseResume_PreservesElapsed) {
+    // Elapsed time must accumulate only while running; paused intervals are excluded.
+    bool fired = false;
+    te.after(1.0f, [&fired]() { fired = true; });
+
+    te.tick(0.4f);   // elapsed = 0.4 s
+    EXPECT_FALSE(fired);
+
+    te.pause();
+    te.tick(0.4f);   // paused — elapsed stays at 0.4 s
+    EXPECT_FALSE(fired);
+
+    te.resume();
+    te.tick(0.4f);   // elapsed = 0.8 s — still below threshold
+    EXPECT_FALSE(fired);
+
+    te.tick(0.2f);   // elapsed = 1.0 s — fires exactly at deadline
+    EXPECT_TRUE(fired);
+}
+
+TEST_F(TimedEventsTest, TimedEvent_MultiScene_Interleaved) {
+    // Two independent TimedEvents ticked in alternating turns must produce independent
+    // results, unaffected by each other's tick sequence.
+    TimedEvents sceneA;
+    TimedEvents sceneB;
+
+    int countA = 0;
+    int countB = 0;
+
+    // A fires every 0.25 s; B fires every 0.5 s.
+    sceneA.every(0.25f, [&countA]() { ++countA; });
+    sceneB.every(0.5f, [&countB]() { ++countB; });
+
+    // Interleave ticks: A, B, A, B — each tick advances 0.25 s.
+    sceneA.tick(0.25f);  // A elapsed=0.25 → fires (1); B not ticked yet
+    sceneB.tick(0.25f);  // B elapsed=0.25
+    sceneA.tick(0.25f);  // A elapsed=0.50 → fires (2)
+    sceneB.tick(0.25f);  // B elapsed=0.50 → fires (1)
+
+    EXPECT_EQ(countA, 2);
+    EXPECT_EQ(countB, 1);
+}
+
 }  // namespace vde::test

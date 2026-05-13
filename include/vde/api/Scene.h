@@ -135,7 +135,7 @@ class Scene {
      * three separate tasks:
      *   1. updateGameLogic(dt) — GameLogic phase
      *   2. updateAudio(dt)     — Audio phase
-     *   3. updateVisuals(dt)   — PreRender phase (visual-only updates)
+     *   3. updateVisuals(dt)   — Visual phase (visual-only updates)
      *
      * When disabled (the default), the single `update(dt)` task is
      * used instead, preserving backwards compatibility.
@@ -177,7 +177,7 @@ class Scene {
     /**
      * @brief Visual update (phase callback).
      *
-     * Called during a late GameLogic / early PreRender slot when
+     * Called during the Visual scheduler phase (after PostPhysics and timed events) when
      * phase callbacks are enabled.  Use this for animation ticks,
      * particle systems, or anything that only affects visuals.
      *

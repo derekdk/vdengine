@@ -592,5 +592,71 @@ TEST_F(GameSchedulerTest, MainThreadOnly_SceneCallbacks) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Phase 4 — Transition destination and worker-mode hardening
+// ---------------------------------------------------------------------------
+
+TEST_F(GameSchedulerTest, TransitionFrame_DestinationSceneIndependent) {
+    // During a transition the scheduler activates both the source and destination scenes
+    // simultaneously alongside any other active scenes.  The destination scene's tasks must
+    // not acquire a false dependency on unrelated scene tasks — each scene's graph remains
+    // independent regardless of how many scenes are simultaneously active.
+    //
+    // Simulated by making all three scenes active at once (the same scheduler path that
+    // executes during a real transition frame).
+    game.addScene("source", std::make_unique<PhaseCallbackTestScene>());
+    game.addScene("unrelated", std::make_unique<PhaseCallbackTestScene>());
+    game.addScene("dest", std::make_unique<PhaseCallbackTestScene>());
+
+    SceneGroup group;
+    group.sceneNames = {"source", "unrelated", "dest"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    TaskId logicDest = sched.findTaskByName("scene.gameLogic.dest");
+    TaskId logicUnrelated = sched.findTaskByName("scene.gameLogic.unrelated");
+
+    ASSERT_NE(logicDest, INVALID_TASK_ID);
+    ASSERT_NE(logicUnrelated, INVALID_TASK_ID);
+
+    auto descDest = sched.getTaskDescriptor(logicDest);
+    ASSERT_TRUE(descDest.has_value());
+
+    EXPECT_EQ(std::find(descDest->dependsOn.begin(), descDest->dependsOn.end(), logicUnrelated),
+              descDest->dependsOn.end())
+        << "scene.gameLogic.dest must not depend on scene.gameLogic.unrelated";
+}
+
+TEST_F(GameSchedulerTest, WorkerMode_NoSceneCallbackOffMainThread) {
+    // When the scheduler runs with worker threads enabled, scene callbacks must still be
+    // registered as main-thread-only so that the scheduler never dispatches them to a worker.
+    game.getScheduler().setWorkerThreadCount(4);
+
+    game.addScene("worker_scene", std::make_unique<PhaseCallbackTestScene>());
+
+    SceneGroup group;
+    group.sceneNames = {"worker_scene"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    const std::vector<std::string> requiredMainThread = {
+        "scene.gameLogic.worker_scene",
+        "scene.audio.worker_scene",
+        "scene.visuals.worker_scene",
+        "scene.timed.worker_scene",
+    };
+
+    for (const auto& name : requiredMainThread) {
+        TaskId id = sched.findTaskByName(name);
+        ASSERT_NE(id, INVALID_TASK_ID) << "Task not found: " << name;
+        auto desc = sched.getTaskDescriptor(id);
+        ASSERT_TRUE(desc.has_value());
+        EXPECT_TRUE(desc->mainThreadOnly)
+            << "Task must be main-thread-only even with workers active: " << name;
+    }
+}
+
 }  // namespace vde::test
 // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,bugprone-unchecked-optional-access)

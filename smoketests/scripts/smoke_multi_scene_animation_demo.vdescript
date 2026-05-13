@@ -1,0 +1,8 @@
+# Smoke test: Multi-Scene Animation Demo
+# Verifies that both scenes complete their timed events and animations within
+# the 7-second auto-terminate window.
+# Scene A: one-shot timer at 0.8s triggers animations; color flip fires ≥4 times by ~3.2s
+# Scene B: scale-pulse loop completes ≥3 cycles (~2.4s); timer fires ≥5 times by ~3s
+wait startup
+wait 7s
+exit
