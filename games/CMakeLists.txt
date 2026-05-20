@@ -42,3 +42,5 @@ endfunction()
 
 add_subdirectory(fishing_game)
 add_subdirectory(pong)
+
+add_subdirectory(pac_man)
