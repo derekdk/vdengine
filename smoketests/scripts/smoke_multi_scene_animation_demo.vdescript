@@ -1,0 +1,10 @@
+# Smoke test: Multi-Scene Animation Demo
+# Validates that Scene A (timed event -> animation round trips) and
+# Scene B (repeating timer + independent loop animation) both reach
+# their milestones within the 5-second window.
+# Scene A needs >= 2 round trips (~3.6 s at 0.8 s/leg + 1 s start delay).
+# Scene B needs >= 4 timer fires (~2.0 s at 0.5 s interval)
+#          and >= 2 animation cycles (~1.2 s at 0.6 s/cycle).
+wait startup
+wait 5s
+exit

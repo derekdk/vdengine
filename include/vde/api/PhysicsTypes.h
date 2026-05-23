@@ -15,6 +15,7 @@
 #include <limits>
 #include <optional>
 
+// cppcheck-suppress syntaxError
 namespace vde {
 
 // ============================================================================

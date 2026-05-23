@@ -268,6 +268,36 @@ TEST_F(TimedEventsTest, MultiScene_CancelOneDoesNotAffectOther) {
     EXPECT_TRUE(firedB);
 }
 
+TEST_F(TimedEventsTest, TimedEvent_MultiScene_Interleaved) {
+    // Interleaved ticks of two independent TimedEvents instances must each track
+    // their own elapsed time without cross-contamination.
+    TimedEvents sceneA;
+    TimedEvents sceneB;
+
+    int countA = 0;
+    int countB = 0;
+
+    // A fires after 0.5 s, B fires after 0.7 s.
+    sceneA.after(0.5f, [&countA]() { ++countA; });
+    sceneB.after(0.7f, [&countB]() { ++countB; });
+
+    sceneA.tick(0.3f);  // A elapsed = 0.3 — not yet
+    EXPECT_EQ(countA, 0);
+    EXPECT_EQ(countB, 0);
+
+    sceneB.tick(0.3f);  // B elapsed = 0.3 — not yet
+    EXPECT_EQ(countA, 0);
+    EXPECT_EQ(countB, 0);
+
+    sceneA.tick(0.3f);  // A elapsed = 0.6 — fires (0.6 >= 0.5)
+    EXPECT_EQ(countA, 1);
+    EXPECT_EQ(countB, 0);  // B's count unchanged by A's tick
+
+    sceneB.tick(0.5f);     // B elapsed = 0.8 — fires (0.8 >= 0.7)
+    EXPECT_EQ(countA, 1);  // A's count unchanged by B's tick
+    EXPECT_EQ(countB, 1);
+}
+
 // ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------

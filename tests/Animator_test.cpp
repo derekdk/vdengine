@@ -42,9 +42,9 @@ AnimationCallbacks makeCallbacks(std::function<void(const AnimationContext&)> on
                                  std::function<void(const AnimationContext&)> onUpdate = {},
                                  std::function<void(const AnimationContext&)> onComplete = {}) {
     AnimationCallbacks callbacks{};
-    callbacks.onStart = onStart;
-    callbacks.onUpdate = onUpdate;
-    callbacks.onComplete = onComplete;
+    callbacks.onStart = std::move(onStart);
+    callbacks.onUpdate = std::move(onUpdate);
+    callbacks.onComplete = std::move(onComplete);
     return callbacks;
 }
 
@@ -54,9 +54,9 @@ makeBoundCallbacks(std::function<void(T&, const AnimationContext&)> onStart = {}
                    std::function<void(T&, const AnimationContext&)> onUpdate = {},
                    std::function<void(T&, const AnimationContext&)> onComplete = {}) {
     BoundAnimationCallbacks<T> callbacks{};
-    callbacks.onStart = onStart;
-    callbacks.onUpdate = onUpdate;
-    callbacks.onComplete = onComplete;
+    callbacks.onStart = std::move(onStart);
+    callbacks.onUpdate = std::move(onUpdate);
+    callbacks.onComplete = std::move(onComplete);
     return callbacks;
 }
 
@@ -569,6 +569,68 @@ TEST_F(AnimatorTest, Animator_LoopElapsed_RemainsMonotonic) {
     anim.update(0.5f);
     EXPECT_NEAR(lastElapsed, 1.6f, 1e-5f);
     EXPECT_EQ(lastCycle, 1u);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — callback ordering and weak-binding cleanup
+// ---------------------------------------------------------------------------
+
+TEST_F(AnimatorTest, Animator_CallbackOrder_SameFrame) {
+    // Three animations with identical durations completing in a single update()
+    // must fire their onComplete callbacks in registration order.
+    std::vector<int> completionOrder;
+
+    anim.schedule(makeOptions(1.0f), makeCallbacks({}, {}, [&](const AnimationContext&) {
+                      completionOrder.push_back(1);
+                  }));
+    anim.schedule(makeOptions(1.0f), makeCallbacks({}, {}, [&](const AnimationContext&) {
+                      completionOrder.push_back(2);
+                  }));
+    anim.schedule(makeOptions(1.0f), makeCallbacks({}, {}, [&](const AnimationContext&) {
+                      completionOrder.push_back(3);
+                  }));
+
+    anim.update(1.0f);  // all three complete simultaneously
+
+    ASSERT_EQ(completionOrder.size(), 3u);
+    EXPECT_EQ(completionOrder.at(0), 1);
+    EXPECT_EQ(completionOrder.at(1), 2);
+    EXPECT_EQ(completionOrder.at(2), 3);
+}
+
+TEST_F(AnimatorTest, Animator_WeakObjectBinding_DropsCleanly) {
+    // A Weak binding whose shared_ptr has been released must silently cancel the
+    // animation — no crash, no completion callback, no dangling reference.
+    struct FakeTarget {
+        int updateCount = 0;
+    };
+
+    int completions = 0;
+
+    auto sharedTarget = std::make_shared<FakeTarget>();
+    std::weak_ptr<FakeTarget> weakTarget = sharedTarget;
+
+    Scene scene;
+    auto binding = AnimationBinding<FakeTarget>::weak(weakTarget);
+
+    auto handle =
+        anim.schedule(scene, binding, makeOptions(2.0f),
+                      makeBoundCallbacks<FakeTarget>(
+                          {}, [](FakeTarget& t, const AnimationContext&) { t.updateCount++; },
+                          [&completions](FakeTarget&, const AnimationContext&) { ++completions; }));
+
+    anim.update(0.3f);
+    EXPECT_EQ(sharedTarget->updateCount, 1);
+    EXPECT_TRUE(handle.isActive());
+
+    // Release the only strong reference — weak_ptr now returns nullptr on lock().
+    sharedTarget.reset();
+
+    // Next update must not crash and must drop the animation silently.
+    EXPECT_NO_THROW({ anim.update(0.3f); });
+    EXPECT_EQ(anim.activeCount(), 0u);
+    EXPECT_FALSE(handle.isActive());
+    EXPECT_EQ(completions, 0);
 }
 
 // ============================================================================

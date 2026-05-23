@@ -17,6 +17,9 @@
 
 namespace vde {
 
+// Forward declaration — pool parameter is reserved for future intra-task dispatch.
+class ThreadPool;
+
 /**
  * @brief 2D physics simulation with fixed-timestep accumulator.
  *
@@ -162,9 +165,81 @@ class PhysicsScene {
      * Uses a fixed-timestep accumulator. The actual number of sub-steps
      * is capped by PhysicsConfig::maxSubSteps to prevent spiral-of-death.
      *
+     * Collision callbacks fire synchronously before this method returns
+     * (backward-compatible behaviour for existing call sites and tests).
+     *
      * @param deltaTime Frame delta time in seconds
      */
     void step(float deltaTime);
+
+    /**
+     * @brief Run all physics sub-phases through the accumulator loop.
+     *
+     * Same accumulator semantics as step(), but collision callbacks are
+     * *not* dispatched immediately — they are staged into an internal buffer
+     * and must be flushed via drainStagedEvents().
+     *
+     * Used by the scheduler's physics tasks so callbacks always execute on
+     * the main thread (in postPhysics), not on a worker thread.
+     *
+     * @param deltaTime Frame delta time in seconds
+     * @param pool      Reserved for future intra-task chunk dispatch; pass nullptr in v1.
+     */
+    void stepPhases(float deltaTime, ThreadPool* pool);
+
+    /**
+     * @brief Run only the integration sub-phase for all accumulator sub-steps.
+     *
+     * Saves previous body state, applies gravity and forces, applies velocity
+     * damping, integrates positions, and clears the accumulated force buffer.
+     * Does not detect or resolve collisions.
+     *
+     * Intended for use by the scheduler's `scene.physics.integrate` task
+     * (worker-eligible, mainThreadOnly = false).
+     *
+     * @param deltaTime Frame delta time in seconds
+     */
+    void integrationStep(float deltaTime);
+
+    /**
+     * @brief Run the broad-phase AABB overlap detection.
+     *
+     * Computes AABBs for all bodies and writes overlapping pairs into an
+     * internal candidate list.  Must be called after integrationStep().
+     *
+     * Intended for use by the scheduler's `scene.physics.broadPhase` task
+     * (worker-eligible, mainThreadOnly = false).
+     */
+    void broadPhaseStep();
+
+    /**
+     * @brief Run impulse resolution on broad-phase candidates and stage events.
+     *
+     * Reads the candidate pairs produced by broadPhaseStep(), computes detailed
+     * collision info, applies positional correction and impulse resolution, and
+     * stages collision-begin / collision-end events for later dispatch.
+     * Updates previousPairs for the next frame's begin/end delta tracking.
+     *
+     * Intended for use by the scheduler's `scene.physics.resolve` task
+     * (worker-eligible, mainThreadOnly = false).
+     */
+    void resolveStep();
+
+    /**
+     * @brief Drain and dispatch staged collision events.
+     *
+     * Fires all onCollisionBegin / onCollisionEnd callbacks (global and per-body)
+     * that were staged during the most recent physics sub-phase run.  Clears the
+     * staged buffer after dispatch.
+     *
+     * Returns the events that were fired so callers (tests) can inspect them.
+     *
+     * Called by the scheduler's `scene.postPhysics` task on the main thread.
+     * Safe to call when the buffer is empty — returns an empty vector.
+     *
+     * @return All collision events that were dispatched.
+     */
+    std::vector<CollisionEvent> drainStagedEvents();
 
     /**
      * @brief Get the interpolation alpha for rendering.

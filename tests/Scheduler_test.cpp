@@ -423,6 +423,15 @@ class LegacyTestScene : public Scene {
     void update(float) override { updateCallCount++; }
 };
 
+/// Minimal scene with both phase callbacks and physics enabled.
+class PhysicsTestScene : public Scene {
+  public:
+    PhysicsTestScene() {
+        enablePhaseCallbacks();
+        enablePhysics();
+    }
+};
+
 }  // anonymous namespace
 
 class GameSchedulerTest : public ::testing::Test {
@@ -590,6 +599,162 @@ TEST_F(GameSchedulerTest, MainThreadOnly_SceneCallbacks) {
         ASSERT_TRUE(desc.has_value());
         EXPECT_TRUE(desc->mainThreadOnly) << "Task must be main-thread-only: " << name;
     }
+}
+
+// ============================================================================
+// Phase 4 — Transition and worker-thread scheduler additions
+// ============================================================================
+
+TEST_F(GameSchedulerTest, TransitionFrame_DestinationSceneIndependent) {
+    // Simulate a transition frame: "source" is in the active group, "dest" is also
+    // in the active group (matching how rebuildSchedulerGraph() includes the transition
+    // destination scene alongside the source scene), and "unrelated" is a background
+    // scene that continues independently.
+    //
+    // Goal: neither "dest" nor "unrelated" should have any scheduler dependency on
+    // the other — only real data-flow edges should exist.
+    auto unrelatedScene = std::make_unique<PhaseCallbackTestScene>();
+    unrelatedScene->setContinueInBackground(true);
+
+    game.addScene("source", std::make_unique<PhaseCallbackTestScene>());
+    game.addScene("dest", std::make_unique<PhaseCallbackTestScene>());
+    game.addScene("unrelated", std::move(unrelatedScene));
+
+    // Active group contains both "source" and "dest" — mirrors what the engine does
+    // during a transition (destination is added to the update list alongside source).
+    SceneGroup group;
+    group.sceneNames = {"source", "dest"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    TaskId logicDest = sched.findTaskByName("scene.gameLogic.dest");
+    TaskId logicUnrelated = sched.findTaskByName("scene.gameLogic.unrelated");
+
+    ASSERT_NE(logicDest, INVALID_TASK_ID) << "scene.gameLogic.dest not found";
+    ASSERT_NE(logicUnrelated, INVALID_TASK_ID) << "scene.gameLogic.unrelated not found";
+
+    auto descDest = sched.getTaskDescriptor(logicDest);
+    auto descUnrelated = sched.getTaskDescriptor(logicUnrelated);
+
+    ASSERT_TRUE(descDest.has_value());
+    ASSERT_TRUE(descUnrelated.has_value());
+
+    EXPECT_EQ(std::find(descDest->dependsOn.begin(), descDest->dependsOn.end(), logicUnrelated),
+              descDest->dependsOn.end())
+        << "scene.gameLogic.dest must not depend on scene.gameLogic.unrelated";
+
+    EXPECT_EQ(
+        std::find(descUnrelated->dependsOn.begin(), descUnrelated->dependsOn.end(), logicDest),
+        descUnrelated->dependsOn.end())
+        << "scene.gameLogic.unrelated must not depend on scene.gameLogic.dest";
+}
+
+TEST_F(GameSchedulerTest, WorkerMode_NoSceneCallbackOffMainThread) {
+    // Configuring worker threads must not change the mainThreadOnly flag for any
+    // scene callback task.  All scene logic, timed, audio, visual, and animation
+    // tasks must remain main-thread-only regardless of the worker thread count.
+    game.getScheduler().setWorkerThreadCount(4);
+
+    game.addScene("worker_scene", std::make_unique<PhaseCallbackTestScene>());
+
+    SceneGroup group;
+    group.sceneNames = {"worker_scene"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    const std::vector<std::string> mustBeMainThread = {
+        "scene.gameLogic.worker_scene", "scene.timed.worker_scene",      "scene.audio.worker_scene",
+        "scene.visuals.worker_scene",   "scene.animations.worker_scene",
+    };
+
+    for (const auto& name : mustBeMainThread) {
+        TaskId id = sched.findTaskByName(name);
+        ASSERT_NE(id, INVALID_TASK_ID) << "Task not found: " << name;
+        auto desc = sched.getTaskDescriptor(id);
+        ASSERT_TRUE(desc.has_value());
+        EXPECT_TRUE(desc->mainThreadOnly)
+            << "Task must be main-thread-only even with worker threads active: " << name;
+    }
+}
+
+// ============================================================================
+// Phase 5: Physics sub-phase scheduler task properties
+// ============================================================================
+
+TEST_F(GameSchedulerTest, PhysicsTask_SubPhasesAreWorkerEligible) {
+    // All three physics sub-phase tasks must have mainThreadOnly = false
+    // so the scheduler can dispatch them to worker threads.
+    game.addScene("phys", std::make_unique<PhysicsTestScene>());
+    SceneGroup group;
+    group.sceneNames = {"phys"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    const std::vector<std::string> workerEligible = {
+        "scene.physics.integrate.phys",
+        "scene.physics.broadPhase.phys",
+        "scene.physics.resolve.phys",
+    };
+
+    for (const auto& name : workerEligible) {
+        TaskId id = sched.findTaskByName(name);
+        ASSERT_NE(id, INVALID_TASK_ID) << "Sub-phase task not found: " << name;
+        auto desc = sched.getTaskDescriptor(id);
+        ASSERT_TRUE(desc.has_value());
+        EXPECT_FALSE(desc->mainThreadOnly)
+            << "Physics sub-phase task must be worker-eligible: " << name;
+    }
+}
+
+TEST_F(GameSchedulerTest, PostPhysicsTask_IsMainThreadOnly) {
+    // The postPhysics task that drains callbacks and syncs transforms must
+    // run on the main thread only.
+    game.addScene("phys_mt", std::make_unique<PhysicsTestScene>());
+    SceneGroup group;
+    group.sceneNames = {"phys_mt"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+    TaskId postPhysId = sched.findTaskByName("scene.postPhysics.phys_mt");
+    ASSERT_NE(postPhysId, INVALID_TASK_ID);
+    auto desc = sched.getTaskDescriptor(postPhysId);
+    ASSERT_TRUE(desc.has_value());
+    EXPECT_TRUE(desc->mainThreadOnly) << "postPhysics task must be main-thread-only";
+}
+
+TEST_F(GameSchedulerTest, MultiPhysicsScene_NoInterSceneDependency) {
+    // Physics integrate tasks for two separate scenes must have no dependency
+    // on each other — they are eligible to run in parallel.
+    game.addScene("phys_A", std::make_unique<PhysicsTestScene>());
+    game.addScene("phys_B", std::make_unique<PhysicsTestScene>());
+    SceneGroup group;
+    group.sceneNames = {"phys_A", "phys_B"};
+    game.setActiveSceneGroup(group);
+
+    const Scheduler& sched = game.getScheduler();
+
+    TaskId intA = sched.findTaskByName("scene.physics.integrate.phys_A");
+    TaskId intB = sched.findTaskByName("scene.physics.integrate.phys_B");
+
+    ASSERT_NE(intA, INVALID_TASK_ID);
+    ASSERT_NE(intB, INVALID_TASK_ID);
+
+    auto descA = sched.getTaskDescriptor(intA);
+    auto descB = sched.getTaskDescriptor(intB);
+
+    ASSERT_TRUE(descA.has_value());
+    ASSERT_TRUE(descB.has_value());
+
+    // phys_A integrate must not depend on phys_B integrate (and vice versa)
+    EXPECT_EQ(std::find(descA->dependsOn.begin(), descA->dependsOn.end(), intB),
+              descA->dependsOn.end())
+        << "phys_A integrate must not depend on phys_B integrate";
+    EXPECT_EQ(std::find(descB->dependsOn.begin(), descB->dependsOn.end(), intA),
+              descB->dependsOn.end())
+        << "phys_B integrate must not depend on phys_A integrate";
 }
 
 }  // namespace vde::test

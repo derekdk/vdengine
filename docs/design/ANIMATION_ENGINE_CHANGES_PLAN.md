@@ -416,7 +416,7 @@ The rule remains: a task starts as main-thread-only and opts out only with evide
 No example is required for Phase 1 — the scheduler correction is an internal engine change with
 no new user-visible feature surface.
 
-## Phase 2: Timed Event Foundation
+## Phase 2: Timed Event Foundation **Complete**
 
 **Goal:** Add a scene-owned timing service that can drive multiple delayed or repeating callbacks.
 
@@ -484,7 +484,7 @@ and exits with code 0 on success, code 1 on failure.
 Waits for startup, waits 2.5 seconds (enough for ≥ 4 repeating ticks), then exits and checks
 the process exit code.
 
-## Phase 3: Animator Integration
+## Phase 3: Animator Integration **Complete**
 
 **Goal:** Land the generic animator on top of the corrected scheduler foundation.
 
@@ -541,7 +541,7 @@ and exits with code 0 on success, code 1 on failure.
 Waits for startup, waits 4 seconds (covers multiple cycles of each animation type), then exits
 and checks the process exit code.
 
-## Phase 4: Hardening, Docs, and Consumers
+## Phase 4: Hardening, Docs, and Consumers **Complete**
 
 **Goal:** Prove the new phase model and adopt it in a few visible places.
 
@@ -603,7 +603,7 @@ deadline; missing any cycle exits with code 1.
 Waits for startup, waits 5 seconds (both scenes must complete at least two full cycles), then
 exits and checks the process exit code.
 
-## Phase 5: Physics Parallelism and Engine Thread Pool
+## Phase 5: Physics Parallelism and Engine Thread Pool **Complete**
 
 **Goal:** Move physics simulation work onto worker threads so the main thread is free during
 physics steps, and give the engine a stable, minimum-size thread pool that is always ready.

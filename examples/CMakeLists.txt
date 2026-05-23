@@ -293,3 +293,6 @@ add_vde_example(vde_timed_events_demo "timed_events_demo/main.cpp")
 
 # Animation Demo example
 add_vde_example(vde_animation_demo "animation_demo/main.cpp")
+
+# Multi-Scene Animation Demo example
+add_vde_example(vde_multi_scene_animation_demo "multi_scene_animation_demo/main.cpp")
