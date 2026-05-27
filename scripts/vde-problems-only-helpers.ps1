@@ -1,9 +1,18 @@
 # VDE Problems-Only Output Helpers
 # Dot-source this file after defining the following variables:
 #   $ProblemsOnly    - switch indicating AI-friendly output mode
+#   $ShowWarningsInProblemsOnly - set true only when callers explicitly want warning lines in quiet mode
 #   $failurePattern  - regex for lines that are failures
 #   $warningPattern  - regex for lines that are warnings
 #   $problemPattern  - combined regex (failures + warnings) used by Get-ProblemLines
+#
+# Quiet-mode contract:
+#   default (no flags)  -> PASS / FAILURE only
+#   -ProblemsOnly       -> PASS / WARNING / FAILURE
+#   -Verbose            -> detailed tool output
+
+$ignoredExternalLayerPattern = '(?i)(GalaxyOverlayVkLayer(?:_VERBOSE|_DEBUG)?|VK_LAYER_NV_optimus|VK_LAYER_NV_present|VK_LAYER_OBS_HOOK|VK_LAYER_VALVE_steam_fossilize|VK_LAYER_VALVE_steam_overlay)'
+$ignoredProblemPattern = '(?i)(duplicated_message_limit value|Policy #LLP_LAYER_3|CategoryInfo.*LLP_LAYER_3)'
 
 function Write-Success {
     param([string]$msg)
@@ -19,6 +28,9 @@ function Write-Info {
 
 function Write-Warn {
     param([string]$msg)
+    if ($ProblemsOnly -and -not $ShowWarningsInProblemsOnly) {
+        return
+    }
     if ($ProblemsOnly -and $msg -notmatch '^(WARNING|FAILURE|PASS):') {
         $msg = "WARNING: $msg"
     }
@@ -35,10 +47,94 @@ function Write-Err {
 
 function Write-Pass { param([string]$msg) Write-Host "PASS: $msg" -ForegroundColor Green }
 
+function Resolve-ProblemsOnlyPreference {
+    param(
+        [hashtable]$BoundParameters,
+        [bool]$VerboseRequested
+    )
+
+    if ($VerboseRequested) {
+        return $false
+    }
+
+    if ($BoundParameters.ContainsKey('ProblemsOnly')) {
+        $boundValue = $BoundParameters['ProblemsOnly']
+        if ($boundValue -is [System.Management.Automation.SwitchParameter]) {
+            return $boundValue.IsPresent
+        }
+
+        return [bool]$boundValue
+    }
+
+    return $true
+}
+
+function Resolve-ProblemsOnlyWarningPreference {
+    param([hashtable]$BoundParameters)
+
+    if (-not $BoundParameters.ContainsKey('ProblemsOnly')) {
+        return $false
+    }
+
+    $boundValue = $BoundParameters['ProblemsOnly']
+    if ($boundValue -is [System.Management.Automation.SwitchParameter]) {
+        return $boundValue.IsPresent
+    }
+
+    return [bool]$boundValue
+}
+
+function Invoke-CommandForProblemsOnly {
+    param(
+        [scriptblock]$Command,
+        [int]$MaxLines = 40
+    )
+
+    $stdout = [IO.Path]::GetTempFileName()
+    $stderr = [IO.Path]::GetTempFileName()
+
+    try {
+        & $Command > $stdout 2> $stderr
+        $exitCode = $LASTEXITCODE
+
+        $allLines = @()
+        if (Test-Path $stdout) {
+            $allLines += Get-Content -Path $stdout -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $stderr) {
+            $allLines += Get-Content -Path $stderr -ErrorAction SilentlyContinue
+        }
+
+        $problemLines = Get-ProblemLines -Lines $allLines -MaxLines $MaxLines
+        if ($problemLines.Count -eq 0 -and $exitCode -ne 0) {
+            $problemLines = @($allLines | Select-Object -Last $MaxLines)
+        }
+
+        if ($problemLines.Count -gt 0) {
+            Write-ProblemLines -Lines $problemLines
+        }
+
+        return [pscustomobject]@{
+            ExitCode     = $exitCode
+            Lines        = @($allLines)
+            ProblemLines = @($problemLines)
+        }
+    }
+    finally {
+        if (Test-Path $stdout) {
+            Remove-Item $stdout -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $stderr) {
+            Remove-Item $stderr -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Get-ProblemLines {
     param(
         [string[]]$Lines,
-        [int]$MaxLines = 40
+        [int]$MaxLines = 40,
+        [int]$ContextLines = 0
     )
 
     if (-not $Lines) {
@@ -54,11 +150,15 @@ function Get-ProblemLines {
             continue
         }
 
+        if (($line -match $ignoredProblemPattern) -or ($line -match $ignoredExternalLayerPattern)) {
+            continue
+        }
+
         if ($line -match $problemPattern) {
             if (-not $selected.Contains($line)) {
                 $selected.Add($line)
             }
-            $captureContext = 2
+            $captureContext = $ContextLines
             if ($selected.Count -ge $MaxLines) {
                 break
             }
@@ -100,6 +200,75 @@ function Write-ProblemLines {
     }
 }
 
+function Write-CompactWarnings {
+    param(
+        [string]$Prefix = '',
+        [string[]]$Lines,
+        [int]$MaxLines = 4
+    )
+
+    $warningLines = @($Lines | Where-Object { (Test-IsWarningLine -Line $_) -and ($_ -notmatch $ignoredProblemPattern) -and ($_ -notmatch $ignoredExternalLayerPattern) } | Select-Object -Unique)
+    $displayLines = @($warningLines | Select-Object -First $MaxLines)
+
+    if ($displayLines.Count -gt 0) {
+        Write-ProblemLines -Prefix $Prefix -Lines $displayLines
+    }
+
+    if ($warningLines.Count -gt $displayLines.Count) {
+        $suppressedCount = $warningLines.Count - $displayLines.Count
+        Write-Warn "$Prefix$suppressedCount additional warning line(s) suppressed"
+    }
+}
+
+function Write-WarningSummary {
+    param(
+        [string]$Prefix = '',
+        [string[]]$Lines
+    )
+
+    $warningLines = @($Lines | Where-Object { (Test-IsWarningLine -Line $_) -and ($_ -notmatch $ignoredProblemPattern) -and ($_ -notmatch $ignoredExternalLayerPattern) } | Select-Object -Unique)
+    if ($warningLines.Count -eq 0) {
+        return
+    }
+
+    $summary = $warningLines[0]
+    if ($warningLines.Count -gt 1) {
+        $summary = "$summary ($($warningLines.Count) unique warning line(s))"
+    }
+
+    Write-Warn "$Prefix$summary"
+}
+
+function Invoke-ScriptWithMode {
+    param(
+        [string]$ScriptPath,
+        [string[]]$Arguments = @(),
+        [switch]$VerboseOutput
+    )
+
+    $shell = if (Get-Command powershell.exe -ErrorAction SilentlyContinue) {
+        'powershell.exe'
+    } elseif (Get-Command powershell -ErrorAction SilentlyContinue) {
+        'powershell'
+    } else {
+        'pwsh'
+    }
+
+    $scriptArgs = @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-NonInteractive',
+        '-File', $ScriptPath
+    ) + $Arguments
+
+    if ($VerboseOutput) {
+        $scriptArgs += '-Verbose'
+    } else {
+        $scriptArgs += '-ProblemsOnly'
+    }
+
+    & $shell @scriptArgs | Out-Host
+    return $LASTEXITCODE
+}
+
 function Invoke-BuildForProblemsOnly {
     param(
         [string]$BuildScriptPath,
@@ -107,39 +276,8 @@ function Invoke-BuildForProblemsOnly {
         [string]$SelectedConfig
     )
 
-    $stdout = [IO.Path]::GetTempFileName()
-    $stderr = [IO.Path]::GetTempFileName()
-
-    try {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $BuildScriptPath -Generator $SelectedGenerator -Config $SelectedConfig > $stdout 2> $stderr
-        $buildExitCode = $LASTEXITCODE
-
-        $buildLines = @()
-        if (Test-Path $stdout) {
-            $buildLines += Get-Content -Path $stdout -ErrorAction SilentlyContinue
-        }
-        if (Test-Path $stderr) {
-            $buildLines += Get-Content -Path $stderr -ErrorAction SilentlyContinue
-        }
-
-        $problemLines = Get-ProblemLines -Lines $buildLines -MaxLines 40
-        if ($problemLines.Count -eq 0 -and $buildExitCode -ne 0) {
-            $problemLines = @($buildLines | Select-Object -Last 40)
-        }
-
-        Write-ProblemLines -Lines $problemLines
-
-        if ($buildExitCode -ne 0) {
-            Write-Err "FAILURE: Build failed with exit code $buildExitCode"
-            exit 1
-        }
-    }
-    finally {
-        if (Test-Path $stdout) {
-            Remove-Item $stdout -ErrorAction SilentlyContinue
-        }
-        if (Test-Path $stderr) {
-            Remove-Item $stderr -ErrorAction SilentlyContinue
-        }
+    $buildExitCode = Invoke-ScriptWithMode -ScriptPath $BuildScriptPath -Arguments @('-Generator', $SelectedGenerator, '-Config', $SelectedConfig)
+    if ($buildExitCode -ne 0) {
+        exit $buildExitCode
     }
 }

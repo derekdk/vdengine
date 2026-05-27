@@ -26,6 +26,9 @@ $problemPattern = '(?i)(assert failed|test failed|\[\s*failed\s*\]|unknown file:
 
 . "$PSScriptRoot\vde-problems-only-helpers.ps1"
 
+$ProblemsOnly = Resolve-ProblemsOnlyPreference -BoundParameters $PSBoundParameters -VerboseRequested $Verbose
+$ShowWarningsInProblemsOnly = Resolve-ProblemsOnlyWarningPreference -BoundParameters $PSBoundParameters
+
 Write-Info "=========================================="
 Write-Info "VDE Test Script"
 Write-Info "=========================================="
@@ -48,15 +51,10 @@ Write-Info "Filter: $Filter"
 
 # Build if requested
 if ($Build) {
-    if ($ProblemsOnly) {
-        Invoke-BuildForProblemsOnly -BuildScriptPath "$scriptDir\build.ps1" -SelectedGenerator $Generator -SelectedConfig $Config
-    } else {
-        Write-Info "Building before running tests..."
-        & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
-        if ($LASTEXITCODE -ne 0) {
-            Write-Err "Build failed! Cannot run tests."
-            exit 1
-        }
+    $buildExitCode = Invoke-ScriptWithMode -ScriptPath "$scriptDir\build.ps1" -Arguments @('-Generator', $Generator, '-Config', $Config) -VerboseOutput:$Verbose
+    if ($buildExitCode -ne 0) {
+        Write-Err "FAILURE: Tests did not run because the build failed."
+        exit $buildExitCode
     }
 }
 
@@ -96,8 +94,20 @@ if ($ProblemsOnly) {
     $stderr = [IO.Path]::GetTempFileName()
 
     try {
-        & $testExe $testArgs > $stdout 2> $stderr
-        $testExitCode = $LASTEXITCODE
+        $startProcessArgs = @{
+            FilePath = $testExe
+            NoNewWindow = $true
+            Wait = $true
+            PassThru = $true
+            RedirectStandardOutput = $stdout
+            RedirectStandardError = $stderr
+        }
+        if ($testArgs.Count -gt 0) {
+            $startProcessArgs.ArgumentList = $testArgs
+        }
+
+        $testProcess = Start-Process @startProcessArgs
+        $testExitCode = $testProcess.ExitCode
 
         $allLines = @()
         if (Test-Path $stdout) {
@@ -107,17 +117,18 @@ if ($ProblemsOnly) {
             $allLines += Get-Content -Path $stderr -ErrorAction SilentlyContinue
         }
 
-        $problemLines = Get-ProblemLines -Lines $allLines
-        if ($problemLines.Count -eq 0 -and $testExitCode -ne 0) {
-            $problemLines = @($allLines | Select-Object -Last 40)
-        }
-
-        Write-ProblemLines -Lines $problemLines
-
         if ($testExitCode -ne 0) {
+            $problemLines = Get-ProblemLines -Lines $allLines
+            if ($problemLines.Count -eq 0) {
+                $problemLines = @($allLines | Select-Object -Last 40)
+            }
+
+            Write-ProblemLines -Lines $problemLines
             Write-Err "FAILURE: Tests FAILED with exit code $testExitCode"
             exit 1
         }
+
+        Write-WarningSummary -Lines $allLines
     }
     finally {
         if (Test-Path $stdout) {

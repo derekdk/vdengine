@@ -33,6 +33,8 @@ param(
 
     [switch]$FullLint,
 
+    [switch]$Verbose,
+
     # GoogleTest filter pattern (passed to test.ps1 -Filter)
     [string]$Filter = "",
 
@@ -49,11 +51,19 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$QuietConsole = -not $Verbose
 
 $scriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot   = Split-Path -Parent $scriptDir
 $logsDir    = Join-Path $repoRoot "logs"
 $timestamp  = Get-Date -Format "yyyyMMdd-HHmmss"
+$stageHost  = if (Get-Command powershell.exe -ErrorAction SilentlyContinue) {
+    'powershell.exe'
+} elseif (Get-Command powershell -ErrorAction SilentlyContinue) {
+    'powershell'
+} else {
+    'pwsh'
+}
 
 if (-not (Test-Path $logsDir)) {
     New-Item -ItemType Directory -Path $logsDir | Out-Null
@@ -69,14 +79,32 @@ Set-Content  -Path $archiveLog -Value "VDE Verify Run: $timestamp" -Encoding UTF
 
 # --- Log helpers -----------------------------------------------------------
 
+function Test-VerifyConsoleLine {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    return $Text -match '^(PASS|FAILURE|WARNING):' -or
+        $Text -match '^\s*STAGE RESULT:' -or
+        $Text -match '^\s*OVERALL:' -or
+        $Text -match '^\s*(Log|Archive):' -or
+        $Text -match '(?i)\b(error|fatal error|warning|failed)\b'
+}
+
 function Write-Log {
     param(
         [string]$Text,
         [string]$Color = "White"
     )
-    Write-Host $Text -ForegroundColor $Color
     # Strip ANSI escape codes so the log file is plain text
     $clean = $Text -replace '\x1b\[[0-9;]*[A-Za-z]', ''
+
+    if (-not $QuietConsole -or (Test-VerifyConsoleLine -Text $clean)) {
+        Write-Host $Text -ForegroundColor $Color
+    }
+
     Add-Content -Path $latestLog  -Value $clean
     Add-Content -Path $archiveLog -Value $clean
 }
@@ -101,7 +129,9 @@ function Invoke-Stage {
     Write-LogDivider "Cyan"
     Write-Log "  Stage: $Label" "Cyan"
     Write-LogDivider "Cyan"
-    Write-Host "  Running $Label... (output appears when stage completes)" -ForegroundColor DarkCyan
+    if (-not $QuietConsole) {
+        Write-Host "  Running $Label... (output appears when stage completes)" -ForegroundColor DarkCyan
+    }
 
     $scriptPath = Join-Path $scriptDir $ScriptName
     $psArgs = @(
@@ -110,7 +140,7 @@ function Invoke-Stage {
     ) + $ExtraArgs
 
     # Run as external process; $LASTEXITCODE captures its exit code
-    $stageOutput = & pwsh @psArgs 2>&1
+    $stageOutput = & $stageHost @psArgs 2>&1
     $stageExit   = $LASTEXITCODE
     $stagePass   = ($stageExit -eq 0)
 
@@ -118,7 +148,9 @@ function Invoke-Stage {
     foreach ($line in $stageOutput) {
         $lineStr  = [string]$line
         $cleanStr = $lineStr -replace '\x1b\[[0-9;]*[A-Za-z]', ''
-        Write-Host $lineStr
+        if (-not $QuietConsole -or (Test-VerifyConsoleLine -Text $cleanStr)) {
+            Write-Host $lineStr
+        }
         Add-Content -Path $latestLog  -Value $cleanStr
         Add-Content -Path $archiveLog -Value $cleanStr
     }
@@ -148,6 +180,7 @@ Write-LogDivider "Cyan"
 # Stage 1: Build
 if (-not $SkipBuild) {
     $buildArgs = @("-Generator", $Generator, "-Config", $Config)
+    if ($Verbose) { $buildArgs += '-Verbose' }
     $buildPass = Invoke-Stage "BUILD" "build.ps1" $buildArgs
     $stageResults["BUILD"] = $buildPass
 
@@ -165,7 +198,8 @@ if (-not $SkipBuild) {
 }
 
 # Stage 2: Unit Tests
-$testArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
+$testArgs = @("-Generator", $Generator, "-Config", $Config)
+if ($Verbose) { $testArgs += '-Verbose' }
 if ($Filter) { $testArgs += "-Filter", $Filter }
 $testPass = Invoke-Stage "UNIT TESTS" "test.ps1" $testArgs
 $stageResults["UNIT TESTS"] = $testPass
@@ -173,7 +207,8 @@ if (-not $testPass) { $overallPass = $false }
 
 # Stage 3: Smoke Tests
 if (-not $SkipSmoke) {
-    $smokeArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
+    $smokeArgs = @("-Generator", $Generator, "-Config", $Config)
+    if ($Verbose) { $smokeArgs += '-Verbose' }
     if ($SmokeFilter) { $smokeArgs += "-Filter", $SmokeFilter }
     if ($SmokeExtended) { $smokeArgs += "-Extended" }
     $smokePass = Invoke-Stage "SMOKE TESTS" "smoke-test.ps1" $smokeArgs
@@ -183,7 +218,8 @@ if (-not $SkipSmoke) {
 
 # Stage 4: Render Verification
 if (-not $SkipRenderVerify) {
-    $renderArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
+    $renderArgs = @("-Generator", $Generator, "-Config", $Config)
+    if ($Verbose) { $renderArgs += '-Verbose' }
     if ($SmokeFilter) { $renderArgs += "-Filter", $SmokeFilter }
     if ($SmokeExtended) { $renderArgs += "-Extended" }
     $renderPass = Invoke-Stage "RENDER VERIFY" "render-verify.ps1" $renderArgs
@@ -220,9 +256,9 @@ foreach ($stageName in $stageResults.Keys) {
 
 Write-Log ""
 if ($overallPass) {
-    Write-Log "  OVERALL: ALL STAGES PASSED" "Green"
+    Write-Log "PASS: Verification succeeded." "Green"
 } else {
-    Write-Log "  OVERALL: VERIFICATION FAILED" "Red"
+    Write-Log "FAILURE: Verification failed." "Red"
 }
 Write-LogDivider
 

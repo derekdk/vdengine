@@ -1,19 +1,29 @@
 # VDE Rebuild Script
 # Performs a full rebuild (clean then build)
-# Usage: .\scripts\rebuild.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release]
+# Usage: .\scripts\rebuild.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Verbose] [-ProblemsOnly]
 
 param(
     [ValidateSet("MSBuild", "Ninja")]
     [string]$Generator = "Ninja",
     
     [ValidateSet("Debug", "Release")]
-    [string]$Config = "Debug"
+    [string]$Config = "Debug",
+
+    [switch]$Verbose = $false,
+
+    [switch]$ProblemsOnly = $false
 )
 
 $ErrorActionPreference = "Stop"
 
-# Colors for output
-function Write-Info { param([string]$msg) Write-Host $msg -ForegroundColor Cyan }
+$failurePattern = '(?i)(^\s*error\b|\berror:|\bfatal error\b|\bfailed\b)'
+$warningPattern = '(?i)(^\s*warning\b|\bwarning:|\bwarn\b)'
+$problemPattern = '(?i)(^\s*error\b|\berror:|\bfatal error\b|\bfailed\b|^\s*warning\b|\bwarning:|\bwarn\b)'
+
+. "$PSScriptRoot\vde-problems-only-helpers.ps1"
+
+$ProblemsOnly = Resolve-ProblemsOnlyPreference -BoundParameters $PSBoundParameters -VerboseRequested $Verbose
+$ShowWarningsInProblemsOnly = Resolve-ProblemsOnlyWarningPreference -BoundParameters $PSBoundParameters
 
 Write-Info "=========================================="
 Write-Info "VDE Rebuild Script (Clean + Build)"
@@ -22,13 +32,25 @@ Write-Info "=========================================="
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # First clean
-& "$scriptDir\clean.ps1" -Generator $Generator -Config $Config
-if ($LASTEXITCODE -ne 0) {
-    exit 1
+$cleanExitCode = Invoke-ScriptWithMode -ScriptPath "$scriptDir\clean.ps1" -Arguments @('-Generator', $Generator, '-Config', $Config) -VerboseOutput:$Verbose
+if ($cleanExitCode -ne 0) {
+    Write-Err "FAILURE: Rebuild failed during clean."
+    exit $cleanExitCode
 }
 
 # Then build
-& "$scriptDir\build.ps1" -Generator $Generator -Config $Config
-if ($LASTEXITCODE -ne 0) {
-    exit 1
+$buildExitCode = Invoke-ScriptWithMode -ScriptPath "$scriptDir\build.ps1" -Arguments @('-Generator', $Generator, '-Config', $Config) -VerboseOutput:$Verbose
+if ($buildExitCode -ne 0) {
+    Write-Err "FAILURE: Rebuild failed during build."
+    exit $buildExitCode
 }
+
+if ($ProblemsOnly) {
+    Write-Pass "Rebuild succeeded ($Generator $Config)."
+} else {
+    Write-Success "=========================================="
+    Write-Success "Rebuild completed successfully!"
+    Write-Success "=========================================="
+}
+
+exit 0

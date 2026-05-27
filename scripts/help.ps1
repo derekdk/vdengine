@@ -14,6 +14,7 @@ Write-Host ""
 Write-Host "=======================================" -ForegroundColor Green
 Write-Host "   VDE Build Scripts Quick Reference" -ForegroundColor Green
 Write-Host "=======================================" -ForegroundColor Green
+Write-Host "  Default build/test output is PASS/FAILURE only. Use -ProblemsOnly to include warnings or -Verbose for detailed logs." -ForegroundColor DarkGray
 
 Write-Title "BUILD SCRIPTS"
 Write-Cmd '.\scripts\build.ps1' 'Build the project (default Ninja Debug)'
@@ -45,11 +46,12 @@ Write-Cmd '.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate module
 Write-Cmd '.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate modules -Markdown' 'Diff and write Markdown report'
 
 Write-Title "QUICK START"
-Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default; also writes compile_commands.json)'
+Write-Cmd '.\scripts\build.ps1' 'Build with Ninja (default quiet output; also writes compile_commands.json)'
+Write-Cmd '.\scripts\build.ps1 -Verbose' 'Build with detailed output'
 Write-Cmd '.\scripts\build.ps1 -Generator MSBuild' 'Build with MSBuild'
-Write-Cmd '.\scripts\test.ps1' 'Run all tests'
+Write-Cmd '.\scripts\test.ps1' 'Run all tests (quiet status output by default)'
 Write-Cmd '.\scripts\test.ps1 -Build' 'Build and test together'
-Write-Cmd '.\scripts\smoke-test.ps1' 'Run smoke tests'
+Write-Cmd '.\scripts\smoke-test.ps1' 'Run smoke tests (quiet status output by default)'
 Write-Cmd '.\scripts\lint.ps1' 'Run all linters'
 Write-Cmd '.\scripts\run-vlauncher.ps1' 'Launch VLauncher from root'
 Write-Cmd '.\scripts\install-hooks.ps1' 'Enable local main-branch commit protection'
@@ -57,11 +59,12 @@ Write-Cmd '.\scripts\install-hooks.ps1' 'Enable local main-branch commit protect
 Write-Title "COMMON TASKS"
 Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
 Write-Cmd '.\scripts\test.ps1 -Filter "Camera*"' 'Run specific tests'
-Write-Cmd '.\scripts\test.ps1 -ProblemsOnly' 'Show only warnings/failures plus final status'
-Write-Cmd '.\scripts\smoke-test.ps1 -ProblemsOnly' 'Show only smoke-test warnings/failures plus final status'
+Write-Cmd '.\scripts\test.ps1 -Verbose' 'Show detailed unit test output'
+Write-Cmd '.\scripts\smoke-test.ps1 -Verbose' 'Show detailed smoke-test output'
 Write-Cmd '.\scripts\smoke-test.ps1 -Extended' 'Include priority 2 examples and games in the smoke run'
 Write-Cmd '.\scripts\lint.ps1 -ChangedOnly' 'Lint only the current git delta'
-Write-Cmd '.\scripts\verify.ps1' 'Full end-to-end verification (build + tests + smoke + render + targeted lint)'
+Write-Cmd '.\scripts\verify.ps1' 'Full end-to-end verification (quiet stage summaries by default)'
+Write-Cmd '.\scripts\verify.ps1 -Verbose' 'Full verification with detailed stage output'
 Write-Cmd '.\scripts\verify.ps1 -SkipSmoke -SkipRenderVerify' 'Quick verify (build + unit tests + targeted lint only)'
 Write-Cmd '.\scripts\verify.ps1 -FullLint' 'Full verification with full-repo lint at the end'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean rebuild'

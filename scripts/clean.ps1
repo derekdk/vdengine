@@ -1,6 +1,6 @@
 # VDE Clean Script
 # Cleans build artifacts
-# Usage: .\scripts\clean.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Full]
+# Usage: .\scripts\clean.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Full] [-Verbose] [-ProblemsOnly]
 
 param(
     [ValidateSet("MSBuild", "Ninja")]
@@ -9,15 +9,23 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Config = "Debug",
     
-    [switch]$Full = $false  # If set, removes entire build directory
+    [switch]$Full = $false,
+
+    [switch]$Verbose = $false,
+
+    [switch]$ProblemsOnly = $false
 )
 
 $ErrorActionPreference = "Stop"
 
-# Colors for output
-function Write-Success { param([string]$msg) Write-Host $msg -ForegroundColor Green }
-function Write-Info { param([string]$msg) Write-Host $msg -ForegroundColor Cyan }
-function Write-Warn { param([string]$msg) Write-Host $msg -ForegroundColor Yellow }
+$failurePattern = '(?i)(^\s*error\b|\berror:|\bfatal error\b|\bfailed\b)'
+$warningPattern = '(?i)(^\s*warning\b|\bwarning:|\bwarn\b)'
+$problemPattern = '(?i)(^\s*error\b|\berror:|\bfatal error\b|\bfailed\b|^\s*warning\b|\bwarning:|\bwarn\b)'
+
+. "$PSScriptRoot\vde-problems-only-helpers.ps1"
+
+$ProblemsOnly = Resolve-ProblemsOnlyPreference -BoundParameters $PSBoundParameters -VerboseRequested $Verbose
+$ShowWarningsInProblemsOnly = Resolve-ProblemsOnlyWarningPreference -BoundParameters $PSBoundParameters
 
 Write-Info "=========================================="
 Write-Info "VDE Clean Script"
@@ -40,43 +48,68 @@ Write-Info "Configuration: $Config"
 Write-Info "Full Clean: $Full"
 
 if (-not (Test-Path $buildDir)) {
-    Write-Warn "Build directory does not exist: $buildDir"
-    Write-Info "Nothing to clean"
+    if ($ProblemsOnly) {
+        Write-Pass "Nothing to clean ($Generator $Config)."
+    } else {
+        Write-Warn "Build directory does not exist: $buildDir"
+        Write-Info "Nothing to clean"
+    }
     exit 0
 }
 
 if ($Full) {
-    Write-Warn "Performing FULL CLEAN - removing entire build directory..."
-    Write-Warn "This will require a full reconfigure on next build"
+    Write-Info "Performing FULL CLEAN - removing entire build directory..."
+    Write-Info "This will require a full reconfigure on next build"
     
     Remove-Item -Path $buildDir -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Success "Full clean complete - build directory removed"
 } else {
     Push-Location $buildDir
     try {
         if (-not (Test-Path "CMakeCache.txt")) {
-            Write-Warn "No CMakeCache.txt found - build directory may not be configured"
+            if ($ProblemsOnly) {
+                Write-Pass "Nothing to clean ($Generator $Config)."
+            } else {
+                Write-Warn "No CMakeCache.txt found - build directory may not be configured"
+            }
             exit 0
         }
         
         Write-Info "Cleaning build artifacts..."
-        
-        if ($Generator -eq "Ninja") {
-            # For Ninja, use ninja clean
-            if (Get-Command ninja -ErrorAction SilentlyContinue) {
-                ninja -t clean
+
+        if ($ProblemsOnly) {
+            if ($Generator -eq "Ninja") {
+                if (Get-Command ninja -ErrorAction SilentlyContinue) {
+                    $cleanResult = Invoke-CommandForProblemsOnly -Command { & ninja -t clean }
+                } else {
+                    $cleanResult = Invoke-CommandForProblemsOnly -Command { & cmake --build . --target clean }
+                }
             } else {
-                # Fallback to cmake --build --target clean
-                cmake --build . --target clean
+                $cleanResult = Invoke-CommandForProblemsOnly -Command { & cmake --build . --config $Config --target clean }
+            }
+
+            if ($cleanResult.ExitCode -ne 0) {
+                Write-Err "FAILURE: Clean command failed."
+                exit 1
             }
         } else {
-            # For MSBuild, use cmake --build --target clean with config
-            cmake --build . --config $Config --target clean
-        }
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warn "Clean command returned non-zero exit code"
-        } else {
+            if ($Generator -eq "Ninja") {
+                # For Ninja, use ninja clean
+                if (Get-Command ninja -ErrorAction SilentlyContinue) {
+                    ninja -t clean
+                } else {
+                    # Fallback to cmake --build --target clean
+                    cmake --build . --target clean
+                }
+            } else {
+                # For MSBuild, use cmake --build --target clean with config
+                cmake --build . --config $Config --target clean
+            }
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "Clean command failed"
+                exit 1
+            }
+
             Write-Success "Clean complete"
         }
     }
@@ -85,6 +118,18 @@ if ($Full) {
     }
 }
 
-Write-Success "=========================================="
-Write-Success "Clean completed!"
-Write-Success "=========================================="
+if ($ProblemsOnly) {
+    if ($Full) {
+        Write-Pass "Full clean completed ($Generator $Config)."
+    } else {
+        Write-Pass "Clean completed ($Generator $Config)."
+    }
+} else {
+    Write-Success "=========================================="
+    if ($Full) {
+        Write-Success "Full clean completed!"
+    } else {
+        Write-Success "Clean completed!"
+    }
+    Write-Success "=========================================="
+}

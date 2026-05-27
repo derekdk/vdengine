@@ -25,6 +25,8 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **benchmark-compile.ps1** | Capture per-TU compile timing for benchmarking | `.\scripts\benchmark-compile.ps1 -Label "baseline"` |
 | **compare-benchmarks.ps1** | Compare two benchmark reports | `.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate candidate` |
 
+> Build, clean, test, smoke, render-verify, and verify scripts now have three output modes: default `PASS:` / `FAILURE:` only, `-ProblemsOnly` for `PASS:` / `WARNING:` / `FAILURE:`, and `-Verbose` for detailed underlying tool output.
+
 ## Quick Start
 
 ### Build (Default: Ninja Debug)
@@ -82,7 +84,7 @@ Build the VDE project with your choice of generator and configuration.
 
 **Syntax:**
 ```powershell
-.\scripts\build.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Clean] [-Parallel <N>]
+.\scripts\build.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Clean] [-Parallel <N>] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
@@ -90,6 +92,8 @@ Build the VDE project with your choice of generator and configuration.
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Clean` - Clean before building
 - `-Parallel <N>` - Parallel build jobs (0 = auto-detect)
+- `-Verbose` - Show full configure/build output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **Examples:**
 ```powershell
@@ -107,13 +111,16 @@ Build the VDE project with your choice of generator and configuration.
 
 # Parallel build with 8 jobs
 .\scripts\build.ps1 -Parallel 8
+
+# Detailed configure/build output
+.\scripts\build.ps1 -Verbose
 ```
 
 **Features:**
 - Automatically loads VS Developer environment for Ninja builds
 - Auto-detects if reconfiguration is needed
 - Ninja builds automatically generate `build_ninja/compile_commands.json` for `clang-tidy`
-- Shows output locations after successful build
+- Default output is a single machine-friendly status line; use `-Verbose` to also show tool output and output locations
 
 ### rebuild.ps1
 
@@ -121,12 +128,14 @@ Perform a full clean rebuild (clean + build).
 
 **Syntax:**
 ```powershell
-.\scripts\rebuild.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release]
+.\scripts\rebuild.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
+- `-Verbose` - Show detailed clean + build output
+- `-ProblemsOnly` - Include warning lines alongside the compact status output
 
 **Examples:**
 ```powershell
@@ -138,6 +147,9 @@ Perform a full clean rebuild (clean + build).
 
 # Release rebuild
 .\scripts\rebuild.ps1 -Config Release
+
+# Detailed rebuild output
+.\scripts\rebuild.ps1 -Verbose
 ```
 
 ### clean.ps1
@@ -146,13 +158,15 @@ Clean build artifacts or completely remove the build directory.
 
 **Syntax:**
 ```powershell
-.\scripts\clean.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Full]
+.\scripts\clean.ps1 [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Full] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Full` - Remove entire build directory (requires reconfigure)
+- `-Verbose` - Show detailed clean output
+- `-ProblemsOnly` - Include warning lines alongside the compact status output
 
 **Examples:**
 ```powershell
@@ -168,6 +182,9 @@ Clean build artifacts or completely remove the build directory.
 # Full clean both generators
 .\scripts\clean.ps1 -Full
 .\scripts\clean.ps1 -Generator Ninja -Full
+
+# Detailed clean output
+.\scripts\clean.ps1 -Verbose
 ```
 
 ### test.ps1
@@ -184,8 +201,8 @@ Run unit tests with optional filtering and building.
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Filter <pattern>` - GoogleTest filter pattern (default: "*")
 - `-Build` - Build before running tests
-- `-Verbose` - Verbose test output with timing
-- `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
+- `-Verbose` - Show detailed test output with timing instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **Examples:**
 ```powershell
@@ -207,9 +224,6 @@ Run unit tests with optional filtering and building.
 # Verbose output
 .\scripts\test.ps1 -Verbose
 
-# AI-friendly failure summary output
-.\scripts\test.ps1 -ProblemsOnly
-
 # Build, then run filtered tests
 .\scripts\test.ps1 -Build -Filter "CameraTest.*"
 ```
@@ -224,7 +238,7 @@ Run unit tests with optional filtering and building.
 
 ### smoke-test.ps1
 
-Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output.
+Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and compact status output by default.
 
 **Syntax:**
 ```powershell
@@ -238,8 +252,8 @@ Run smoke tests against examples, games, and tools, with optional filtering, pri
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests
 - `-Extended` - Include priority 2 examples and games; default runs only priority 1 examples/games while tools always run
-- `-Verbose` - Verbose output with detailed error messages
-- `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
+- `-Verbose` - Show detailed smoke-test output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **Examples:**
 ```powershell
@@ -261,8 +275,8 @@ Run smoke tests against examples, games, and tools, with optional filtering, pri
 # Build, then smoke test
 .\scripts\smoke-test.ps1 -Build
 
-# AI-friendly failure summary output
-.\scripts\smoke-test.ps1 -ProblemsOnly
+# Detailed smoke-test output
+.\scripts\smoke-test.ps1 -Verbose
 ```
 
 ### format.ps1
@@ -461,11 +475,13 @@ Clean build artifacts from both the Ninja (`build_ninja/`) and MSBuild (`build/`
 
 **Syntax:**
 ```powershell
-.\scripts\clean-all.ps1 [-Full]
+.\scripts\clean-all.ps1 [-Full] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
 - `-Full` - Remove entire build directories (requires reconfigure before next build)
+- `-Verbose` - Show detailed per-generator clean output
+- `-ProblemsOnly` - Include warning lines alongside the compact status output
 
 **Examples:**
 ```powershell
@@ -474,6 +490,9 @@ Clean build artifacts from both the Ninja (`build_ninja/`) and MSBuild (`build/`
 
 # Fully remove both build directories
 .\scripts\clean-all.ps1 -Full
+
+# Detailed clean-all output
+.\scripts\clean-all.ps1 -Verbose
 ```
 
 ### render-verify.ps1
@@ -493,8 +512,8 @@ Run golden-image comparison tests against examples that declare a `[render_verif
 - `-Build` - Build before running verification
 - `-Extended` - Include priority 2 examples (default: priority 1 only)
 - `-UpdateGolden` - Capture new golden images instead of comparing
-- `-Verbose` - Verbose output with detailed per-frame results
-- `-ProblemsOnly` - Emit only warnings/failures plus a final `PASS:` or `FAILURE:` summary
+- `-Verbose` - Show detailed render-verification output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **Examples:**
 ```powershell
@@ -510,8 +529,8 @@ Run golden-image comparison tests against examples that declare a `[render_verif
 # Build first, then verify
 .\scripts\render-verify.ps1 -Build
 
-# AI-friendly failure summary output
-.\scripts\render-verify.ps1 -ProblemsOnly
+# Detailed render-verification output
+.\scripts\render-verify.ps1 -Verbose
 ```
 
 ### verify.ps1
@@ -521,7 +540,7 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 **Syntax:**
 ```powershell
 .\scripts\verify.ps1 [-SkipBuild] [-SkipSmoke] [-SkipRenderVerify] [-SkipLint] [-FullLint]
-                     [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended]
+                     [-Verbose] [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended]
                      [-Generator MSBuild|Ninja] [-Config Debug|Release]
 ```
 
@@ -531,6 +550,7 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 - `-SkipRenderVerify` - Skip the render verification stage
 - `-SkipLint` - Skip the lint stage
 - `-FullLint` - Run full-repo lint instead of targeted changed-file lint
+- `-Verbose` - Show full stage output; default console output is compact stage summaries and final status lines
 - `-Filter` - GoogleTest filter pattern passed to `test.ps1`
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
 - `-SmokeExtended` - Include priority 2 examples in the smoke run
@@ -556,9 +576,12 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 
 # Fast inner loop (unit tests only, with filter)
 .\scripts\verify.ps1 -SkipBuild -SkipSmoke -SkipRenderVerify -Filter "CameraTest.*"
+
+# Detailed stage output
+.\scripts\verify.ps1 -Verbose
 ```
 
-**AI agents:** Run `.\scripts\verify.ps1` and then use `read_file` on `logs/verify-latest.log` to inspect results. Do not rely on terminal streaming output.
+**AI agents:** Run `.\scripts\verify.ps1` for compact console status and use `read_file` on `logs/verify-latest.log` when you need full stage details.
 
 ### show-log.ps1
 
@@ -768,6 +791,8 @@ You can have both build directories simultaneously and switch between them by sp
 ### build-and-test.ps1 (DEPRECATED)
 
 The old `build-and-test.ps1` script is still available for backward compatibility but is deprecated. It now calls the new `build.ps1` and `test.ps1` scripts internally.
+
+Like the newer scripts, it defaults to compact status output; use `-Verbose` if you need the underlying build/test details.
 
 **Migration:**
 ```powershell

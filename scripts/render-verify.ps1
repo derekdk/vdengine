@@ -39,6 +39,9 @@ $outputFailurePattern = '(?i)(assert failed|test failed|unknown file: Failure|\[
 
 . "$PSScriptRoot\vde-problems-only-helpers.ps1"
 
+$ProblemsOnly = Resolve-ProblemsOnlyPreference -BoundParameters $PSBoundParameters -VerboseRequested $Verbose
+$ShowWarningsInProblemsOnly = Resolve-ProblemsOnlyWarningPreference -BoundParameters $PSBoundParameters
+
 Write-Info "=========================================="
 Write-Info "VDE Render Verification Script"
 Write-Info "=========================================="
@@ -78,15 +81,10 @@ if ($Filter) {
 
 # Build if requested
 if ($Build) {
-    if ($ProblemsOnly) {
-        Invoke-BuildForProblemsOnly -BuildScriptPath "$scriptDir\build.ps1" -SelectedGenerator $Generator -SelectedConfig $Config
-    } else {
-        Write-Info "Building before running render verification..."
-        & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
-        if ($LASTEXITCODE -ne 0) {
-            Write-Err "Build failed! Cannot run render verification."
-            exit 1
-        }
+    $buildExitCode = Invoke-ScriptWithMode -ScriptPath "$scriptDir\build.ps1" -Arguments @('-Generator', $Generator, '-Config', $Config) -VerboseOutput:$Verbose
+    if ($buildExitCode -ne 0) {
+        Write-Err "FAILURE: Render verification did not run because the build failed."
+        exit $buildExitCode
     }
 }
 
@@ -327,6 +325,7 @@ if ($allExes.Count -eq 0) {
         Write-Warn "Only priority 2 examples matched. Re-run with -Extended."
     }
     Write-Warn "Ensure examples have [render_verify] sections in vde.toml."
+    Write-Err "FAILURE: No render verification executables matched the requested selection."
     exit 1
 }
 
@@ -373,7 +372,11 @@ foreach ($exe in $allExes) {
     $verifyScriptPath = Join-Path $scriptBaseDir $verifyScript
 
     if (-not (Test-Path $verifyScriptPath)) {
-        Write-Warn "  Verify script not found: $verifyScript (skipping $($exe.Name))"
+        if ($ProblemsOnly) {
+            Write-Warn "$($exe.Name) skipped because verify script '$verifyScript' was not found"
+        } else {
+            Write-Warn "  Verify script not found: $verifyScript (skipping $($exe.Name))"
+        }
         $skipCount++
         $results += [pscustomobject]@{
             exe      = $exe.Name
@@ -391,7 +394,11 @@ foreach ($exe in $allExes) {
     if (-not $UpdateGolden) {
         $goldenImagePath = Join-Path $goldenDir $exe.Golden
         if ($exe.Golden -and -not (Test-Path $goldenImagePath)) {
-            Write-Warn "  Golden image not found: $($exe.Golden) (skipping $($exe.Name)). Run with -UpdateGolden first."
+            if ($ProblemsOnly) {
+                Write-Warn "$($exe.Name) skipped because golden image '$($exe.Golden)' was not found. Run with -UpdateGolden first."
+            } else {
+                Write-Warn "  Golden image not found: $($exe.Golden) (skipping $($exe.Name)). Run with -UpdateGolden first."
+            }
             $skipCount++
             $results += [pscustomobject]@{
                 exe      = $exe.Name
@@ -422,6 +429,7 @@ foreach ($exe in $allExes) {
 
         $job = Start-Job -ScriptBlock {
             param($exePath, $scriptPath, $workDir, $stdoutFile, $stderrFile)
+            $env:VK_LOADER_LAYERS_DISABLE = '~implicit~'
             Set-Location $workDir
             & $exePath "--input-script" $scriptPath > $stdoutFile 2> $stderrFile
             return $LASTEXITCODE
@@ -482,7 +490,7 @@ foreach ($exe in $allExes) {
     if ($passed) {
         $passCount++
         if ($ProblemsOnly) {
-            Write-ProblemLines -Prefix "[$($exe.Name)]: " -Lines @($keyLines | Where-Object { Test-IsWarningLine -Line $_ })
+            Write-WarningSummary -Prefix "[$($exe.Name)]: " -Lines $keyLines
         } elseif ($Verbose) {
             Write-Success "  PASSED"
         } else {

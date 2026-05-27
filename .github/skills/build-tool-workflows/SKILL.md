@@ -63,6 +63,8 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - A smoke test category or name filter
 - A full clean (`.\scripts\clean.ps1 -Full`)
 
+Build, clean, test, smoke, render-verify, and verify scripts now have three output modes: default `PASS:` / `FAILURE:` only, `-ProblemsOnly` for `PASS:` / `WARNING:` / `FAILURE:`, and `-Verbose` for detailed underlying tool output.
+
 ---
 
 ## Script Commands (for parameterized or advanced use)
@@ -108,7 +110,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 ```powershell
 .\scripts\test.ps1 -Filter "CameraTest.*"
 .\scripts\test.ps1 -Build -Filter "Suite.TestName"
-.\scripts\test.ps1 -ProblemsOnly
+.\scripts\test.ps1 -Verbose
 ```
 
 **Smoke tests with filter or category:**
@@ -117,7 +119,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 .\scripts\smoke-test.ps1 -Category Examples
 .\scripts\smoke-test.ps1 -Category Tools
 .\scripts\smoke-test.ps1 -Extended
-.\scripts\smoke-test.ps1 -ProblemsOnly
+.\scripts\smoke-test.ps1 -Verbose
 ```
 
 **Format check without modifying files:**
@@ -147,26 +149,34 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-Config` - Debug (default) or Release
 - `-Clean` - Clean before building
 - `-Parallel <N>` - Number of parallel build jobs (0 = auto)
+- `-Verbose` - Show full configure/build output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **rebuild.ps1**
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
+- `-Verbose` - Show detailed clean + build output
+- `-ProblemsOnly` - Include warning lines alongside the compact status output
 
 **clean.ps1**
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Full` - Remove entire build directory
+- `-Verbose` - Show detailed clean output
+- `-ProblemsOnly` - Include warning lines alongside the compact status output
 
 **clean-all.ps1**
 - `-Full` - Remove entire build directories for both Ninja and MSBuild
+- `-Verbose` - Show detailed per-generator clean output
+- `-ProblemsOnly` - Include warning lines alongside the compact status output
 
 **test.ps1**
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Filter` - GoogleTest filter pattern (default: "*")
 - `-Build` - Build before running tests
-- `-Verbose` - Verbose test output
-- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
+- `-Verbose` - Show detailed test output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **smoke-test.ps1**
 - `-Category` - All (default), Examples, or Tools
@@ -175,8 +185,8 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Build` - Build before running smoke tests
-- `-Verbose` - Verbose output with detailed error messages
-- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
+- `-Verbose` - Show detailed smoke-test output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **verify.ps1**
 - `-SkipBuild` - Skip the build stage (tests + smoke only)
@@ -184,6 +194,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-SkipRenderVerify` - Skip the render verification stage
 - `-SkipLint` - Skip the lint stage
 - `-FullLint` - Run full-repo lint instead of targeted changed-file lint
+- `-Verbose` - Show full stage output instead of the default compact stage summaries
 - `-Filter` - GoogleTest filter pattern passed to test.ps1
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
 - `-SmokeExtended` - Include priority 2 examples in the smoke run
@@ -197,8 +208,8 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-Build` - Build before running
 - `-Extended` - Include priority 2 examples
 - `-UpdateGolden` - Capture new golden images instead of comparing
-- `-Verbose` - Verbose output
-- `-ProblemsOnly` - Emit only warnings/failures plus a final PASS/FAIL line
+- `-Verbose` - Show detailed render-verification output instead of the default compact status lines
+- `-ProblemsOnly` - Include warning lines alongside the compact `PASS:` / `FAILURE:` output
 
 **lint.ps1**
 - `-ChangedOnly` - Lint files changed in the current git working tree
@@ -364,7 +375,7 @@ For standard all-tests runs, prefer the `scripts: test` or `scripts: build-and-t
 .\scripts\test.ps1 -Filter "CameraTest.*"             # Filter by test name
 .\scripts\test.ps1 -Build                             # Build first, then test
 .\scripts\test.ps1 -Build -Filter "Suite.TestName"    # Build + filtered test
-.\scripts\test.ps1 -ProblemsOnly                      # AI-friendly output
+.\scripts\test.ps1 -Verbose                           # Detailed output
 .\scripts\test.ps1 -Generator MSBuild -Config Release # Non-default config
 ```
 
@@ -392,6 +403,6 @@ For fast red-green iteration with filtered tests, see the `test-fix-loop` skill.
 - **Use scripts when you need parameters** — generator, config, filter, category, or full clean flags require calling scripts directly.
 - **Ninja (default)** for faster builds during development. MSBuild for IDE integration.
 - **Use `-Filter`** for focused test runs during development. See `test-fix-loop` skill for the full iteration strategy.
-- **Use `-ProblemsOnly`** when running tests for verification — keeps output small and parseable.
+- **Default test output is already compact** — add `-Verbose` only when you need the detailed underlying tool output.
 - **Run `.\scripts\format.ps1 -Check`** before committing to verify formatting.
 - **See the `terminal-management` skill** for PowerShell pitfalls, long-running command handling, and terminal session health.

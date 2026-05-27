@@ -42,6 +42,9 @@ $outputFailurePattern = '(?i)(assert failed|test failed|unknown file: Failure|\[
 
 . "$PSScriptRoot\vde-problems-only-helpers.ps1"
 
+$ProblemsOnly = Resolve-ProblemsOnlyPreference -BoundParameters $PSBoundParameters -VerboseRequested $Verbose
+$ShowWarningsInProblemsOnly = Resolve-ProblemsOnlyWarningPreference -BoundParameters $PSBoundParameters
+
 Write-Info "=========================================="
 Write-Info "VDE Smoke Test Script"
 Write-Info "=========================================="
@@ -72,15 +75,10 @@ if ($Filter) {
 
 # Build if requested
 if ($Build) {
-    if ($ProblemsOnly) {
-        Invoke-BuildForProblemsOnly -BuildScriptPath "$scriptDir\build.ps1" -SelectedGenerator $Generator -SelectedConfig $Config
-    } else {
-        Write-Info "Building before running smoke tests..."
-        & "$scriptDir\build.ps1" -Generator $Generator -Config $Config
-        if ($LASTEXITCODE -ne 0) {
-            Write-Err "Build failed! Cannot run smoke tests."
-            exit 1
-        }
+    $buildExitCode = Invoke-ScriptWithMode -ScriptPath "$scriptDir\build.ps1" -Arguments @('-Generator', $Generator, '-Config', $Config) -VerboseOutput:$Verbose
+    if ($buildExitCode -ne 0) {
+        Write-Err "FAILURE: Smoke tests did not run because the build failed."
+        exit $buildExitCode
     }
 }
 
@@ -302,10 +300,6 @@ function Get-AppSmokeMetadata {
 
     $targetName = [System.IO.Path]::GetFileNameWithoutExtension($ExeName)
     $sourceDir = Resolve-AppSourceDir -TargetName $targetName -CategoryRoot $CategoryRoot -TargetSourceMap $TargetSourceMap -ExplicitTomlTargetMap $ExplicitTomlTargetMap
-    if (-not $sourceDir -and -not $MissingMetadataWarnings.ContainsKey($targetName)) {
-        Write-Warn "No $CategoryLabel vde.toml source mapping found for $targetName; using default smoke metadata"
-        $MissingMetadataWarnings[$targetName] = $true
-    }
 
     $tomlPath = $null
     if ($sourceDir) {
@@ -403,7 +397,7 @@ function Resolve-AppSourceDir {
 
     foreach ($candidateName in ($candidateNames | Select-Object -Unique)) {
         $candidateDir = Join-Path (Join-Path $vdeRoot $CategoryRoot) $candidateName
-        if (Test-Path (Join-Path $candidateDir 'vde.toml')) {
+        if (Test-Path $candidateDir) {
             return $candidateDir
         }
     }
@@ -434,6 +428,13 @@ function Get-ExampleExes {
         Where-Object { $_.Name -notin $excludeFromExamples } |
         ForEach-Object {
             $metadata = Get-AppSmokeMetadata -ExeName $_.Name -CategoryRoot 'examples' -TargetSourceMap $exampleTargetSourceMap -ExplicitTomlTargetMap $explicitExampleTomlTargetMap -MissingMetadataWarnings $missingExampleMetadataWarnings -CategoryLabel 'example'
+            if (-not $metadata.SourceDir) {
+                if ($Verbose) {
+                    Write-Info "Skipping stale example artifact: $($_.Name)"
+                }
+                return
+            }
+
             [pscustomobject]@{
                 Name          = $_.Name
                 FullPath      = $_.FullName
@@ -458,6 +459,13 @@ function Get-GameExes {
         Where-Object { $_.Name -notin $excludeFromGames } |
         ForEach-Object {
             $metadata = Get-AppSmokeMetadata -ExeName $_.Name -CategoryRoot 'games' -TargetSourceMap $gameTargetSourceMap -ExplicitTomlTargetMap $explicitGameTomlTargetMap -MissingMetadataWarnings $missingGameMetadataWarnings -CategoryLabel 'game'
+            if (-not $metadata.SourceDir) {
+                if ($Verbose) {
+                    Write-Info "Skipping stale game artifact: $($_.Name)"
+                }
+                return
+            }
+
             [pscustomobject]@{
                 Name          = $_.Name
                 FullPath      = $_.FullName
@@ -536,6 +544,7 @@ if ($allExes.Count -eq 0) {
         Write-Warn "Only priority 2 examples/games matched. Re-run with -Extended to include them."
     }
     Write-Warn "Run with -Build flag to build first, or run .\scripts\build.ps1"
+    Write-Err "FAILURE: No smoke test executables matched the requested selection."
     exit 1
 }
 
@@ -592,9 +601,10 @@ foreach ($exe in $allExes) {
     $smokeScriptPath = Join-Path $scriptBaseDir $smokeScript
 
     if (-not (Test-Path $smokeScriptPath)) {
-        Write-Warn "  Smoke script not found: $smokeScript (skipping $($exe.Name))"
         if ($ProblemsOnly) {
-            Write-Warn "WARNING: [$($exe.Category)] $($exe.Name) skipped because smoke script '$smokeScript' was not found"
+            Write-Warn "[$($exe.Category)] $($exe.Name) skipped because smoke script '$smokeScript' was not found"
+        } else {
+            Write-Warn "  Smoke script not found: $smokeScript (skipping $($exe.Name))"
         }
         $skipCount++
         $results += [pscustomobject]@{
@@ -628,6 +638,7 @@ foreach ($exe in $allExes) {
         # Run the process with timeout via background job
         $job = Start-Job -ScriptBlock {
             param($exePath, $scriptPath, $workDir, $stdoutFile, $stderrFile)
+            $env:VK_LOADER_LAYERS_DISABLE = '~implicit~'
             Set-Location $workDir
             & $exePath "--input-script" $scriptPath > $stdoutFile 2> $stderrFile
             return $LASTEXITCODE
@@ -677,7 +688,7 @@ foreach ($exe in $allExes) {
     if ($passed) {
         $passCount++
         if ($ProblemsOnly) {
-            Write-ProblemLines -Prefix "[$($exe.Category)] $($exe.Name): " -Lines @($keyLines | Where-Object { Test-IsWarningLine -Line $_ })
+            Write-WarningSummary -Prefix "[$($exe.Category)] $($exe.Name): " -Lines $keyLines
         } elseif ($Verbose) {
             Write-Success "  PASSED"
         } else {
