@@ -677,8 +677,9 @@ TEST_F(PhysicsSceneTest, CollisionEndCallbackFiresOnSeparation) {
     // Keep stepping — A bounces away, collision end should fire
     for (int i = 0; i < 120; ++i) {
         phys.step(1.0f / 60.0f);
-        if (endCount > 0)
+        if (endCount > 0) {
             break;
+        }
     }
 
     EXPECT_GT(endCount, 0);
@@ -814,8 +815,9 @@ TEST_F(PhysicsSceneTest, PerBodyCollisionEndCallback) {
     // Keep stepping until per-body end fires
     for (int i = 0; i < 120; ++i) {
         phys.step(1.0f / 60.0f);
-        if (bodyAEndCount > 0)
+        if (bodyAEndCount > 0) {
             break;
+        }
     }
 
     EXPECT_GT(bodyAEndCount, 0);
@@ -949,8 +951,8 @@ TEST_F(PhysicsSceneTest, QueryAABBReturnsCorrectBodies) {
     auto results = phys.queryAABB({0.0f, 0.0f}, {6.0f, 6.0f});
 
     EXPECT_EQ(results.size(), 2);
-    bool foundA = std::find(results.begin(), results.end(), idA) != results.end();
-    bool foundB = std::find(results.begin(), results.end(), idB) != results.end();
+    bool foundA = std::ranges::find(results, idA) != results.end();
+    bool foundB = std::ranges::find(results, idB) != results.end();
     EXPECT_TRUE(foundA);
     EXPECT_TRUE(foundB);
 }
@@ -1034,8 +1036,8 @@ TEST(PhysicsBodyDefFactoryTest, DynamicBoxDefaults) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Dynamic);
     EXPECT_EQ(def.shape, PhysicsShape::Box);
-    EXPECT_FLOAT_EQ(def.position->x, 1.0f);
-    EXPECT_FLOAT_EQ(def.position->y, 2.0f);
+    EXPECT_FLOAT_EQ(def.position.value().x, 1.0f);  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_FLOAT_EQ(def.position.value().y, 2.0f);  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_FLOAT_EQ(def.extents.x, 0.5f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.3f);
     EXPECT_FLOAT_EQ(def.mass, 1.0f);
@@ -1056,9 +1058,9 @@ TEST(PhysicsBodyDefFactoryTest, DynamicCircleDefaults) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Dynamic);
     EXPECT_EQ(def.shape, PhysicsShape::Circle);
-    EXPECT_FLOAT_EQ(def.position->x, 3.0f);
-    EXPECT_FLOAT_EQ(def.position->y, 4.0f);
-    EXPECT_FLOAT_EQ(def.extents.x, 0.75f);  // radius stored in extents.x
+    EXPECT_FLOAT_EQ(def.position.value().x, 3.0f);  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_FLOAT_EQ(def.position.value().y, 4.0f);  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_FLOAT_EQ(def.extents.x, 0.75f);          // radius stored in extents.x
     EXPECT_FLOAT_EQ(def.mass, 1.0f);
     EXPECT_FLOAT_EQ(def.restitution, 0.2f);
     EXPECT_FLOAT_EQ(def.friction, 0.1f);
@@ -1077,7 +1079,7 @@ TEST(PhysicsBodyDefFactoryTest, StaticBox) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Static);
     EXPECT_EQ(def.shape, PhysicsShape::Box);
-    EXPECT_FLOAT_EQ(def.position->x, -5.0f);
+    EXPECT_FLOAT_EQ(def.position.value().x, -5.0f);  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_FLOAT_EQ(def.extents.x, 3.0f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.5f);
     EXPECT_FLOAT_EQ(def.mass, 0.0f);
@@ -1088,8 +1090,8 @@ TEST(PhysicsBodyDefFactoryTest, KinematicBox) {
 
     EXPECT_EQ(def.type, PhysicsBodyType::Kinematic);
     EXPECT_EQ(def.shape, PhysicsShape::Box);
-    EXPECT_FLOAT_EQ(def.position->x, 2.0f);
-    EXPECT_FLOAT_EQ(def.position->y, 1.0f);
+    EXPECT_FLOAT_EQ(def.position.value().x, 2.0f);  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_FLOAT_EQ(def.position.value().y, 1.0f);  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_FLOAT_EQ(def.extents.x, 1.0f);
     EXPECT_FLOAT_EQ(def.extents.y, 0.25f);
     EXPECT_FLOAT_EQ(def.mass, 0.0f);
@@ -1230,6 +1232,185 @@ TEST_F(PhysicsSceneTest, SetDesiredVelocitySingleStepRespectsAcceleration) {
     // Velocity change should be acceleration * dt = 5 * (1/60) ≈ 0.0833
     float expectedDeltaV = acceleration * cfg.fixedTimestep;
     EXPECT_NEAR(state.velocity.x, expectedDeltaV, 1e-4f);
+}
+
+// ============================================================================
+// Phase 5: Physics Sub-Phase Decomposition Tests
+// ============================================================================
+
+TEST_F(PhysicsSceneTest, StepPhases_MatchesStep_SingleBody) {
+    // stepPhases(dt, nullptr) must produce the same body position and velocity
+    // as step(dt) for a single body under gravity (one exact sub-step).
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, -9.81f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    cfg.maxSubSteps = 8;
+    float dt = cfg.fixedTimestep;  // exactly one sub-step
+
+    PhysicsBodyDef def;
+    def.type = PhysicsBodyType::Dynamic;
+    def.position = {0.0f, 10.0f};
+    def.extents = {0.5f, 0.5f};
+    def.mass = 1.0f;
+
+    // Reference: step()
+    PhysicsScene ref(cfg);
+    ref.createBody(def);
+    PhysicsBodyId refId = 1;  // first body
+    ref.step(dt);
+    PhysicsBodyState refState = ref.getBodyState(refId);
+
+    // New path: stepPhases()
+    PhysicsScene phased(cfg);
+    phased.createBody(def);
+    PhysicsBodyId phasedId = 1;
+    phased.stepPhases(dt, nullptr);
+    PhysicsBodyState phasedState = phased.getBodyState(phasedId);
+
+    EXPECT_NEAR(refState.position.x, phasedState.position.x, 1e-5f);
+    EXPECT_NEAR(refState.position.y, phasedState.position.y, 1e-5f);
+    EXPECT_NEAR(refState.velocity.x, phasedState.velocity.x, 1e-5f);
+    EXPECT_NEAR(refState.velocity.y, phasedState.velocity.y, 1e-5f);
+}
+
+TEST_F(PhysicsSceneTest, StepPhases_MatchesStep_Collision) {
+    // For a single accumulator sub-step, stepPhases() and step() must produce
+    // the same body positions after a two-body collision.
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    float dt = cfg.fixedTimestep;
+
+    PhysicsBodyDef defA;
+    defA.type = PhysicsBodyType::Dynamic;
+    defA.position = {0.0f, 0.0f};
+    defA.extents = {1.0f, 1.0f};
+    defA.mass = 1.0f;
+
+    PhysicsBodyDef defB;
+    defB.type = PhysicsBodyType::Dynamic;
+    defB.position = {1.5f, 0.0f};
+    defB.extents = {1.0f, 1.0f};
+    defB.mass = 1.0f;
+
+    // Reference: step()
+    PhysicsScene ref(cfg);
+    PhysicsBodyId refA = ref.createBody(defA);
+    PhysicsBodyId refB = ref.createBody(defB);
+    ref.step(dt);
+    auto stateRefA = ref.getBodyState(refA);
+    auto stateRefB = ref.getBodyState(refB);
+
+    // New path: stepPhases()
+    PhysicsScene phased(cfg);
+    PhysicsBodyId phasedA = phased.createBody(defA);
+    PhysicsBodyId phasedB = phased.createBody(defB);
+    phased.stepPhases(dt, nullptr);
+    auto statePhasedA = phased.getBodyState(phasedA);
+    auto statePhasedB = phased.getBodyState(phasedB);
+
+    EXPECT_NEAR(stateRefA.position.x, statePhasedA.position.x, 1e-4f);
+    EXPECT_NEAR(stateRefA.position.y, statePhasedA.position.y, 1e-4f);
+    EXPECT_NEAR(stateRefB.position.x, statePhasedB.position.x, 1e-4f);
+    EXPECT_NEAR(stateRefB.position.y, statePhasedB.position.y, 1e-4f);
+}
+
+TEST_F(PhysicsSceneTest, DrainStagedEvents_EmptyAfterDrain) {
+    // Calling drainStagedEvents() a second time must return an empty vector.
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    PhysicsScene phys(cfg);
+
+    PhysicsBodyDef defA;
+    defA.type = PhysicsBodyType::Dynamic;
+    defA.position = {0.0f, 0.0f};
+    defA.extents = {1.0f, 1.0f};
+    defA.mass = 1.0f;
+
+    PhysicsBodyDef defB;
+    defB.type = PhysicsBodyType::Dynamic;
+    defB.position = {1.0f, 0.0f};  // overlapping with A
+    defB.extents = {1.0f, 1.0f};
+    defB.mass = 1.0f;
+
+    phys.createBody(defA);
+    phys.createBody(defB);
+
+    // Stage events without firing them (use stepPhases, not step)
+    phys.stepPhases(cfg.fixedTimestep, nullptr);
+
+    auto first = phys.drainStagedEvents();
+    EXPECT_FALSE(first.empty()) << "Expected at least one staged collision event";
+
+    // Second drain must be empty
+    auto second = phys.drainStagedEvents();
+    EXPECT_TRUE(second.empty()) << "Buffer must be empty after drain";
+}
+
+TEST_F(PhysicsSceneTest, DrainStagedEvents_CollectsAcrossSubSteps) {
+    // Events staged across multiple fixed-timestep sub-steps should all be
+    // accessible via a single drainStagedEvents() call.
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    cfg.fixedTimestep = 1.0f / 60.0f;
+    cfg.maxSubSteps = 4;
+    PhysicsScene phys(cfg);
+
+    PhysicsBodyDef defA;
+    defA.type = PhysicsBodyType::Dynamic;
+    defA.position = {0.0f, 0.0f};
+    defA.extents = {1.0f, 1.0f};
+    defA.mass = 1.0f;
+
+    PhysicsBodyDef defB;
+    defB.type = PhysicsBodyType::Static;
+    defB.position = {1.0f, 0.0f};  // overlapping with A
+    defB.extents = {1.0f, 1.0f};
+
+    phys.createBody(defA);
+    phys.createBody(defB);
+
+    // Run 2 sub-steps in a single stepPhases call
+    phys.stepPhases(2.0f * cfg.fixedTimestep, nullptr);
+
+    // The single drain call must collect events from all sub-steps.
+    auto events = phys.drainStagedEvents();
+
+    // After drain, the buffer must be empty.
+    auto empty = phys.drainStagedEvents();
+    EXPECT_TRUE(empty.empty()) << "Buffer must be empty after drain";
+}
+
+TEST_F(PhysicsSceneTest, StepPhases_CallbackFiredByDrain) {
+    // Callbacks registered via setOnCollisionBegin must fire when drainStagedEvents
+    // is called, not during stepPhases().
+    PhysicsConfig cfg;
+    cfg.gravity = {0.0f, 0.0f};
+    PhysicsScene phys(cfg);
+
+    int callCount = 0;
+    phys.setOnCollisionBegin([&callCount](const CollisionEvent&) { callCount++; });
+
+    PhysicsBodyDef defA;
+    defA.type = PhysicsBodyType::Dynamic;
+    defA.position = {0.0f, 0.0f};
+    defA.extents = {1.0f, 1.0f};
+    defA.mass = 1.0f;
+
+    PhysicsBodyDef defB;
+    defB.type = PhysicsBodyType::Dynamic;
+    defB.position = {1.0f, 0.0f};
+    defB.extents = {1.0f, 1.0f};
+    defB.mass = 1.0f;
+
+    phys.createBody(defA);
+    phys.createBody(defB);
+
+    phys.stepPhases(cfg.fixedTimestep, nullptr);
+    EXPECT_EQ(callCount, 0) << "Callbacks must not fire during stepPhases — only on drain";
+
+    phys.drainStagedEvents();
+    EXPECT_GT(callCount, 0) << "Callbacks must fire on drainStagedEvents";
 }
 
 }  // namespace vde::test

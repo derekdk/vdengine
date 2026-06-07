@@ -7,6 +7,7 @@
  */
 
 #include <vde/api/PhysicsScene.h>
+#include <vde/api/ThreadPool.h>
 
 #include <algorithm>
 #include <cmath>
@@ -65,8 +66,19 @@ struct PhysicsScene::Impl {
     std::unordered_map<PhysicsBodyId, CollisionCallback> bodyOnCollisionEnd;
 
     // Track active collision pairs for collision-end detection
-    CollisionPairSet activePairs;
     CollisionPairSet previousPairs;  // Pairs from the last step
+
+    // Phase 5: broad-phase candidate pairs (AABB overlaps)
+    using CandidatePair = std::pair<PhysicsBodyId, PhysicsBodyId>;
+    std::vector<CandidatePair> m_candidatePairs;
+
+    // Phase 5: staged collision events — filled by resolveStep/doSingleResolve,
+    // drained by drainAndFire() / drainStagedEvents().
+    struct StagedEvent {
+        bool isBegin;
+        CollisionEvent event;
+    };
+    std::vector<StagedEvent> m_stagedEvents;
 
     // -----------------------------------------------------------------
     // Body management
@@ -102,7 +114,7 @@ struct PhysicsScene::Impl {
         return it->second;
     }
 
-    const PhysicsBody& getBody(PhysicsBodyId id) const {
+    [[nodiscard]] const PhysicsBody& getBody(PhysicsBodyId id) const {
         auto it = bodies.find(id);
         if (it == bodies.end()) {
             throw std::runtime_error("PhysicsScene: body " + std::to_string(id) + " not found");
@@ -120,7 +132,7 @@ struct PhysicsScene::Impl {
     };
 
     static AABB computeAABB(const PhysicsBody& body) {
-        AABB aabb;
+        AABB aabb{};
         if (body.def.shape == PhysicsShape::Circle || body.def.shape == PhysicsShape::Sphere) {
             float r = body.def.extents.x;
             aabb.min = body.state.position - glm::vec2(r, r);
@@ -305,20 +317,17 @@ struct PhysicsScene::Impl {
     }
 
     // -----------------------------------------------------------------
-    // Fixed-step simulation
+    // Fixed-step simulation — sub-phase helpers
     // -----------------------------------------------------------------
 
-    void singleStep() {
-        float dt = config.fixedTimestep;
-
-        // Collect body pointers for iteration
+    // Sub-phase 1 (one sub-step): save prevState, integrate forces and positions.
+    void doSingleIntegration(float dt) {
         std::vector<PhysicsBodyId> ids;
         ids.reserve(bodies.size());
         for (auto& [id, body] : bodies) {
             ids.push_back(id);
         }
 
-        // Save previous state for interpolation & integrate
         for (auto bodyId : ids) {
             auto& body = bodies[bodyId];
             body.prevState = body.state;
@@ -327,15 +336,13 @@ struct PhysicsScene::Impl {
                 continue;
             }
 
-            // Apply gravity
+            // Apply gravity + accumulated forces
             glm::vec2 acceleration =
                 config.gravity +
                 body.accumulatedForce * (body.def.mass > 0.0f ? 1.0f / body.def.mass : 0.0f);
             body.state.velocity += acceleration * dt;
 
-            // Apply damping: decay rate (1/s) via implicit Euler.
-            // Clamp to >= 0 to prevent energy injection or division-by-zero
-            // when linearDamping is negative (1 + d*dt could reach 0 or go negative).
+            // Apply damping via implicit Euler — clamp to prevent energy injection.
             float damping = std::max(0.0f, body.def.linearDamping);
             body.state.velocity *= 1.0f / (1.0f + damping * dt);
 
@@ -345,103 +352,152 @@ struct PhysicsScene::Impl {
             // Clear accumulated force
             body.accumulatedForce = {0.0f, 0.0f};
         }
+    }
 
-        // Collision detection and resolution (multiple iterations)
+    // Sub-phase 2 (one pass): AABB overlap detection.
+    // Clears m_candidatePairs and refills with pairs whose AABBs overlap.
+    void doSingleBroadPhase() {
+        m_candidatePairs.clear();
+
+        std::vector<PhysicsBodyId> ids;
+        ids.reserve(bodies.size());
+        for (auto& [id, body] : bodies) {
+            if (body.alive) {
+                ids.push_back(id);
+            }
+        }
+
+        for (size_t i = 0; i < ids.size(); ++i) {
+            for (size_t j = i + 1; j < ids.size(); ++j) {
+                const auto& bodyA = bodies.at(ids.at(i));
+                const auto& bodyB = bodies.at(ids.at(j));
+
+                // Skip if both are static/kinematic
+                if (bodyA.def.type != PhysicsBodyType::Dynamic &&
+                    bodyB.def.type != PhysicsBodyType::Dynamic) {
+                    continue;
+                }
+
+                AABB aabbA = computeAABB(bodyA);
+                AABB aabbB = computeAABB(bodyB);
+                if (aabbOverlap(aabbA, aabbB)) {
+                    m_candidatePairs.emplace_back(ids.at(i), ids.at(j));
+                }
+            }
+        }
+    }
+
+    // Sub-phase 3 (one pass): impulse resolution + collision event staging.
+    // Reads m_candidatePairs; appends to m_stagedEvents (does NOT clear it —
+    // callers that want a clean buffer must clear before calling).
+    void doSingleResolve() {
         CollisionPairSet currentFramePairs;
 
         for (int iter = 0; iter < config.iterations; ++iter) {
-            for (size_t i = 0; i < ids.size(); ++i) {
-                for (size_t j = i + 1; j < ids.size(); ++j) {
-                    auto& bodyA = bodies[ids[i]];
-                    auto& bodyB = bodies[ids[j]];
+            for (const auto& [idI, idJ] : m_candidatePairs) {
+                auto& bodyA = bodies[idI];
+                auto& bodyB = bodies[idJ];
 
-                    // Skip if both are static/kinematic
-                    if (bodyA.def.type != PhysicsBodyType::Dynamic &&
-                        bodyB.def.type != PhysicsBodyType::Dynamic) {
-                        continue;
-                    }
+                CollisionInfo info{};
+                if (computeCollision(bodyA, bodyB, info)) {
+                    auto pair =
+                        std::make_pair(std::min(info.idA, info.idB), std::max(info.idA, info.idB));
+                    currentFramePairs.insert(pair);
 
-                    CollisionInfo info;
-                    if (computeCollision(bodyA, bodyB, info)) {
-                        auto pair = std::make_pair(std::min(info.idA, info.idB),
-                                                   std::max(info.idA, info.idB));
-                        currentFramePairs.insert(pair);
-
-                        // Fire begin callbacks on first iteration only
-                        if (iter == 0) {
-                            // Only fire begin if this pair wasn't active last step
-                            bool isNew = (previousPairs.find(pair) == previousPairs.end());
-                            if (isNew) {
-                                CollisionEvent evt;
-                                evt.bodyA = info.idA;
-                                evt.bodyB = info.idB;
-                                evt.contactPoint = info.contactPoint;
-                                evt.normal = info.normal;
-                                evt.depth = info.depth;
-
-                                if (onCollisionBegin) {
-                                    onCollisionBegin(evt);
-                                }
-                                // Per-body callbacks
-                                auto itA = bodyOnCollisionBegin.find(info.idA);
-                                if (itA != bodyOnCollisionBegin.end()) {
-                                    itA->second(evt);
-                                }
-                                auto itB = bodyOnCollisionBegin.find(info.idB);
-                                if (itB != bodyOnCollisionBegin.end()) {
-                                    itB->second(evt);
-                                }
-                            }
+                    // Stage begin events only on first iteration for new pairs
+                    if (iter == 0) {
+                        bool isNew = (previousPairs.find(pair) == previousPairs.end());
+                        if (isNew) {
+                            CollisionEvent evt;
+                            evt.bodyA = info.idA;
+                            evt.bodyB = info.idB;
+                            evt.contactPoint = info.contactPoint;
+                            evt.normal = info.normal;
+                            evt.depth = info.depth;
+                            m_stagedEvents.push_back({.isBegin = true, .event = evt});
                         }
-
-                        resolveCollision(bodyA, bodyB, info);
                     }
+
+                    resolveCollision(bodyA, bodyB, info);
                 }
             }
         }
 
-        // Detect collision-end: pairs that were active previously but not now
+        // Stage end events for pairs that ended this step
         for (const auto& oldPair : previousPairs) {
             if (currentFramePairs.find(oldPair) == currentFramePairs.end()) {
-                // Both bodies must still exist for a meaningful end event
                 bool aExists = (bodies.find(oldPair.first) != bodies.end());
                 bool bExists = (bodies.find(oldPair.second) != bodies.end());
                 if (aExists && bExists) {
                     CollisionEvent evt;
                     evt.bodyA = oldPair.first;
                     evt.bodyB = oldPair.second;
-                    // Contact point / normal / depth are zero for end events
-
-                    if (onCollisionEnd) {
-                        onCollisionEnd(evt);
-                    }
-                    // Per-body end callbacks
-                    auto itA = bodyOnCollisionEnd.find(oldPair.first);
-                    if (itA != bodyOnCollisionEnd.end()) {
-                        itA->second(evt);
-                    }
-                    auto itB = bodyOnCollisionEnd.find(oldPair.second);
-                    if (itB != bodyOnCollisionEnd.end()) {
-                        itB->second(evt);
-                    }
+                    m_stagedEvents.push_back({.isBegin = false, .event = evt});
                 }
             }
         }
 
-        // Update active pairs for the next step
-        activePairs = currentFramePairs;
         previousPairs = currentFramePairs;
     }
 
-    void step(float deltaTime) {
+    // -----------------------------------------------------------------
+    // drainAndFire: dispatch all staged events, clear the buffer, return them.
+    // -----------------------------------------------------------------
+
+    std::vector<CollisionEvent> drainAndFire() {
+        std::vector<CollisionEvent> result;
+        result.reserve(m_stagedEvents.size());
+
+        for (const auto& staged : m_stagedEvents) {
+            result.push_back(staged.event);
+            if (staged.isBegin) {
+                if (onCollisionBegin) {
+                    onCollisionBegin(staged.event);
+                }
+                auto itA = bodyOnCollisionBegin.find(staged.event.bodyA);
+                if (itA != bodyOnCollisionBegin.end()) {
+                    itA->second(staged.event);
+                }
+                auto itB = bodyOnCollisionBegin.find(staged.event.bodyB);
+                if (itB != bodyOnCollisionBegin.end()) {
+                    itB->second(staged.event);
+                }
+            } else {
+                if (onCollisionEnd) {
+                    onCollisionEnd(staged.event);
+                }
+                auto itA = bodyOnCollisionEnd.find(staged.event.bodyA);
+                if (itA != bodyOnCollisionEnd.end()) {
+                    itA->second(staged.event);
+                }
+                auto itB = bodyOnCollisionEnd.find(staged.event.bodyB);
+                if (itB != bodyOnCollisionEnd.end()) {
+                    itB->second(staged.event);
+                }
+            }
+        }
+
+        m_stagedEvents.clear();
+        return result;
+    }
+
+    // -----------------------------------------------------------------
+    // Interleaved accumulator loop (used by step() for backward compat).
+    // Events accumulate across sub-steps; caller is responsible for
+    // draining via drainAndFire().
+    // -----------------------------------------------------------------
+
+    void doStepPhases(float deltaTime) {
+        m_stagedEvents.clear();  // start this frame's event buffer clean
         accumulator += deltaTime;
         lastStepCount = 0;
 
-        int steps = 0;
-        while (accumulator >= config.fixedTimestep && steps < config.maxSubSteps) {
-            singleStep();
+        while (accumulator >= config.fixedTimestep && lastStepCount < config.maxSubSteps) {
+            doSingleIntegration(config.fixedTimestep);
+            doSingleBroadPhase();
+            doSingleResolve();  // appends to m_stagedEvents
             accumulator -= config.fixedTimestep;
-            steps++;
+            lastStepCount++;
         }
 
         // Clamp accumulator to prevent spiral of death
@@ -449,9 +505,46 @@ struct PhysicsScene::Impl {
             accumulator = config.fixedTimestep;
         }
 
-        lastStepCount = steps;
         interpolationAlpha =
-            config.fixedTimestep > 0.0f ? accumulator / config.fixedTimestep : 0.0f;
+            (config.fixedTimestep > 0.0f) ? accumulator / config.fixedTimestep : 0.0f;
+    }
+
+    // -----------------------------------------------------------------
+    // Scheduler sub-phase methods.
+    //
+    // In v1, integrationStep() runs the complete fixed-timestep loop
+    // (integrate + detect + resolve) for all sub-steps via doStepPhases().
+    // broadPhaseStep() and resolveStep() are no-ops, reserved for future
+    // intra-scene parallelism (per-body chunk dispatch) without blocking waits.
+    //
+    // Scene-level parallelism (the primary Phase 5 goal) is achieved by the
+    // scheduler dispatching each scene's integrationStep task to a worker thread.
+    // Multiple scenes integrate concurrently; their broadPhase and resolve
+    // tasks are instant barriers that maintain the dependency ordering for
+    // future extensibility.
+    // -----------------------------------------------------------------
+
+    // Used by scene.physics.integrate scheduler task.
+    // Runs the complete fixed-timestep loop for all sub-steps.
+    void integrationStep(float deltaTime) { doStepPhases(deltaTime); }
+
+    // Used by scene.physics.broadPhase scheduler task.
+    // No-op in v1 — integrationStep() already ran the full interleaved loop.
+    // Reserved for future intra-scene parallelism.
+    void broadPhaseStep() {}
+
+    // Used by scene.physics.resolve scheduler task.
+    // No-op in v1 — integrationStep() already ran the full interleaved loop.
+    // Reserved for future intra-scene parallelism.
+    void resolveStep() {}
+
+    // -----------------------------------------------------------------
+    // Backward-compatible step() — interleaved loop + synchronous dispatch.
+    // -----------------------------------------------------------------
+
+    void step(float deltaTime) {
+        doStepPhases(deltaTime);
+        drainAndFire();  // fire callbacks synchronously; ignore returned events
     }
 };
 
@@ -548,6 +641,26 @@ void PhysicsScene::step(float deltaTime) {
     m_impl->step(deltaTime);
 }
 
+void PhysicsScene::stepPhases(float deltaTime, ThreadPool* /* pool */) {
+    m_impl->doStepPhases(deltaTime);
+}
+
+void PhysicsScene::integrationStep(float deltaTime) {
+    m_impl->integrationStep(deltaTime);
+}
+
+void PhysicsScene::broadPhaseStep() {
+    m_impl->broadPhaseStep();
+}
+
+void PhysicsScene::resolveStep() {
+    m_impl->resolveStep();
+}
+
+std::vector<CollisionEvent> PhysicsScene::drainStagedEvents() {
+    return m_impl->drainAndFire();
+}
+
 float PhysicsScene::getInterpolationAlpha() const {
     return m_impl->interpolationAlpha;
 }
@@ -596,8 +709,9 @@ bool PhysicsScene::raycast(const glm::vec2& origin, const glm::vec2& direction, 
     float closestDist = maxDistance;
 
     for (const auto& [id, body] : m_impl->bodies) {
-        if (!body.alive)
+        if (!body.alive) {
             continue;
+        }
 
         PhysicsScene::Impl::AABB aabb = PhysicsScene::Impl::computeAABB(body);
 
@@ -615,12 +729,14 @@ bool PhysicsScene::raycast(const glm::vec2& origin, const glm::vec2& direction, 
             float invD = 1.0f / dir.x;
             float t1 = (aabb.min.x - origin.x) * invD;
             float t2 = (aabb.max.x - origin.x) * invD;
-            if (t1 > t2)
+            if (t1 > t2) {
                 std::swap(t1, t2);
+            }
             tmin = std::max(tmin, t1);
             tmax = std::min(tmax, t2);
-            if (tmin > tmax)
+            if (tmin > tmax) {
                 continue;
+            }
         }
 
         // Y slab
@@ -632,12 +748,14 @@ bool PhysicsScene::raycast(const glm::vec2& origin, const glm::vec2& direction, 
             float invD = 1.0f / dir.y;
             float t1 = (aabb.min.y - origin.y) * invD;
             float t2 = (aabb.max.y - origin.y) * invD;
-            if (t1 > t2)
+            if (t1 > t2) {
                 std::swap(t1, t2);
+            }
             tmin = std::max(tmin, t1);
             tmax = std::min(tmax, t2);
-            if (tmin > tmax)
+            if (tmin > tmax) {
                 continue;
+            }
         }
 
         // We have a valid intersection at tmin
@@ -650,16 +768,17 @@ bool PhysicsScene::raycast(const glm::vec2& origin, const glm::vec2& direction, 
             // Compute hit normal (which face was hit)
             glm::vec2 hitPoint = outHit.point;
             float eps = 0.001f;
-            if (std::abs(hitPoint.x - aabb.min.x) < eps)
+            if (std::abs(hitPoint.x - aabb.min.x) < eps) {
                 outHit.normal = {-1.0f, 0.0f};
-            else if (std::abs(hitPoint.x - aabb.max.x) < eps)
+            } else if (std::abs(hitPoint.x - aabb.max.x) < eps) {
                 outHit.normal = {1.0f, 0.0f};
-            else if (std::abs(hitPoint.y - aabb.min.y) < eps)
+            } else if (std::abs(hitPoint.y - aabb.min.y) < eps) {
                 outHit.normal = {0.0f, -1.0f};
-            else if (std::abs(hitPoint.y - aabb.max.y) < eps)
+            } else if (std::abs(hitPoint.y - aabb.max.y) < eps) {
                 outHit.normal = {0.0f, 1.0f};
-            else
+            } else {
                 outHit.normal = -dir;  // fallback
+            }
 
             hit = true;
         }
@@ -672,13 +791,14 @@ std::vector<PhysicsBodyId> PhysicsScene::queryAABB(const glm::vec2& min,
                                                    const glm::vec2& max) const {
     std::vector<PhysicsBodyId> result;
 
-    PhysicsScene::Impl::AABB queryBox;
+    PhysicsScene::Impl::AABB queryBox{};
     queryBox.min = min;
     queryBox.max = max;
 
     for (const auto& [id, body] : m_impl->bodies) {
-        if (!body.alive)
+        if (!body.alive) {
             continue;
+        }
 
         PhysicsScene::Impl::AABB bodyAABB = PhysicsScene::Impl::computeAABB(body);
         if (PhysicsScene::Impl::aabbOverlap(queryBox, bodyAABB)) {

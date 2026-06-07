@@ -27,6 +27,7 @@
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 
 #include "stb_image.h"
 #include "stb_image_write.h"
@@ -253,6 +254,26 @@ void Game::run() {
 
     // Build the initial scheduler task graph
     rebuildSchedulerGraph();
+
+    // Ensure the thread pool is ready before the first frame.
+    // Minimum 3 workers to allow physics sub-phases from different scenes to
+    // overlap.  Default: max(3, hardware_concurrency - 1), capped at 16.
+    {
+        const size_t kMinWorkers = 3;
+        const size_t kMaxWorkers = 16;
+        size_t current = m_scheduler.getWorkerThreadCount();
+        if (current == 0) {
+            size_t hw = std::thread::hardware_concurrency();
+            size_t target = (hw > 1) ? (hw - 1) : kMinWorkers;
+            target = std::max(target, kMinWorkers);
+            target = std::min(target, kMaxWorkers);
+            m_scheduler.setWorkerThreadCount(target);
+        } else if (current < kMinWorkers) {
+            std::cerr << "[VDE] Worker thread count clamped from " << current << " to "
+                      << kMinWorkers << " (minimum for physics parallelism)\n";
+            m_scheduler.setWorkerThreadCount(kMinWorkers);
+        }
+    }
 
     // Main game loop
     while (m_running && !m_window->shouldClose()) {
@@ -2588,16 +2609,36 @@ void Game::rebuildSchedulerGraph() {
             // Physics chain (optional) — depends only on this scene's gameLogic
             TaskId visualDep = gameLogicTask;
             if (scene->hasPhysics()) {
-                // Physics step — worker-eligible: operates only on this scene's physics data
-                TaskId physicsTask = m_scheduler.addTask({
-                    .name = "scene.physics." + sceneName,
+                // Sub-phase 1: Integration — worker-eligible (no callbacks, no shared state)
+                TaskId physicsIntegrateTask = m_scheduler.addTask({
+                    .name = "scene.physics.integrate." + sceneName,
                     .phase = TaskPhase::Physics,
-                    .work = [this, scene]() { scene->getPhysicsScene()->step(m_deltaTime); },
+                    .work = [this,
+                             scene]() { scene->getPhysicsScene()->integrationStep(m_deltaTime); },
                     .dependsOn = {gameLogicTask},
                     .mainThreadOnly = false  // worker-eligible
                 });
 
-                // PostPhysics — main-thread: sync transforms, dispatch staged callbacks
+                // Sub-phase 2: Broad-phase AABB detection — worker-eligible
+                TaskId physicsBroadPhaseTask = m_scheduler.addTask({
+                    .name = "scene.physics.broadPhase." + sceneName,
+                    .phase = TaskPhase::Physics,
+                    .work = [scene]() { scene->getPhysicsScene()->broadPhaseStep(); },
+                    .dependsOn = {physicsIntegrateTask},
+                    .mainThreadOnly = false  // worker-eligible
+                });
+
+                // Sub-phase 3: Impulse resolution + event staging — worker-eligible
+                TaskId physicsResolveTask = m_scheduler.addTask({
+                    .name = "scene.physics.resolve." + sceneName,
+                    .phase = TaskPhase::Physics,
+                    .work = [scene]() { scene->getPhysicsScene()->resolveStep(); },
+                    .dependsOn = {physicsBroadPhaseTask},
+                    .mainThreadOnly = false  // worker-eligible
+                });
+
+                // PostPhysics — main-thread: drain staged collision callbacks,
+                // then sync interpolated transforms to physics entities.
                 TaskId postPhysicsTask = m_scheduler.addTask(
                     {.name = "scene.postPhysics." + sceneName,
                      .phase = TaskPhase::PostPhysics,
@@ -2606,7 +2647,11 @@ void Game::rebuildSchedulerGraph() {
                              if (!scene->hasPhysics()) {
                                  return;
                              }
-                             float alpha = scene->getPhysicsScene()->getInterpolationAlpha();
+                             auto* ps = scene->getPhysicsScene();
+                             // Dispatch staged collision events on the main thread.
+                             ps->drainStagedEvents();
+                             // Sync interpolated transforms.
+                             float alpha = ps->getInterpolationAlpha();
                              for (auto& entityRef : scene->getEntities()) {
                                  auto* pe = dynamic_cast<PhysicsEntity*>(entityRef.get());
                                  if (pe && pe->getAutoSync()) {
@@ -2614,7 +2659,7 @@ void Game::rebuildSchedulerGraph() {
                                  }
                              }
                          },
-                     .dependsOn = {physicsTask},
+                     .dependsOn = {physicsResolveTask},
                      .mainThreadOnly = true});
 
                 visualDep = postPhysicsTask;
