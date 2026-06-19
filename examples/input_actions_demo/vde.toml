@@ -1,0 +1,10 @@
+[smoke]
+scripts = ["smoke_input_actions_demo.vdescript"]
+sections = ["entity", "input"]
+
+[render_verify]
+scripts = ["verify_input_actions_demo.vdescript"]
+capture_script = "capture_input_actions_demo.vdescript"
+priority = 2
+golden = "input_actions_demo.png"
+threshold = 0.05

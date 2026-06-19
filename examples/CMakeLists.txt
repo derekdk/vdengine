@@ -296,3 +296,6 @@ add_vde_example(vde_animation_demo "animation_demo/main.cpp")
 
 # Multi-Scene Animation Demo example
 add_vde_example(vde_multi_scene_animation_demo "multi_scene_animation_demo/main.cpp")
+
+# Input Actions Demo example
+add_vde_example(vde_input_actions_demo "input_actions_demo/main.cpp")

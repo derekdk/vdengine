@@ -43,6 +43,7 @@
 #include "ViewportRect.h"
 
 // Input handling
+#include "InputActionMap.h"
 #include "InputHandler.h"
 #include "InputScript.h"
 #include "InputScriptExecutor.h"

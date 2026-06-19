@@ -1,0 +1,31 @@
+# Smoke test: Input Actions Demo
+# Verify named actions, preset swapping, and deterministic persistence behavior.
+wait startup
+wait 250
+press R
+wait 250
+
+keydown D
+wait 350
+keyup D
+
+press SPACE
+wait 250
+
+keydown shift+W
+wait 300
+keyup shift+W
+wait 200
+
+press TAB
+wait 250
+
+keydown L
+wait 350
+keyup L
+wait 250
+
+press R
+wait 250
+
+exit

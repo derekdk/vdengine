@@ -69,24 +69,29 @@ Camera2D::setLookAhead(float pixels, float direction)
 
 ---
 
-### 8. Input Action Mapping / Binding Layer
-**Score: 4.0** — Frequency 5 · Workaround 3 · Scope 5 · Credibility 4
+### 8. Advanced Input Semantics / Rebinding UX
+**Score: 3.1** — Frequency 4 · Workaround 2 · Scope 4 · Credibility 3
 
-VDE input is raw key/button events. Games need an abstraction layer:
+VDE now has a shipped input action layer via `InputActionMap`, including:
 
 - Named actions ("Jump", "Attack", "MoveLeft") bound to one or more physical inputs
-- Rebindable at runtime (settings menu)
-- Dead zone configuration for analog sticks
-- Input buffering for fighting game inputs (e.g., queue a punch during hitstun)
-
-**What's needed:**
-- `InputAction` class with name and bound keys/buttons
-- `InputMap` that translates raw events into action events
+- Keyboard, gamepad button, and thresholded gamepad-axis bindings
+- Action states: pressed, held, released
 - Serialization to/from `StorageManager` for saved bindings
-- Action states: pressed, held, released (not just events)
-- Optional input buffer with configurable window
 
-**Status:** Not tracked. New suggestion.
+The remaining gap is the advanced workflow around that layer:
+
+- Rebindable runtime UI for settings menus
+- Per-action analog/deadzone tuning workflows beyond thresholded axes
+- Input buffering for fighting game inputs (e.g., queue a punch during hitstun)
+- Higher-level intent helpers for analog movement/look actions
+
+**What's still needed:**
+- Built-in rebinding/prompt flow for changing bindings at runtime
+- Optional buffered-input window API on top of action states
+- Additional docs/examples for migrating older raw-input examples
+
+**Status:** Partially addressed. Core action mapping shipped; advanced semantics remain.
 
 ---
 
