@@ -6,7 +6,7 @@ A lightweight, reusable Vulkan-based rendering engine designed for rapid prototy
 
 VDE provides a clean abstraction over Vulkan's verbose API while maintaining flexibility for advanced use cases. The engine is organized in two layers:
 
-For the current implemented, partial, and planned feature picture, start with [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md). It is the canonical high-level status document for this repository.
+For a current picture of implemented, partial, and planned features, start with [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md). It is the canonical high-level status document for this repository.
 
 **Game API (high-level)** — the recommended way to build applications:
 - **Scene System**: `Game`, `Scene`, `SceneGroup` with per-scene cameras, viewports, and lifecycle
