@@ -13,6 +13,8 @@
 
 using namespace vde;
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+
 // ============================================================================
 // SimpleCamera Tests
 // ============================================================================
@@ -59,8 +61,9 @@ TEST_F(SimpleCameraTest, SetDirection) {
     bool hasNonZero = false;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            if (view[i][j] != 0.0f)
+            if (view[i][j] != 0.0f) {
                 hasNonZero = true;
+            }
         }
     }
     EXPECT_TRUE(hasNonZero);
@@ -96,8 +99,9 @@ TEST_F(SimpleCameraTest, GetViewMatrix) {
     bool hasNonZero = false;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            if (view[i][j] != 0.0f)
+            if (view[i][j] != 0.0f) {
                 hasNonZero = true;
+            }
         }
     }
     EXPECT_TRUE(hasNonZero);
@@ -229,8 +233,9 @@ TEST_F(OrbitCameraTest, GetViewMatrix) {
     bool hasNonZero = false;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            if (view[i][j] != 0.0f)
+            if (view[i][j] != 0.0f) {
                 hasNonZero = true;
+            }
         }
     }
     EXPECT_TRUE(hasNonZero);
@@ -302,6 +307,79 @@ TEST_F(Camera2DTest, MoveAddsToPosition) {
     EXPECT_FLOAT_EQ(pos.y, 3.0f);
 }
 
+TEST_F(Camera2DTest, FollowTargetSnapsWhenSpeedIsZero) {
+    camera->followTarget(glm::vec2(6.0f, -2.0f), 0.0f);
+    camera->update(1.0f);
+
+    glm::vec2 pos = camera->getPosition();
+    EXPECT_FLOAT_EQ(pos.x, 6.0f);
+    EXPECT_FLOAT_EQ(pos.y, -2.0f);
+}
+
+TEST_F(Camera2DTest, DeadzoneKeepsSmallTargetMotionCentered) {
+    camera->setDeadzone(4.0f, 2.0f);
+
+    camera->followTarget(glm::vec2(1.5f, 0.5f), 0.0f);
+    camera->update(1.0f);
+
+    glm::vec2 pos = camera->getPosition();
+    EXPECT_FLOAT_EQ(pos.x, 0.0f);
+    EXPECT_FLOAT_EQ(pos.y, 0.0f);
+
+    camera->followTarget(glm::vec2(4.0f, 0.0f), 0.0f);
+    camera->update(1.0f);
+
+    pos = camera->getPosition();
+    EXPECT_FLOAT_EQ(pos.x, 2.0f);
+    EXPECT_FLOAT_EQ(pos.y, 0.0f);
+}
+
+TEST_F(Camera2DTest, LookAheadUsesRecentTargetVelocity) {
+    camera->setLookAhead(3.0f, 0.5f, 0.0f);
+
+    camera->followTarget(glm::vec2(0.0f, 0.0f), 0.0f);
+    camera->update(1.0f);
+
+    camera->followTarget(glm::vec2(10.0f, 0.0f), 0.0f);
+    camera->update(1.0f);
+
+    glm::vec2 pos = camera->getPosition();
+    EXPECT_FLOAT_EQ(pos.x, 13.0f);
+    EXPECT_FLOAT_EQ(pos.y, 0.0f);
+}
+
+TEST_F(Camera2DTest, ZoomToInterpolatesTowardTargetZoom) {
+    camera->zoomTo(2.0f, 4.0f);
+    camera->update(0.1f);
+
+    EXPECT_GT(camera->getZoom(), 1.0f);
+    EXPECT_LT(camera->getZoom(), 2.0f);
+
+    for (int index = 0; index < 30; ++index) {
+        camera->update(0.1f);
+    }
+
+    EXPECT_NEAR(camera->getZoom(), 2.0f, 0.01f);
+}
+
+TEST_F(Camera2DTest, ShakeOffsetsVisibleRectTemporarily) {
+    camera->shake(1.0f, 0.3f, 0.0f);
+    camera->update(0.1f);
+
+    const Rect2D shakenRect = camera->getVisibleRect();
+    const float shakenCenterX = (shakenRect.left + shakenRect.right) * 0.5f;
+    const float shakenCenterY = (shakenRect.bottom + shakenRect.top) * 0.5f;
+    EXPECT_TRUE((std::fabs(shakenCenterX) > 0.001f) || (std::fabs(shakenCenterY) > 0.001f));
+
+    camera->update(1.0f);
+
+    const Rect2D settledRect = camera->getVisibleRect();
+    const float settledCenterX = (settledRect.left + settledRect.right) * 0.5f;
+    const float settledCenterY = (settledRect.bottom + settledRect.top) * 0.5f;
+    EXPECT_NEAR(settledCenterX, 0.0f, 0.001f);
+    EXPECT_NEAR(settledCenterY, 0.0f, 0.001f);
+}
+
 TEST_F(Camera2DTest, ProjectionIsOrthographic) {
     glm::mat4 proj = camera->getProjectionMatrix();
 
@@ -316,8 +394,9 @@ TEST_F(Camera2DTest, GetViewMatrix) {
     bool hasNonZero = false;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            if (view[i][j] != 0.0f)
+            if (view[i][j] != 0.0f) {
                 hasNonZero = true;
+            }
         }
     }
     EXPECT_TRUE(hasNonZero);
@@ -481,3 +560,5 @@ TEST_F(Camera2DTest, GetVisibleRectWithZoom) {
     EXPECT_FLOAT_EQ(rect.bottom, -3.75f);
     EXPECT_FLOAT_EQ(rect.top, 3.75f);
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)

@@ -821,6 +821,18 @@ Camera2D(float width, float height);
 | `void setRotation(float degrees)` | Set rotation |
 | `void setViewportSize(float w, float h)` | Set viewport size |
 | `void move(float dx, float dy)` | Move camera |
+| `void followTarget(const glm::vec2& target, float speed = 5.0f)` | Request smoothed follow toward a target position for the current frame |
+| `void setDeadzone(float width, float height)` | Keep the followed target inside a centered rectangle before the camera moves |
+| `void setLookAhead(float maxDistance, float lookAheadSeconds = 0.15f, float smoothing = 8.0f)` | Offset follow by recent target velocity |
+| `void shake(float intensity, float durationSec, float decayRate = 5.0f)` | Apply time-limited decaying screen shake |
+| `void zoomTo(float targetZoom, float speed)` | Smoothly interpolate toward a target zoom level |
+| `Rect2D getVisibleRect() const` | Query the current visible world-space rectangle |
+
+Notes:
+
+- `followTarget()` is intended to be called during your scene update with the target's current world position.
+- All feel helpers are optional and preserve the old `Camera2D` behavior until explicitly enabled.
+- The engine advances `Camera2D::update()` automatically during normal scene execution, so `shake()` and `zoomTo()` animate without extra wiring.
 
 ---
 

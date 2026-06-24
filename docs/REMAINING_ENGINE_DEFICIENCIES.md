@@ -46,26 +46,31 @@ has no culling.
 
 ---
 
-### 7. Camera2D Deadzone, Shake & Smooth Zoom
-**Score: 4.3** — Frequency 5 · Workaround 4 · Scope 4 · Credibility 4
+### 7. Advanced Camera2D Constraints and Composition
+**Score: 2.6** — Frequency 3 · Workaround 2 · Scope 3 · Credibility 3
 
-Camera feel is critical to 2D game quality. VDE's `Camera2D` supports basic follow with
-lerp, but lacks:
+VDE now ships the core camera-feel layer on `Camera2D`, including:
 
-- **Deadzone**: Area around the target where the camera doesn't move (prevents jitter
-  during idle animations, allows player to look ahead)
-- **Screen shake**: Time-limited, decaying offset for impacts and explosions
-- **Smooth zoom**: Animated zoom transitions for dramatic moments or UI focus
+- `followTarget()` for per-frame target following
+- `setDeadzone()` for jitter-resistant follow windows
+- `setLookAhead()` for velocity-based lead
+- `shake()` for time-limited decaying shake
+- `zoomTo()` for smooth zoom interpolation
 
-**What's needed:**
+The remaining gap is the next layer above that core API:
+
+- **Bounds / confinement**: Constrain camera travel to a level rectangle or track
+- **Camera rails / authored paths**: Follow gameplay while staying on a designed route
+- **Higher-level composition presets**: Separate horizontal/vertical tuning, easing presets, or anchor-based framing helpers
+
+**What's still needed:**
 ```
-Camera2D::setDeadzone(float width, float height)
-Camera2D::shake(float intensity, float durationSec, float decayRate = 5.0f)
-Camera2D::zoomTo(float targetZoom, float speed)
-Camera2D::setLookAhead(float pixels, float direction)
+Camera2D::setBounds(float minX, float minY, float maxX, float maxY)
+Camera2D::setBoundsEnabled(bool enabled)
+Camera2D::setFollowAxes(bool horizontal, bool vertical)
 ```
 
-**Status:** Partially noted in `OPEN_SUGGESTIONS.md` (#9). Shake and deadzone not started.
+**Status:** Core feel helpers shipped and demonstrated in `camera_feel_demo`; advanced constraints/composition are still open.
 
 ---
 

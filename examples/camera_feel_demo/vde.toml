@@ -1,0 +1,10 @@
+[smoke]
+scripts = ["smoke_camera_feel_demo.vdescript"]
+sections = ["entity", "input"]
+
+[render_verify]
+scripts = ["verify_camera_feel_demo.vdescript"]
+capture_script = "capture_camera_feel_demo.vdescript"
+priority = 2
+golden = "camera_feel_demo.png"
+threshold = 0.05

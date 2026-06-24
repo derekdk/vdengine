@@ -1,0 +1,13 @@
+# Render verification: Camera Feel Demo
+# Compare the stable combined-mode frame against the golden image.
+wait startup
+press R
+wait 200
+press 4
+wait 1200
+
+screenshot render_verify_output/camera_feel_demo.png
+wait 100
+compare render_verify_output/camera_feel_demo.png ../../smoketests/golden/camera_feel_demo.png 0.05
+
+exit

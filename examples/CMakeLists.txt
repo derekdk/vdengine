@@ -299,3 +299,6 @@ add_vde_example(vde_multi_scene_animation_demo "multi_scene_animation_demo/main.
 
 # Input Actions Demo example
 add_vde_example(vde_input_actions_demo "input_actions_demo/main.cpp")
+
+# Camera Feel Demo example
+add_vde_example(vde_camera_feel_demo "camera_feel_demo/main.cpp")

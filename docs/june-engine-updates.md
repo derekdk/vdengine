@@ -85,6 +85,21 @@ Replace repeated per-example key handling with named, rebindable actions.
 
 ## Phase B: Camera2D Feel Helpers (Week 2-3)
 
+### Status Snapshot (2026-06-19)
+
+Initial vertical slice delivered:
+
+- `Camera2D` now exposes `followTarget()`, `setDeadzone()`, `setLookAhead()`, `shake()`, and `zoomTo()`
+- normal scene execution now advances `GameCamera::update()` so camera interpolation and shake run without extra user wiring
+- `GameCamera_test.cpp` covers the new Camera2D helper semantics
+- runnable `camera_feel_demo` example added with smoke coverage
+
+Remaining follow-up for this phase after the initial slice:
+
+- camera bounds / confinement helpers
+- more opinionated composition presets or per-axis tuning helpers
+- broader migration of older 2D examples to the new follow helper API
+
 ### Goal
 
 Add core camera-feel tools expected for modern 2D gameplay.

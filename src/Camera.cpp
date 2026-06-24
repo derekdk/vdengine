@@ -9,10 +9,7 @@ namespace vde {
 
 Camera::Camera()
     : m_position(0.0f, 10.0f, 10.0f), m_target(0.0f, 0.0f, 0.0f), m_up(0.0f, 1.0f, 0.0f),
-      m_pitch(45.0f), m_yaw(0.0f) {
-    // Default distance for typical use
-    m_distance = 20.0f;
-
+      m_distance(20.0f), m_pitch(45.0f), m_yaw(0.0f) {
     // Update position to match the distance
     updatePositionFromOrbit();
 }
@@ -129,6 +126,7 @@ glm::mat4 Camera::getProjectionMatrix() const {
     }
 
     // Vulkan Y-flip: Vulkan has Y pointing down, unlike OpenGL
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     proj[1][1] *= -1;
 
     return proj;
