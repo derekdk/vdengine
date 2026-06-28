@@ -1,0 +1,42 @@
+# Smoke test: Camera Feel Demo
+# Exercise deadzone, look-ahead, zoom, shake, and combined camera helpers.
+wait startup
+wait 250
+
+press R
+wait 200
+
+press 1
+keydown D
+wait 450
+keyup D
+wait 250
+
+press 2
+keydown W
+wait 350
+keyup W
+keydown D
+wait 400
+keyup D
+wait 250
+
+press 3
+wait 700
+
+press SPACE
+wait 300
+
+press 4
+keydown D
+wait 450
+keyup D
+keydown S
+wait 300
+keyup S
+wait 350
+
+press R
+wait 250
+
+exit

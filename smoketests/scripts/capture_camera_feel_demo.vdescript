@@ -1,0 +1,12 @@
+# Golden image capture: Camera Feel Demo
+# Capture a stable combined-mode frame after the zoom settles.
+wait startup
+press R
+wait 200
+press 4
+wait 1200
+
+screenshot render_verify_output/camera_feel_demo.png
+wait 100
+
+exit

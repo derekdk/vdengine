@@ -391,6 +391,56 @@ class Camera2D : public GameCamera {
     void move(float deltaX, float deltaY);
 
     /**
+     * @brief Request that the camera follow a target position this frame.
+     *
+     * Call this during scene update with the target's current world position.
+     * A speed of 0 snaps immediately; higher values interpolate more quickly.
+     */
+    void followTarget(const glm::vec2& target, float speed = 5.0f);
+
+    /**
+     * @brief Set the follow deadzone size in world units.
+     *
+     * When the followed target remains inside this rectangle centered on the
+     * camera, the camera does not move. Set either dimension to 0 to disable
+     * deadzone behavior on that axis.
+     */
+    void setDeadzone(float width, float height);
+
+    /**
+     * @brief Enable velocity-based look-ahead for followTarget().
+     *
+     * The follow target is offset in its movement direction by an amount based
+     * on recent velocity, clamped to maxDistance.
+     *
+     * @param maxDistance Maximum look-ahead offset in world units
+     * @param lookAheadSeconds Velocity-to-offset scale in seconds
+     * @param smoothing Interpolation speed for the offset (0 = instant)
+     */
+    void setLookAhead(float maxDistance, float lookAheadSeconds = 0.15f, float smoothing = 8.0f);
+
+    /**
+     * @brief Apply a temporary decaying shake offset.
+     *
+     * @param intensity Maximum shake amplitude in world units
+     * @param durationSec Total shake duration in seconds
+     * @param decayRate Exponential decay rate applied over the shake lifetime
+     */
+    void shake(float intensity, float durationSec, float decayRate = 5.0f);
+
+    /**
+     * @brief Smoothly interpolate to a target zoom level.
+     *
+     * A speed of 0 snaps immediately; higher values interpolate more quickly.
+     */
+    void zoomTo(float targetZoom, float speed);
+
+    /**
+     * @brief Advance follow, shake, and zoom interpolation.
+     */
+    void update(float deltaTime) override;
+
+    /**
      * @brief Get the world-space rectangle currently visible on screen.
      *
      * Computes the axis-aligned bounding box of the visible area based on
@@ -419,6 +469,27 @@ class Camera2D : public GameCamera {
     float m_rotation = 0.0f;
     float m_viewportWidth = defaults::DEFAULT_SCREEN_WIDTH;
     float m_viewportHeight = defaults::DEFAULT_SCREEN_HEIGHT;
+    glm::vec2 m_renderOffset{0.0f};
+
+    glm::vec2 m_followTarget{0.0f};
+    glm::vec2 m_previousFollowTarget{0.0f};
+    glm::vec2 m_deadzoneSize{0.0f};
+    glm::vec2 m_lookAheadOffset{0.0f};
+    bool m_followRequested = false;
+    bool m_hasPreviousFollowTarget = false;
+    float m_followSpeed = 5.0f;
+    float m_lookAheadMaxDistance = 0.0f;
+    float m_lookAheadSeconds = 0.15f;
+    float m_lookAheadSmoothing = 8.0f;
+
+    float m_zoomTarget = 1.0f;
+    float m_zoomSmoothing = 0.0f;
+
+    float m_shakeIntensity = 0.0f;
+    float m_shakeDuration = 0.0f;
+    float m_shakeTimeRemaining = 0.0f;
+    float m_shakeDecayRate = 5.0f;
+    float m_shakeTimeElapsed = 0.0f;
 
     void updateCamera();
 };

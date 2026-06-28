@@ -1,0 +1,12 @@
+# Render verification: Input Actions Demo
+# Compares current output against the golden image.
+wait startup
+wait 200
+press R
+wait_frames 20
+
+screenshot render_verify_output/input_actions_demo.png
+wait 100
+compare render_verify_output/input_actions_demo.png ../../smoketests/golden/input_actions_demo.png 0.05
+
+exit

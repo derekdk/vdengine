@@ -621,37 +621,23 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
     // Start the transition
     m_transitionManager->start(std::move(transition), duration, [this]() {
         // Transition complete callback
-
-        // Deactivate the source scene
-        if (!m_transitionSourceScene.empty() && m_transitionSourceScene != m_transitionDestScene) {
-            deactivateScene(m_transitionSourceScene);
-        }
-
-        // Set active scene to the destination
         auto destIt = m_scenes.find(m_transitionDestScene);
         if (destIt != m_scenes.end()) {
             m_activeScene = destIt->second.get();
             m_activeScene->m_diagnostics.isFocused = true;
         }
         m_activeSceneGroup = SceneGroup::create(m_transitionDestScene, {m_transitionDestScene});
-        m_sceneStack.clear();
 
-        // Rebuild m_activeSceneNames to match the new single-scene group
-        m_activeSceneNames.clear();
-        m_activeSceneNames.insert(m_transitionDestScene);
+        // Finish the source-scene exit and scheduler rebuild at the next frame boundary.
+        m_pendingScene = m_transitionDestScene;
+        m_sceneSwitchPending = true;
 
         // Clear transition state
         m_transitionSourceScene.clear();
         m_transitionDestScene.clear();
         m_viewportTransition = false;
         m_transitionViewport = ViewportRect::fullWindow();
-
-        // Rebuild scheduler without transition tasks
-        rebuildSchedulerGraph();
     });
-
-    // Rebuild scheduler to include transition update task
-    rebuildSchedulerGraph();
 }
 
 void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
@@ -660,13 +646,10 @@ void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition
     transitionToScene(name, std::move(transition), duration);
 
     // Apply viewport-scoped transition settings (after transitionToScene sets up state).
-    // Must call rebuildSchedulerGraph() again here because the full-screen overload already
-    // built the graph with m_viewportTransition == false; we need a second rebuild now that
-    // the flag is correctly set to true so the scheduler accounts for viewport-scoped rendering.
+    // The render task reads m_viewportTransition at runtime, so no scheduler rebuild is needed.
     if (m_transitionManager && m_transitionManager->isActive()) {
         m_viewportTransition = true;
         m_transitionViewport = region;
-        rebuildSchedulerGraph();
     }
 }
 
@@ -689,9 +672,6 @@ void Game::cancelTransition() {
     m_transitionDestScene.clear();
     m_viewportTransition = false;
     m_transitionViewport = ViewportRect::fullWindow();
-
-    // Rebuild scheduler without transition tasks
-    rebuildSchedulerGraph();
 }
 
 float Game::getTransitionProgress() const {
@@ -2689,7 +2669,13 @@ void Game::rebuildSchedulerGraph() {
             TaskId visualsTask =
                 m_scheduler.addTask({.name = "scene.visuals." + sceneName,
                                      .phase = TaskPhase::Visual,
-                                     .work = [this, scene]() { scene->updateVisuals(m_deltaTime); },
+                                     .work =
+                                         [this, scene]() {
+                                             scene->updateVisuals(m_deltaTime);
+                                             if (auto* camera = scene->getCamera()) {
+                                                 camera->update(m_deltaTime);
+                                             }
+                                         },
                                      .dependsOn = {timedTask},
                                      .mainThreadOnly = true});
 
@@ -2708,7 +2694,13 @@ void Game::rebuildSchedulerGraph() {
             TaskId updateTask =
                 m_scheduler.addTask({.name = "scene.update." + sceneName,
                                      .phase = TaskPhase::GameLogic,
-                                     .work = [this, scene]() { scene->update(m_deltaTime); },
+                                     .work =
+                                         [this, scene]() {
+                                             scene->update(m_deltaTime);
+                                             if (auto* camera = scene->getCamera()) {
+                                                 camera->update(m_deltaTime);
+                                             }
+                                         },
                                      .dependsOn = {gameUpdateTask},
                                      .mainThreadOnly = true});
 
@@ -2776,24 +2768,15 @@ void Game::rebuildSchedulerGraph() {
                      const Color& bg = m_activeScene->getBackgroundColor();
                      m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
                  }
+
+                 if (m_transitionManager && m_transitionManager->isActive()) {
+                     m_transitionManager->update(m_deltaTime);
+                 }
              },
          .dependsOn = preRenderDeps,
          .mainThreadOnly = true});
 
-    // ---------------------------------------------------------------
-    // Task 3b: Transition update — advance transition progress.
-    //          Only present when a transition is active.
-    // ---------------------------------------------------------------
     TaskId renderDep = preRenderTask;
-    if (m_transitionManager && m_transitionManager->isActive()) {
-        TaskId transitionUpdateTask =
-            m_scheduler.addTask({.name = "transition.update",
-                                 .phase = TaskPhase::PreRender,
-                                 .work = [this]() { m_transitionManager->update(m_deltaTime); },
-                                 .dependsOn = {preRenderTask},
-                                 .mainThreadOnly = true});
-        renderDep = transitionUpdateTask;
-    }
 
     // ---------------------------------------------------------------
     // Task 4: Render — draw frame.  When transitioning, render both

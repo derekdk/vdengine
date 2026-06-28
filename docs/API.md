@@ -821,6 +821,18 @@ Camera2D(float width, float height);
 | `void setRotation(float degrees)` | Set rotation |
 | `void setViewportSize(float w, float h)` | Set viewport size |
 | `void move(float dx, float dy)` | Move camera |
+| `void followTarget(const glm::vec2& target, float speed = 5.0f)` | Request smoothed follow toward a target position for the current frame |
+| `void setDeadzone(float width, float height)` | Keep the followed target inside a centered rectangle before the camera moves |
+| `void setLookAhead(float maxDistance, float lookAheadSeconds = 0.15f, float smoothing = 8.0f)` | Offset follow by recent target velocity |
+| `void shake(float intensity, float durationSec, float decayRate = 5.0f)` | Apply time-limited decaying screen shake |
+| `void zoomTo(float targetZoom, float speed)` | Smoothly interpolate toward a target zoom level |
+| `Rect2D getVisibleRect() const` | Query the current visible world-space rectangle |
+
+Notes:
+
+- `followTarget()` is intended to be called during your scene update with the target's current world position.
+- All feel helpers are optional and preserve the old `Camera2D` behavior until explicitly enabled.
+- The engine advances `Camera2D::update()` automatically during normal scene execution, so `shake()` and `zoomTo()` animate without extra wiring.
 
 ---
 
@@ -964,6 +976,67 @@ Key, mouse button, and gamepad constants are defined in `<vde/api/KeyCodes.h>`:
 - Dead zone is applied to analog axes (values below threshold report as 0.0)
 - State is tracked internally for polling methods
 - Multiple gamepads (up to 16) are supported independently
+
+---
+
+## vde::InputActionMap
+
+**Header**: `<vde/api/InputActionMap.h>` (also included via `GameAPI.h`)
+
+Higher-level input-action mapping that translates keyboard and gamepad input into named gameplay actions.
+
+### Core Concepts
+
+| Type | Description |
+|------|-------------|
+| `InputActionBinding` | One physical binding: keyboard key, gamepad button, or thresholded gamepad axis direction |
+| `InputAction` | Serializable action definition with a name and one or more bindings |
+| `InputActionMap` | Runtime state tracker for named actions with held/pressed/released queries |
+
+### Binding Methods
+
+| Method | Description |
+|--------|-------------|
+| `void addAction(const std::string& name)` | Register an action name without bindings yet |
+| `void addBinding(const std::string& name, const InputActionBinding& binding)` | Append one keyboard/gamepad binding to an action |
+| `void setBindings(const std::string& name, const std::vector<InputActionBinding>& bindings)` | Replace all bindings for an action |
+| `void clearBindings(const std::string& name)` | Remove only the bindings for one action |
+| `std::vector<InputAction> getActions() const` | Enumerate current action definitions |
+
+### Event Forwarding
+
+| Method | Description |
+|--------|-------------|
+| `void handleKeyPress(int key)` | Call from `InputHandler::onKeyPress()` |
+| `void handleKeyRelease(int key)` | Call from `InputHandler::onKeyRelease()` |
+| `void handleGamepadButtonPress(int gamepadId, int button)` | Call from `InputHandler::onGamepadButtonPress()` |
+| `void handleGamepadButtonRelease(int gamepadId, int button)` | Call from `InputHandler::onGamepadButtonRelease()` |
+| `void handleGamepadAxis(int gamepadId, int axis, float value)` | Call from `InputHandler::onGamepadAxis()` for thresholded axis actions |
+| `void advanceFrame()` | Clear edge-trigger flags after a frame/update tick |
+
+### Query Methods
+
+| Method | Description |
+|--------|-------------|
+| `bool isPressed(const std::string& name) const` | Returns `true` if the action became active this frame |
+| `bool isHeld(const std::string& name) const` | Returns `true` while any bound source is active |
+| `bool isReleased(const std::string& name) const` | Returns `true` if the action became inactive this frame |
+| `bool consumePressed(const std::string& name)` | Returns `true` once, then clears the pressed edge |
+| `bool consumeReleased(const std::string& name)` | Returns `true` once, then clears the released edge |
+
+### Persistence
+
+| Method | Description |
+|--------|-------------|
+| `bool saveBindings(const std::string& storageKey) const` | Serialize bindings through `StorageManager` |
+| `bool loadBindings(const std::string& storageKey)` | Restore bindings from `StorageManager` |
+
+### Notes
+
+- Multiple keyboard and gamepad sources can drive the same named action.
+- Axis bindings are digital thresholds layered on top of the engine's dead-zone filtered `onGamepadAxis()` values.
+- `InputActionMap` is the action-layer API; `KeyStateTracker` remains the lighter-weight helper for simple held/one-shot key mappings.
+- See `examples/input_actions_demo` for a runnable action-map example with persistence and preset swapping.
 
 ---
 

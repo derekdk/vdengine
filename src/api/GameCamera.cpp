@@ -14,6 +14,72 @@
 
 namespace vde {
 
+namespace {
+
+constexpr float kEpsilon = 0.0001f;
+
+float smoothingFactor(float speed, float deltaTime) {
+    if (speed <= 0.0f || deltaTime <= 0.0f) {
+        return 1.0f;
+    }
+
+    return 1.0f - std::exp(-speed * deltaTime);
+}
+
+float smoothToward(float current, float target, float speed, float deltaTime) {
+    return current + ((target - current) * smoothingFactor(speed, deltaTime));
+}
+
+glm::vec2 smoothToward(const glm::vec2& current, const glm::vec2& target, float speed,
+                       float deltaTime) {
+    return current + ((target - current) * smoothingFactor(speed, deltaTime));
+}
+
+glm::vec2 clampMagnitude(const glm::vec2& value, float maxMagnitude) {
+    if (maxMagnitude <= 0.0f) {
+        return glm::vec2(0.0f);
+    }
+
+    const float lengthSquared = glm::dot(value, value);
+    if (lengthSquared <= (maxMagnitude * maxMagnitude)) {
+        return value;
+    }
+
+    const float scale = maxMagnitude / std::sqrt(lengthSquared);
+    return value * scale;
+}
+
+glm::vec2 applyDeadzoneFollow(const glm::vec2& currentPosition, const glm::vec2& focusPosition,
+                              const glm::vec2& deadzoneSize) {
+    glm::vec2 desiredPosition = currentPosition;
+
+    const float halfWidth = deadzoneSize.x * 0.5f;
+    if (halfWidth > 0.0f) {
+        if (focusPosition.x < (currentPosition.x - halfWidth)) {
+            desiredPosition.x = focusPosition.x + halfWidth;
+        } else if (focusPosition.x > (currentPosition.x + halfWidth)) {
+            desiredPosition.x = focusPosition.x - halfWidth;
+        }
+    } else {
+        desiredPosition.x = focusPosition.x;
+    }
+
+    const float halfHeight = deadzoneSize.y * 0.5f;
+    if (halfHeight > 0.0f) {
+        if (focusPosition.y < (currentPosition.y - halfHeight)) {
+            desiredPosition.y = focusPosition.y + halfHeight;
+        } else if (focusPosition.y > (currentPosition.y + halfHeight)) {
+            desiredPosition.y = focusPosition.y - halfHeight;
+        }
+    } else {
+        desiredPosition.y = focusPosition.y;
+    }
+
+    return desiredPosition;
+}
+
+}  // namespace
+
 // ============================================================================
 // GameCamera Base Implementation
 // ============================================================================
@@ -55,23 +121,20 @@ Ray GameCamera::screenToWorldRay(float screenX, float screenY, float screenWidth
 // SimpleCamera Implementation
 // ============================================================================
 
-SimpleCamera::SimpleCamera()
-    : GameCamera(), m_position(0.0f, 0.0f, 5.0f), m_pitch(0.0f), m_yaw(-90.0f)  // Looking toward -Z
-      ,
-      m_fov(60.0f) {
+SimpleCamera::SimpleCamera() : GameCamera(), m_position(0.0f, 0.0f, 5.0f) {
     updateVectors();
-    updateProjection();
+    m_camera.setPerspective(m_fov, m_aspectRatio, m_nearPlane, m_farPlane);
 }
 
 SimpleCamera::SimpleCamera(const Position& position, const Direction& direction)
-    : GameCamera(), m_position(position), m_fov(60.0f) {
+    : GameCamera(), m_position(position) {
     // Calculate pitch and yaw from direction
     glm::vec3 dir = glm::normalize(direction.toVec3());
     m_pitch = glm::degrees(std::asin(dir.y));
     m_yaw = glm::degrees(std::atan2(dir.z, dir.x));
 
     updateVectors();
-    updateProjection();
+    m_camera.setPerspective(m_fov, m_aspectRatio, m_nearPlane, m_farPlane);
 }
 
 void SimpleCamera::setPosition(const Position& position) {
@@ -142,20 +205,15 @@ void SimpleCamera::updateVectors() {
 // OrbitCamera Implementation
 // ============================================================================
 
-OrbitCamera::OrbitCamera()
-    : GameCamera(), m_target(0.0f, 0.0f, 0.0f), m_distance(10.0f), m_pitch(45.0f), m_yaw(0.0f),
-      m_fov(60.0f), m_minDistance(1.0f), m_maxDistance(100.0f), m_minPitch(5.0f),
-      m_maxPitch(85.0f) {
+OrbitCamera::OrbitCamera() : GameCamera(), m_target(0.0f, 0.0f, 0.0f) {
     updateCamera();
-    updateProjection();
+    m_camera.setPerspective(m_fov, m_aspectRatio, m_nearPlane, m_farPlane);
 }
 
 OrbitCamera::OrbitCamera(const Position& target, float distance, float pitch, float yaw)
-    : GameCamera(), m_target(target), m_distance(distance), m_pitch(pitch), m_yaw(yaw),
-      m_fov(60.0f), m_minDistance(1.0f), m_maxDistance(100.0f), m_minPitch(5.0f),
-      m_maxPitch(85.0f) {
+    : GameCamera(), m_target(target), m_distance(distance), m_pitch(pitch), m_yaw(yaw) {
     updateCamera();
-    updateProjection();
+    m_camera.setPerspective(m_fov, m_aspectRatio, m_nearPlane, m_farPlane);
 }
 
 void OrbitCamera::setTarget(const Position& target) {
@@ -180,8 +238,9 @@ void OrbitCamera::setPitch(float pitch) {
 void OrbitCamera::setYaw(float yaw) {
     // Wrap yaw to 0-360 range
     m_yaw = std::fmod(yaw, 360.0f);
-    if (m_yaw < 0.0f)
+    if (m_yaw < 0.0f) {
         m_yaw += 360.0f;
+    }
     updateCamera();
 }
 
@@ -256,16 +315,13 @@ void OrbitCamera::updateCamera() {
 // Camera2D Implementation
 // ============================================================================
 
-Camera2D::Camera2D()
-    : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_zoom(1.0f), m_rotation(0.0f),
-      m_viewportWidth(defaults::DEFAULT_SCREEN_WIDTH),
-      m_viewportHeight(defaults::DEFAULT_SCREEN_HEIGHT) {
+Camera2D::Camera2D() : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_zoomTarget(m_zoom) {
     updateCamera();
 }
 
 Camera2D::Camera2D(float width, float height)
-    : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_zoom(1.0f), m_rotation(0.0f),
-      m_viewportWidth(width), m_viewportHeight(height) {
+    : GameCamera(), m_position(0.0f, 0.0f, 0.0f), m_viewportWidth(width), m_viewportHeight(height),
+      m_zoomTarget(m_zoom) {
     m_aspectRatio = width / height;
     updateCamera();
 }
@@ -283,6 +339,8 @@ void Camera2D::setPosition(const Position& pos) {
 
 void Camera2D::setZoom(float zoom) {
     m_zoom = std::max(0.01f, zoom);
+    m_zoomTarget = m_zoom;
+    m_zoomSmoothing = 0.0f;
     updateCamera();
 }
 
@@ -304,6 +362,125 @@ void Camera2D::move(float deltaX, float deltaY) {
     updateCamera();
 }
 
+void Camera2D::followTarget(const glm::vec2& target, float speed) {
+    m_followTarget = target;
+    m_followSpeed = speed;
+    m_followRequested = true;
+}
+
+void Camera2D::setDeadzone(float width, float height) {
+    m_deadzoneSize.x = std::max(0.0f, width);
+    m_deadzoneSize.y = std::max(0.0f, height);
+}
+
+void Camera2D::setLookAhead(float maxDistance, float lookAheadSeconds, float smoothing) {
+    m_lookAheadMaxDistance = std::max(0.0f, maxDistance);
+    m_lookAheadSeconds = std::max(0.0f, lookAheadSeconds);
+    m_lookAheadSmoothing = std::max(0.0f, smoothing);
+
+    if (m_lookAheadMaxDistance <= 0.0f) {
+        m_lookAheadOffset = glm::vec2(0.0f);
+        m_hasPreviousFollowTarget = false;
+    }
+}
+
+void Camera2D::shake(float intensity, float durationSec, float decayRate) {
+    if (intensity <= 0.0f || durationSec <= 0.0f) {
+        m_shakeIntensity = 0.0f;
+        m_shakeDuration = 0.0f;
+        m_shakeTimeRemaining = 0.0f;
+        m_shakeTimeElapsed = 0.0f;
+        m_renderOffset = glm::vec2(0.0f);
+        updateCamera();
+        return;
+    }
+
+    m_shakeIntensity = intensity;
+    m_shakeDuration = durationSec;
+    m_shakeTimeRemaining = durationSec;
+    m_shakeDecayRate = std::max(0.0f, decayRate);
+    m_shakeTimeElapsed = 0.0f;
+}
+
+void Camera2D::zoomTo(float targetZoom, float speed) {
+    if (speed <= 0.0f) {
+        setZoom(targetZoom);
+        return;
+    }
+
+    m_zoomTarget = std::max(0.01f, targetZoom);
+    m_zoomSmoothing = speed;
+}
+
+void Camera2D::update(float deltaTime) {
+    const float clampedDeltaTime = std::max(0.0f, deltaTime);
+
+    if (std::fabs(m_zoom - m_zoomTarget) > kEpsilon) {
+        m_zoom = smoothToward(m_zoom, m_zoomTarget, m_zoomSmoothing, clampedDeltaTime);
+        if (std::fabs(m_zoom - m_zoomTarget) <= kEpsilon) {
+            m_zoom = m_zoomTarget;
+        }
+    }
+
+    if (m_followRequested) {
+        glm::vec2 desiredLookAhead(0.0f);
+        if (m_lookAheadMaxDistance > 0.0f && m_hasPreviousFollowTarget &&
+            clampedDeltaTime > kEpsilon) {
+            const glm::vec2 velocity = (m_followTarget - m_previousFollowTarget) / clampedDeltaTime;
+            desiredLookAhead =
+                clampMagnitude(velocity * m_lookAheadSeconds, m_lookAheadMaxDistance);
+        }
+
+        if (m_lookAheadMaxDistance > 0.0f) {
+            m_lookAheadOffset = smoothToward(m_lookAheadOffset, desiredLookAhead,
+                                             m_lookAheadSmoothing, clampedDeltaTime);
+        } else {
+            m_lookAheadOffset = glm::vec2(0.0f);
+        }
+
+        const glm::vec2 currentPosition(m_position.x, m_position.y);
+        const glm::vec2 desiredPosition = applyDeadzoneFollow(
+            currentPosition, m_followTarget + m_lookAheadOffset, m_deadzoneSize);
+        const glm::vec2 nextPosition =
+            smoothToward(currentPosition, desiredPosition, m_followSpeed, clampedDeltaTime);
+        m_position.x = nextPosition.x;
+        m_position.y = nextPosition.y;
+
+        m_previousFollowTarget = m_followTarget;
+        m_hasPreviousFollowTarget = true;
+        m_followRequested = false;
+    } else if (glm::dot(m_lookAheadOffset, m_lookAheadOffset) > kEpsilon) {
+        m_lookAheadOffset = smoothToward(m_lookAheadOffset, glm::vec2(0.0f), m_lookAheadSmoothing,
+                                         clampedDeltaTime);
+        if (glm::dot(m_lookAheadOffset, m_lookAheadOffset) <= kEpsilon) {
+            m_lookAheadOffset = glm::vec2(0.0f);
+        }
+        m_hasPreviousFollowTarget = false;
+    } else {
+        m_hasPreviousFollowTarget = false;
+    }
+
+    m_renderOffset = glm::vec2(0.0f);
+    if (m_shakeTimeRemaining > 0.0f) {
+        m_shakeTimeElapsed += clampedDeltaTime;
+        m_shakeTimeRemaining = std::max(0.0f, m_shakeTimeRemaining - clampedDeltaTime);
+
+        const float durationRatio =
+            (m_shakeDuration > kEpsilon) ? (m_shakeTimeRemaining / m_shakeDuration) : 0.0f;
+        const float amplitude =
+            m_shakeIntensity * durationRatio * std::exp(-m_shakeDecayRate * m_shakeTimeElapsed);
+
+        m_renderOffset.x = std::sin(m_shakeTimeElapsed * 37.0f) * amplitude;
+        m_renderOffset.y = std::cos(m_shakeTimeElapsed * 53.0f) * amplitude;
+
+        if (m_shakeTimeRemaining <= 0.0f) {
+            m_renderOffset = glm::vec2(0.0f);
+        }
+    }
+
+    updateCamera();
+}
+
 void Camera2D::updateProjection() {
     // 2D camera uses orthographic projection
     // This is handled in updateCamera()
@@ -312,8 +489,10 @@ void Camera2D::updateProjection() {
 void Camera2D::updateCamera() {
     // Set camera for 2D rendering
     // Position camera looking down the -Z axis
-    m_camera.setPosition(glm::vec3(m_position.x, m_position.y, 10.0f));
-    m_camera.setTarget(glm::vec3(m_position.x, m_position.y, 0.0f));
+    const float cameraX = m_position.x + m_renderOffset.x;
+    const float cameraY = m_position.y + m_renderOffset.y;
+    m_camera.setPosition(glm::vec3(cameraX, cameraY, 10.0f));
+    m_camera.setTarget(glm::vec3(cameraX, cameraY, 0.0f));
 
     // Use orthographic projection for proper 2D rendering
     float halfWidth = (m_viewportWidth * 0.5f) / m_zoom;
@@ -347,13 +526,13 @@ void Camera2D::applyTo(VulkanContext& context) {
 Rect2D Camera2D::getVisibleRect() const {
     float halfWidth = (m_viewportWidth * 0.5f) / m_zoom;
     float halfHeight = (m_viewportHeight * 0.5f) / m_zoom;
+    const float centerX = m_position.x + m_renderOffset.x;
+    const float centerY = m_position.y + m_renderOffset.y;
 
-    return Rect2D{
-        m_position.x - halfWidth,   // left
-        m_position.x + halfWidth,   // right
-        m_position.y - halfHeight,  // bottom
-        m_position.y + halfHeight   // top
-    };
+    return Rect2D{.left = centerX - halfWidth,
+                  .right = centerX + halfWidth,
+                  .bottom = centerY - halfHeight,
+                  .top = centerY + halfHeight};
 }
 
 }  // namespace vde

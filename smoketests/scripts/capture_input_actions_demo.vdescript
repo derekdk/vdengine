@@ -1,0 +1,11 @@
+# Golden image capture: Input Actions Demo
+# Captures the initial visual state for render verification.
+wait startup
+wait 200
+press R
+wait_frames 20
+
+screenshot render_verify_output/input_actions_demo.png
+wait 100
+
+exit
