@@ -1,6 +1,6 @@
 # VDE Project Status
 
-Last updated: 2026-05-29
+Last updated: 2026-06-28
 
 This is the canonical status document for VDE. It answers three questions clearly:
 
@@ -14,7 +14,7 @@ When this document disagrees with older planning or status notes, trust this fil
 
 VDE is already a small game engine and prototyping framework, not just a thin Vulkan wrapper. The project is strongest in code-driven runtime features, rendering foundations, audio, text, transitions, examples, tests, and verification tooling.
 
-The main gaps are workflow-completeness items rather than missing primitives in isolation: tilemaps and level authoring, input action mapping, physics filtering and scaling, Camera2D feel helpers, dedicated sprite-animation workflow helpers, and a game-facing UI/data pipeline.
+The main gaps are workflow-completeness items rather than missing primitives in isolation: tilemaps and level authoring, input rebinding/buffering ergonomics, physics filtering and scaling, advanced Camera2D constraints, and a game-facing UI/data pipeline.
 
 ## Status Meanings
 
@@ -46,7 +46,7 @@ The main gaps are workflow-completeness items rather than missing primitives in 
 | Area | What exists now | What is still missing | Evidence |
 |------|-----------------|-----------------------|----------|
 | Camera2D ergonomics | Positioning, zoom, rotation, viewport sizing, visible-rect calculation, orthographic application, `followTarget()`, deadzone, look-ahead, shake, and smooth zoom are now public APIs | No built-in camera bounds/rails workflow or higher-level composition presets yet | [../include/vde/api/GameCamera.h](../include/vde/api/GameCamera.h), [../examples/camera_feel_demo/](../examples/camera_feel_demo/), [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md) |
-| 2D animation workflow | SpriteSheet atlas support plus the generic scene-owned Animator service | No dedicated `SpriteAnimation` asset, `AnimatedSprite` wrapper, named sprite-state transitions, or frame-event helpers | [../include/vde/api/SpriteSheet.h](../include/vde/api/SpriteSheet.h), [../include/vde/api/Animator.h](../include/vde/api/Animator.h), [OPEN_SUGGESTIONS.md](OPEN_SUGGESTIONS.md) |
+| 2D animation workflow | SpriteSheet atlas support, the generic scene-owned Animator service, `SpriteAnimation` clips, and `AnimatedSpriteEntity` with named playback states and frame events | No blend graphs, authored transition editor, or data-driven animation import path yet | [../include/vde/api/SpriteSheet.h](../include/vde/api/SpriteSheet.h), [../include/vde/api/SpriteAnimation.h](../include/vde/api/SpriteAnimation.h), [../include/vde/api/AnimatedSpriteEntity.h](../include/vde/api/AnimatedSpriteEntity.h), [../examples/sidescroller/](../examples/sidescroller/) |
 | Input abstraction | Raw input events, `KeyStateTracker` named held/one-shot bindings, and `InputActionMap` pressed/held/released actions with saved bindings | No built-in rebinding UI, buffered/fighting-game input semantics, or higher-level analog intent helpers beyond thresholded axis bindings | [../include/vde/api/InputHandler.h](../include/vde/api/InputHandler.h), [../include/vde/api/InputActionMap.h](../include/vde/api/InputActionMap.h), [../include/vde/api/KeyStateTracker.h](../include/vde/api/KeyStateTracker.h), [../examples/input_actions_demo/](../examples/input_actions_demo/), [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md) |
 | Physics selectivity and scale | Body simulation, callbacks, raycasts, and AABB query support | No collision layers/filter masks and no public broadphase partitioning workflow for larger scenes | [../include/vde/api/PhysicsScene.h](../include/vde/api/PhysicsScene.h), [TOP_FIVE_ENGINE_FEATURES_PLAN.md](TOP_FIVE_ENGINE_FEATURES_PLAN.md), [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md) |
 | Content pipeline | Resource caching, storage, launcher/editor tools, and many runnable examples | Scenes are still primarily authored in C++; there is no general scene serialization or level-loading pipeline | [../tools/](../tools/), [../include/vde/api/ResourceManager.h](../include/vde/api/ResourceManager.h), [../include/vde/api/StorageManager.h](../include/vde/api/StorageManager.h), [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md), [ENGINE_API_EVALUATION_2026-05-26.md](ENGINE_API_EVALUATION_2026-05-26.md) |
@@ -63,7 +63,6 @@ The main gaps are workflow-completeness items rather than missing primitives in 
 | Advanced input semantics and rebinding UX | Needed for buffered inputs, settings-menu rebinding workflows, and higher-level analog intent helpers beyond the shipped action-map layer | [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md), [ENGINE_API_EVALUATION_2026-05-26.md](ENGINE_API_EVALUATION_2026-05-26.md) |
 | Advanced Camera2D constraints and composition | Needed for bounds, rails, composition anchors, and more opinionated follow presets on top of the shipped feel-helper core | [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md), [OPEN_SUGGESTIONS.md](OPEN_SUGGESTIONS.md) |
 | Physics broadphase / spatial partitioning | Needed to scale beyond small and medium body counts without an O(n^2)-style bottleneck | [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md), [ENGINE_API_EVALUATION_2026-05-26.md](ENGINE_API_EVALUATION_2026-05-26.md) |
-| Dedicated sprite-animation helpers | Needed for a higher-level `AnimatedSprite` style workflow on top of the generic animator | [OPEN_SUGGESTIONS.md](OPEN_SUGGESTIONS.md), [ENGINE_API_EVALUATION_2026-05-26.md](ENGINE_API_EVALUATION_2026-05-26.md) |
 | 2D particle system | Needed for common feedback and VFX workflows | [TOP_FIVE_ENGINE_FEATURES_PLAN.md](TOP_FIVE_ENGINE_FEATURES_PLAN.md) |
 | Game-facing UI / HUD system | Needed for menus, HUDs, and runtime UI beyond debug overlays | [TOP_FIVE_ENGINE_FEATURES_PLAN.md](TOP_FIVE_ENGINE_FEATURES_PLAN.md) |
 | Scene serialization and level loading | Needed to move from code-only scenes toward data-driven content workflows | [REMAINING_ENGINE_DEFICIENCIES.md](REMAINING_ENGINE_DEFICIENCIES.md), [ENGINE_API_EVALUATION_2026-05-26.md](ENGINE_API_EVALUATION_2026-05-26.md) |

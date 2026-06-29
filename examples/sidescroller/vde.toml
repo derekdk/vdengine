@@ -1,4 +1,4 @@
 [smoke]
-scripts = ["smoke_quick.vdescript"]
+scripts = ["smoke_sidescroller.vdescript"]
 priority = 2
-sections = ["physics", "camera", "input"]
+sections = ["entity", "camera", "input"]

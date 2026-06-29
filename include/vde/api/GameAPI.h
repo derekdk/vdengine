@@ -18,6 +18,7 @@
  */
 
 // Core game classes
+#include "AnimatedSpriteEntity.h"
 #include "Animator.h"
 #include "BlockFallTransition.h"
 #include "CircleRevealTransition.h"
@@ -39,6 +40,7 @@
 #include "Resource.h"
 #include "Scene.h"
 #include "SceneGroup.h"
+#include "SpriteAnimation.h"
 #include "SpriteSheet.h"
 #include "ViewportRect.h"
 

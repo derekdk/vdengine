@@ -1,0 +1,15 @@
+# Smoke test: sidescroller animation-state workflow
+# Exercises run, attack, jump, and direction-flip behavior before exit.
+wait startup
+wait 400
+hold RIGHT 900
+wait 150
+press X
+wait 80
+press X
+wait 300
+press SPACE
+wait 700
+hold LEFT 700
+wait 300
+exit

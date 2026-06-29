@@ -219,6 +219,8 @@ set(VDE_SOURCES
     src/api/StorageManager.cpp
     # SpriteSheet
     src/api/SpriteSheet.cpp
+    src/api/SpriteAnimation.cpp
+    src/api/AnimatedSpriteEntity.cpp
     # Text rendering
     src/api/BitmapFont.cpp
     src/api/TextRenderer.cpp
@@ -297,6 +299,8 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/InputScript.h
     include/vde/api/InputScriptExecutor.h
     include/vde/api/ScriptEnvironment.h
+    include/vde/api/SpriteAnimation.h
+    include/vde/api/AnimatedSpriteEntity.h
     # Storage
     include/vde/api/StorageManager.h
     # SpriteSheet

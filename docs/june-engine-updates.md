@@ -122,6 +122,22 @@ Add core camera-feel tools expected for modern 2D gameplay.
 
 ## Phase C: Animated Sprite-State Workflow (Week 3-4)
 
+### Status Snapshot (2026-06-28)
+
+Initial vertical slice delivered:
+
+- `SpriteAnimation` public clip model added for frame sequences with per-frame durations and looping control
+- `AnimatedSpriteEntity` public wrapper added with named states, `play()` / `pause()` / `resume()` / `stop()`, playback speed, and frame-event hooks
+- focused unit coverage added for looping, one-shot clamping, pause/resume, speed scaling, and frame-event dispatch
+- `sidescroller` migrated to a SpriteSheet-backed `idle` / `run` / `jump` / `attack` workflow with no manual UV math in gameplay code
+- smoke coverage added for the migrated `sidescroller` example
+
+Remaining follow-up for this phase after the initial slice:
+
+- transition-condition helpers and optional blending for more advanced graphs
+- optional data import path from external animation authoring tools / atlases
+- migration pass for additional legacy examples that still manage sprite frames manually
+
 ### Goal
 
 Provide a sprite-focused state animation wrapper so users stop writing manual frame/UV logic.
