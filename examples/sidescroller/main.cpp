@@ -253,6 +253,7 @@ class PlayerEntity : public vde::AnimatedSpriteEntity {
 
         addCharacterAnimations(*this);
         onFrameEvent("attack", 1, [this]() { m_attackFlashTime = 0.12f; });
+        configureTransitions();
         play("idle");
     }
 
@@ -270,11 +271,10 @@ class PlayerEntity : public vde::AnimatedSpriteEntity {
     void jump(float power) { m_physics.jump(power); }
 
     void queueAttack() {
-        if (m_isAttacking) {
+        if (getCurrentAnimation() == "attack" && !isAnimationFinished()) {
             return;
         }
 
-        m_isAttacking = true;
         setSpeed(1.0f);
         play("attack");
     }
@@ -288,8 +288,6 @@ class PlayerEntity : public vde::AnimatedSpriteEntity {
     }
 
     void update(float deltaTime) override {
-        AnimatedSpriteEntity::update(deltaTime);
-
         m_physics.update(deltaTime);
 
         auto pos = getPosition();
@@ -308,6 +306,12 @@ class PlayerEntity : public vde::AnimatedSpriteEntity {
 
         setPosition(pos);
 
+        if (getCurrentAnimation() != "attack") {
+            setSpeed(shouldRunAnimation() ? getRunAnimationSpeed() : 1.0f);
+        }
+
+        AnimatedSpriteEntity::update(deltaTime);
+
         if (m_attackFlashTime > 0.0f) {
             m_attackFlashTime = std::max(0.0f, m_attackFlashTime - deltaTime);
             setColor(vde::Color::fromHex(0xfff1b8));
@@ -315,7 +319,10 @@ class PlayerEntity : public vde::AnimatedSpriteEntity {
             setColor(m_baseTint);
         }
 
-        updateAnimationState();
+        if (!hasActiveBlend()) {
+            setScale(1.1f, 1.1f, 1.0f);
+        }
+
         m_movementInputThisFrame = false;
     }
 
@@ -324,40 +331,87 @@ class PlayerEntity : public vde::AnimatedSpriteEntity {
     [[nodiscard]] bool isAttackFlashActive() const { return m_attackFlashTime > 0.0f; }
 
   private:
-    void transitionTo(const std::string& animationName, float speed) {
-        setSpeed(speed);
-        if (getCurrentAnimation() != animationName || !isPlaying()) {
-            play(animationName);
-        }
+    void configureTransitions() {
+        addConditionalTransition(
+            "idle", "jump", [this](const AnimatedSpriteEntity&) { return shouldJumpAnimation(); });
+        addConditionalTransition(
+            "idle", "run", [this](const AnimatedSpriteEntity&) { return shouldRunAnimation(); },
+            0.08f,
+            [this](AnimatedSpriteEntity&, const std::string&, const std::string&, float progress) {
+                applyBlendScale(progress);
+            });
+
+        addConditionalTransition(
+            "run", "jump", [this](const AnimatedSpriteEntity&) { return shouldJumpAnimation(); });
+        addConditionalTransition(
+            "run", "idle", [this](const AnimatedSpriteEntity&) { return shouldIdleAnimation(); },
+            0.08f,
+            [this](AnimatedSpriteEntity&, const std::string&, const std::string&, float progress) {
+                applyBlendScale(1.0f - progress);
+            });
+
+        addConditionalTransition(
+            "jump", "run",
+            [this](const AnimatedSpriteEntity&) {
+                return m_physics.onGround && shouldRunAnimation();
+            },
+            0.10f,
+            [this](AnimatedSpriteEntity&, const std::string&, const std::string&, float progress) {
+                applyBlendScale(progress);
+            });
+        addConditionalTransition(
+            "jump", "idle", [this](const AnimatedSpriteEntity&) { return shouldIdleAnimation(); },
+            0.10f,
+            [this](AnimatedSpriteEntity&, const std::string&, const std::string&, float progress) {
+                applyBlendScale(1.0f - progress);
+            });
+
+        addConditionalTransition("attack", "jump", [this](const AnimatedSpriteEntity&) {
+            return isAnimationFinished() && shouldJumpAnimation();
+        });
+        addConditionalTransition(
+            "attack", "run",
+            [this](const AnimatedSpriteEntity&) {
+                return isAnimationFinished() && shouldRunAnimation();
+            },
+            0.06f,
+            [this](AnimatedSpriteEntity&, const std::string&, const std::string&, float progress) {
+                applyBlendScale(progress);
+            });
+        addConditionalTransition(
+            "attack", "idle",
+            [this](const AnimatedSpriteEntity&) {
+                return isAnimationFinished() && shouldIdleAnimation();
+            },
+            0.06f,
+            [this](AnimatedSpriteEntity&, const std::string&, const std::string&, float progress) {
+                applyBlendScale(1.0f - progress);
+            });
     }
 
-    void updateAnimationState() {
-        if (m_isAttacking) {
-            if (isAnimationFinished()) {
-                m_isAttacking = false;
-            } else {
-                return;
-            }
-        }
+    [[nodiscard]] bool shouldJumpAnimation() const { return !m_physics.onGround; }
 
-        if (!m_physics.onGround) {
-            transitionTo("jump", 1.0f);
-            return;
-        }
+    [[nodiscard]] bool shouldRunAnimation() const {
+        return m_movementInputThisFrame || std::abs(m_physics.velocity.x) > 1.0f;
+    }
 
-        if (m_movementInputThisFrame || std::abs(m_physics.velocity.x) > 1.0f) {
-            float runSpeed = std::clamp(std::abs(m_physics.velocity.x) / 8.0f, 0.9f, 1.8f);
-            transitionTo("run", runSpeed);
-            return;
-        }
+    [[nodiscard]] bool shouldIdleAnimation() const {
+        return m_physics.onGround && !shouldRunAnimation();
+    }
 
-        transitionTo("idle", 1.0f);
+    [[nodiscard]] float getRunAnimationSpeed() const {
+        return std::clamp(std::abs(m_physics.velocity.x) / 8.0f, 0.9f, 1.8f);
+    }
+
+    void applyBlendScale(float progress) {
+        float width = 1.1f + 0.08f * progress;
+        float height = 1.1f - 0.04f * progress;
+        setScale(width, height, 1.0f);
     }
 
     Physics2D m_physics;
     vde::Color m_baseTint;
     float m_attackFlashTime = 0.0f;
-    bool m_isAttacking = false;
     bool m_movementInputThisFrame = false;
 };
 

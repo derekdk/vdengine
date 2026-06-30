@@ -812,7 +812,51 @@ SpriteEntity wrapper for named SpriteSheet-based animation states.
 | `const std::string& getCurrentAnimation() const` | Get the active state name |
 | `int getCurrentFrame() const` | Get the active frame index inside the current clip |
 | `void onFrameEvent(const std::string& animName, int frameIndex, FrameCallback callback)` | Register a callback for a frame-entry event |
+| `void addConditionalTransition(const std::string& from, const std::string& to, TransitionPredicate predicate, float blendDuration = 0.0f, BlendCallback blendCallback = {}, bool resetPlayback = true)` | Register a conditional state change evaluated after playback updates |
+| `void addFinishedTransition(const std::string& from, const std::string& to, float blendDuration = 0.0f, BlendCallback blendCallback = {}, bool resetPlayback = true)` | Transition automatically when a non-looping state finishes |
+| `void clearTransitions(const std::string& from)` | Remove all transitions from one source state |
+| `void clearAllTransitions()` | Remove all registered transitions |
+| `bool hasActiveBlend() const` | Check whether a transition blend window is active |
+| `float getBlendProgress() const` | Get current blend progress from 0..1 |
+| `const std::string& getBlendSourceAnimation() const` | Get the source state for the active blend |
+| `const std::string& getBlendTargetAnimation() const` | Get the target state for the active blend |
 | `void update(float deltaTime) override` | Advance playback and update the sprite UV rect |
+
+Notes:
+
+- Transition predicates are evaluated in insertion order after playback updates.
+- Transition endpoints must already be registered via addAnimation() before you add a transition that references them.
+- Blend callbacks are optional and provide a lightweight hook for transition-time effects; this is not a full blend-graph system.
+
+---
+
+## vde::SpriteAnimationImport
+
+**Header**: `<vde/api/SpriteAnimationImport.h>`
+
+Import helpers for SpriteSheet-backed clip data.
+
+### Types
+
+```cpp
+struct ImportedSpriteAnimationSet {
+    SpriteSheet::Ref spriteSheet;
+    std::unordered_map<std::string, SpriteAnimation> animations;
+    std::vector<std::string> frameNames;
+};
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `static ImportedSpriteAnimationSet importAsepriteJson(shared_ptr<Texture> texture, const std::string& jsonText)` | Import atlas regions and tagged clips from Aseprite-style JSON text |
+| `static ImportedSpriteAnimationSet importAsepriteJsonFile(shared_ptr<Texture> texture, const std::string& jsonPath)` | Import atlas regions and tagged clips from an Aseprite-style JSON file |
+
+Notes:
+
+- The current import helper expects the atlas texture to be loaded separately.
+- The imported clip names come from Aseprite frame tags when present; otherwise one single-frame clip is generated per exported frame.
 
 ---
 

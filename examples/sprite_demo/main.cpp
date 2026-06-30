@@ -5,7 +5,7 @@
  * This example demonstrates:
  * - Creating SpriteEntity objects
  * - Loading textures and assigning to sprites
- * - Using UV rectangles for sprite sheets
+ * - Using imported atlas metadata for animated sprite playback
  * - Setting sprite colors/tints
  * - Using anchor points for sprite origins
  * - Combining 2D sprites with 3D meshes
@@ -16,8 +16,79 @@
 
 #include <cmath>
 #include <iostream>
+#include <vector>
 
 #include "../ExampleBase.h"
+
+namespace {
+
+struct RGBA {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+};
+
+void putPixel(std::vector<uint8_t>& pixels, uint32_t stride, uint32_t x, uint32_t y, RGBA color) {
+    size_t offset = (static_cast<size_t>(y) * stride + x) * 4;
+    pixels.at(offset + 0) = color.r;
+    pixels.at(offset + 1) = color.g;
+    pixels.at(offset + 2) = color.b;
+    pixels.at(offset + 3) = color.a;
+}
+
+void fillRect(std::vector<uint8_t>& pixels, uint32_t stride, uint32_t x0, uint32_t y0,
+              uint32_t width, uint32_t height, RGBA color) {
+    for (uint32_t y = y0; y < y0 + height; ++y) {
+        for (uint32_t x = x0; x < x0 + width; ++x) {
+            putPixel(pixels, stride, x, y, color);
+        }
+    }
+}
+
+vde::ImportedSpriteAnimationSet createRainbowImport(vde::VulkanContext* context) {
+    constexpr uint32_t kFrameSize = 16;
+    constexpr uint32_t kFrameCount = 2;
+    constexpr uint32_t kTextureWidth = kFrameSize * kFrameCount;
+    constexpr uint32_t kTextureHeight = kFrameSize;
+
+    std::vector<uint8_t> pixels(static_cast<size_t>(kTextureWidth) * kTextureHeight * 4, 0);
+    constexpr RGBA kTransparent{.r = 0, .g = 0, .b = 0, .a = 0};
+    constexpr RGBA kWhite{.r = 255, .g = 255, .b = 255, .a = 255};
+    constexpr RGBA kAccent{.r = 220, .g = 220, .b = 220, .a = 255};
+
+    fillRect(pixels, kTextureWidth, 0, 0, kTextureWidth, kTextureHeight, kTransparent);
+
+    fillRect(pixels, kTextureWidth, 2, 2, 12, 12, kWhite);
+    fillRect(pixels, kTextureWidth, 18, 2, 12, 12, kWhite);
+    fillRect(pixels, kTextureWidth, 20, 4, 8, 8, kAccent);
+
+    auto texture = std::make_shared<vde::Texture>();
+    texture->loadFromData(pixels.data(), kTextureWidth, kTextureHeight);
+    if (context != nullptr) {
+        texture->uploadToGPU(context);
+    }
+
+    const std::string jsonText = R"json(
+{
+    "frames": [
+        {"filename": "pulse_0", "frame": {"x": 0, "y": 0, "w": 16, "h": 16}, "duration": 160},
+        {"filename": "pulse_1", "frame": {"x": 16, "y": 0, "w": 16, "h": 16}, "duration": 160}
+    ],
+    "meta": {
+        "image": "rainbow_import.png",
+        "size": {"w": 32, "h": 16},
+        "frameTags": [
+            {"name": "pulse", "from": 0, "to": 1, "direction": "pingpong"}
+        ]
+    }
+}
+)json";
+
+    return vde::SpriteAnimationImport::importAsepriteJson(texture, jsonText);
+}
+
+}  // namespace
 
 /**
  * @brief Simple input handler for the sprite demo.
@@ -28,33 +99,45 @@ class SpriteInputHandler : public vde::examples::BaseExampleInputHandler {
         // Call base class first for ESC and F keys
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
-        if (key == vde::KEY_LEFT)
+        }
+        if (key == vde::KEY_LEFT) {
             m_left = true;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_right = true;
-        if (key == vde::KEY_UP)
+        }
+        if (key == vde::KEY_UP) {
             m_up = true;
-        if (key == vde::KEY_DOWN)
+        }
+        if (key == vde::KEY_DOWN) {
             m_down = true;
-        if (key == vde::KEY_1)
+        }
+        if (key == vde::KEY_1) {
             m_key1 = true;
-        if (key == vde::KEY_2)
+        }
+        if (key == vde::KEY_2) {
             m_key2 = true;
-        if (key == vde::KEY_3)
+        }
+        if (key == vde::KEY_3) {
             m_key3 = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT)
+        if (key == vde::KEY_LEFT) {
             m_left = false;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_right = false;
-        if (key == vde::KEY_UP)
+        }
+        if (key == vde::KEY_UP) {
             m_up = false;
-        if (key == vde::KEY_DOWN)
+        }
+        if (key == vde::KEY_DOWN) {
             m_down = false;
+        }
     }
 
     bool isSpacePressed() {
@@ -78,10 +161,10 @@ class SpriteInputHandler : public vde::examples::BaseExampleInputHandler {
         return v;
     }
 
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
-    bool isUp() const { return m_up; }
-    bool isDown() const { return m_down; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
+    [[nodiscard]] bool isUp() const { return m_up; }
+    [[nodiscard]] bool isDown() const { return m_down; }
 
   private:
     bool m_spacePressed = false;
@@ -90,13 +173,18 @@ class SpriteInputHandler : public vde::examples::BaseExampleInputHandler {
 };
 
 /**
- * @brief An animated sprite that cycles through colors.
+ * @brief An imported animated sprite that cycles through colors.
  */
-class AnimatedSprite : public vde::SpriteEntity {
+class AnimatedSprite : public vde::AnimatedSpriteEntity {
   public:
-    AnimatedSprite() = default;
+    explicit AnimatedSprite(const vde::ImportedSpriteAnimationSet& imported) {
+        setSpriteSheet(imported.spriteSheet);
+        addAnimation("pulse", imported.animations.at("pulse"));
+        play("pulse");
+    }
 
     void update(float deltaTime) override {
+        AnimatedSpriteEntity::update(deltaTime);
         m_time += deltaTime;
 
         // Cycle hue over time for rainbow effect
@@ -183,8 +271,9 @@ class SpriteScene : public vde::examples::BaseExampleScene {
         m_player->setColor(vde::Color::fromHex(0x00b894));  // Green
         m_player->setScale(0.5f, 0.5f, 1.0f);
 
-        // Create an animated rainbow sprite
-        m_animated = addEntity<AnimatedSprite>();
+        // Create an animated rainbow sprite driven by imported atlas metadata
+        m_importedSet = createRainbowImport(getGame()->getVulkanContext());
+        m_animated = addEntity<AnimatedSprite>(m_importedSet);
         m_animated->setName("RainbowSprite");
         m_animated->setPosition(-1.5f, 1.0f, 0.0f);
         m_animated->setScale(0.4f, 0.4f, 1.0f);
@@ -242,67 +331,73 @@ class SpriteScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<SpriteInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Toggle player visibility
         if (input->isSpacePressed()) {
             m_player->setVisible(!m_player->isVisible());
-            std::cout << "Player visibility: " << (m_player->isVisible() ? "ON" : "OFF")
-                      << std::endl;
+            std::cout << "Player visibility: " << (m_player->isVisible() ? "ON" : "OFF") << '\n';
         }
 
         // Change anchor point with number keys
         if (input->isKey1Pressed()) {
             m_player->setAnchor(0.5f, 0.5f);
-            std::cout << "Anchor: Center (0.5, 0.5)" << std::endl;
+            std::cout << "Anchor: Center (0.5, 0.5)\n";
         }
         if (input->isKey2Pressed()) {
             m_player->setAnchor(0.0f, 0.0f);
-            std::cout << "Anchor: Bottom-Left (0, 0)" << std::endl;
+            std::cout << "Anchor: Bottom-Left (0, 0)\n";
         }
         if (input->isKey3Pressed()) {
             m_player->setAnchor(1.0f, 0.5f);
-            std::cout << "Anchor: Right-Center (1, 0.5)" << std::endl;
+            std::cout << "Anchor: Right-Center (1, 0.5)\n";
         }
 
         // Move player with arrow keys
         float speed = 2.0f;
         auto pos = m_player->getPosition();
 
-        if (input->isLeft())
+        if (input->isLeft()) {
             pos.x -= speed * deltaTime;
-        if (input->isRight())
+        }
+        if (input->isRight()) {
             pos.x += speed * deltaTime;
-        if (input->isUp())
+        }
+        if (input->isUp()) {
             pos.y += speed * deltaTime;
-        if (input->isDown())
+        }
+        if (input->isDown()) {
             pos.y -= speed * deltaTime;
+        }
 
         m_player->setPosition(pos);
     }
 
   protected:
-    std::string getExampleName() const override { return "Sprite System"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Sprite System"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"SpriteEntity creation and rendering", "Sprite colors and tinting",
-                "Anchor point positioning", "Animated sprites"};
+                "Anchor point positioning",
+                "AnimatedSpriteEntity using imported Aseprite-style atlas metadata"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Green player sprite at center (moveable)",
                 "Rainbow animated sprite (top-left area)",
                 "Colored corner sprites (red, blue, orange, purple)",
-                "Dark semi-transparent background"};
+                "Dark semi-transparent background", "Imported clip loops while the sprite pulses"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"Arrow keys - Move player sprite", "1/2/3      - Change anchor point",
                 "Space      - Toggle player visibility"};
     }
 
   private:
+    vde::ImportedSpriteAnimationSet m_importedSet;
     std::shared_ptr<vde::SpriteEntity> m_player;
     std::shared_ptr<AnimatedSprite> m_animated;
     std::shared_ptr<vde::SpriteEntity> m_background;
@@ -316,7 +411,16 @@ class SpriteDemo : public vde::examples::BaseExampleGame<SpriteInputHandler, Spr
 /**
  * @brief Main entry point.
  */
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
-    SpriteDemo demo;
-    return vde::examples::runExample(demo, "VDE Sprite Demo", 1024, 768, argc, argv);
+    try {
+        SpriteDemo demo;
+        return vde::examples::runExample(demo, "VDE Sprite Demo", 1024, 768, argc, argv);
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal error: " << e.what() << '\n';
+        return 1;
+    } catch (...) {
+        std::cerr << "Fatal error: unknown exception\n";
+        return 1;
+    }
 }

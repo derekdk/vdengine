@@ -28,6 +28,9 @@ namespace vde {
 class AnimatedSpriteEntity : public SpriteEntity {
   public:
     using FrameCallback = std::function<void()>;
+    using TransitionPredicate = std::function<bool(const AnimatedSpriteEntity&)>;
+    using BlendCallback =
+        std::function<void(AnimatedSpriteEntity&, const std::string&, const std::string&, float)>;
 
     /**
      * @brief Set the SpriteSheet used by this entity.
@@ -139,6 +142,53 @@ class AnimatedSpriteEntity : public SpriteEntity {
      */
     void onFrameEvent(const std::string& animName, int frameIndex, FrameCallback callback);
 
+    /**
+     * @brief Add a conditional state transition.
+     *
+     * Transition rules are evaluated in insertion order after playback updates.
+     * The first matching rule for the active state is taken.
+     */
+    void addConditionalTransition(const std::string& from, const std::string& to,
+                                  TransitionPredicate predicate, float blendDuration = 0.0f,
+                                  BlendCallback blendCallback = {}, bool resetPlayback = true);
+
+    /**
+     * @brief Add a transition that fires when a state finishes naturally.
+     */
+    void addFinishedTransition(const std::string& from, const std::string& to,
+                               float blendDuration = 0.0f, BlendCallback blendCallback = {},
+                               bool resetPlayback = true);
+
+    /**
+     * @brief Remove all transitions from a source state.
+     */
+    void clearTransitions(const std::string& from);
+
+    /**
+     * @brief Remove all registered transitions.
+     */
+    void clearAllTransitions();
+
+    /**
+     * @brief Check whether a transition blend window is active.
+     */
+    bool hasActiveBlend() const { return m_activeBlend.active; }
+
+    /**
+     * @brief Get current blend progress in the range 0..1.
+     */
+    float getBlendProgress() const { return m_activeBlend.progress; }
+
+    /**
+     * @brief Get the source state for the active blend window.
+     */
+    const std::string& getBlendSourceAnimation() const { return m_activeBlend.fromAnimation; }
+
+    /**
+     * @brief Get the target state for the active blend window.
+     */
+    const std::string& getBlendTargetAnimation() const { return m_activeBlend.toAnimation; }
+
     void update(float deltaTime) override;
 
   protected:
@@ -150,14 +200,37 @@ class AnimatedSpriteEntity : public SpriteEntity {
   private:
     using FrameCallbackMap = std::unordered_map<int, std::vector<FrameCallback>>;
 
+    struct TransitionRule {
+        std::string toAnimation;
+        TransitionPredicate predicate;
+        float blendDuration = 0.0f;
+        BlendCallback blendCallback;
+        bool resetPlayback = true;
+    };
+
+    struct ActiveBlendState {
+        std::string fromAnimation;
+        std::string toAnimation;
+        float duration = 0.0f;
+        float elapsed = 0.0f;
+        float progress = 0.0f;
+        BlendCallback callback;
+        bool active = false;
+    };
+
     const SpriteAnimation* currentAnimation() const;
     void resetPlayback();
     void advanceFrame();
     void fireFrameCallbacks(const std::string& animName, int frameIndex);
+    void validateTransitionEndpoints(const std::string& from, const std::string& to) const;
+    void evaluateTransitions();
+    void beginTransition(const std::string& fromAnimation, const TransitionRule& transition);
+    void updateActiveBlend(float deltaTime);
 
     std::shared_ptr<SpriteSheet> m_spriteSheet;
     std::unordered_map<std::string, SpriteAnimation> m_animations;
     std::unordered_map<std::string, FrameCallbackMap> m_frameCallbacks;
+    std::unordered_map<std::string, std::vector<TransitionRule>> m_transitions;
     std::string m_currentAnimationName;
     int m_currentFrameIndex = 0;
     float m_currentFrameElapsed = 0.0f;
@@ -165,6 +238,7 @@ class AnimatedSpriteEntity : public SpriteEntity {
     bool m_isPlaying = false;
     bool m_isPaused = false;
     bool m_finished = false;
+    ActiveBlendState m_activeBlend;
 };
 
 }  // namespace vde

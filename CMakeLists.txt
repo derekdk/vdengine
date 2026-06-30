@@ -145,6 +145,14 @@ FetchContent_Declare(
     URL_HASH SHA256=${TOMLPLUSPLUS_ARCHIVE_SHA256}
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
+
+# nlohmann/json for metadata import helpers (header-only)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
+)
 FetchContent_GetProperties(sqlite3)
 if(NOT sqlite3_POPULATED)
     # Policy CMP0169: allow direct FetchContent_Populate for content with no CMakeLists
@@ -161,6 +169,7 @@ endif()
 
 # Make toml++ available
 FetchContent_MakeAvailable(tomlplusplus)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # Library sources
 set(VDE_SOURCES
@@ -220,6 +229,7 @@ set(VDE_SOURCES
     # SpriteSheet
     src/api/SpriteSheet.cpp
     src/api/SpriteAnimation.cpp
+    src/api/SpriteAnimationImport.cpp
     src/api/AnimatedSpriteEntity.cpp
     # Text rendering
     src/api/BitmapFont.cpp
@@ -300,6 +310,7 @@ set(VDE_PUBLIC_HEADERS
     include/vde/api/InputScriptExecutor.h
     include/vde/api/ScriptEnvironment.h
     include/vde/api/SpriteAnimation.h
+    include/vde/api/SpriteAnimationImport.h
     include/vde/api/AnimatedSpriteEntity.h
     # Storage
     include/vde/api/StorageManager.h
@@ -367,6 +378,7 @@ target_link_libraries(vde PUBLIC
 
 target_link_libraries(vde PRIVATE
     sqlite3
+    nlohmann_json::nlohmann_json
 )
 
 # Shader directory configuration

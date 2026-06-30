@@ -41,6 +41,7 @@
 #include "Scene.h"
 #include "SceneGroup.h"
 #include "SpriteAnimation.h"
+#include "SpriteAnimationImport.h"
 #include "SpriteSheet.h"
 #include "ViewportRect.h"
 

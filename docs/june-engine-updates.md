@@ -131,12 +131,15 @@ Initial vertical slice delivered:
 - focused unit coverage added for looping, one-shot clamping, pause/resume, speed scaling, and frame-event dispatch
 - `sidescroller` migrated to a SpriteSheet-backed `idle` / `run` / `jump` / `attack` workflow with no manual UV math in gameplay code
 - smoke coverage added for the migrated `sidescroller` example
+- transition-condition helpers and optional blend callbacks added for more advanced state graphs
+- Aseprite-style JSON import helper added for atlas-backed clip import
+- additional legacy example migration completed in `sprite_demo` using imported atlas metadata plus `AnimatedSpriteEntity`
 
 Remaining follow-up for this phase after the initial slice:
 
-- transition-condition helpers and optional blending for more advanced graphs
-- optional data import path from external animation authoring tools / atlases
-- migration pass for additional legacy examples that still manage sprite frames manually
+- broader migration pass for other SpriteSheet-driven demos that still set frame UVs manually for character-like workflows
+- richer data import support beyond the current Aseprite-style JSON subset
+- higher-level authoring/editor workflow for animation states if the engine grows a dedicated content pipeline
 
 ### Goal
 

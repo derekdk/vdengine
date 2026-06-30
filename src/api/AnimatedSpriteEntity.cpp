@@ -1,5 +1,6 @@
 #include <vde/api/AnimatedSpriteEntity.h>
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -119,32 +120,77 @@ void AnimatedSpriteEntity::onFrameEvent(const std::string& animName, int frameIn
     m_frameCallbacks[animName][frameIndex].push_back(std::move(callback));
 }
 
+void AnimatedSpriteEntity::addConditionalTransition(const std::string& from, const std::string& to,
+                                                    TransitionPredicate predicate,
+                                                    float blendDuration,
+                                                    BlendCallback blendCallback,
+                                                    bool resetPlayback) {
+    if (from.empty() || to.empty()) {
+        throw std::invalid_argument("AnimatedSpriteEntity transition states cannot be empty");
+    }
+    if (predicate == nullptr) {
+        throw std::invalid_argument("AnimatedSpriteEntity transition predicate cannot be empty");
+    }
+    if (blendDuration < 0.0f) {
+        throw std::invalid_argument(
+            "AnimatedSpriteEntity transition blend duration cannot be negative");
+    }
+
+    validateTransitionEndpoints(from, to);
+    m_transitions[from].push_back({.toAnimation = to,
+                                   .predicate = std::move(predicate),
+                                   .blendDuration = blendDuration,
+                                   .blendCallback = std::move(blendCallback),
+                                   .resetPlayback = resetPlayback});
+}
+
+void AnimatedSpriteEntity::addFinishedTransition(const std::string& from, const std::string& to,
+                                                 float blendDuration, BlendCallback blendCallback,
+                                                 bool resetPlayback) {
+    addConditionalTransition(
+        from, to, [](const AnimatedSpriteEntity& entity) { return entity.isAnimationFinished(); },
+        blendDuration, std::move(blendCallback), resetPlayback);
+}
+
+void AnimatedSpriteEntity::clearTransitions(const std::string& from) {
+    m_transitions.erase(from);
+}
+
+void AnimatedSpriteEntity::clearAllTransitions() {
+    m_transitions.clear();
+    m_activeBlend = {};
+}
+
 void AnimatedSpriteEntity::update(float deltaTime) {
-    if (!m_isPlaying || m_isPaused || deltaTime <= 0.0f || m_speed <= 0.0f) {
-        return;
+    if (deltaTime > 0.0f) {
+        updateActiveBlend(deltaTime);
     }
 
-    float remaining = deltaTime * m_speed;
-    constexpr float kEpsilon = 1e-6f;
+    if (m_isPlaying && !m_isPaused && deltaTime > 0.0f && m_speed > 0.0f) {
+        float remaining = deltaTime * m_speed;
+        constexpr float kEpsilon = 1e-6f;
 
-    while (remaining > kEpsilon && m_isPlaying) {
-        const SpriteAnimation* animation = currentAnimation();
-        if (animation == nullptr) {
-            return;
+        while (remaining > kEpsilon && m_isPlaying) {
+            const SpriteAnimation* animation = currentAnimation();
+            if (animation == nullptr) {
+                return;
+            }
+
+            const auto& frame = animation->getFrame(m_currentFrameIndex);
+            float frameRemaining = frame.duration - m_currentFrameElapsed;
+
+            if (remaining + kEpsilon < frameRemaining) {
+                m_currentFrameElapsed += remaining;
+                break;
+            }
+
+            remaining -= frameRemaining;
+            m_currentFrameElapsed = 0.0f;
+            advanceFrame();
         }
-
-        const auto& frame = animation->getFrame(m_currentFrameIndex);
-        float frameRemaining = frame.duration - m_currentFrameElapsed;
-
-        if (remaining + kEpsilon < frameRemaining) {
-            m_currentFrameElapsed += remaining;
-            return;
-        }
-
-        remaining -= frameRemaining;
-        m_currentFrameElapsed = 0.0f;
-        advanceFrame();
     }
+
+    evaluateTransitions();
 }
 
 void AnimatedSpriteEntity::applyCurrentFrame() {
@@ -216,6 +262,66 @@ void AnimatedSpriteEntity::fireFrameCallbacks(const std::string& animName, int f
 
     for (const auto& callback : frameIt->second) {
         callback();
+    }
+}
+
+void AnimatedSpriteEntity::validateTransitionEndpoints(const std::string& from,
+                                                       const std::string& to) const {
+    (void)getAnimation(from);
+    (void)getAnimation(to);
+}
+
+void AnimatedSpriteEntity::evaluateTransitions() {
+    if (m_currentAnimationName.empty()) {
+        return;
+    }
+
+    auto transitionsIt = m_transitions.find(m_currentAnimationName);
+    if (transitionsIt == m_transitions.end()) {
+        return;
+    }
+
+    const std::string fromAnimation = m_currentAnimationName;
+    for (const auto& transition : transitionsIt->second) {
+        if (transition.predicate != nullptr && transition.predicate(*this)) {
+            beginTransition(fromAnimation, transition);
+            return;
+        }
+    }
+}
+
+void AnimatedSpriteEntity::beginTransition(const std::string& fromAnimation,
+                                           const TransitionRule& transition) {
+    play(transition.toAnimation, transition.resetPlayback);
+
+    if (transition.blendDuration > 0.0f && transition.blendCallback != nullptr) {
+        m_activeBlend = {.fromAnimation = fromAnimation,
+                         .toAnimation = transition.toAnimation,
+                         .duration = transition.blendDuration,
+                         .elapsed = 0.0f,
+                         .progress = 0.0f,
+                         .callback = transition.blendCallback,
+                         .active = true};
+        m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation, 0.0f);
+        return;
+    }
+
+    m_activeBlend = {};
+}
+
+void AnimatedSpriteEntity::updateActiveBlend(float deltaTime) {
+    if (!m_activeBlend.active || m_activeBlend.callback == nullptr ||
+        m_activeBlend.duration <= 0.0f) {
+        return;
+    }
+
+    m_activeBlend.elapsed = std::min(m_activeBlend.elapsed + deltaTime, m_activeBlend.duration);
+    m_activeBlend.progress = std::clamp(m_activeBlend.elapsed / m_activeBlend.duration, 0.0f, 1.0f);
+    m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation,
+                           m_activeBlend.progress);
+
+    if (m_activeBlend.elapsed >= m_activeBlend.duration) {
+        m_activeBlend = {};
     }
 }
 
