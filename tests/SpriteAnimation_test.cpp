@@ -423,9 +423,9 @@ TEST(SpriteAnimationImportTest, ImportAsepriteJsonFileReadsMetadataFromDisk) {
 
     const auto uniqueStamp =
         std::filesystem::file_time_type::clock::now().time_since_epoch().count();
-    const auto jsonPath = std::filesystem::temp_directory_path() /
-                          ("vde_sprite_animation_import_test_" + std::to_string(uniqueStamp) +
-                           ".json");
+    const auto jsonPath =
+        std::filesystem::temp_directory_path() /
+        ("vde_sprite_animation_import_test_" + std::to_string(uniqueStamp) + ".json");
     {
         std::ofstream output(jsonPath);
         ASSERT_TRUE(output) << "Failed to create temp JSON file: " << jsonPath.string();
