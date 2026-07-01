@@ -11,13 +11,14 @@ For a current picture of implemented, partial, and planned features, start with 
 **Game API (high-level)** — the recommended way to build applications:
 - **Scene System**: `Game`, `Scene`, `SceneGroup` with per-scene cameras, viewports, and lifecycle
 - **Entity System**: `MeshEntity`, `SpriteEntity`, `PhysicsEntity`, `TextEntity`, and more
+- **Animation**: Scene-owned tweening, sprite animation clips, and animated sprite entities
 - **Physics**: 2D rigid-body simulation with collision detection
 - **Audio**: Cross-platform audio playback via miniaudio (`AudioManager`, `AudioSource`)
 - **Text Rendering**: TrueType and bitmap font rendering
 - **Resource Manager**: Centralized asset caching and reference counting
 - **Storage**: Persistent key-value store backed by SQLite
 - **Transitions**: Fade, wipe, block-fall, and circle-reveal scene transitions
-- **Input Scripting**: Automated input replay for smoke testing
+- **Input & Automation**: Input handlers, action maps, key tracking, and scripted input replay
 
 **Low-Level Rendering Layer** — for direct Vulkan control:
 - **Window Management**: Cross-platform window creation via GLFW
@@ -66,13 +67,25 @@ VDE provides PowerShell scripts that handle all environment setup automatically:
 # Run smoke tests against examples, games, and tools
 .\scripts\smoke-test.ps1
 
+# Run the full verification pipeline
+.\scripts\verify.ps1
+
+# Run targeted lint checks for your current git delta
+.\scripts\lint.ps1 -ChangedOnly
+
+# Run golden-image render verification
+.\scripts\render-verify.ps1
+
 # Clean rebuild
 .\scripts\rebuild.ps1
 
 # Format C++ code
 .\scripts\format.ps1
 
-# Launch VLauncher (interactive example browser)
+# Launch VLauncher (interactive example/game/tool browser)
+.\scripts\run-vlauncher.ps1
+
+# Root shortcut for VLauncher
 .\run-vlauncher.ps1
 
 # Enable local protection: block direct commits to main
@@ -81,6 +94,8 @@ VDE provides PowerShell scripts that handle all environment setup automatically:
 
 For complete documentation see:
 - `scripts/README.md` — Detailed script reference
+- `docs/GETTING_STARTED.md` — Onboarding guide and first-application walkthrough
+- `docs/PROJECT_STATUS.md` — Canonical implemented/partial/planned status
 - `.github/skills/build-tool-workflows/SKILL.md` — Complete build guide
 
 ### Building Manually
@@ -226,10 +241,10 @@ vdengine/
 │       └── ...            # Input, transitions, world units, …
 ├── src/                   # Implementation files
 ├── shaders/               # GLSL shader sources
-├── tests/                 # Unit tests (Google Test)
-├── examples/              # Example applications (30+)
-├── games/                 # Larger playable applications and prototypes
-├── tools/                 # Asset creation tools (VLauncher, geometry REPL, resource editor)
+├── tests/                 # Unit tests (vde_tests + vde_resource_editor_tests)
+├── examples/              # 43 example directories / 44 registered example targets
+├── games/                 # 2 larger playable applications
+├── tools/                 # 4 tools (VLauncher, geometry REPL, hex editor, resource editor)
 ├── scripts/               # Build/test/format PowerShell scripts
 └── third_party/           # Vendored dependencies (if present)
 ```
@@ -248,6 +263,7 @@ VDE uses CMake FetchContent for most dependencies. Only the Vulkan SDK requires 
 | **miniaudio** | 0.11.21 | Cross-platform audio |
 | **SQLite3** | 3.49.1 | Persistent key-value storage |
 | **toml++** | v3.4.0 | TOML configuration parsing |
+| **nlohmann/json** | v3.11.3 | Metadata and import helpers |
 | **Dear ImGui** | v1.91.8-docking | Debug UI (examples, games, and tools) |
 | **Google Test** | 1.14.0 | Unit testing |
 
@@ -268,6 +284,9 @@ cmake .. -DVDE_BUILD_GAMES=OFF
 
 # Disable building tools
 cmake .. -DVDE_BUILD_TOOLS=OFF
+
+# Enable compiler timing instrumentation for build benchmarking
+cmake .. -DVDE_TIMING=ON
 ```
 
 ## Integration
@@ -302,19 +321,19 @@ cd build_ninja
 ctest --output-on-failure
 ```
 
-### Test Coverage
+The repo currently registers two test executables: `vde_tests` for engine and Game API coverage, and `vde_resource_editor_tests` for resource-editor domain logic.
 
-| Component | Coverage |
-|-----------|----------|
-| Window | Resolution, lifecycle |
-| Camera | Matrices, orbital movement |
-| HexGeometry | Dimensions, vertex counts |
-| ShaderCache | Hash consistency |
-| Types | Vertex/UBO structures |
+Coverage spans rendering helpers, scenes and entities, world units and bounds, physics, audio, input and scripted input execution, transitions, text and emoji rendering, sprite sheets and animation, launcher utilities, FLIP image comparison helpers, and resource-editor command infrastructure.
+
+For the full local gate used by the repo, run:
+
+```powershell
+.\scripts\verify.ps1
+```
 
 ## Examples
 
-VDE ships with 34 example applications. Launch them interactively via VLauncher:
+VDE currently ships with 44 registered example targets across 43 example directories. They cover low-level rendering, sprites, text, transitions, physics, audio, diagnostics, storage, input automation, camera feel, and multi-scene or multi-viewport workflows. Launch them interactively via VLauncher:
 
 ```powershell
 .\run-vlauncher.ps1
@@ -335,13 +354,31 @@ Notable examples:
 | `physics_demo` | 2D rigid-body physics |
 | `sprite_demo` | Sprite rendering |
 | `audio_demo` | Audio playback |
+| `camera_feel_demo` | Camera2D follow, deadzone, look-ahead, and shake workflows |
+| `input_actions_demo` | Named action mapping and persisted bindings |
 | `imgui_demo` | Dear ImGui integration |
-| `text_adventure_demo` | Text rendering |
+| `emoji_demo` | Color emoji rendering in engine text and ImGui |
+| `text_adventure_demo` | Interactive text adventure capstone |
 | `multi_scene_demo` | Multiple scenes with scene groups |
 | `quad_viewport_demo` | Split-screen viewports |
 | `transition_demo` | Scene transitions |
-| `asteroids_demo` | Complete Asteroids game |
-| `breakout_demo` | Complete Breakout game |
+| `asteroids_demo` | Classic Asteroids plus a physics-based variant |
+| `vertical_shooter` | Full top-down scrolling shooter |
+| `breakout_demo` | Complete Breakout-style game |
+
+## Games and Tools
+
+Beyond the examples, VDE also ships with 2 games and 4 tools.
+
+**Games**
+- `pong` — compact multiplayer-ready game sample with a fuller gameplay loop
+- `fishing_game` — 2D pond-fishing game showing the recommended `games/` layout
+
+**Tools**
+- `vlauncher` — interactive launcher for examples, games, and tools
+- `resource_editor` — asset and command-system tool with dedicated tests
+- `geometry_repl` — geometry experimentation and inspection tool
+- `hex_editor` — hex-grid editing workflow
 
 ## Versioning
 
