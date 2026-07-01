@@ -91,6 +91,10 @@ std::vector<ImportedFrameRecord> parseAsepriteFrames(const OrderedJson& root) {
     if (frames.is_object()) {
         records.reserve(frames.size());
         for (auto it = frames.begin(); it != frames.end(); ++it) {
+            if (!it.value().is_object()) {
+                throw std::invalid_argument(
+                    "SpriteAnimationImport Aseprite frames object must map names to objects");
+            }
             records.push_back(parseFrameRecord(it.key(), it.value()));
         }
         return records;
