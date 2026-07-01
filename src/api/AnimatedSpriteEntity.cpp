@@ -310,6 +310,7 @@ void AnimatedSpriteEntity::beginTransition(const std::string& fromAnimation,
     }
 
     m_activeBlend = {};
+}
 
 void AnimatedSpriteEntity::updateActiveBlend(float deltaTime) {
     if (!m_activeBlend.active || m_activeBlend.duration <= 0.0f) {
