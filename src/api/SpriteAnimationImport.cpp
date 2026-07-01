@@ -168,6 +168,9 @@ SpriteAnimationImport::importAsepriteJson(std::shared_ptr<Texture> texture,
     }
 
     OrderedJson root = OrderedJson::parse(jsonText);
+    if (!root.is_object()) {
+        throw std::invalid_argument("SpriteAnimationImport requires a JSON object root");
+    }
     auto frames = parseAsepriteFrames(root);
 
     ImportedSpriteAnimationSet imported;
