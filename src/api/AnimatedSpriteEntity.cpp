@@ -318,8 +318,7 @@ void AnimatedSpriteEntity::updateActiveBlend(float deltaTime) {
     }
 
     m_activeBlend.elapsed = std::min(m_activeBlend.elapsed + deltaTime, m_activeBlend.duration);
-    m_activeBlend.progress =
-        std::clamp(m_activeBlend.elapsed / m_activeBlend.duration, 0.0f, 1.0f);
+    m_activeBlend.progress = std::clamp(m_activeBlend.elapsed / m_activeBlend.duration, 0.0f, 1.0f);
 
     if (m_activeBlend.callback != nullptr) {
         m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation,
