@@ -312,15 +312,18 @@ void AnimatedSpriteEntity::beginTransition(const std::string& fromAnimation,
     m_activeBlend = {};
 
 void AnimatedSpriteEntity::updateActiveBlend(float deltaTime) {
-    if (!m_activeBlend.active || m_activeBlend.callback == nullptr ||
-        m_activeBlend.duration <= 0.0f) {
+    if (!m_activeBlend.active || m_activeBlend.duration <= 0.0f) {
         return;
     }
 
     m_activeBlend.elapsed = std::min(m_activeBlend.elapsed + deltaTime, m_activeBlend.duration);
-    m_activeBlend.progress = std::clamp(m_activeBlend.elapsed / m_activeBlend.duration, 0.0f, 1.0f);
-    m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation,
-                           m_activeBlend.progress);
+    m_activeBlend.progress =
+        std::clamp(m_activeBlend.elapsed / m_activeBlend.duration, 0.0f, 1.0f);
+
+    if (m_activeBlend.callback != nullptr) {
+        m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation,
+                               m_activeBlend.progress);
+    }
 
     if (m_activeBlend.elapsed >= m_activeBlend.duration) {
         m_activeBlend = {};
