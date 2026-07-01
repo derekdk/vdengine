@@ -61,6 +61,9 @@ add_vde_example(vde_sprite_demo "sprite_demo/main.cpp")
 # Parallax scrolling demo - layered looping scenery with runtime speed controls
 add_vde_example(vde_parallax_demo "parallax_demo/main.cpp")
 
+# TileMap demo - layered tile rendering, culling, collision extraction, and parallax backgrounds
+add_vde_example(vde_tilemap_demo "tilemap_demo/main.cpp")
+
 # Breakout demo - simple breakout clone demonstrating 2D gameplay and sprite collisions
 add_vde_example(vde_breakout_demo "breakout_demo/main.cpp")
 

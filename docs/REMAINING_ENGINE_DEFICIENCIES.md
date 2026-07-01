@@ -30,19 +30,19 @@ Each item is scored on four axes (1–5 scale):
 **Score: 4.5** — Frequency 5 · Workaround 5 · Scope 4 · Credibility 4
 
 Every 2D sidescroller, platformer, RPG, and strategy game needs a tilemap. VDE has
-no tile grid renderer, no collision generation from tile data, and no format support.
-The workaround is manually placing individual sprite entities, which does not scale and
-has no culling.
+the runtime half of that workflow now: a layered `TileMap`, SpriteSheet binding,
+visible-region culling, merged solid / one-way collision extraction, and a
+`RepeatingBackground` helper. The remaining gap is practical authored content
+import and richer tile metadata.
 
-**What's needed:**
-- `TileMap` entity with grid dimensions and spritesheet binding
-- View-frustum culling (only render visible tiles)
-- Collision shape generation from tile types (solid, one-way platform, slope)
-- Instanced or batched rendering for performance
-- CSV loader (minimum); Tiled `.tmx` JSON support (ideal)
-- `RepeatingBackground` entity for infinite scrolling backgrounds with parallax factor
+**What's still needed:**
+- Tiled / authored data import into the runtime `TileMap` structures
+- CSV or equivalent lightweight offline loader for simple maps
+- Optional object-layer import for collision or spawn metadata
+- Richer collision annotations beyond the current `solid` and `one-way` extraction
+- Authoring/editor workflow so levels do not need to be assembled purely in C++
 
-**Status:** Proposed API exists in `OPEN_SUGGESTIONS.md` (#3). Not started.
+**Status:** Runtime TileMap workflow delivered in public code; import and authoring path still planned.
 
 ---
 

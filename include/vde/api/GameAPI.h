@@ -43,6 +43,7 @@
 #include "SpriteAnimation.h"
 #include "SpriteAnimationImport.h"
 #include "SpriteSheet.h"
+#include "TileMap.h"
 #include "ViewportRect.h"
 
 // Input handling
