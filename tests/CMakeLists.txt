@@ -91,6 +91,7 @@ set(VDE_TEST_SOURCES
     BitmapFont_test.cpp
     # FLIP image comparison tests
     FlipCompare_test.cpp
+    TileMap_test.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp

@@ -164,6 +164,23 @@ Provide a sprite-focused state animation wrapper so users stop writing manual fr
 
 ## Phase D: TileMap Runtime Workflow (Week 4-6)
 
+### Status Snapshot (2026-07-01)
+
+Initial vertical slice delivered:
+
+- `TileMap` public API added with fixed-size tile grids, multiple layers, SpriteSheet binding, and per-layer depth / visibility control
+- camera-visible mesh rebuilding added so medium-size maps render through a culled batched mesh rather than one entity per tile
+- collision extraction added for merged `solid` regions and row-merged `one-way` platform spans
+- `RepeatingBackground` public helper added for scrolling parallax backdrops tied to `Camera2D`
+- focused unit coverage added in `TileMap_test.cpp`
+- runnable `tilemap_demo` example added with smoke coverage for the end-to-end runtime workflow
+
+Remaining follow-up for this phase after the initial slice:
+
+- richer collision metadata such as slopes or tile-authored gameplay tags if future 2D games need them
+- chunked or cached rebuild strategies if larger-than-current runtime maps expose a measurable rebuild bottleneck
+- external import / authoring workflow, which remains the explicit scope of Phase E
+
 ### Goal
 
 Enable scalable tile-based level construction and rendering workflows.

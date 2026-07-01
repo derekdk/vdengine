@@ -860,6 +860,113 @@ Notes:
 
 ---
 
+## vde::TileMap
+
+**Header**: `<vde/api/TileMap.h>`
+
+Mesh-backed layered tilemap for 2D level rendering.
+
+### Tile Collision Types
+
+```cpp
+enum class TileCollisionKind : uint8_t {
+    None,
+    Solid,
+    OneWay,
+};
+
+struct TileCollisionRect {
+    glm::vec2 center;
+    glm::vec2 halfExtents;
+    TileCollisionKind kind;
+    int layerIndex;
+};
+
+struct TileVisibilityBounds {
+    int minColumn;
+    int maxColumn;
+    int minRow;
+    int maxRow;
+    bool empty() const;
+};
+```
+
+### Construction
+
+```cpp
+TileMap(float tileWidth, float tileHeight, int columns, int rows);
+```
+
+### Core Methods
+
+| Method | Description |
+|--------|-------------|
+| `int addLayer(const std::string& name = {})` | Add a new tile layer and return its zero-based index |
+| `int getLayerCount() const` | Get the number of layers |
+| `const LayerInfo& getLayerInfo(int layerIndex) const` | Read layer name, visibility, and depth |
+| `void setLayerVisible(int layerIndex, bool visible)` | Toggle rendering for a layer |
+| `void setLayerDepth(int layerIndex, float depth)` | Set the layer's local Z depth |
+| `void setTileSet(shared_ptr<SpriteSheet>)` | Bind the SpriteSheet used for tile IDs |
+| `shared_ptr<SpriteSheet> getTileSet() const` | Get the bound SpriteSheet |
+| `void setTile(int column, int row, int tileId)` | Set a tile on the base layer |
+| `void setTile(int layerIndex, int column, int row, int tileId)` | Set a tile on a specific layer |
+| `int getTile(int column, int row) const` | Read a tile from the base layer |
+| `int getTile(int layerIndex, int column, int row) const` | Read a tile from a specific layer |
+| `void fillRegion(int startColumn, int startRow, int endColumn, int endRow, int tileId)` | Fill an inclusive region on the base layer |
+| `void fillRegion(int layerIndex, int startColumn, int startRow, int endColumn, int endRow, int tileId)` | Fill an inclusive region on a specific layer |
+| `void loadFromArray(const std::vector<int>& tiles)` | Replace the base layer from a row-major tile array |
+| `void loadLayerFromArray(int layerIndex, const std::vector<int>& tiles)` | Replace a specific layer from a row-major tile array |
+| `void setCulling(bool enabled)` | Enable or disable camera-visible mesh rebuilding |
+| `bool isCullingEnabled() const` | Query whether culling is active |
+| `TileVisibilityBounds computeVisibleBounds(const Rect2D& rect) const` | Convert a world-space rectangle into tile coordinates |
+| `TileVisibilityBounds computeVisibleBoundsFromCamera() const` | Use the active `Camera2D` visible rect for culling |
+| `TileVisibilityBounds getLastVisibleBounds() const` | Inspect the most recent rendered tile bounds |
+| `void setCollisionKind(int tileId, TileCollisionKind kind)` | Assign collision meaning to a tile ID |
+| `TileCollisionKind getCollisionKind(int tileId) const` | Read the collision meaning for a tile ID |
+| `std::vector<TileCollisionRect> extractCollisionRects(int layerIndex = -1) const` | Merge tiles into world-space solid and one-way collision rectangles |
+
+### Notes
+
+- Tile coordinates use a bottom-left origin in local tilemap space.
+- `TileMap::kEmptyTile` clears a tile slot without requiring an atlas entry.
+- Rendering batches only the currently visible tiles into a mesh when culling is enabled.
+- One-way collision extraction is row-based so platform spans remain top-only surfaces for gameplay code.
+
+---
+
+## vde::RepeatingBackground
+
+**Header**: `<vde/api/TileMap.h>`
+
+Repeating textured background helper for 2D parallax layers.
+
+### Construction
+
+```cpp
+RepeatingBackground(shared_ptr<Texture> texture, float tileSize, int tilesX, int tilesY);
+RepeatingBackground(shared_ptr<Texture> texture, float tileWidth, float tileHeight,
+                    int tilesX, int tilesY);
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void setParallaxFactor(float factorX, float factorY)` | Set how strongly the layer follows the camera |
+| `glm::vec2 getParallaxFactor() const` | Read the current parallax factor |
+| `void setScrollVelocity(float velocityX, float velocityY)` | Set autonomous scroll velocity in world units per second |
+| `glm::vec2 getScrollVelocity() const` | Read the autonomous scroll velocity |
+| `void setScrollOffset(float offsetX, float offsetY)` | Override the scroll offset directly |
+| `glm::vec2 getScrollOffset() const` | Read the current scroll offset |
+| `void update(float deltaTime) override` | Advance autonomous scrolling |
+
+### Notes
+
+- The helper rebuilds only enough quads to cover the active `Camera2D` view.
+- Parallax is applied relative to the camera position, so slower factors naturally create background depth.
+
+---
+
 ## vde::GameCamera
 
 **Header**: `<vde/api/GameCamera.h>`

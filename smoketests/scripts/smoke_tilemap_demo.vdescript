@@ -1,0 +1,21 @@
+# Smoke test: TileMap runtime demo
+# Traverse the level, jump through a one-way platform, then reset.
+wait startup
+wait 250
+
+keydown D
+wait 1100
+press SPACE
+wait 900
+keyup D
+wait 250
+
+keydown D
+wait 2200
+keyup D
+wait 300
+
+press R
+wait 250
+
+exit
