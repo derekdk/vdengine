@@ -739,6 +739,124 @@ Entity that renders a 2D sprite with texture, color tint, UV rect, and anchor po
 | `void setAnchor(float x, float y)` | Set anchor point (0-1; 0.5, 0.5 = center) |
 | `float getAnchorX() const` | Get anchor X |
 | `float getAnchorY() const` | Get anchor Y |
+| `void setFlipX(bool)` | Mirror the sprite horizontally |
+| `void setFlipY(bool)` | Mirror the sprite vertically |
+| `bool isFlippedX() const` | Check horizontal flip state |
+| `bool isFlippedY() const` | Check vertical flip state |
+| `void sizeToFit(float worldHeight, float maxWidth = 0.0f)` | Scale the sprite to a world height while preserving texture aspect ratio |
+
+---
+
+## vde::SpriteAnimation
+
+**Header**: `<vde/api/SpriteAnimation.h>`
+
+Named frame clip for SpriteSheet-backed sprite playback.
+
+### Types
+
+```cpp
+struct Frame {
+    int spriteIndex = 0;
+    float duration = 0.1f;
+};
+```
+
+### Constructors
+
+```cpp
+SpriteAnimation();
+explicit SpriteAnimation(std::string name);
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void addFrame(int spriteIndex, float duration = 0.1f)` | Append a frame referencing a SpriteSheet index |
+| `void setLooping(bool)` | Enable or disable looping |
+| `bool isLooping() const` | Check looping state |
+| `void setName(std::string)` | Set clip name |
+| `const std::string& getName() const` | Get clip name |
+| `int getFrameCount() const` | Get number of frames |
+| `float getTotalDuration() const` | Get one-pass clip duration |
+| `int getFrameAtTime(float time) const` | Resolve active frame index for elapsed time |
+| `const Frame& getFrame(int index) const` | Get a frame by clip-local index |
+
+---
+
+## vde::AnimatedSpriteEntity
+
+**Header**: `<vde/api/AnimatedSpriteEntity.h>`
+
+SpriteEntity wrapper for named SpriteSheet-based animation states.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `void setSpriteSheet(shared_ptr<SpriteSheet>)` | Assign the atlas used for frame lookup and apply its texture to the sprite |
+| `shared_ptr<SpriteSheet> getSpriteSheet() const` | Get the active SpriteSheet |
+| `void addAnimation(const std::string& name, SpriteAnimation animation)` | Add or replace a named clip |
+| `bool hasAnimation(const std::string& name) const` | Check whether a named clip exists |
+| `const SpriteAnimation& getAnimation(const std::string& name) const` | Get a named clip |
+| `void play(const std::string& name, bool reset = true)` | Start or resume playback of a named state |
+| `void pause()` | Pause playback without resetting frame/time |
+| `void resume()` | Resume a paused clip |
+| `void stop()` | Stop playback and return to the first frame of the current clip |
+| `void setSpeed(float speed)` | Set playback speed multiplier |
+| `float getSpeed() const` | Get playback speed multiplier |
+| `bool isPlaying() const` | Check whether playback is advancing |
+| `bool isPaused() const` | Check whether playback is paused |
+| `bool isAnimationFinished() const` | Check whether the current one-shot clip finished naturally |
+| `const std::string& getCurrentAnimation() const` | Get the active state name |
+| `int getCurrentFrame() const` | Get the active frame index inside the current clip |
+| `void onFrameEvent(const std::string& animName, int frameIndex, FrameCallback callback)` | Register a callback for a frame-entry event |
+| `void addConditionalTransition(const std::string& from, const std::string& to, TransitionPredicate predicate, float blendDuration = 0.0f, BlendCallback blendCallback = {}, bool resetPlayback = true)` | Register a conditional state change evaluated after playback updates |
+| `void addFinishedTransition(const std::string& from, const std::string& to, float blendDuration = 0.0f, BlendCallback blendCallback = {}, bool resetPlayback = true)` | Transition automatically when a non-looping state finishes |
+| `void clearTransitions(const std::string& from)` | Remove all transitions from one source state |
+| `void clearAllTransitions()` | Remove all registered transitions |
+| `bool hasActiveBlend() const` | Check whether a transition blend window is active |
+| `float getBlendProgress() const` | Get current blend progress from 0..1 |
+| `const std::string& getBlendSourceAnimation() const` | Get the source state for the active blend |
+| `const std::string& getBlendTargetAnimation() const` | Get the target state for the active blend |
+| `void update(float deltaTime) override` | Advance playback and update the sprite UV rect |
+
+Notes:
+
+- Transition predicates are evaluated in insertion order after playback updates.
+- Transition endpoints must already be registered via addAnimation() before you add a transition that references them.
+- Blend callbacks are optional and provide a lightweight hook for transition-time effects; this is not a full blend-graph system.
+
+---
+
+## vde::SpriteAnimationImport
+
+**Header**: `<vde/api/SpriteAnimationImport.h>`
+
+Import helpers for SpriteSheet-backed clip data.
+
+### Types
+
+```cpp
+struct ImportedSpriteAnimationSet {
+    SpriteSheet::Ref spriteSheet;
+    std::unordered_map<std::string, SpriteAnimation> animations;
+    std::vector<std::string> frameNames;
+};
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `static ImportedSpriteAnimationSet importAsepriteJson(shared_ptr<Texture> texture, const std::string& jsonText)` | Import atlas regions and tagged clips from Aseprite-style JSON text |
+| `static ImportedSpriteAnimationSet importAsepriteJsonFile(shared_ptr<Texture> texture, const std::string& jsonPath)` | Import atlas regions and tagged clips from an Aseprite-style JSON file |
+
+Notes:
+
+- The current import helper expects the atlas texture to be loaded separately.
+- The imported clip names come from Aseprite frame tags when present; otherwise one single-frame clip is generated per exported frame.
 
 ---
 
