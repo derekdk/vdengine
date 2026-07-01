@@ -294,7 +294,7 @@ void AnimatedSpriteEntity::beginTransition(const std::string& fromAnimation,
                                            const TransitionRule& transition) {
     play(transition.toAnimation, transition.resetPlayback);
 
-    if (transition.blendDuration > 0.0f && transition.blendCallback != nullptr) {
+    if (transition.blendDuration > 0.0f) {
         m_activeBlend = {.fromAnimation = fromAnimation,
                          .toAnimation = transition.toAnimation,
                          .duration = transition.blendDuration,
@@ -302,12 +302,14 @@ void AnimatedSpriteEntity::beginTransition(const std::string& fromAnimation,
                          .progress = 0.0f,
                          .callback = transition.blendCallback,
                          .active = true};
-        m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation, 0.0f);
+        if (m_activeBlend.callback != nullptr) {
+            m_activeBlend.callback(*this, m_activeBlend.fromAnimation, m_activeBlend.toAnimation,
+                                   0.0f);
+        }
         return;
     }
 
     m_activeBlend = {};
-}
 
 void AnimatedSpriteEntity::updateActiveBlend(float deltaTime) {
     if (!m_activeBlend.active || m_activeBlend.callback == nullptr ||
