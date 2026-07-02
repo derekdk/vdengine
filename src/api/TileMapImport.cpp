@@ -659,9 +659,15 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
 
     const std::filesystem::path path(jsonPath);
     const std::string fileText = readTextFile(path);
-    OrderedJson root = OrderedJson::parse(fileText);
-    validateSupportedRoot(root);
 
+    OrderedJson root;
+    try {
+        root = OrderedJson::parse(fileText);
+    } catch (const nlohmann::json::parse_error& ex) {
+        throw std::invalid_argument(std::string("TileMapImport failed to parse JSON file '") +
+                                    path.string() + "': " + ex.what());
+    }
+    validateSupportedRoot(root);
     auto texture = std::make_shared<Texture>();
     const ParsedTileSet tileset = parseTileSet(root, nullptr);
     (void)tileset;
