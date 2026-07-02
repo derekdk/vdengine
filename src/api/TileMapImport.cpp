@@ -652,7 +652,8 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
     }
 
     const std::filesystem::path path(jsonPath);
-    OrderedJson root = OrderedJson::parse(readTextFile(path));
+    const std::string fileText = readTextFile(path);
+    OrderedJson root = OrderedJson::parse(fileText);
     validateSupportedRoot(root);
 
     auto texture = std::make_shared<Texture>();
@@ -671,7 +672,6 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
                                  imagePath.string());
     }
 
-    return importTiledJsonImpl(texture, root.dump(), options);
-}
+    return importTiledJsonImpl(texture, fileText, options);
 
 }  // namespace vde
