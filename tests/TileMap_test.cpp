@@ -1,13 +1,15 @@
 /**
  * @file TileMap_test.cpp
- * @brief Unit tests for TileMap and RepeatingBackground.
+ * @brief Unit tests for TileMap, TileMapImport, and RepeatingBackground.
  */
 
 #include <vde/Texture.h>
 #include <vde/api/TileMap.h>
+#include <vde/api/TileMapImport.h>
 
 #include <memory>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -160,6 +162,349 @@ TEST(TileMapTest, ExtractCollisionRectsFiltersByLayer) {
     ASSERT_EQ(topRects.size(), 1u);
     EXPECT_EQ(baseRects.front().layerIndex, 0);
     EXPECT_EQ(topRects.front().layerIndex, topLayer);
+}
+
+TEST(TileMapImportTest, ImportTiledJsonBuildsTileMapAndFlipsRows) {
+    auto texture = makeTestTileSet(2, 2)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 3,
+    "height": 2,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {
+            "type": "tilelayer",
+            "name": "ground",
+            "visible": true,
+            "data": [1, 2, 0, 3, 4, 0]
+        },
+        {
+            "type": "tilelayer",
+            "name": "decor",
+            "visible": false,
+            "data": [0, 0, 0, 0, 1, 0]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 4,
+            "columns": 2,
+            "image": "terrain.png",
+            "imagewidth": 32,
+            "imageheight": 32,
+            "tiles": [
+                {
+                    "id": 0,
+                    "properties": [
+                        {"name": "collision", "type": "string", "value": "solid"}
+                    ]
+                },
+                {
+                    "id": 3,
+                    "properties": [
+                        {"name": "collision", "type": "string", "value": "oneway"}
+                    ]
+                }
+            ]
+        }
+    ]
+}
+)json";
+
+    TileMapImportOptions options;
+    options.layerDepthStep = 0.07f;
+    auto imported = TileMapImport::importTiledJson(texture, jsonText, options);
+
+    ASSERT_NE(imported.tileMap, nullptr);
+    EXPECT_EQ(imported.tileMap->getColumnCount(), 3);
+    EXPECT_EQ(imported.tileMap->getRowCount(), 2);
+    EXPECT_EQ(imported.tileMap->getLayerCount(), 2);
+    EXPECT_EQ(imported.tileMap->getLayerInfo(0).name, "ground");
+    EXPECT_EQ(imported.tileMap->getLayerInfo(1).name, "decor");
+    EXPECT_FALSE(imported.tileMap->isLayerVisible(1));
+    EXPECT_FLOAT_EQ(imported.tileMap->getLayerDepth(1), 0.07f);
+
+    EXPECT_EQ(imported.tileMap->getTile(0, 0), 2);
+    EXPECT_EQ(imported.tileMap->getTile(1, 0), 3);
+    EXPECT_EQ(imported.tileMap->getTile(0, 1), 0);
+    EXPECT_EQ(imported.tileMap->getTile(1, 1), 1);
+    EXPECT_EQ(imported.tileMap->getTile(2, 1), TileMap::kEmptyTile);
+
+    ASSERT_NE(imported.tileMap->getTileSet(), nullptr);
+    EXPECT_EQ(imported.tileMap->getTileSet()->getSpriteCount(), 4);
+    EXPECT_EQ(imported.tileMap->getCollisionKind(0), TileCollisionKind::Solid);
+    EXPECT_EQ(imported.tileMap->getCollisionKind(3), TileCollisionKind::OneWay);
+}
+
+TEST(TileMapImportTest, ImportTiledJsonFileLoadsCheckedInSample) {
+    const std::string mapPath = std::string(VDE_ASSETS_DIR) + "/tiled/tilemap_demo.tmj";
+
+    auto imported = TileMapImport::importTiledJsonFile(nullptr, mapPath);
+
+    ASSERT_NE(imported.tileMap, nullptr);
+    EXPECT_EQ(imported.tileMap->getColumnCount(), 128);
+    EXPECT_EQ(imported.tileMap->getRowCount(), 24);
+    EXPECT_EQ(imported.tileMap->getLayerCount(), 2);
+    EXPECT_EQ(imported.tileMap->getLayerInfo(0).name, "ground");
+    EXPECT_EQ(imported.tileMap->getLayerInfo(1).name, "accents");
+    EXPECT_EQ(imported.tileMap->getCollisionKind(0), TileCollisionKind::Solid);
+    EXPECT_EQ(imported.tileMap->getCollisionKind(3), TileCollisionKind::OneWay);
+
+    ASSERT_EQ(imported.objects.size(), 1u);
+    EXPECT_EQ(imported.objects.front().name, "spawn");
+    EXPECT_TRUE(imported.objects.front().point);
+    EXPECT_NEAR(imported.objects.front().position.x, 4.5f, 0.0001f);
+    EXPECT_NEAR(imported.objects.front().position.y, 7.0f, 0.0001f);
+}
+
+TEST(TileMapImportTest, ImportTiledJsonExtractsPointAndRectangleObjects) {
+    auto texture = makeTestTileSet(2, 1)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 2,
+    "height": 2,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {
+            "type": "tilelayer",
+            "name": "ground",
+            "data": [1, 0, 0, 0]
+        },
+        {
+            "type": "objectgroup",
+            "name": "markers",
+            "objects": [
+                {
+                    "id": 7,
+                    "name": "spawn",
+                    "type": "spawn",
+                    "point": true,
+                    "x": 24,
+                    "y": 8,
+                    "properties": [
+                        {"name": "facing", "type": "string", "value": "right"}
+                    ]
+                },
+                {
+                    "id": 8,
+                    "name": "gate",
+                    "x": 16,
+                    "y": 16,
+                    "width": 16,
+                    "height": 16,
+                    "properties": [
+                        {"name": "collision", "type": "string", "value": "solid"},
+                        {"name": "enabled", "type": "bool", "value": true},
+                        {"name": "priority", "type": "int", "value": 3},
+                        {"name": "weight", "type": "float", "value": 1.5}
+                    ]
+                }
+            ]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 2,
+            "columns": 2,
+            "image": "terrain.png",
+            "imagewidth": 32,
+            "imageheight": 16
+        }
+    ]
+}
+)json";
+
+    auto imported = TileMapImport::importTiledJson(texture, jsonText);
+
+    ASSERT_EQ(imported.objects.size(), 2u);
+
+    const auto& spawn = imported.objects.at(0);
+    EXPECT_TRUE(spawn.point);
+    EXPECT_EQ(spawn.name, "spawn");
+    EXPECT_EQ(spawn.layerName, "markers");
+    EXPECT_NEAR(spawn.position.x, 1.5f, 0.0001f);
+    EXPECT_NEAR(spawn.position.y, 1.5f, 0.0001f);
+    ASSERT_TRUE(spawn.properties.contains("facing"));
+    EXPECT_EQ(std::get<std::string>(spawn.properties.at("facing")), "right");
+
+    const auto& gate = imported.objects.at(1);
+    EXPECT_FALSE(gate.point);
+    EXPECT_NEAR(gate.position.x, 1.0f, 0.0001f);
+    EXPECT_NEAR(gate.position.y, 0.0f, 0.0001f);
+    EXPECT_NEAR(gate.size.x, 1.0f, 0.0001f);
+    EXPECT_NEAR(gate.size.y, 1.0f, 0.0001f);
+    EXPECT_EQ(gate.collisionKind, TileCollisionKind::Solid);
+    ASSERT_TRUE(gate.properties.contains("enabled"));
+    ASSERT_TRUE(gate.properties.contains("priority"));
+    ASSERT_TRUE(gate.properties.contains("weight"));
+    EXPECT_TRUE(std::get<bool>(gate.properties.at("enabled")));
+    EXPECT_EQ(std::get<int>(gate.properties.at("priority")), 3);
+    EXPECT_FLOAT_EQ(std::get<float>(gate.properties.at("weight")), 1.5f);
+}
+
+TEST(TileMapImportTest, ImportTiledJsonRejectsRectangleObjectsOutsideBounds) {
+    auto texture = makeTestTileSet(2, 1)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 2,
+    "height": 2,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {
+            "type": "tilelayer",
+            "name": "ground",
+            "data": [1, 0, 0, 0]
+        },
+        {
+            "type": "objectgroup",
+            "name": "markers",
+            "objects": [
+                {
+                    "id": 8,
+                    "name": "gate",
+                    "x": 16,
+                    "y": 16,
+                    "width": 17,
+                    "height": 17
+                }
+            ]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 2,
+            "columns": 2,
+            "image": "terrain.png",
+            "imagewidth": 32,
+            "imageheight": 16
+        }
+    ]
+}
+)json";
+
+    try {
+        (void)TileMapImport::importTiledJson(texture, jsonText);
+        FAIL() << "Expected import to reject rectangle objects outside map bounds";
+    } catch (const std::invalid_argument& ex) {
+        EXPECT_NE(std::string(ex.what()).find("map bounds"), std::string::npos);
+    }
+}
+
+TEST(TileMapImportTest, ImportTiledJsonRejectsMapsWithoutTileLayers) {
+    auto texture = makeTestTileSet(1, 1)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 1,
+    "height": 1,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {
+            "type": "objectgroup",
+            "name": "markers",
+            "objects": [
+                {
+                    "id": 1,
+                    "point": true,
+                    "x": 0,
+                    "y": 0
+                }
+            ]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 1,
+            "columns": 1,
+            "image": "terrain.png",
+            "imagewidth": 16,
+            "imageheight": 16
+        }
+    ]
+}
+)json";
+
+    try {
+        (void)TileMapImport::importTiledJson(texture, jsonText);
+        FAIL() << "Expected import to reject maps without tile layers";
+    } catch (const std::invalid_argument& ex) {
+        EXPECT_NE(std::string(ex.what()).find("at least one tile layer"), std::string::npos);
+    }
+}
+
+TEST(TileMapImportTest, ImportTiledJsonRejectsUnsupportedInfiniteMaps) {
+    auto texture = makeTestTileSet(1, 1)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "infinite": true,
+    "width": 1,
+    "height": 1,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {"type": "tilelayer", "name": "ground", "data": [1]}
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 1,
+            "columns": 1,
+            "image": "terrain.png",
+            "imagewidth": 16,
+            "imageheight": 16
+        }
+    ]
+}
+)json";
+
+    try {
+        (void)TileMapImport::importTiledJson(texture, jsonText);
+        FAIL() << "Expected import to reject infinite maps";
+    } catch (const std::invalid_argument& ex) {
+        EXPECT_NE(std::string(ex.what()).find("finite orthogonal"), std::string::npos);
+    }
 }
 
 TEST(RepeatingBackgroundTest, InvalidArgumentsThrow) {

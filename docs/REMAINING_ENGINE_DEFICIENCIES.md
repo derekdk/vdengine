@@ -30,19 +30,19 @@ Each item is scored on four axes (1–5 scale):
 **Score: 4.5** — Frequency 5 · Workaround 5 · Scope 4 · Credibility 4
 
 Every 2D sidescroller, platformer, RPG, and strategy game needs a tilemap. VDE has
-the runtime half of that workflow now: a layered `TileMap`, SpriteSheet binding,
-visible-region culling, merged solid / one-way collision extraction, and a
-`RepeatingBackground` helper. The remaining gap is practical authored content
-import and richer tile metadata.
+the runtime half of that workflow now, plus a practical initial authored-data
+path: a layered `TileMap`, SpriteSheet binding, visible-region culling, merged
+solid / one-way collision extraction, a `RepeatingBackground` helper, and a
+documented finite-orthogonal Tiled JSON import path. The remaining gap is the
+broader authoring surface around that initial slice.
 
 **What's still needed:**
-- Tiled / authored data import into the runtime `TileMap` structures
-- CSV or equivalent lightweight offline loader for simple maps
-- Optional object-layer import for collision or spawn metadata
+- External TSX tileset support and multi-tileset maps beyond the current single-image subset
 - Richer collision annotations beyond the current `solid` and `one-way` extraction
+- Additional authored metadata such as gameplay tags, slopes, or tile-driven triggers
 - Authoring/editor workflow so levels do not need to be assembled purely in C++
 
-**Status:** Runtime TileMap workflow delivered in public code; import and authoring path still planned.
+**Status:** Partial. Runtime TileMap workflow and a practical Tiled JSON subset are delivered in public code; broader authoring coverage remains open.
 
 ---
 

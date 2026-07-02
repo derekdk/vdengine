@@ -901,6 +901,7 @@ TileMap(float tileWidth, float tileHeight, int columns, int rows);
 
 | Method | Description |
 |--------|-------------|
+| `void setLayerName(int layerIndex, const std::string& name)` | Rename a tile layer |
 | `int addLayer(const std::string& name = {})` | Add a new tile layer and return its zero-based index |
 | `int getLayerCount() const` | Get the number of layers |
 | `const LayerInfo& getLayerInfo(int layerIndex) const` | Read layer name, visibility, and depth |
@@ -931,6 +932,68 @@ TileMap(float tileWidth, float tileHeight, int columns, int rows);
 - `TileMap::kEmptyTile` clears a tile slot without requiring an atlas entry.
 - Rendering batches only the currently visible tiles into a mesh when culling is enabled.
 - One-way collision extraction is row-based so platform spans remain top-only surfaces for gameplay code.
+
+---
+
+## vde::TileMapImport
+
+**Header**: `<vde/api/TileMapImport.h>`
+
+Import helper that translates a documented Tiled JSON subset into the runtime `TileMap` workflow.
+
+### Import Types
+
+```cpp
+using TileMapImportPropertyValue = std::variant<bool, int, float, std::string>;
+
+struct ImportedTileObject {
+    int id;
+    std::string name;
+    std::string type;
+    std::string layerName;
+    glm::vec2 position;
+    glm::vec2 size;
+    bool point;
+    bool visible;
+    float rotationDegrees;
+    TileCollisionKind collisionKind;
+    std::unordered_map<std::string, TileMapImportPropertyValue> properties;
+};
+
+struct ImportedTileMap {
+    std::shared_ptr<TileMap> tileMap;
+    std::vector<ImportedTileObject> objects;
+};
+
+struct TileMapImportOptions {
+    float tileWidth = 1.0f;
+    float tileHeight = 1.0f;
+    float layerDepthStep = 0.05f;
+    bool importObjectLayers = true;
+};
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `static ImportedTileMap importTiledJson(const shared_ptr<Texture>& texture, const std::string& jsonText, const TileMapImportOptions& options = {})` | Import Tiled JSON text using a caller-provided tileset texture |
+| `static ImportedTileMap importTiledJsonFile(VulkanContext* context, const std::string& jsonPath, const TileMapImportOptions& options = {})` | Import a `.tmj` / Tiled JSON file and load its referenced tileset image |
+
+### Supported Subset
+
+- Finite orthogonal maps with `renderorder: right-down`
+- Inline integer tile-layer data arrays (no encoding, compression, or chunks)
+- One embedded image tileset
+- Optional object layers containing point or axis-aligned rectangle objects
+- Bool, int, float, and string custom properties
+
+### Notes
+
+- Tiled's top-down tile rows are flipped into `TileMap`'s bottom-left origin automatically.
+- Imported object positions are converted into TileMap local/world units using a bottom-left origin.
+- Tile collision kinds can be authored through tileset tile properties such as `collision = "solid"` or `collision = "oneway"`.
+- Unsupported features throw actionable exceptions instead of silently falling back, including infinite maps, external TSX tilesets, multiple tilesets, encoded layers, and flipped or rotated tile GIDs.
 
 ---
 
