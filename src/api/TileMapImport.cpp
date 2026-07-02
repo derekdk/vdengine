@@ -565,9 +565,14 @@ ImportedTileMap importTiledJsonImpl(const std::shared_ptr<Texture>& texture,
 
     validateImportOptions(options);
 
-    OrderedJson root = OrderedJson::parse(jsonText);
+    OrderedJson root;
+    try {
+        root = OrderedJson::parse(jsonText);
+    } catch (const nlohmann::json::parse_error& ex) {
+        throw std::invalid_argument(std::string("TileMapImport failed to parse JSON text: ") +
+                                    ex.what());
+    }
     validateSupportedRoot(root);
-
     const int columns = getRequiredInt(root, "width", "map");
     const int rows = getRequiredInt(root, "height", "map");
     const int tilePixelWidth = getRequiredInt(root, "tilewidth", "map");
