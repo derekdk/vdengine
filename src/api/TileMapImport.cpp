@@ -481,8 +481,11 @@ ImportedTileObject parseObject(const OrderedJson& object, const std::string& lay
     imported.point = getOptionalBool(object, "point", false);
     imported.visible = getOptionalBool(object, "visible", true);
     imported.rotationDegrees = getOptionalFloat(object, "rotation", 0.0f, "object");
+    if (!imported.point && std::abs(imported.rotationDegrees) > 1e-4f) {
+        throw std::invalid_argument(
+            "TileMapImport supports only axis-aligned rectangle objects (rotation must be 0)");
+    }
     imported.properties = parseProperties(object, "object");
-
     const float xPixels = getRequiredFloat(object, "x", "object");
     const float yPixels = getRequiredFloat(object, "y", "object");
     const float widthPixels = getOptionalFloat(object, "width", 0.0f, "object");
