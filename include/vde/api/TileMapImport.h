@@ -6,7 +6,6 @@
  */
 
 #include <vde/Texture.h>
-#include <vde/api/SpriteSheet.h>
 #include <vde/api/TileMap.h>
 
 #include <glm/vec2.hpp>
