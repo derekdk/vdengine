@@ -4,9 +4,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <ranges>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -674,5 +674,6 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
     }
 
     return importTiledJsonImpl(texture, fileText, options);
+}
 
 }  // namespace vde
