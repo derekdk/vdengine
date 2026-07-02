@@ -1,6 +1,7 @@
 #include <vde/VulkanContext.h>
 #include <vde/api/TileMapImport.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -12,7 +13,6 @@
 #include <utility>
 
 #include <nlohmann/json.hpp>
-
 namespace vde {
 
 namespace {
