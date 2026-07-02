@@ -420,7 +420,17 @@ std::vector<int> parseLayerTiles(const OrderedJson& layer, const ParsedTileSet& 
                                             "' contains a non-integer tile GID");
             }
 
-            const uint32_t rawGid = gidValue.get<uint32_t>();
+            uint32_t rawGid = 0u;
+            if (gidValue.is_number_integer()) {
+                const int64_t signedGid = gidValue.get<int64_t>();
+                if (signedGid < 0) {
+                    throw std::invalid_argument("TileMapImport tile layer '" + layerName +
+                                                "' contains a negative tile GID");
+                }
+                rawGid = static_cast<uint32_t>(signedGid);
+            } else {
+                rawGid = gidValue.get<uint32_t>();
+            }
             if ((rawGid & kTiledFlipMask) != 0u) {
                 throw std::invalid_argument(
                     "TileMapImport does not support flipped or rotated Tiled tile GIDs on layer '" +
