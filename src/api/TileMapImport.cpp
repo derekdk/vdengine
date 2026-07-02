@@ -292,17 +292,26 @@ ParsedTileSet parseTileSet(const OrderedJson& root, const std::shared_ptr<Textur
     parsed.columns = getRequiredInt(tileset, "columns", "tileset");
     parsed.spacingPx = getOptionalInt(tileset, "spacing", 0, "tileset");
     const int marginPx = getOptionalInt(tileset, "margin", 0, "tileset");
+    const int tileWidthPx = getRequiredInt(tileset, "tilewidth", "tileset");
+    const int tileHeightPx = getRequiredInt(tileset, "tileheight", "tileset");
     if (marginPx != 0) {
         throw std::invalid_argument(
             "TileMapImport does not support tileset margins; export with margin 0");
     }
-    if (parsed.firstGid <= 0 || parsed.tileCount <= 0 || parsed.columns <= 0 ||
-        parsed.spacingPx < 0) {
+    if (parsed.firstGid <= 0 || parsed.tileCount <= 0 || parsed.columns <= 0 || parsed.spacingPx < 0 ||
+        tileWidthPx <= 0 || tileHeightPx <= 0) {
         throw std::invalid_argument("TileMapImport tileset metadata contains invalid dimensions");
     }
     if ((parsed.tileCount % parsed.columns) != 0) {
         throw std::invalid_argument(
             "TileMapImport requires a full grid tileset where tilecount divides evenly by columns");
+    }
+
+    const int mapTileWidthPx = getRequiredInt(root, "tilewidth", "map");
+    const int mapTileHeightPx = getRequiredInt(root, "tileheight", "map");
+    if (tileWidthPx != mapTileWidthPx || tileHeightPx != mapTileHeightPx) {
+        throw std::invalid_argument(
+            "TileMapImport requires tileset tilewidth/tileheight to match the root map tilewidth/tileheight");
     }
 
     parsed.rows = parsed.tileCount / parsed.columns;
@@ -311,6 +320,13 @@ ParsedTileSet parseTileSet(const OrderedJson& root, const std::shared_ptr<Textur
     const int imageHeight = getRequiredInt(tileset, "imageheight", "tileset");
     if (imageWidth <= 0 || imageHeight <= 0) {
         throw std::invalid_argument("TileMapImport tileset image dimensions must be positive");
+    }
+
+    const int expectedImageWidth = parsed.columns * tileWidthPx + parsed.spacingPx * (parsed.columns - 1);
+    const int expectedImageHeight = parsed.rows * tileHeightPx + parsed.spacingPx * (parsed.rows - 1);
+    if (imageWidth != expectedImageWidth || imageHeight != expectedImageHeight) {
+        throw std::invalid_argument(
+            "TileMapImport tileset image dimensions do not match the tileset columns/rows, tile size, and spacing");
     }
 
     parsed.imageWidth = static_cast<uint32_t>(imageWidth);
