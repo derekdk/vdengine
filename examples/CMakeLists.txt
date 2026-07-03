@@ -78,6 +78,7 @@ set(VDE_TILEMAP_DEMO_ASSET_STAMP
 add_custom_command(
     OUTPUT ${VDE_TILEMAP_DEMO_ASSET_STAMP}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+    COMMAND ${CMAKE_COMMAND} -E rm -r -f $<TARGET_FILE_DIR:vde_tilemap_demo>/assets/tiled
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_tilemap_demo>/assets/tiled
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/assets/tiled
