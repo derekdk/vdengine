@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -408,6 +409,14 @@ std::vector<int> parseLayerTiles(const OrderedJson& layer, const ParsedTileSet& 
             "' uses layer offsets, which are unsupported in the current subset");
     }
 
+    const int layerX = getOptionalInt(layer, "x", 0, "tile layer");
+    const int layerY = getOptionalInt(layer, "y", 0, "tile layer");
+    if (layerX != 0 || layerY != 0) {
+        throw std::invalid_argument(
+            "TileMapImport tile layer '" + layerName +
+            "' uses layer x/y offsets, which are unsupported in the current subset");
+    }
+
     const float opacity = getOptionalFloat(layer, "opacity", 1.0f, "tile layer");
     if (std::abs(opacity - 1.0f) > 1e-4f) {
         throw std::invalid_argument("TileMapImport tile layer '" + layerName +
@@ -506,8 +515,9 @@ ImportedTileObject parseObject(const OrderedJson& object, const std::string& lay
     const float yPixels = getRequiredFloat(object, "y", "object");
     const float widthPixels = getOptionalFloat(object, "width", 0.0f, "object");
     const float heightPixels = getOptionalFloat(object, "height", 0.0f, "object");
-    if (widthPixels < 0.0f || heightPixels < 0.0f) {
-        throw std::invalid_argument("TileMapImport object width and height must be non-negative");
+    if (!imported.point && (widthPixels <= 0.0f || heightPixels <= 0.0f)) {
+        throw std::invalid_argument(
+            "TileMapImport rectangle objects require positive width and height");
     }
 
     if (imported.point) {
@@ -553,6 +563,14 @@ void parseObjectLayer(const OrderedJson& layer, ImportedTileMap& imported, int m
         throw std::invalid_argument(
             "TileMapImport object layer '" + layerName +
             "' uses layer offsets, which are unsupported in the current subset");
+    }
+
+    const int layerX = getOptionalInt(layer, "x", 0, "object layer");
+    const int layerY = getOptionalInt(layer, "y", 0, "object layer");
+    if (layerX != 0 || layerY != 0) {
+        throw std::invalid_argument(
+            "TileMapImport object layer '" + layerName +
+            "' uses layer x/y offsets, which are unsupported in the current subset");
     }
 
     for (const auto& object : layer.at("objects")) {
@@ -615,6 +633,10 @@ ImportedTileMap importTiledJsonImpl(const std::shared_ptr<Texture>& texture,
         imported.tileMap->setCollisionKind(tileId, collisionKind);
     }
 
+    if (columns > std::numeric_limits<int>::max() / tilePixelWidth ||
+        rows > std::numeric_limits<int>::max() / tilePixelHeight) {
+        throw std::invalid_argument("TileMapImport map pixel dimensions would overflow");
+    }
     const int mapPixelWidth = columns * tilePixelWidth;
     const int mapPixelHeight = rows * tilePixelHeight;
     const float unitScaleX = options.tileWidth / static_cast<float>(tilePixelWidth);
@@ -689,11 +711,8 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
     validateSupportedRoot(root);
     auto texture = std::make_shared<Texture>();
     const ParsedTileSet tileset = parseTileSet(root, nullptr);
-    (void)tileset;
 
-    const auto& tilesetJson = root.at("tilesets").at(0);
-    const std::filesystem::path imagePath =
-        path.parent_path() / getRequiredString(tilesetJson, "image", "tileset");
+    const std::filesystem::path imagePath = path.parent_path() / tileset.imagePath;
     if (!texture->loadFromFile(imagePath.string())) {
         throw std::runtime_error("TileMapImport failed to load tileset image: " +
                                  imagePath.string());

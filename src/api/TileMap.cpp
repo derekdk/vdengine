@@ -76,7 +76,6 @@ void TileMap::setLayerName(int layerIndex, const std::string& name) {
     }
 
     info.name = name;
-    markDirty();
 }
 
 void TileMap::setLayerVisible(int layerIndex, bool visible) {
