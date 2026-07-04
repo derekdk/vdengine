@@ -34,6 +34,7 @@
 #include <mach-o/dyld.h>
 #elif defined(__linux__)
 #include <climits>
+
 #include <unistd.h>
 #endif
 
@@ -114,8 +115,7 @@ inline void setWorkingDirectoryToExecutablePath() {
     }
 
     std::error_code error;
-    std::filesystem::path exeDir =
-        std::filesystem::canonical(exePathBuffer, error).parent_path();
+    std::filesystem::path exeDir = std::filesystem::canonical(exePathBuffer, error).parent_path();
     if (!error && !exeDir.empty()) {
         std::filesystem::current_path(exeDir, error);
     }
