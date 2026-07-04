@@ -68,6 +68,16 @@ const TileMap::LayerInfo& TileMap::getLayerInfo(int layerIndex) const {
     return m_layers.at(static_cast<size_t>(layerIndex)).info;
 }
 
+void TileMap::setLayerName(int layerIndex, const std::string& name) {
+    validateLayerIndex(layerIndex);
+    auto& info = m_layers.at(static_cast<size_t>(layerIndex)).info;
+    if (info.name == name) {
+        return;
+    }
+
+    info.name = name;
+}
+
 void TileMap::setLayerVisible(int layerIndex, bool visible) {
     validateLayerIndex(layerIndex);
     auto& info = m_layers.at(static_cast<size_t>(layerIndex)).info;

@@ -2,7 +2,6 @@
 #include <vde/api/GameAPI.h>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -15,8 +14,6 @@ namespace {
 
 constexpr float kViewWidth = 22.0f;
 constexpr float kViewHeight = 12.0f;
-constexpr int kMapColumns = 128;
-constexpr int kMapRows = 24;
 constexpr float kTileSize = 1.0f;
 constexpr float kPlayerWidth = 0.78f;
 constexpr float kPlayerHeight = 1.42f;
@@ -27,12 +24,8 @@ constexpr float kJumpVelocity = 11.5f;
 constexpr float kGravity = -28.0f;
 constexpr float kMaxFallVelocity = -22.0f;
 constexpr float kCollisionEpsilon = 0.001f;
-constexpr glm::vec2 kSpawnPoint(4.5f, 7.0f);
-constexpr int kGrassTileId = 0;
-constexpr int kDirtTileId = 1;
-constexpr int kStoneTileId = 2;
-constexpr int kOneWayTileId = 3;
-constexpr int kAccentTileId = 4;
+constexpr glm::vec2 kDefaultSpawnPoint(4.5f, 7.0f);
+constexpr const char* kImportedMapPath = "assets/tiled/tilemap_demo.tmj";
 
 struct RGBA {
     constexpr RGBA() = default;
@@ -60,97 +53,6 @@ void putPixel(std::vector<uint8_t>& buffer, uint32_t stride, uint32_t x, uint32_
     buffer.at(offset + 3) = color.a;
 }
 
-void fillRect(std::vector<uint8_t>& buffer, uint32_t stride, uint32_t x0, uint32_t y0,
-              uint32_t width, uint32_t height, RGBA color) {
-    for (uint32_t y = y0; y < y0 + height; ++y) {
-        for (uint32_t x = x0; x < x0 + width; ++x) {
-            putPixel(buffer, stride, x, y, color);
-        }
-    }
-}
-
-void drawTileBorder(std::vector<uint8_t>& buffer, uint32_t stride, uint32_t originX,
-                    uint32_t originY, RGBA color) {
-    fillRect(buffer, stride, originX, originY, 16, 1, color);
-    fillRect(buffer, stride, originX, originY + 15, 16, 1, color);
-    fillRect(buffer, stride, originX, originY, 1, 16, color);
-    fillRect(buffer, stride, originX + 15, originY, 1, 16, color);
-}
-
-std::shared_ptr<vde::SpriteSheet> createTileSet(vde::VulkanContext* context) {
-    constexpr uint32_t kTilePixels = 16;
-    constexpr uint32_t kColumns = 5;
-    constexpr uint32_t kRows = 1;
-    constexpr uint32_t kTextureWidth = kTilePixels * kColumns;
-    constexpr uint32_t kTextureHeight = kTilePixels * kRows;
-
-    constexpr RGBA kGrassTop{92, 196, 92, 255};
-    constexpr RGBA kGrassBody{57, 138, 57, 255};
-    constexpr RGBA kDirtBase{123, 90, 56, 255};
-    constexpr RGBA kDirtDark{92, 62, 36, 255};
-    constexpr RGBA kStoneBase{106, 117, 132, 255};
-    constexpr RGBA kStoneDark{74, 84, 98, 255};
-    constexpr RGBA kPlatformWood{204, 152, 72, 255};
-    constexpr RGBA kPlatformShadow{126, 86, 38, 255};
-    constexpr RGBA kAccentBase{246, 220, 108, 255};
-    constexpr RGBA kAccentDark{194, 134, 44, 255};
-    constexpr RGBA kOutline{38, 48, 61, 255};
-
-    std::vector<uint8_t> pixels(static_cast<size_t>(kTextureWidth) * kTextureHeight * 4, 0);
-
-    for (uint32_t tile = 0; tile < kColumns; ++tile) {
-        const uint32_t originX = tile * kTilePixels;
-        const uint32_t originY = 0;
-
-        switch (tile) {
-        case kGrassTileId:
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 16, kGrassBody);
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 4, kGrassTop);
-            fillRect(pixels, kTextureWidth, originX + 2, originY + 4, 2, 3, kGrassTop);
-            fillRect(pixels, kTextureWidth, originX + 7, originY + 5, 2, 2, kGrassTop);
-            fillRect(pixels, kTextureWidth, originX + 12, originY + 4, 2, 3, kGrassTop);
-            break;
-        case kDirtTileId:
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 16, kDirtBase);
-            fillRect(pixels, kTextureWidth, originX + 2, originY + 3, 3, 3, kDirtDark);
-            fillRect(pixels, kTextureWidth, originX + 10, originY + 4, 2, 2, kDirtDark);
-            fillRect(pixels, kTextureWidth, originX + 6, originY + 10, 4, 2, kDirtDark);
-            break;
-        case kStoneTileId:
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 16, kStoneBase);
-            fillRect(pixels, kTextureWidth, originX + 2, originY + 2, 5, 4, kStoneDark);
-            fillRect(pixels, kTextureWidth, originX + 9, originY + 4, 4, 3, kStoneDark);
-            fillRect(pixels, kTextureWidth, originX + 5, originY + 9, 6, 4, kStoneDark);
-            break;
-        case kOneWayTileId:
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 16, kPlatformShadow);
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 4, kPlatformWood);
-            fillRect(pixels, kTextureWidth, originX + 2, originY + 5, 2, 6, kPlatformWood);
-            fillRect(pixels, kTextureWidth, originX + 12, originY + 5, 2, 6, kPlatformWood);
-            break;
-        case kAccentTileId:
-            fillRect(pixels, kTextureWidth, originX, originY, 16, 16, kAccentDark);
-            fillRect(pixels, kTextureWidth, originX + 3, originY + 3, 10, 10, kAccentBase);
-            fillRect(pixels, kTextureWidth, originX + 6, originY + 0, 4, 16, kAccentDark);
-            fillRect(pixels, kTextureWidth, originX + 0, originY + 6, 16, 4, kAccentDark);
-            break;
-        default:
-            break;
-        }
-
-        drawTileBorder(pixels, kTextureWidth, originX, originY, kOutline);
-    }
-
-    auto texture = std::make_shared<vde::Texture>();
-    texture->loadFromData(pixels.data(), kTextureWidth, kTextureHeight);
-    if (context != nullptr) {
-        texture->uploadToGPU(context);
-    }
-
-    return vde::SpriteSheet::createGrid(texture, static_cast<int>(kColumns),
-                                        static_cast<int>(kRows));
-}
-
 std::shared_ptr<vde::Texture> createBackdropTexture(uint32_t width, uint32_t height, RGBA base,
                                                     RGBA stripe, RGBA highlight, bool diagonal) {
     std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4, 0);
@@ -172,14 +74,6 @@ std::shared_ptr<vde::Texture> createBackdropTexture(uint32_t width, uint32_t hei
     texture->loadFromData(pixels.data(), width, height);
     return texture;
 }
-
-int surfaceRowForColumn(int column) {
-    static constexpr std::array<int, 8> kSegments = {3, 4, 5, 3, 6, 4, 7, 5};
-    const int base = kSegments.at(static_cast<size_t>(column / 16));
-    const int wobble = ((column % 12) >= 8) ? 1 : 0;
-    return std::clamp(base + wobble, 3, 8);
-}
-
 AABB makePlayerBounds(const glm::vec2& center) {
     return AABB{.left = center.x - kPlayerHalfWidth,
                 .right = center.x + kPlayerHalfWidth,
@@ -200,6 +94,16 @@ bool intersects(const AABB& a, const AABB& b) {
 
 bool overlapsHorizontally(const AABB& a, const AABB& b) {
     return a.left < b.right && a.right > b.left;
+}
+
+glm::vec2 findSpawnPoint(const std::vector<vde::ImportedTileObject>& objects) {
+    for (const auto& object : objects) {
+        if (object.name == "spawn" || object.type == "spawn") {
+            return object.position;
+        }
+    }
+
+    return kDefaultSpawnPoint;
 }
 
 }  // namespace
@@ -248,9 +152,11 @@ class TileMapScene : public vde::examples::BaseExampleScene {
         createPlayer();
         resetDemo();
 
-        std::cout << "TileMap demo: " << kMapColumns << 'x' << kMapRows << " tiles across "
-                  << m_tileMap->getLayerCount() << " layers, extracted " << m_solidRects.size()
-                  << " solid regions and " << m_oneWayRects.size() << " one-way regions\n";
+        std::cout << "Tiled import demo: " << m_tileMap->getColumnCount() << 'x'
+                  << m_tileMap->getRowCount() << " imported tiles across "
+                  << m_tileMap->getLayerCount() << " layers, " << m_importedObjectCount
+                  << " imported objects, extracted " << m_solidRects.size() << " solid regions and "
+                  << m_oneWayRects.size() << " one-way regions\n";
     }
 
     void update(float deltaTime) override {
@@ -291,7 +197,7 @@ class TileMapScene : public vde::examples::BaseExampleScene {
         m_onGround = false;
         resolveVerticalCollisions(previousBottom);
 
-        const float maxX = static_cast<float>(kMapColumns) - kPlayerHalfWidth;
+        const float maxX = static_cast<float>(m_tileMap->getColumnCount()) - kPlayerHalfWidth;
         m_playerPosition.x = std::clamp(m_playerPosition.x, kPlayerHalfWidth, maxX);
 
         if (m_playerPosition.y < -5.0f) {
@@ -310,19 +216,19 @@ class TileMapScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    [[nodiscard]] std::string getExampleName() const override { return "TileMap Runtime Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Tiled Import Demo"; }
 
     [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
-            "Mesh-backed TileMap rendering with layered SpriteSheet tiles and camera culling",
-            "Collision extraction for merged solid terrain and one-way platform spans",
-            "RepeatingBackground parallax layers behind a medium-size scrolling level",
+            "Checked-in Tiled JSON sample imported into TileMap layers and SpriteSheet tiles",
+            "Collision extraction from imported solid terrain and one-way platform spans",
+            "Object-layer spawn metadata plus repeating parallax backgrounds in a playable scene",
         };
     }
 
     [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
-            "A long side-view level with grass, dirt, stone, and amber one-way platforms",
+            "A long imported side-view level with grass, dirt, stone, and amber one-way platforms",
             "Two repeating background layers scrolling behind the map at different parallax speeds",
             "A bright player marker that can run, jump through one-way platforms from below, and "
             "land on them from above",
@@ -356,40 +262,19 @@ class TileMapScene : public vde::examples::BaseExampleScene {
     }
 
     void createTileMap() {
-        m_tileMap = addEntity<vde::TileMap>(kTileSize, kTileSize, kMapColumns, kMapRows);
+        vde::TileMapImportOptions options;
+        options.tileWidth = kTileSize;
+        options.tileHeight = kTileSize;
+        options.layerDepthStep = 0.06f;
+
+        auto imported = vde::TileMapImport::importTiledJsonFile(
+            getGame() ? getGame()->getVulkanContext() : nullptr, kImportedMapPath, options);
+        m_tileMap = imported.tileMap;
+        m_importedObjectCount = imported.objects.size();
+        m_spawnPoint = findSpawnPoint(imported.objects);
+
+        addEntity(std::static_pointer_cast<vde::Entity>(m_tileMap));
         m_tileMap->setPosition(0.0f, 0.0f, -0.4f);
-        m_tileMap->setTileSet(createTileSet(getGame() ? getGame()->getVulkanContext() : nullptr));
-        m_tileMap->setCollisionKind(kGrassTileId, vde::TileCollisionKind::Solid);
-        m_tileMap->setCollisionKind(kDirtTileId, vde::TileCollisionKind::Solid);
-        m_tileMap->setCollisionKind(kStoneTileId, vde::TileCollisionKind::Solid);
-        m_tileMap->setCollisionKind(kOneWayTileId, vde::TileCollisionKind::OneWay);
-
-        const int decorLayer = m_tileMap->addLayer("accents");
-        m_tileMap->setLayerDepth(decorLayer, 0.06f);
-
-        for (int column = 0; column < kMapColumns; ++column) {
-            const int surfaceRow = surfaceRowForColumn(column);
-            for (int row = 0; row < surfaceRow - 1; ++row) {
-                const int tile = (row < 2 || (column % 11) < 4) ? kDirtTileId : kStoneTileId;
-                m_tileMap->setTile(column, row, tile);
-            }
-            m_tileMap->setTile(column, surfaceRow - 1, kGrassTileId);
-
-            if ((column % 9) == 2 && surfaceRow < (kMapRows - 1)) {
-                m_tileMap->setTile(decorLayer, column, surfaceRow, kAccentTileId);
-            }
-        }
-
-        m_tileMap->fillRegion(14, 7, 20, 7, kOneWayTileId);
-        m_tileMap->fillRegion(28, 9, 35, 9, kOneWayTileId);
-        m_tileMap->fillRegion(49, 11, 57, 11, kOneWayTileId);
-        m_tileMap->fillRegion(74, 10, 84, 10, kOneWayTileId);
-        m_tileMap->fillRegion(98, 13, 108, 13, kOneWayTileId);
-
-        m_tileMap->fillRegion(24, 4, 27, 6, kStoneTileId);
-        m_tileMap->fillRegion(60, 5, 63, 8, kStoneTileId);
-        m_tileMap->fillRegion(88, 6, 93, 8, kStoneTileId);
-        m_tileMap->fillRegion(112, 4, 117, 7, kStoneTileId);
     }
 
     void rebuildCollisionCache() {
@@ -417,12 +302,12 @@ class TileMapScene : public vde::examples::BaseExampleScene {
     }
 
     void resetDemo() {
-        m_playerPosition = kSpawnPoint;
+        m_playerPosition = m_spawnPoint;
         m_playerVelocity = glm::vec2(0.0f);
         m_onGround = false;
 
         if (m_camera2D != nullptr) {
-            m_camera2D->setPosition(kSpawnPoint.x + 3.0f, kSpawnPoint.y + 1.5f);
+            m_camera2D->setPosition(m_spawnPoint.x + 3.0f, m_spawnPoint.y + 1.5f);
         }
 
         syncVisuals();
@@ -517,6 +402,8 @@ class TileMapScene : public vde::examples::BaseExampleScene {
     std::shared_ptr<vde::SpriteEntity> m_playerShadow;
     std::vector<vde::TileCollisionRect> m_solidRects;
     std::vector<vde::TileCollisionRect> m_oneWayRects;
+    size_t m_importedObjectCount = 0;
+    glm::vec2 m_spawnPoint{kDefaultSpawnPoint};
     glm::vec2 m_playerPosition{0.0f};
     glm::vec2 m_playerVelocity{0.0f};
     bool m_onGround = false;

@@ -64,6 +64,36 @@ add_vde_example(vde_parallax_demo "parallax_demo/main.cpp")
 # TileMap demo - layered tile rendering, culling, collision extraction, and parallax backgrounds
 add_vde_example(vde_tilemap_demo "tilemap_demo/main.cpp")
 
+# Keep imported Tiled sample assets synced for the tilemap demo
+file(GLOB_RECURSE VDE_TILEMAP_DEMO_ASSET_FILES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/assets/tiled/*
+)
+
+# In multi-config generators, keep the stamp per-config so switching Debug/Release
+# still syncs assets to the corresponding output directory.
+set(VDE_TILEMAP_DEMO_ASSET_STAMP
+    ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/vde_tilemap_demo_assets.stamp
+)
+
+add_custom_command(
+    OUTPUT ${VDE_TILEMAP_DEMO_ASSET_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
+    COMMAND ${CMAKE_COMMAND} -E rm -r -f $<TARGET_FILE_DIR:vde_tilemap_demo>/assets/tiled
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:vde_tilemap_demo>/assets/tiled
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets/tiled
+        $<TARGET_FILE_DIR:vde_tilemap_demo>/assets/tiled
+    COMMAND ${CMAKE_COMMAND} -E touch ${VDE_TILEMAP_DEMO_ASSET_STAMP}
+    DEPENDS ${VDE_TILEMAP_DEMO_ASSET_FILES}
+    COMMENT "Syncing tilemap demo Tiled assets..."
+    VERBATIM
+)
+
+add_custom_target(vde_tilemap_demo_sync_assets
+    DEPENDS ${VDE_TILEMAP_DEMO_ASSET_STAMP}
+)
+
+add_dependencies(vde_tilemap_demo vde_tilemap_demo_sync_assets)
 # Breakout demo - simple breakout clone demonstrating 2D gameplay and sprite collisions
 add_vde_example(vde_breakout_demo "breakout_demo/main.cpp")
 

@@ -112,6 +112,13 @@ class TileMap : public MeshEntity {
     const LayerInfo& getLayerInfo(int layerIndex) const;
 
     /**
+     * @brief Rename a layer.
+     * @param layerIndex Zero-based layer index.
+     * @param name New layer name.
+     */
+    void setLayerName(int layerIndex, const std::string& name);
+
+    /**
      * @brief Set whether a layer should render.
      * @param layerIndex Zero-based layer index.
      * @param visible True to render the layer.

@@ -44,6 +44,7 @@
 #include "SpriteAnimationImport.h"
 #include "SpriteSheet.h"
 #include "TileMap.h"
+#include "TileMapImport.h"
 #include "ViewportRect.h"
 
 // Input handling

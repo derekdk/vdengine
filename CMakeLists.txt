@@ -229,6 +229,7 @@ set(VDE_SOURCES
     # SpriteSheet
     src/api/SpriteSheet.cpp
     src/api/TileMap.cpp
+    src/api/TileMapImport.cpp
     src/api/SpriteAnimation.cpp
     src/api/SpriteAnimationImport.cpp
     src/api/AnimatedSpriteEntity.cpp
@@ -318,6 +319,7 @@ set(VDE_PUBLIC_HEADERS
     # SpriteSheet
     include/vde/api/SpriteSheet.h
     include/vde/api/TileMap.h
+    include/vde/api/TileMapImport.h
     # Default constants
     include/vde/api/Defaults.h
     # Gameplay utility headers

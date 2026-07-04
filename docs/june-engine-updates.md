@@ -205,6 +205,23 @@ Enable scalable tile-based level construction and rendering workflows.
 
 ## Phase E: Tiled Import Path (Week 6-7)
 
+### Status Snapshot (2026-07-01)
+
+Initial vertical slice delivered:
+
+- `TileMapImport` public API added for finite orthogonal Tiled JSON / `.tmj` maps with one embedded image tileset
+- Tiled layer names, visibility, depth ordering, and tile IDs now translate into runtime `TileMap` structures
+- tileset tile properties now import collision metadata for the existing `solid` / `one-way` runtime extraction path
+- optional point / rectangle object-layer extraction added for spawn or authored gameplay metadata
+- checked-in sample assets under `assets/tiled/` now drive the playable `tilemap_demo` scene with existing smoke coverage
+- unsupported constructs fail with actionable diagnostics for infinite maps, external TSX tilesets, multiple tilesets, encoded/chunked layers, and flipped/rotated GIDs
+
+Remaining follow-up for this phase after the initial slice:
+
+- external TSX and broader multi-tileset support if projects outgrow the current single-image subset
+- richer authored metadata such as slopes, gameplay tags, or tile-driven triggers
+- deeper editor/authoring workflow beyond the current checked-in Tiled sample path
+
 ### Goal
 
 Ship a practical data import path from Tiled into the runtime TileMap workflow.

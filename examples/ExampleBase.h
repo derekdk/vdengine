@@ -30,6 +30,13 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <climits>
+#include <mach-o/dyld.h
+#elif defined(__linux__)
+#include <climits>
+
+#include <unistd.h>
 #endif
 
 // ImGui includes (optional - only used if VDE_EXAMPLE_USE_IMGUI is defined)
@@ -95,6 +102,31 @@ inline void setWorkingDirectoryToExecutablePath() {
     if (len == 0 || len >= MAX_PATH) {
         return;
     }
+
+    std::error_code error;
+    std::filesystem::path exeDir = std::filesystem::path(exePathBuffer).parent_path();
+    if (!exeDir.empty()) {
+        std::filesystem::current_path(exeDir, error);
+    }
+#elif defined(__APPLE__)
+    char exePathBuffer[PATH_MAX] = {};
+    uint32_t size = sizeof(exePathBuffer);
+    if (_NSGetExecutablePath(exePathBuffer, &size) != 0) {
+        return;
+    }
+
+    std::error_code error;
+    std::filesystem::path exeDir = std::filesystem::canonical(exePathBuffer, error).parent_path();
+    if (!error && !exeDir.empty()) {
+        std::filesystem::current_path(exeDir, error);
+    }
+#elif defined(__linux__)
+    char exePathBuffer[PATH_MAX] = {};
+    ssize_t len = readlink("/proc/self/exe", exePathBuffer, sizeof(exePathBuffer) - 1);
+    if (len <= 0) {
+        return;
+    }
+    exePathBuffer[len] = '\0';
 
     std::error_code error;
     std::filesystem::path exeDir = std::filesystem::path(exePathBuffer).parent_path();
