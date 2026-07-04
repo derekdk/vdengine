@@ -1,0 +1,16 @@
+# Smoke test: Level Builder phase 1 baseline
+# Traverse the imported map, jump once, then reset.
+wait startup
+wait 250
+
+keydown D
+wait 1100
+press SPACE
+wait 900
+keyup D
+wait 250
+
+press R
+wait 250
+
+exit

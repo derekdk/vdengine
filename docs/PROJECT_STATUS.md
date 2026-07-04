@@ -78,7 +78,7 @@ The broader ranked backlog remains in [REMAINING_ENGINE_DEFICIENCIES.md](REMAINI
 ## Current Runnable Surface
 
 - **Examples:** runnable example directories live under [../examples/](../examples/), with targets registered in [../examples/CMakeLists.txt](../examples/CMakeLists.txt). Coverage spans core rendering, sprites, tilemaps, text, transitions, physics, audio, diagnostics, storage, resources, automation, camera-feel workflows, and multi-viewport scenarios.
-- **Games:** 2 games are registered in [../games/CMakeLists.txt](../games/CMakeLists.txt): [../games/pong/](../games/pong/) and [../games/fishing_game/](../games/fishing_game/).
+- **Games:** 3 games are registered in [../games/CMakeLists.txt](../games/CMakeLists.txt): [../games/pong/](../games/pong/), [../games/fishing_game/](../games/fishing_game/), and [../games/level_builder/](../games/level_builder/).
 - **Tools:** 4 tools are registered in [../tools/CMakeLists.txt](../tools/CMakeLists.txt): [../tools/vlauncher/](../tools/vlauncher/), [../tools/geometry_repl/](../tools/geometry_repl/), [../tools/hex_editor/](../tools/hex_editor/), and [../tools/resource_editor/](../tools/resource_editor/).
 - **Tests:** [../tests/CMakeLists.txt](../tests/CMakeLists.txt) registers `vde_tests` and `vde_resource_editor_tests`, covering engine, game API, text, audio, physics, transitions, launcher utilities, and resource-editor domain logic.
 - **Verification:** [../scripts/verify.ps1](../scripts/verify.ps1) combines build, unit test, smoke test, render verification, and lint workflows. The supporting scripts in [../scripts/](../scripts/) are part of the core project surface, not incidental utilities.

@@ -1,0 +1,4 @@
+[smoke]
+scripts = ["smoke_level_builder.vdescript"]
+priority = 2
+sections = ["entity", "camera", "input"]
