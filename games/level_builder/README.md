@@ -1,6 +1,6 @@
 # Level Builder
 
-Phase 3 keeps the tilemap runtime baseline while adding a Development submode controller and a default no-collision Move Mode.
+Phase 4 keeps the tilemap runtime baseline while adding Select Tile Mode on top of the Development submode controller.
 
 ## Current scope
 
@@ -9,16 +9,16 @@ Phase 3 keeps the tilemap runtime baseline while adding a Development submode co
 - Splits map ownership, player control, and scene orchestration into separate files.
 - Supports left-stick movement and Start-button Development mode toggling.
 - Adds a default Development Move Mode for free scene navigation with no collisions or gravity.
+- Adds Select Tile Mode with nearest-tile acquisition, a white selection outline, and controller-driven tile navigation.
 
 ## Current controls
 
 | Input | Action |
 |-------|--------|
 | `A` / `D` or arrows | Move |
-| `W` / Up | Jump in Play mode, move up in Development Move Mode |
-| `S` / Down | Move down in Development Move Mode |
-| Gamepad D-pad Left / Right or left stick | Move |
-| Gamepad D-pad Up / Down or left stick Y | Vertical move in Development Move Mode |
+| `W` / Up | Jump in Play mode, move up in Development Move Mode, or move tile selection up |
+| `S` / Down | Move down in Development Move Mode or move tile selection down |
+| Gamepad D-pad / left stick | Move player in Move Mode or tile selection in Select Tile Mode |
 | `Space` | Jump |
 | Gamepad `A` or D-pad Up | Jump |
 | `R` | Reset |
@@ -31,6 +31,5 @@ Phase 3 keeps the tilemap runtime baseline while adding a Development submode co
 
 ## Next milestones
 
-- Add Select Tile Mode with a white tile outline.
 - Add tile copy/paste and next/previous tile actions.
 - Add in-memory tile editing.

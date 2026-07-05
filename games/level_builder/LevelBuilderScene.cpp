@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "Input.h"
@@ -24,6 +25,13 @@ constexpr float kRespawnFloorY = -5.0f;
 constexpr float kModeTextX = -10.6f;
 constexpr float kModeTextY = 5.55f;
 constexpr float kModeTextHeight = 0.28f;
+constexpr float kSelectionTextX = -10.6f;
+constexpr float kSelectionTextY = 5.10f;
+constexpr float kSelectionTextHeight = 0.22f;
+constexpr float kActionLegendX = 6.2f;
+constexpr float kActionLegendTopY = 5.35f;
+constexpr float kActionLegendLineHeight = 0.22f;
+constexpr float kActionLegendLineSpacing = 0.32f;
 
 struct RGBA {
     constexpr RGBA() = default;
@@ -86,6 +94,7 @@ void LevelBuilderScene::onEnter() {
 
     createBackgrounds();
     createHud();
+    m_tileCursor.initialize(*this);
     m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
 
     addEntity(std::static_pointer_cast<vde::Entity>(m_tileMapSession.tileMap()));
@@ -94,6 +103,7 @@ void LevelBuilderScene::onEnter() {
     m_playerController.createEntities(*this);
     m_playerController.reset(m_tileMapSession, camera);
     m_devModeController.setPosition(m_playerController.getPosition());
+    setSelectTileUiVisible(false);
 
     std::cout << "Level builder baseline: " << m_tileMapSession.tileMap()->getColumnCount() << 'x'
               << m_tileMapSession.tileMap()->getRowCount() << " imported tiles across "
@@ -130,12 +140,20 @@ void LevelBuilderScene::update(float deltaTime) {
     }
 
     if (m_devModeController.isEnabled()) {
+        const DevelopmentSubmode previousSubmode = m_devModeController.activeSubmode();
         if (actions.consumePressed("prev_submode")) {
             m_devModeController.cycleToPreviousAvailableSubmode();
-            updateModeText();
         }
         if (actions.consumePressed("next_submode")) {
             m_devModeController.cycleToNextAvailableSubmode();
+        }
+
+        if (previousSubmode != m_devModeController.activeSubmode()) {
+            if (m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
+                initializeSelectTileMode();
+            } else {
+                setSelectTileUiVisible(false);
+            }
             updateModeText();
         }
     }
@@ -144,6 +162,10 @@ void LevelBuilderScene::update(float deltaTime) {
         m_playerController.reset(m_tileMapSession, camera);
         m_devModeController.setPosition(m_playerController.getPosition());
         m_playerController.stopMotion();
+        if (m_devModeController.isEnabled() &&
+            m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
+            initializeSelectTileMode();
+        }
         finishFrame();
         return;
     }
@@ -163,15 +185,42 @@ void LevelBuilderScene::update(float deltaTime) {
     }
 
     if (m_devModeController.isEnabled()) {
-        m_devModeController.update(deltaTime, moveAxis);
-        m_playerController.stopMotion();
-        m_playerController.setPosition(m_devModeController.position());
-        m_playerController.setFacingFromHorizontal(moveAxis.x);
-        camera->followTarget(m_playerController.getPosition() +
-                                 glm::vec2(0.0f, kCameraTargetYOffset),
-                             kCameraFollowSpeed);
-        finishFrame();
-        return;
+        switch (m_devModeController.activeSubmode()) {
+        case DevelopmentSubmode::MoveMode:
+            m_devModeController.updateMoveMode(deltaTime, moveAxis);
+            m_playerController.stopMotion();
+            m_playerController.setPosition(m_devModeController.position());
+            m_playerController.setFacingFromHorizontal(moveAxis.x);
+            setSelectTileUiVisible(false);
+            camera->followTarget(m_playerController.getPosition() +
+                                     glm::vec2(0.0f, kCameraTargetYOffset),
+                                 kCameraFollowSpeed);
+            finishFrame();
+            return;
+
+        case DevelopmentSubmode::SelectTileMode: {
+            if (!m_devModeController.hasSelection()) {
+                initializeSelectTileMode();
+            }
+
+            const glm::ivec2 selectionAxis(moveAxis.x < 0.0f ? -1 : (moveAxis.x > 0.0f ? 1 : 0),
+                                           moveAxis.y < 0.0f ? -1 : (moveAxis.y > 0.0f ? 1 : 0));
+            const bool selectionChanged = m_devModeController.updateSelectTileMode(
+                deltaTime, selectionAxis, m_tileMapSession.maxTileCoordinate());
+            if (selectionChanged || !m_tileCursor.isVisible()) {
+                updateSelectTileUi();
+            }
+
+            if (m_devModeController.hasSelection()) {
+                camera->followTarget(
+                    m_tileMapSession.tileCenterWorld(m_devModeController.selectedTile()),
+                    kCameraFollowSpeed);
+            }
+            m_playerController.stopMotion();
+            finishFrame();
+            return;
+        }
+        }
     }
 
     m_playerController.update(deltaTime, moveAxis.x, actions.consumePressed("jump"),
@@ -195,27 +244,28 @@ std::string LevelBuilderScene::getGameName() const {
 
 std::vector<std::string> LevelBuilderScene::getGameplaySummary() const {
     return {
-        "Phase 3 adds a Development submode controller with Move Mode as the default.",
-        "Imports a checked-in Tiled map, collision data, and object-layer spawn metadata.",
-        "Move Mode lets the player sprite move freely through the scene without collisions or "
-        "gravity.",
+        "Phase 4 adds Select Tile Mode on top of the Development submode controller.",
+        "The nearest tile to the player becomes the initial selection when Select Tile Mode "
+        "starts.",
+        "A white outline and on-screen action legend make controller-driven tile navigation "
+        "visible.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getGoals() const {
     return {
-        "Make Development mode useful as a collision-free navigation state.",
-        "Keep play-mode physics isolated while the submode framework grows toward tile selection.",
+        "Make Select Tile Mode navigable before tile-mutation actions are added.",
+        "Keep tile selection state isolated from play-mode physics and camera rules.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getControls() const {
     return {
         "A / D or Left / Right - Move across the tilemap",
-        "W / Up - Jump in Play mode, move up in Development Move Mode",
-        "S / Down - Move down in Development Move Mode",
-        "Gamepad D-pad Left / Right or Left Stick - Move",
-        "Gamepad D-pad Up / Down or Left Stick Y - Vertical move in Development Move Mode",
+        "W / Up - Jump in Play mode, move up in Development Move Mode, or move tile selection up",
+        "S / Down - Move down in Development Move Mode or move tile selection down",
+        std::string("Gamepad D-pad / Left Stick - Move player in Move Mode or tile selection in "
+                    "Select Tile Mode"),
         "Space - Jump",
         "Gamepad A or D-pad Up - Jump",
         "R - Reset to the spawn point",
@@ -230,7 +280,7 @@ void LevelBuilderScene::drawDebugUI() {
 
 #ifdef VDE_GAME_USE_IMGUI
     ImGui::SetNextWindowPos(ImVec2(10, 170), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(340, 145), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(360, 165), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Level Builder")) {
         ImGui::Text("Mode: %s", m_devModeController.isEnabled() ? "Development" : "Play");
         ImGui::Text("Submode: %s", m_devModeController.isEnabled()
@@ -238,11 +288,20 @@ void LevelBuilderScene::drawDebugUI() {
                                        : "N/A");
         ImGui::Text("Player: %.2f, %.2f", m_playerController.getPosition().x,
                     m_playerController.getPosition().y);
+        if (m_devModeController.hasSelection()) {
+            ImGui::Text("Selected Tile: %d, %d", m_devModeController.selectedTile().x,
+                        m_devModeController.selectedTile().y);
+        }
         ImGui::TextColored(ImVec4(0.65f, 0.82f, 0.95f, 1.0f),
                            "Start / Enter toggles Development mode");
-        if (m_devModeController.isEnabled()) {
+        if (m_devModeController.isEnabled() &&
+            m_devModeController.activeSubmode() == DevelopmentSubmode::MoveMode) {
             ImGui::Text("Move Mode: free movement, no collisions, no gravity");
-            ImGui::Text("Q/E or LB/RB cycle submodes (Move only for now)");
+        }
+        if (m_devModeController.isEnabled() &&
+            m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
+            ImGui::Text("Select Tile Mode: movement controls step the tile selection");
+            ImGui::Text("Tile editing buttons arrive in Phase 5");
         }
     }
     ImGui::End();
@@ -273,7 +332,75 @@ void LevelBuilderScene::createHud() {
     m_modeText->setAnchor(0.0f, 0.5f);
     m_modeText->setPosition(kModeTextX, kModeTextY, 1.2f);
     m_modeText->setWorldHeight(kModeTextHeight);
+
+    m_selectionText = addEntity<vde::TextEntity>();
+    m_selectionText->setFont(vde::BitmapFont::small());
+    m_selectionText->setStyle({.color = vde::Color::white(), .pixelScale = 1});
+    m_selectionText->setAnchor(0.0f, 0.5f);
+    m_selectionText->setPosition(kSelectionTextX, kSelectionTextY, 1.2f);
+    m_selectionText->setWorldHeight(kSelectionTextHeight);
+
+    const std::vector<std::string> actionLines = {
+        "SELECT TILE MODE",      "DPAD / STICK - MOVE TILE",    "LB / RB - CHANGE SUBMODE",
+        "START - EXIT DEV MODE", "A/B/X/Y - TILE ACTIONS NEXT",
+    };
+
+    m_actionLegendLines.clear();
+    for (size_t index = 0; index < actionLines.size(); ++index) {
+        auto line = addEntity<vde::TextEntity>();
+        line->setText(actionLines.at(index));
+        line->setFont(vde::BitmapFont::small());
+        line->setStyle({.color = vde::Color(0.88f, 0.94f, 0.99f, 1.0f), .pixelScale = 1});
+        line->setAnchor(0.0f, 0.5f);
+        line->setPosition(
+            kActionLegendX,
+            kActionLegendTopY - (static_cast<float>(index) * kActionLegendLineSpacing), 1.2f);
+        line->setWorldHeight(kActionLegendLineHeight);
+        m_actionLegendLines.push_back(line);
+    }
+
     updateModeText();
+    setSelectTileUiVisible(false);
+}
+
+void LevelBuilderScene::initializeSelectTileMode() {
+    m_devModeController.setSelectedTile(
+        m_tileMapSession.nearestTileToWorld(m_playerController.getPosition()));
+    updateSelectTileUi();
+}
+
+void LevelBuilderScene::updateSelectTileUi() {
+    if (!m_devModeController.hasSelection()) {
+        setSelectTileUiVisible(false);
+        return;
+    }
+
+    setSelectTileUiVisible(true);
+    const glm::ivec2 selectedTile = m_devModeController.selectedTile();
+    const glm::vec2 tileCenter = m_tileMapSession.tileCenterWorld(selectedTile);
+    m_tileCursor.show(tileCenter, m_tileMapSession.tileMap()->getTileWidth(),
+                      m_tileMapSession.tileMap()->getTileHeight());
+
+    if (m_selectionText != nullptr) {
+        m_selectionText->setText("TILE: " + std::to_string(selectedTile.x) + ", " +
+                                 std::to_string(selectedTile.y));
+    }
+}
+
+void LevelBuilderScene::setSelectTileUiVisible(bool visible) {
+    if (!visible) {
+        m_tileCursor.hide();
+    }
+
+    if (m_selectionText != nullptr) {
+        m_selectionText->setVisible(visible);
+    }
+
+    for (const auto& line : m_actionLegendLines) {
+        if (line != nullptr) {
+            line->setVisible(visible);
+        }
+    }
 }
 
 void LevelBuilderScene::updateModeText() {
@@ -299,6 +426,7 @@ void LevelBuilderScene::setDevelopmentMode(bool enabled) {
     } else {
         m_devModeController.exit();
         m_playerController.stopMotion();
+        setSelectTileUiVisible(false);
     }
 
     updateModeText();

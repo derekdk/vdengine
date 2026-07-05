@@ -83,7 +83,9 @@ The engine currently exposes import support for Tiled maps, but not an obvious m
 
 - **Phase 1 is complete.** `games/level_builder/` now exists as a multi-file game target with scene, player, and tilemap-session responsibilities split apart.
 - **Phase 2 is complete.** `InputActionMap` now drives keyboard and gamepad input, left-stick movement works in play mode, and Start / Enter toggles Development mode with visible HUD/debug state.
-- **Remaining work starts at the Development submode layer.** The next milestones are about making Development mode useful, not just togglable.
+- **Phase 3 is complete.** Development mode now has a real submode controller, and `MoveMode` supports collision-free scene navigation while preserving scrolling.
+- **Phase 4 is complete.** `SelectTileMode` now snaps to the nearest tile, shows a white selection outline, supports controller-driven tile navigation, and exposes an on-screen action legend.
+- **The next active work is Phase 5.** The remaining milestones are about actual tile mutation, clipboard behavior, persistence, and end-to-end authoring verification.
 
 ---
 
@@ -93,8 +95,8 @@ The engine currently exposes import support for Tiled maps, but not an obvious m
 |-------|--------|-----------|-----------------|
 | 1 | Complete | Milestone 1 | New game target runs the imported map with the existing playable baseline |
 | 2 | Complete | Milestone 2 | Unified keyboard and joystick action layer, including Start-button mode toggle |
-| 3 | Planned | Milestone 3 | Development submode framework with Move Mode as the default Development submode |
-| 4 | Planned | Milestone 4 | Select Tile Mode with white outline, nearest-tile acquisition, and controller-driven navigation |
+| 3 | Complete | Milestone 3 | Development submode framework with Move Mode as the default Development submode |
+| 4 | Complete | Milestone 4 | Select Tile Mode with white outline, nearest-tile acquisition, and controller-driven navigation |
 | 5 | Planned | Milestone 5 | Tile editing actions: next/previous tile cycling, copy/paste clipboard, and action legend/debug state |
 | 6 | Planned | Milestone 6 | Persistence, smoke coverage, docs, polish, and final verification |
 
@@ -181,9 +183,11 @@ The new game has a single input abstraction that supports current movement and f
 
 ---
 
-## Phase 3: Add Development Submodes and Move Mode
+## Phase 3: Add Development Submodes and Move Mode ✅ COMPLETE
 
 **Goal:** Turn Development mode into a real authoring state machine, with Move Mode as the default Development submode.
+
+**Status:** Complete.
 
 ### Tasks
 
@@ -231,9 +235,11 @@ Development mode has a real submode framework, and `MoveMode` is usable as the d
 
 ---
 
-## Phase 4: Add Select Tile Mode and Tile Navigation
+## Phase 4: Add Select Tile Mode and Tile Navigation ✅ COMPLETE
 
 **Goal:** Add a controller-first tile-selection workflow centered on the player’s current location.
+
+**Status:** Complete.
 
 ### Tasks
 

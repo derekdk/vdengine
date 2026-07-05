@@ -1,5 +1,5 @@
-# Smoke test: Level Builder phase 3 move-mode flow
-# Enter Development Move Mode, move freely with no collisions, return to play, then reset.
+# Smoke test: Level Builder phase 4 select-tile flow
+# Enter Development mode, navigate Move Mode, switch to Select Tile Mode, move the selection, then return to play.
 wait startup
 wait 250
 
@@ -19,7 +19,17 @@ keyup D
 wait 200
 
 press E
+wait 180
+
+press D
 wait 120
+press D
+wait 120
+press W
+wait 120
+press A
+wait 120
+
 press Q
 wait 120
 
