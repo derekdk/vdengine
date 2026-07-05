@@ -1,10 +1,28 @@
-# Smoke test: Level Builder phase 2 input flow
-# Toggle Development mode, return to play mode, then traverse the imported map and reset.
+# Smoke test: Level Builder phase 3 move-mode flow
+# Enter Development Move Mode, move freely with no collisions, return to play, then reset.
 wait startup
 wait 250
 
 press ENTER
+wait 150
+
+keydown D
+wait 350
+keydown W
+wait 350
+keyup W
+wait 150
+keydown S
+wait 250
+keyup S
+keyup D
 wait 200
+
+press E
+wait 120
+press Q
+wait 120
+
 press ENTER
 wait 150
 

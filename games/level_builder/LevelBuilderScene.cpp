@@ -19,6 +19,7 @@ constexpr float kCameraLookAheadDistance = 2.1f;
 constexpr float kCameraLookAheadSmoothing = 0.18f;
 constexpr float kCameraFollowSpeed = 7.5f;
 constexpr float kCameraZoom = 1.08f;
+constexpr float kCameraTargetYOffset = 1.1f;
 constexpr float kRespawnFloorY = -5.0f;
 constexpr float kModeTextX = -10.6f;
 constexpr float kModeTextY = 5.55f;
@@ -92,6 +93,7 @@ void LevelBuilderScene::onEnter() {
 
     m_playerController.createEntities(*this);
     m_playerController.reset(m_tileMapSession, camera);
+    m_devModeController.setPosition(m_playerController.getPosition());
 
     std::cout << "Level builder baseline: " << m_tileMapSession.tileMap()->getColumnCount() << 'x'
               << m_tileMapSession.tileMap()->getRowCount() << " imported tiles across "
@@ -118,7 +120,7 @@ void LevelBuilderScene::update(float deltaTime) {
 
     auto& actions = controls->actions();
     if (actions.consumePressed("toggle_dev_mode")) {
-        setDevelopmentMode(!m_developmentMode);
+        setDevelopmentMode(!m_devModeController.isEnabled());
     }
 
     auto* camera = currentCamera();
@@ -127,35 +129,62 @@ void LevelBuilderScene::update(float deltaTime) {
         return;
     }
 
+    if (m_devModeController.isEnabled()) {
+        if (actions.consumePressed("prev_submode")) {
+            m_devModeController.cycleToPreviousAvailableSubmode();
+            updateModeText();
+        }
+        if (actions.consumePressed("next_submode")) {
+            m_devModeController.cycleToNextAvailableSubmode();
+            updateModeText();
+        }
+    }
+
     if (actions.consumePressed("reset")) {
         m_playerController.reset(m_tileMapSession, camera);
+        m_devModeController.setPosition(m_playerController.getPosition());
+        m_playerController.stopMotion();
         finishFrame();
         return;
     }
 
-    if (m_developmentMode) {
-        finishFrame();
-        return;
-    }
-
-    float moveAxis = 0.0f;
+    glm::vec2 moveAxis(0.0f, 0.0f);
     if (actions.isHeld("move_left")) {
-        moveAxis -= 1.0f;
+        moveAxis.x -= 1.0f;
     }
     if (actions.isHeld("move_right")) {
-        moveAxis += 1.0f;
+        moveAxis.x += 1.0f;
+    }
+    if (actions.isHeld("move_up")) {
+        moveAxis.y += 1.0f;
+    }
+    if (actions.isHeld("move_down")) {
+        moveAxis.y -= 1.0f;
     }
 
-    m_playerController.update(deltaTime, moveAxis, actions.consumePressed("jump"),
+    if (m_devModeController.isEnabled()) {
+        m_devModeController.update(deltaTime, moveAxis);
+        m_playerController.stopMotion();
+        m_playerController.setPosition(m_devModeController.position());
+        m_playerController.setFacingFromHorizontal(moveAxis.x);
+        camera->followTarget(m_playerController.getPosition() +
+                                 glm::vec2(0.0f, kCameraTargetYOffset),
+                             kCameraFollowSpeed);
+        finishFrame();
+        return;
+    }
+
+    m_playerController.update(deltaTime, moveAxis.x, actions.consumePressed("jump"),
                               m_tileMapSession);
 
     if (m_playerController.getPosition().y < kRespawnFloorY) {
         m_playerController.reset(m_tileMapSession, camera);
+        m_devModeController.setPosition(m_playerController.getPosition());
         finishFrame();
         return;
     }
 
-    camera->followTarget(m_playerController.getPosition() + glm::vec2(0.0f, 1.1f),
+    camera->followTarget(m_playerController.getPosition() + glm::vec2(0.0f, kCameraTargetYOffset),
                          kCameraFollowSpeed);
     finishFrame();
 }
@@ -166,28 +195,33 @@ std::string LevelBuilderScene::getGameName() const {
 
 std::vector<std::string> LevelBuilderScene::getGameplaySummary() const {
     return {
-        "Phase 2 unifies keyboard and gamepad input through named actions.",
+        "Phase 3 adds a Development submode controller with Move Mode as the default.",
         "Imports a checked-in Tiled map, collision data, and object-layer spawn metadata.",
-        "Adds a Development mode toggle that pauses play-mode movement while editor controls grow.",
+        "Move Mode lets the player sprite move freely through the scene without collisions or "
+        "gravity.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getGoals() const {
     return {
-        "Validate the unified input layer before adding tile-selection behavior.",
-        "Keep Development mode state in the scene while the input layer stays declarative.",
+        "Make Development mode useful as a collision-free navigation state.",
+        "Keep play-mode physics isolated while the submode framework grows toward tile selection.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getControls() const {
     return {
         "A / D or Left / Right - Move across the tilemap",
+        "W / Up - Jump in Play mode, move up in Development Move Mode",
+        "S / Down - Move down in Development Move Mode",
         "Gamepad D-pad Left / Right or Left Stick - Move",
-        "Space / W / Up - Jump",
+        "Gamepad D-pad Up / Down or Left Stick Y - Vertical move in Development Move Mode",
+        "Space - Jump",
         "Gamepad A or D-pad Up - Jump",
         "R - Reset to the spawn point",
         "Gamepad Back - Reset",
         "Enter / Gamepad Start - Toggle Development mode",
+        "Q / E or Gamepad LB / RB - Cycle Development submodes",
     };
 }
 
@@ -196,13 +230,20 @@ void LevelBuilderScene::drawDebugUI() {
 
 #ifdef VDE_GAME_USE_IMGUI
     ImGui::SetNextWindowPos(ImVec2(10, 170), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(310, 105), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(340, 145), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Level Builder")) {
-        ImGui::Text("Mode: %s", m_developmentMode ? "Development" : "Play");
+        ImGui::Text("Mode: %s", m_devModeController.isEnabled() ? "Development" : "Play");
+        ImGui::Text("Submode: %s", m_devModeController.isEnabled()
+                                       ? m_devModeController.activeSubmodeName()
+                                       : "N/A");
         ImGui::Text("Player: %.2f, %.2f", m_playerController.getPosition().x,
                     m_playerController.getPosition().y);
         ImGui::TextColored(ImVec4(0.65f, 0.82f, 0.95f, 1.0f),
                            "Start / Enter toggles Development mode");
+        if (m_devModeController.isEnabled()) {
+            ImGui::Text("Move Mode: free movement, no collisions, no gravity");
+            ImGui::Text("Q/E or LB/RB cycle submodes (Move only for now)");
+        }
     }
     ImGui::End();
 #endif
@@ -232,19 +273,35 @@ void LevelBuilderScene::createHud() {
     m_modeText->setAnchor(0.0f, 0.5f);
     m_modeText->setPosition(kModeTextX, kModeTextY, 1.2f);
     m_modeText->setWorldHeight(kModeTextHeight);
-    setDevelopmentMode(false);
+    updateModeText();
+}
+
+void LevelBuilderScene::updateModeText() {
+    if (m_modeText == nullptr) {
+        return;
+    }
+
+    if (m_devModeController.isEnabled()) {
+        m_modeText->setStyle({.color = vde::Color::fromHex(0xffd36b), .pixelScale = 1});
+        m_modeText->setText(std::string("MODE: DEVELOPMENT / ") +
+                            m_devModeController.activeSubmodeName());
+        return;
+    }
+
+    m_modeText->setStyle({.color = vde::Color(0.84f, 0.92f, 0.98f, 1.0f), .pixelScale = 1});
+    m_modeText->setText("MODE: PLAY");
 }
 
 void LevelBuilderScene::setDevelopmentMode(bool enabled) {
-    m_developmentMode = enabled;
-
-    if (m_modeText != nullptr) {
-        const vde::Color textColor =
-            enabled ? vde::Color::fromHex(0xffd36b) : vde::Color(0.84f, 0.92f, 0.98f, 1.0f);
-        m_modeText->setStyle({.color = textColor, .pixelScale = 1});
-        m_modeText->setText(enabled ? "MODE: DEVELOPMENT" : "MODE: PLAY");
+    if (enabled) {
+        m_devModeController.enter(m_playerController.getPosition());
+        m_playerController.stopMotion();
+    } else {
+        m_devModeController.exit();
+        m_playerController.stopMotion();
     }
 
+    updateModeText();
     std::cout << (enabled ? "Development mode enabled\n" : "Development mode disabled\n");
 }
 

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "../GameBase.h"
+#include "DevModeController.h"
 #include "PlayerController.h"
 #include "TileMapSession.h"
 
@@ -29,14 +30,15 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
   private:
     void createBackgrounds();
     void createHud();
+    void updateModeText();
     void setDevelopmentMode(bool enabled);
     LevelBuilderInput* input();
     vde::Camera2D* currentCamera();
 
+    DevModeController m_devModeController;
     TileMapSession m_tileMapSession;
     PlayerController m_playerController;
     std::shared_ptr<vde::TextEntity> m_modeText;
-    bool m_developmentMode = false;
 };
 
 }  // namespace levelbuilder

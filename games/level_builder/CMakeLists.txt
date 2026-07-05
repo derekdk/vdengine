@@ -1,5 +1,6 @@
 add_vde_game(vde_level_builder
     main.cpp
+    DevModeController.cpp
     LevelBuilderScene.cpp
     PlayerController.cpp
     TileMapSession.cpp

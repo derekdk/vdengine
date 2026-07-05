@@ -15,6 +15,9 @@ class PlayerController {
     void createEntities(vde::Scene& scene);
     void reset(const TileMapSession& session, vde::Camera2D* camera);
     void update(float deltaTime, float moveAxis, bool jumpRequested, const TileMapSession& session);
+    void stopMotion();
+    void setPosition(const glm::vec2& position);
+    void setFacingFromHorizontal(float moveAxis);
 
     [[nodiscard]] glm::vec2 getPosition() const { return m_playerPosition; }
 

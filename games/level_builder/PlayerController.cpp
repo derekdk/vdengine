@@ -112,6 +112,27 @@ void PlayerController::update(float deltaTime, float moveAxis, bool jumpRequeste
     syncVisuals();
 }
 
+void PlayerController::stopMotion() {
+    m_playerVelocity = glm::vec2(0.0f);
+}
+
+void PlayerController::setPosition(const glm::vec2& position) {
+    m_playerPosition = position;
+    syncVisuals();
+}
+
+void PlayerController::setFacingFromHorizontal(float moveAxis) {
+    if (m_player == nullptr) {
+        return;
+    }
+
+    if (moveAxis < 0.0f) {
+        m_player->setFlipX(true);
+    } else if (moveAxis > 0.0f) {
+        m_player->setFlipX(false);
+    }
+}
+
 void PlayerController::resolveHorizontalCollisions(const TileMapSession& session) {
     if (std::abs(m_playerVelocity.x) < 0.0001f) {
         return;

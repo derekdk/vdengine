@@ -70,6 +70,7 @@ set(VDE_TEST_SOURCES
     Math2D_test.cpp
     Timing_test.cpp
     Random_test.cpp
+    DevModeController_test.cpp
     # Phase 2 animation engine tests
     PlaybackClock_test.cpp
     TimedEvents_test.cpp
@@ -92,6 +93,8 @@ set(VDE_TEST_SOURCES
     # FLIP image comparison tests
     FlipCompare_test.cpp
     TileMap_test.cpp
+
+    ${CMAKE_SOURCE_DIR}/games/level_builder/DevModeController.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
