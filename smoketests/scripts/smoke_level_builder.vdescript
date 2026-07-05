@@ -1,7 +1,12 @@
-# Smoke test: Level Builder phase 1 baseline
-# Traverse the imported map, jump once, then reset.
+# Smoke test: Level Builder phase 2 input flow
+# Toggle Development mode, return to play mode, then traverse the imported map and reset.
 wait startup
 wait 250
+
+press ENTER
+wait 200
+press ENTER
+wait 150
 
 keydown D
 wait 1100

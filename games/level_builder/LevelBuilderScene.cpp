@@ -20,6 +20,9 @@ constexpr float kCameraLookAheadSmoothing = 0.18f;
 constexpr float kCameraFollowSpeed = 7.5f;
 constexpr float kCameraZoom = 1.08f;
 constexpr float kRespawnFloorY = -5.0f;
+constexpr float kModeTextX = -10.6f;
+constexpr float kModeTextY = 5.55f;
+constexpr float kModeTextHeight = 0.28f;
 
 struct RGBA {
     constexpr RGBA() = default;
@@ -81,6 +84,7 @@ void LevelBuilderScene::onEnter() {
     }
 
     createBackgrounds();
+    createHud();
     m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
 
     addEntity(std::static_pointer_cast<vde::Entity>(m_tileMapSession.tileMap()));
@@ -101,34 +105,59 @@ void LevelBuilderScene::update(float deltaTime) {
     BaseGameScene::update(deltaTime);
 
     auto* controls = input();
-    auto* camera = currentCamera();
-    if (controls == nullptr || camera == nullptr || m_tileMapSession.tileMap() == nullptr) {
+    const auto finishFrame = [&controls]() {
+        if (controls != nullptr) {
+            controls->finishFrame();
+        }
+    };
+
+    if (controls == nullptr) {
+        finishFrame();
         return;
     }
 
-    if (controls->keys.consume("reset")) {
+    auto& actions = controls->actions();
+    if (actions.consumePressed("toggle_dev_mode")) {
+        setDevelopmentMode(!m_developmentMode);
+    }
+
+    auto* camera = currentCamera();
+    if (camera == nullptr || m_tileMapSession.tileMap() == nullptr) {
+        finishFrame();
+        return;
+    }
+
+    if (actions.consumePressed("reset")) {
         m_playerController.reset(m_tileMapSession, camera);
+        finishFrame();
+        return;
+    }
+
+    if (m_developmentMode) {
+        finishFrame();
         return;
     }
 
     float moveAxis = 0.0f;
-    if (controls->keys.isHeld("left")) {
+    if (actions.isHeld("move_left")) {
         moveAxis -= 1.0f;
     }
-    if (controls->keys.isHeld("right")) {
+    if (actions.isHeld("move_right")) {
         moveAxis += 1.0f;
     }
 
-    m_playerController.update(deltaTime, moveAxis, controls->keys.consume("jump"),
+    m_playerController.update(deltaTime, moveAxis, actions.consumePressed("jump"),
                               m_tileMapSession);
 
     if (m_playerController.getPosition().y < kRespawnFloorY) {
         m_playerController.reset(m_tileMapSession, camera);
+        finishFrame();
         return;
     }
 
     camera->followTarget(m_playerController.getPosition() + glm::vec2(0.0f, 1.1f),
                          kCameraFollowSpeed);
+    finishFrame();
 }
 
 std::string LevelBuilderScene::getGameName() const {
@@ -137,28 +166,46 @@ std::string LevelBuilderScene::getGameName() const {
 
 std::vector<std::string> LevelBuilderScene::getGameplaySummary() const {
     return {
-        "Phase 1 baseline port of the tilemap demo into a multi-file game target.",
+        "Phase 2 unifies keyboard and gamepad input through named actions.",
         "Imports a checked-in Tiled map, collision data, and object-layer spawn metadata.",
-        "Keeps the playable run-and-jump loop while the level-builder structure is added.",
+        "Adds a Development mode toggle that pauses play-mode movement while editor controls grow.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getGoals() const {
     return {
-        "Validate the game-side tilemap port before adding Development mode.",
-        "Keep map ownership, player control, and scene orchestration in separate files.",
+        "Validate the unified input layer before adding tile-selection behavior.",
+        "Keep Development mode state in the scene while the input layer stays declarative.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getControls() const {
     return {
         "A / D or Left / Right - Move across the tilemap",
+        "Gamepad D-pad Left / Right or Left Stick - Move",
         "Space / W / Up - Jump",
-        "R - Reset to the spawn point",
-        "Gamepad D-pad Left / Right - Move",
         "Gamepad A or D-pad Up - Jump",
+        "R - Reset to the spawn point",
         "Gamepad Back - Reset",
+        "Enter / Gamepad Start - Toggle Development mode",
     };
+}
+
+void LevelBuilderScene::drawDebugUI() {
+    BaseGameScene::drawDebugUI();
+
+#ifdef VDE_GAME_USE_IMGUI
+    ImGui::SetNextWindowPos(ImVec2(10, 170), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(310, 105), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Level Builder")) {
+        ImGui::Text("Mode: %s", m_developmentMode ? "Development" : "Play");
+        ImGui::Text("Player: %.2f, %.2f", m_playerController.getPosition().x,
+                    m_playerController.getPosition().y);
+        ImGui::TextColored(ImVec4(0.65f, 0.82f, 0.95f, 1.0f),
+                           "Start / Enter toggles Development mode");
+    }
+    ImGui::End();
+#endif
 }
 
 void LevelBuilderScene::createBackgrounds() {
@@ -176,6 +223,29 @@ void LevelBuilderScene::createBackgrounds() {
     ridges->setPosition(0.0f, -1.5f, -2.2f);
     ridges->setParallaxFactor(0.42f, 0.12f);
     ridges->setScrollVelocity(0.48f, 0.0f);
+}
+
+void LevelBuilderScene::createHud() {
+    m_modeText = addEntity<vde::TextEntity>();
+    m_modeText->setFont(vde::BitmapFont::small());
+    m_modeText->setStyle({.color = vde::Color(0.84f, 0.92f, 0.98f, 1.0f), .pixelScale = 1});
+    m_modeText->setAnchor(0.0f, 0.5f);
+    m_modeText->setPosition(kModeTextX, kModeTextY, 1.2f);
+    m_modeText->setWorldHeight(kModeTextHeight);
+    setDevelopmentMode(false);
+}
+
+void LevelBuilderScene::setDevelopmentMode(bool enabled) {
+    m_developmentMode = enabled;
+
+    if (m_modeText != nullptr) {
+        const vde::Color textColor =
+            enabled ? vde::Color::fromHex(0xffd36b) : vde::Color(0.84f, 0.92f, 0.98f, 1.0f);
+        m_modeText->setStyle({.color = textColor, .pixelScale = 1});
+        m_modeText->setText(enabled ? "MODE: DEVELOPMENT" : "MODE: PLAY");
+    }
+
+    std::cout << (enabled ? "Development mode enabled\n" : "Development mode disabled\n");
 }
 
 LevelBuilderInput* LevelBuilderScene::input() {

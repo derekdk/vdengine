@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
 
     void onEnter() override;
     void update(float deltaTime) override;
+    void drawDebugUI() override;
 
   protected:
     std::string getGameName() const override;
@@ -26,11 +28,15 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
 
   private:
     void createBackgrounds();
+    void createHud();
+    void setDevelopmentMode(bool enabled);
     LevelBuilderInput* input();
     vde::Camera2D* currentCamera();
 
     TileMapSession m_tileMapSession;
     PlayerController m_playerController;
+    std::shared_ptr<vde::TextEntity> m_modeText;
+    bool m_developmentMode = false;
 };
 
 }  // namespace levelbuilder
