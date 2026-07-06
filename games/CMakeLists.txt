@@ -41,4 +41,5 @@ function(add_vde_game target_name)
 endfunction()
 
 add_subdirectory(fishing_game)
+add_subdirectory(level_builder)
 add_subdirectory(pong)

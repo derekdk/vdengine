@@ -165,8 +165,8 @@ function Get-RenderVerifySectionMap {
 
 # --- Source Directory Resolution ---
 
-# Build the target-to-source mapping from examples/CMakeLists.txt
-function Get-ExampleTargetSourceMap {
+# Build the target-to-source mapping from a category CMakeLists.txt
+function Get-CategoryTargetSourceMap {
     param([string]$CmakePath)
 
     $targetMap = @{}
@@ -233,11 +233,15 @@ function Add-TargetSourceMapEntry {
     }
 }
 
-function Resolve-ExampleSourceDir {
+function Resolve-AppSourceDir {
     param([string]$TargetName)
 
     if ($exampleTargetSourceMap.ContainsKey($TargetName)) {
         return $exampleTargetSourceMap[$TargetName]
+    }
+
+    if ($gameTargetSourceMap.ContainsKey($TargetName)) {
+        return $gameTargetSourceMap[$TargetName]
     }
 
     $candidateNames = @()
@@ -256,51 +260,62 @@ function Resolve-ExampleSourceDir {
         if (Test-Path (Join-Path $candidateDir 'vde.toml')) {
             return $candidateDir
         }
+
+        $candidateDir = Join-Path (Join-Path $vdeRoot 'games') $candidateName
+        if (Test-Path (Join-Path $candidateDir 'vde.toml')) {
+            return $candidateDir
+        }
     }
 
     return $null
 }
 
-$exampleTargetSourceMap = Get-ExampleTargetSourceMap -CmakePath (Join-Path $vdeRoot 'examples\CMakeLists.txt')
+$exampleTargetSourceMap = Get-CategoryTargetSourceMap -CmakePath (Join-Path $vdeRoot 'examples\CMakeLists.txt')
+$gameTargetSourceMap = Get-CategoryTargetSourceMap -CmakePath (Join-Path $vdeRoot 'games\CMakeLists.txt')
 
 # --- Executable Discovery ---
 
 function Get-VerifyExes {
+    $searchDirs = @()
     if ($Generator -eq "Ninja") {
-        $dir = Join-Path $buildDir "examples"
+        $searchDirs += Join-Path $buildDir "examples"
+        $searchDirs += Join-Path $buildDir "games"
     } else {
-        $dir = Join-Path $buildDir "examples\$Config"
-    }
-
-    if (-not (Test-Path $dir)) {
-        Write-Warn "Examples directory not found: $dir"
-        return @()
+        $searchDirs += Join-Path $buildDir "examples\$Config"
+        $searchDirs += Join-Path $buildDir "games\$Config"
     }
 
     $exes = @()
-    foreach ($exeFile in Get-ChildItem -Path $dir -Filter "vde_*.exe" -File) {
-        $targetName = [System.IO.Path]::GetFileNameWithoutExtension($exeFile.Name)
-        $sourceDir = Resolve-ExampleSourceDir -TargetName $targetName
-        if (-not $sourceDir) { continue }
+    foreach ($dir in $searchDirs) {
+        if (-not (Test-Path $dir)) {
+            Write-Warn "Directory not found: $dir"
+            continue
+        }
 
-        $tomlPath = Join-Path $sourceDir 'vde.toml'
-        $rvSection = Get-RenderVerifySectionMap -TomlPath $tomlPath
-        if (-not $rvSection) { continue }
-        if ($rvSection['Scripts'].Count -eq 0) { continue }
+        foreach ($exeFile in Get-ChildItem -Path $dir -Recurse -Filter "vde_*.exe" -File) {
+            $targetName = [System.IO.Path]::GetFileNameWithoutExtension($exeFile.Name)
+            $sourceDir = Resolve-AppSourceDir -TargetName $targetName
+            if (-not $sourceDir) { continue }
 
-        $exes += [pscustomobject]@{
-            Name          = $exeFile.Name
-            FullPath      = $exeFile.FullName
-            WorkDir       = $exeFile.DirectoryName
-            VerifyScript  = $rvSection['Scripts'][0]
-            CaptureScript = $rvSection['CaptureScript']
-            Priority      = $rvSection['Priority']
-            Golden        = $rvSection['Golden']
-            Threshold     = $rvSection['Threshold']
+            $tomlPath = Join-Path $sourceDir 'vde.toml'
+            $rvSection = Get-RenderVerifySectionMap -TomlPath $tomlPath
+            if (-not $rvSection) { continue }
+            if ($rvSection['Scripts'].Count -eq 0) { continue }
+
+            $exes += [pscustomobject]@{
+                Name          = $exeFile.Name
+                FullPath      = $exeFile.FullName
+                WorkDir       = $exeFile.DirectoryName
+                VerifyScript  = $rvSection['Scripts'][0]
+                CaptureScript = $rvSection['CaptureScript']
+                Priority      = $rvSection['Priority']
+                Golden        = $rvSection['Golden']
+                Threshold     = $rvSection['Threshold']
+            }
         }
     }
 
-    return @($exes)
+    return @($exes | Sort-Object FullPath -Unique)
 }
 
 # Gather executables
@@ -326,7 +341,7 @@ if ($allExes.Count -eq 0) {
     if (-not $Extended -and $filteredPriority2Count -gt 0) {
         Write-Warn "Only priority 2 examples matched. Re-run with -Extended."
     }
-    Write-Warn "Ensure examples have [render_verify] sections in vde.toml."
+    Write-Warn "Ensure examples/games have [render_verify] sections in vde.toml."
     exit 1
 }
 

@@ -1,0 +1,22 @@
+# Golden image capture: Level Builder Select Tile Mode
+# Reset to spawn and enter Development mode quickly so gravity/frame time do not drift the
+# captured player position before the selection overlay is shown.
+wait startup
+wait_frames 2
+
+press R
+wait_frames 2
+
+press ENTER
+wait_frames 3
+
+press E
+wait_frames 3
+
+press D
+wait_frames 3
+
+screenshot render_verify_output/level_builder_select_tile.png
+wait 100
+
+exit
