@@ -100,4 +100,43 @@ TEST(DevModeControllerTest, SelectTileModeRepeatsAfterDelayWhenHeld) {
     EXPECT_EQ(controller.selectedTile(), glm::ivec2(2, 0));
 }
 
+TEST(DevModeControllerTest, ClipboardPersistsAcrossSubmodeChangesUntilExit) {
+    DevModeController controller;
+    controller.enter({0.0f, 0.0f});
+
+    controller.setClipboardTile(7);
+
+    ASSERT_TRUE(controller.hasClipboardTile());
+    const auto initialClipboardTile = controller.clipboardTile();
+    ASSERT_TRUE(initialClipboardTile.has_value());
+    EXPECT_EQ(*initialClipboardTile, 7);
+
+    controller.cycleToNextAvailableSubmode();
+    const auto clipboardAfterNext = controller.clipboardTile();
+    ASSERT_TRUE(clipboardAfterNext.has_value());
+    EXPECT_EQ(*clipboardAfterNext, 7);
+
+    controller.cycleToPreviousAvailableSubmode();
+    const auto clipboardAfterPrevious = controller.clipboardTile();
+    ASSERT_TRUE(clipboardAfterPrevious.has_value());
+    EXPECT_EQ(*clipboardAfterPrevious, 7);
+
+    controller.exit();
+
+    EXPECT_FALSE(controller.hasClipboardTile());
+    EXPECT_FALSE(controller.clipboardTile().has_value());
+}
+
+TEST(DevModeControllerTest, EnterClearsClipboardForNewDevelopmentSession) {
+    DevModeController controller;
+    controller.enter({0.0f, 0.0f});
+    controller.setClipboardTile(4);
+
+    controller.exit();
+    controller.enter({2.0f, 1.0f});
+
+    EXPECT_FALSE(controller.hasClipboardTile());
+    EXPECT_FALSE(controller.clipboardTile().has_value());
+}
+
 }  // namespace levelbuilder::test

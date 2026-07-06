@@ -57,6 +57,22 @@ class LevelBuilderInput : public vde::games::BaseGameInputHandler {
         m_actions.addBinding("next_submode", vde::InputActionBinding::key(vde::KEY_E));
         m_actions.addBinding("next_submode", vde::InputActionBinding::gamepadButton(
                                                  vde::GAMEPAD_BUTTON_RIGHT_BUMPER));
+
+        m_actions.addBinding("previous_tile", vde::InputActionBinding::key(vde::KEY_Z));
+        m_actions.addBinding("previous_tile",
+                             vde::InputActionBinding::gamepadButton(vde::GAMEPAD_BUTTON_B));
+
+        m_actions.addBinding("next_tile", vde::InputActionBinding::key(vde::KEY_X));
+        m_actions.addBinding("next_tile",
+                             vde::InputActionBinding::gamepadButton(vde::GAMEPAD_BUTTON_A));
+
+        m_actions.addBinding("copy_tile", vde::InputActionBinding::key(vde::KEY_C));
+        m_actions.addBinding("copy_tile",
+                             vde::InputActionBinding::gamepadButton(vde::GAMEPAD_BUTTON_X));
+
+        m_actions.addBinding("paste_tile", vde::InputActionBinding::key(vde::KEY_V));
+        m_actions.addBinding("paste_tile",
+                             vde::InputActionBinding::gamepadButton(vde::GAMEPAD_BUTTON_Y));
     }
 
     void onKeyPress(int key) override {

@@ -2,6 +2,8 @@
 
 #include <glm/vec2.hpp>
 
+#include <optional>
+
 namespace levelbuilder {
 
 enum class DevelopmentSubmode {
@@ -23,6 +25,7 @@ class DevModeController {
     void cycleToPreviousAvailableSubmode();
 
     void setSelectedTile(const glm::ivec2& tileCoordinate);
+    void setClipboardTile(int tileId);
 
     [[nodiscard]] bool isEnabled() const { return m_enabled; }
     [[nodiscard]] DevelopmentSubmode activeSubmode() const { return m_activeSubmode; }
@@ -30,6 +33,8 @@ class DevModeController {
     [[nodiscard]] glm::vec2 position() const { return m_position; }
     [[nodiscard]] bool hasSelection() const { return m_hasSelection; }
     [[nodiscard]] glm::ivec2 selectedTile() const { return m_selectedTile; }
+    [[nodiscard]] bool hasClipboardTile() const { return m_clipboardTile.has_value(); }
+    [[nodiscard]] std::optional<int> clipboardTile() const { return m_clipboardTile; }
 
   private:
     struct AxisRepeatState {
@@ -48,6 +53,7 @@ class DevModeController {
     glm::vec2 m_position{0.0f};
     bool m_hasSelection = false;
     glm::ivec2 m_selectedTile{0, 0};
+    std::optional<int> m_clipboardTile;
     AxisRepeatState m_horizontalRepeat;
     AxisRepeatState m_verticalRepeat;
 };

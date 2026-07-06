@@ -5,6 +5,7 @@
 #include <glm/vec2.hpp>
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace vde {
@@ -31,6 +32,10 @@ class TileMapSession {
     [[nodiscard]] glm::ivec2 worldToTileClamped(const glm::vec2& worldPosition) const;
     [[nodiscard]] glm::ivec2 nearestTileToWorld(const glm::vec2& worldPosition) const;
     [[nodiscard]] glm::vec2 tileCenterWorld(const glm::ivec2& tileCoordinate) const;
+    [[nodiscard]] std::string editableLayerName() const;
+    [[nodiscard]] int editableTileId(const glm::ivec2& tileCoordinate) const;
+    bool setEditableTileId(const glm::ivec2& tileCoordinate, int tileId);
+    bool cycleEditableTile(const glm::ivec2& tileCoordinate, int direction);
 
   private:
     void rebuildCollisionCache();

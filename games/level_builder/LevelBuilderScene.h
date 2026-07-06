@@ -33,8 +33,10 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void createHud();
     void initializeSelectTileMode();
     void updateSelectTileUi();
+    void updateActionLegendText();
     void setSelectTileUiVisible(bool visible);
     void updateModeText();
+    [[nodiscard]] std::string formatClipboardState() const;
     void setDevelopmentMode(bool enabled);
     LevelBuilderInput* input();
     vde::Camera2D* currentCamera();

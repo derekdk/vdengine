@@ -1,6 +1,6 @@
 # Level Builder
 
-Phase 4 keeps the tilemap runtime baseline while adding Select Tile Mode on top of the Development submode controller.
+Phase 5 keeps the tilemap runtime baseline while adding controller-driven tile editing on top of Select Tile Mode.
 
 ## Current scope
 
@@ -10,6 +10,8 @@ Phase 4 keeps the tilemap runtime baseline while adding Select Tile Mode on top 
 - Supports left-stick movement and Start-button Development mode toggling.
 - Adds a default Development Move Mode for free scene navigation with no collisions or gravity.
 - Adds Select Tile Mode with nearest-tile acquisition, a white selection outline, and controller-driven tile navigation.
+- Edits the imported `ground` layer with next/previous tile cycling plus copy/paste clipboard actions.
+- Surfaces selected-tile IDs and clipboard state in the HUD and debug overlay.
 
 ## Current controls
 
@@ -25,11 +27,13 @@ Phase 4 keeps the tilemap runtime baseline while adding Select Tile Mode on top 
 | Gamepad Back | Reset |
 | `Enter` or Gamepad Start | Toggle Development mode |
 | `Q` / `E` or Gamepad LB / RB | Cycle Development submodes |
+| `Z` / `X` or Gamepad `B` / `A` | Previous / next tile in Select Tile Mode |
+| `C` / `V` or Gamepad `X` / `Y` | Copy / paste the selected ground-layer tile |
 | `F1` | Toggle debug UI |
 | `F11` | Toggle fullscreen |
 | `Esc` | Quit |
 
 ## Next milestones
 
-- Add tile copy/paste and next/previous tile actions.
-- Add in-memory tile editing.
+- Persist edited maps or overlays.
+- Expand smoke and render verification around tile-mutation workflows.

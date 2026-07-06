@@ -24,6 +24,7 @@ void DevModeController::enter(const glm::vec2& startPosition) {
     m_activeSubmode = DevelopmentSubmode::MoveMode;
     m_position = startPosition;
     m_hasSelection = false;
+    m_clipboardTile.reset();
     resetSelectionRepeatState();
 }
 
@@ -31,6 +32,7 @@ void DevModeController::exit() {
     m_enabled = false;
     m_activeSubmode = DevelopmentSubmode::MoveMode;
     m_hasSelection = false;
+    m_clipboardTile.reset();
     resetSelectionRepeatState();
 }
 
@@ -78,6 +80,10 @@ void DevModeController::setSelectedTile(const glm::ivec2& tileCoordinate) {
     m_selectedTile = tileCoordinate;
     m_hasSelection = true;
     resetSelectionRepeatState();
+}
+
+void DevModeController::setClipboardTile(int tileId) {
+    m_clipboardTile = tileId;
 }
 
 const char* DevModeController::activeSubmodeName() const {
