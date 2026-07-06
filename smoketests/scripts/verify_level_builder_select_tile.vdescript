@@ -1,0 +1,19 @@
+# Render verification: Level Builder Select Tile Mode
+# Enter Select Tile Mode, move the selection away from the player, and compare the visible outline.
+wait startup
+wait 250
+
+press ENTER
+wait 150
+
+press E
+wait 180
+
+press D
+wait 150
+
+screenshot render_verify_output/level_builder_select_tile.png
+wait 100
+compare render_verify_output/level_builder_select_tile.png ../../../smoketests/golden/level_builder_select_tile.png 0.06
+
+exit

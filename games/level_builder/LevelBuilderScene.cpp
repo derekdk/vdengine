@@ -93,8 +93,6 @@ void LevelBuilderScene::onEnter() {
     }
 
     createBackgrounds();
-    createHud();
-    m_tileCursor.initialize(*this);
     m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
 
     addEntity(std::static_pointer_cast<vde::Entity>(m_tileMapSession.tileMap()));
@@ -103,6 +101,10 @@ void LevelBuilderScene::onEnter() {
     m_playerController.createEntities(*this);
     m_playerController.reset(m_tileMapSession, camera);
     m_devModeController.setPosition(m_playerController.getPosition());
+
+    createHud();
+    // Create the selection cursor after the HUD so the white outline renders on top of text.
+    m_tileCursor.initialize(*this);
     setSelectTileUiVisible(false);
 
     std::cout << "Level builder baseline: " << m_tileMapSession.tileMap()->getColumnCount() << 'x'

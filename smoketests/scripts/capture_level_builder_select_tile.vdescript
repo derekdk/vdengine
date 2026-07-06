@@ -1,0 +1,18 @@
+# Golden image capture: Level Builder Select Tile Mode
+# Enter Select Tile Mode, move the selection away from the player, and capture the visible outline.
+wait startup
+wait 250
+
+press ENTER
+wait 150
+
+press E
+wait 180
+
+press D
+wait 150
+
+screenshot render_verify_output/level_builder_select_tile.png
+wait 100
+
+exit

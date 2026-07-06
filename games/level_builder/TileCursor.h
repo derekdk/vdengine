@@ -2,6 +2,7 @@
 
 #include <glm/vec2.hpp>
 
+#include <array>
 #include <memory>
 
 namespace vde {
@@ -20,7 +21,7 @@ class TileCursor {
     [[nodiscard]] bool isVisible() const;
 
   private:
-    std::shared_ptr<vde::SpriteEntity> m_outline;
+    std::array<std::shared_ptr<vde::SpriteEntity>, 4> m_outlineSegments;
 };
 
 }  // namespace levelbuilder
