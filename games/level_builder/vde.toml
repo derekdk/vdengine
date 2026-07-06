@@ -1,11 +1,11 @@
 [smoke]
 scripts = ["smoke_level_builder.vdescript"]
-priority = 2
+priority = 1
 sections = ["entity", "camera", "input"]
 
 [render_verify]
 scripts = ["verify_level_builder_select_tile.vdescript"]
 capture_script = "capture_level_builder_select_tile.vdescript"
-priority = 2
+priority = 1
 golden = "level_builder_select_tile.png"
 threshold = 0.06

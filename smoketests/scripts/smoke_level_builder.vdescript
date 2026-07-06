@@ -1,40 +1,43 @@
 # Smoke test: Level Builder phase 5 tile-edit flow
 # Enter Development mode, switch to Select Tile Mode, exercise tile actions, then return to play.
 wait startup
-wait 250
+wait_frames 2
+
+press R
+wait_frames 2
 
 press ENTER
-wait 150
+wait_frames 3
 
 press E
-wait 180
+wait_frames 3
 
 press C
-wait 120
+wait_frames 3
 
 press D
-wait 120
+wait_frames 3
 press X
-wait 120
+wait_frames 3
 press Z
-wait 120
+wait_frames 3
 press V
-wait 120
+wait_frames 3
 press A
-wait 120
+wait_frames 3
 press W
-wait 120
+wait_frames 3
 press V
-wait 120
+wait_frames 3
 
 press A
-wait 120
+wait_frames 3
 
 press Q
-wait 120
+wait_frames 3
 
 press ENTER
-wait 150
+wait_frames 3
 
 keydown D
 wait 1100
