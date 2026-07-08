@@ -34,6 +34,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void initializeSelectTileMode();
     void updateSelectTileUi();
     void updateActionLegendText();
+    void updatePersistenceText();
     void setSelectTileUiVisible(bool visible);
     void updateModeText();
     [[nodiscard]] std::string formatClipboardState() const;
@@ -47,6 +48,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     PlayerController m_playerController;
     std::shared_ptr<vde::TextEntity> m_modeText;
     std::shared_ptr<vde::TextEntity> m_selectionText;
+    std::shared_ptr<vde::TextEntity> m_persistenceText;
     std::vector<std::shared_ptr<vde::TextEntity>> m_actionLegendLines;
 };
 

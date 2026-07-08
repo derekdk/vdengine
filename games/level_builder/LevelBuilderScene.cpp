@@ -28,6 +28,9 @@ constexpr float kModeTextHeight = 0.28f;
 constexpr float kSelectionTextX = -10.6f;
 constexpr float kSelectionTextY = 5.10f;
 constexpr float kSelectionTextHeight = 0.22f;
+constexpr float kPersistenceTextX = -10.6f;
+constexpr float kPersistenceTextY = 4.76f;
+constexpr float kPersistenceTextHeight = 0.20f;
 constexpr float kActionLegendX = 6.2f;
 constexpr float kActionLegendTopY = 5.35f;
 constexpr float kActionLegendLineHeight = 0.22f;
@@ -145,6 +148,21 @@ void LevelBuilderScene::update(float deltaTime) {
         return;
     }
 
+    bool persistenceActionConsumed = false;
+    if (m_devModeController.isEnabled()) {
+        if (actions.consumePressed("save_overlay")) {
+            (void)m_tileMapSession.saveEditableLayerOverlay();
+            persistenceActionConsumed = true;
+        }
+        if (actions.consumePressed("load_overlay")) {
+            (void)m_tileMapSession.reloadEditableLayerOverlay();
+            persistenceActionConsumed = true;
+        }
+        if (persistenceActionConsumed) {
+            updatePersistenceText();
+        }
+    }
+
     if (m_devModeController.isEnabled()) {
         const DevelopmentSubmode previousSubmode = m_devModeController.activeSubmode();
         if (actions.consumePressed("prev_submode")) {
@@ -213,6 +231,7 @@ void LevelBuilderScene::update(float deltaTime) {
                                            moveAxis.y < 0.0f ? -1 : (moveAxis.y > 0.0f ? 1 : 0));
             bool selectionUiChanged = m_devModeController.updateSelectTileMode(
                 deltaTime, selectionAxis, m_tileMapSession.maxTileCoordinate());
+            selectionUiChanged = selectionUiChanged || persistenceActionConsumed;
 
             if (m_devModeController.hasSelection()) {
                 const glm::ivec2 selectedTile = m_devModeController.selectedTile();
@@ -274,20 +293,20 @@ std::string LevelBuilderScene::getGameName() const {
 std::vector<std::string> LevelBuilderScene::getGameplaySummary() const {
     return {
         "Phase 5 turns Select Tile Mode into a real editing workflow on the imported ground "
-        "layer.",
-        "Controller and keyboard actions now cycle tiles, copy the selected tile, and paste the "
-        "clipboard.",
-        "The HUD and debug overlay expose the selected tile ID and clipboard state while you "
-        "edit.",
+        "layer and Phase 6 persists that work as a VDE-native overlay snapshot.",
+        "Controller and keyboard actions now cycle tiles, copy or paste clipboard state, and "
+        "save or reload the current ground-layer overlay.",
+        "The HUD and debug overlay expose the selected tile ID, clipboard state, and overlay "
+        "save status while you edit.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getGoals() const {
     return {
-        "Keep ground-layer tile mutations behind TileMapSession instead of mutating TileMap "
-        "directly in the scene.",
-        "Expose clipboard state clearly enough that controller-first editing is understandable "
-        "without opening code.",
+        "Keep editable ground-layer persistence behind TileMapSession instead of leaking file "
+        "format details into the scene.",
+        "Expose clipboard state and overlay save status clearly enough that controller-first "
+        "editing is understandable without opening code.",
     };
 }
 
@@ -306,6 +325,7 @@ std::vector<std::string> LevelBuilderScene::getControls() const {
         "Q / E or Gamepad LB / RB - Cycle Development submodes",
         "Z / X or Gamepad B / A - Previous or next tile in Select Tile Mode",
         "C / V or Gamepad X / Y - Copy or paste the selected ground-layer tile",
+        "F5 / F9 or Gamepad L3 / R3 - Save or reload the editable ground-layer overlay",
     };
 }
 
@@ -332,16 +352,21 @@ void LevelBuilderScene::drawDebugUI() {
             ImGui::Text("Tile ID: %s", formatTileId(tileId).c_str());
         }
         ImGui::Text("Clipboard: %s", clipboardState.c_str());
+        ImGui::Text("Overlay: %s (%s)", m_tileMapSession.hasUnsavedChanges() ? "Dirty" : "Clean",
+                    m_tileMapSession.overlayFileName().c_str());
+        ImGui::TextWrapped("Persistence: %s", m_tileMapSession.lastPersistenceStatus().c_str());
         ImGui::TextColored(ImVec4(0.65f, 0.82f, 0.95f, 1.0f),
                            "Start / Enter toggles Development mode");
         if (m_devModeController.isEnabled() &&
             m_devModeController.activeSubmode() == DevelopmentSubmode::MoveMode) {
             ImGui::Text("Move Mode: free movement, no collisions, no gravity");
+            ImGui::Text("L3 / R3: save / reload overlay");
         }
         if (m_devModeController.isEnabled() &&
             m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
             ImGui::Text("Select Tile Mode: movement controls step the tile selection");
             ImGui::Text("A / B: next / previous tile, X / Y: copy / paste clipboard");
+            ImGui::Text("L3 / R3: save / reload overlay");
         }
     }
     ImGui::End();
@@ -380,8 +405,15 @@ void LevelBuilderScene::createHud() {
     m_selectionText->setPosition(kSelectionTextX, kSelectionTextY, 1.2f);
     m_selectionText->setWorldHeight(kSelectionTextHeight);
 
+    m_persistenceText = addEntity<vde::TextEntity>();
+    m_persistenceText->setFont(vde::BitmapFont::small());
+    m_persistenceText->setStyle({.color = vde::Color(0.76f, 0.93f, 0.80f, 1.0f), .pixelScale = 1});
+    m_persistenceText->setAnchor(0.0f, 0.5f);
+    m_persistenceText->setPosition(kPersistenceTextX, kPersistenceTextY, 1.2f);
+    m_persistenceText->setWorldHeight(kPersistenceTextHeight);
+
     m_actionLegendLines.clear();
-    constexpr size_t kActionLegendLineCount = 8;
+    constexpr size_t kActionLegendLineCount = 10;
     for (size_t index = 0; index < kActionLegendLineCount; ++index) {
         auto line = addEntity<vde::TextEntity>();
         line->setFont(vde::BitmapFont::small());
@@ -396,6 +428,7 @@ void LevelBuilderScene::createHud() {
 
     updateActionLegendText();
     updateModeText();
+    updatePersistenceText();
     setSelectTileUiVisible(false);
 }
 
@@ -426,6 +459,7 @@ void LevelBuilderScene::updateSelectTileUi() {
     }
 
     updateActionLegendText();
+    updatePersistenceText();
 }
 
 void LevelBuilderScene::updateActionLegendText() {
@@ -439,6 +473,8 @@ void LevelBuilderScene::updateActionLegendText() {
         "B - PREV TILE",
         "X - COPY TILE",
         pasteActionText,
+        "L3 - SAVE OVERLAY",
+        "R3 - RELOAD OVERLAY",
         "LB / RB - CHANGE SUBMODE",
         "START - EXIT DEV MODE",
     };
@@ -449,6 +485,19 @@ void LevelBuilderScene::updateActionLegendText() {
             m_actionLegendLines.at(index)->setText(actionLines.at(index));
         }
     }
+}
+
+void LevelBuilderScene::updatePersistenceText() {
+    if (m_persistenceText == nullptr) {
+        return;
+    }
+
+    const bool hasUnsavedChanges = m_tileMapSession.hasUnsavedChanges();
+    const vde::Color textColor =
+        hasUnsavedChanges ? vde::Color::fromHex(0xffb56a) : vde::Color(0.76f, 0.93f, 0.80f, 1.0f);
+    m_persistenceText->setStyle({.color = textColor, .pixelScale = 1});
+    m_persistenceText->setText(std::string("OVERLAY: ") + (hasUnsavedChanges ? "DIRTY" : "CLEAN") +
+                               "  FILE: " + m_tileMapSession.overlayFileName());
 }
 
 void LevelBuilderScene::setSelectTileUiVisible(bool visible) {
@@ -503,6 +552,7 @@ void LevelBuilderScene::setDevelopmentMode(bool enabled) {
     }
 
     updateModeText();
+    updatePersistenceText();
     std::cout << (enabled ? "Development mode enabled\n" : "Development mode disabled\n");
 }
 

@@ -1,5 +1,6 @@
-# Smoke test: Level Builder phase 5 tile-edit flow
-# Enter Development mode, switch to Select Tile Mode, exercise tile actions, then return to play.
+# Smoke test: Level Builder phase 6 authoring flow
+# Enter Development mode, exercise Move Mode, edit tiles in Select Tile Mode, save and reload
+# the overlay, then return to play.
 wait startup
 wait_frames 2
 
@@ -7,6 +8,11 @@ press R
 wait_frames 2
 
 press ENTER
+wait_frames 3
+
+keydown D
+wait 250
+keyup D
 wait_frames 3
 
 press E
@@ -19,15 +25,13 @@ press D
 wait_frames 3
 press X
 wait_frames 3
+press F5
+wait_frames 3
+press V
+wait_frames 3
+press F9
+wait_frames 3
 press Z
-wait_frames 3
-press V
-wait_frames 3
-press A
-wait_frames 3
-press W
-wait_frames 3
-press V
 wait_frames 3
 
 press A

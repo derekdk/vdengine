@@ -98,6 +98,37 @@ if ($Files.Count -gt 0) {
 $codeFiles = @($selectedFiles | Where-Object { [System.IO.Path]::GetExtension($_) -in $codeExtensions })
 $shaderFiles = @($selectedFiles | Where-Object { [System.IO.Path]::GetExtension($_) -in $shaderExtensions })
 
+function Get-CppcheckTargetFiles {
+    param([string[]]$Files)
+
+    $cppcheckFiles = [System.Collections.Generic.List[string]]::new()
+    foreach ($file in $Files) {
+        $relative = Get-VdeRelativePath -RepoRoot $projectRoot -Path $file
+        if ($relative -and $relative -match '^games[\\/][^\\/]+[\\/].+\.(h|hpp|hh|hxx)$') {
+            $gameDir = Split-Path -Parent $file
+            $siblingSources = Get-ChildItem -Path $gameDir -Filter *.cpp -File -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty FullName
+            if ($siblingSources.Count -eq 0) {
+                $cppcheckFiles.Add($file)
+                continue
+            }
+            foreach ($source in $siblingSources) {
+                $cppcheckFiles.Add($source)
+            }
+            continue
+        }
+
+        $cppcheckFiles.Add($file)
+    }
+
+    return @($cppcheckFiles | Sort-Object -Unique)
+}
+
+$cppcheckCodeFiles = @()
+if ($targetedMode) {
+    $cppcheckCodeFiles = Get-CppcheckTargetFiles -Files $codeFiles
+}
+
 function Write-StageHeader {
     param([string]$Name)
     Write-Host ''
@@ -237,13 +268,13 @@ if ($Quick) {
 $cppcheckTool = Get-Command cppcheck -ErrorAction SilentlyContinue
 if (-not $cppcheckTool) {
     Mark-Skipped -Name 'cppcheck' -Reason 'not found in PATH'
-} elseif ($targetedMode -and $codeFiles.Count -eq 0) {
+} elseif ($targetedMode -and $cppcheckCodeFiles.Count -eq 0) {
     Mark-Skipped -Name 'cppcheck' -Reason 'no matching source files selected'
 } else {
     $cppcheckArgs = @()
     if ($targetedMode) {
         $cppcheckArgs += '-Files'
-        $cppcheckArgs += $codeFiles
+        $cppcheckArgs += $cppcheckCodeFiles
     }
 
     $cppcheckPass = Invoke-Stage -Label 'cppcheck' -ScriptName 'lint-cppcheck.ps1' -ExtraArgs $cppcheckArgs

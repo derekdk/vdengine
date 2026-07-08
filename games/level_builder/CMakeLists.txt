@@ -7,6 +7,8 @@ add_vde_game(vde_level_builder
     TileMapSession.cpp
 )
 
+target_link_libraries(vde_level_builder PRIVATE nlohmann_json::nlohmann_json)
+
 file(GLOB_RECURSE VDE_LEVEL_BUILDER_ASSET_FILES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/assets/tiled/*
 )
