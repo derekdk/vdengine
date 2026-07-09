@@ -82,7 +82,6 @@ class TileMapSession {
     std::vector<int> m_savedEditableTiles;
     std::vector<TileEditRecord> m_editHistory;
     size_t m_appliedEditCount = 0;
-    size_t m_dirtyEditableTileCount = 0;
     size_t m_importedObjectCount = 0;
     glm::vec2 m_spawnPoint{0.0f};
     std::string m_sourceMapId;
