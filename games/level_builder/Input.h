@@ -77,6 +77,14 @@ class LevelBuilderInput : public vde::games::BaseGameInputHandler {
         m_actions.addBinding("paste_tile",
                              vde::InputActionBinding::gamepadButton(vde::GAMEPAD_BUTTON_Y));
 
+        m_actions.addBinding("undo_tile_edit", vde::InputActionBinding::key(vde::KEY_U));
+        m_actions.addBinding("undo_tile_edit", vde::InputActionBinding::gamepadAxisPositive(
+                                                   vde::GAMEPAD_AXIS_LEFT_TRIGGER, 0.55f));
+
+        m_actions.addBinding("redo_tile_edit", vde::InputActionBinding::key(vde::KEY_I));
+        m_actions.addBinding("redo_tile_edit", vde::InputActionBinding::gamepadAxisPositive(
+                                                   vde::GAMEPAD_AXIS_RIGHT_TRIGGER, 0.55f));
+
         m_actions.addBinding("save_overlay", vde::InputActionBinding::key(vde::KEY_F5));
         m_actions.addBinding(
             "save_overlay", vde::InputActionBinding::gamepadButton(vde::GAMEPAD_BUTTON_LEFT_THUMB));

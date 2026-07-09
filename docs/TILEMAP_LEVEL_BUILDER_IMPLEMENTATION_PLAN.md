@@ -87,7 +87,20 @@ The engine currently exposes import support for Tiled maps, but not an obvious m
 - **Phase 4 is complete.** `SelectTileMode` now snaps to the nearest tile, shows a white selection outline, supports controller-driven tile navigation, and exposes an on-screen action legend.
 - **Phase 5 is complete.** `SelectTileMode` now edits the imported `ground` layer with next/previous tile cycling, copy/paste clipboard state, updated HUD/debug text, and smoke coverage for the tile-action path.
 - **Phase 6 is complete.** The level builder now persists the editable `ground` layer as a VDE-native overlay snapshot, extends smoke coverage across the authoring loop, and documents the save/load workflow.
-- **The next recommended roadmap slice is undo/redo plus tile-palette selection.** Persistence is in place; the highest-value follow-up is making repeated edits faster and safer.
+- **The first post-Phase-6 slices are complete.** `SelectTileMode` now uses a palette-driven paint workflow, and `TileMapSession` tracks undo/redo history on top of the persisted overlay state.
+- **The next recommended roadmap slice is region tools plus object-layer editing.** Brush selection and reversibility are in place; the next highest-value step is broader authoring coverage.
+
+---
+
+## Post-Phase-6 Follow-up Slices
+
+### Slice A: Undo / Redo ✅ COMPLETE
+
+`TileMapSession` now records per-tile edit history, supports undo and redo within the current session, and keeps dirty-state tracking aligned with the saved overlay snapshot instead of only marking the map dirty once.
+
+### Slice B: Palette-Driven Brush Selection ✅ COMPLETE
+
+`SelectTileMode` now treats the visible clipboard value as the active paint palette. Previous / next actions choose the palette tile first, copy samples tiles from the map into that palette, and paste paints the current selection from the active palette tile.
 
 ---
 

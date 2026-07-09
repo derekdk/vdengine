@@ -83,4 +83,59 @@ TEST(TileMapSessionTest, ReloadWithoutOverlayFallsBackToImportedLayer) {
     std::filesystem::remove(overlayPath, error);
 }
 
+TEST(TileMapSessionTest, UndoAndRedoRestoreEditableLayerState) {
+    TileMapSession session;
+    session.adoptTileMap(makeEditableMap(), {1.0f, 1.0f}, 0u, "test-map");
+
+    ASSERT_TRUE(session.setEditableTileId({1, 0}, 9));
+    ASSERT_TRUE(session.setEditableTileId({2, 1}, 1));
+    EXPECT_TRUE(session.canUndoEditableEdit());
+    EXPECT_FALSE(session.canRedoEditableEdit());
+    EXPECT_EQ(session.undoDepth(), 2u);
+    EXPECT_EQ(session.redoDepth(), 0u);
+
+    ASSERT_TRUE(session.undoLastEditableEdit());
+    EXPECT_EQ(session.editableTileId({1, 0}), 9);
+    EXPECT_EQ(session.editableTileId({2, 1}), 6);
+    EXPECT_EQ(session.undoDepth(), 1u);
+    EXPECT_EQ(session.redoDepth(), 1u);
+
+    ASSERT_TRUE(session.undoLastEditableEdit());
+    EXPECT_EQ(session.editableTileId({1, 0}), 2);
+    EXPECT_EQ(session.undoDepth(), 0u);
+    EXPECT_EQ(session.redoDepth(), 2u);
+
+    ASSERT_TRUE(session.redoLastEditableEdit());
+    EXPECT_EQ(session.editableTileId({1, 0}), 9);
+    EXPECT_EQ(session.undoDepth(), 1u);
+    EXPECT_EQ(session.redoDepth(), 1u);
+}
+
+TEST(TileMapSessionTest, UndoToSavedStateClearsDirtyFlagAndBranchEditDropsRedoHistory) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeEditableMap(), {1.0f, 1.0f}, 0u, "test-map");
+
+    ASSERT_TRUE(session.setEditableTileId({0, 0}, 8));
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+    EXPECT_FALSE(session.hasUnsavedChanges());
+
+    ASSERT_TRUE(session.setEditableTileId({1, 1}, 7));
+    EXPECT_TRUE(session.hasUnsavedChanges());
+    EXPECT_TRUE(session.canRedoEditableEdit() == false);
+
+    ASSERT_TRUE(session.undoLastEditableEdit());
+    EXPECT_FALSE(session.hasUnsavedChanges());
+    EXPECT_TRUE(session.canRedoEditableEdit());
+
+    ASSERT_TRUE(session.setEditableTileId({2, 0}, 0));
+    EXPECT_TRUE(session.hasUnsavedChanges());
+    EXPECT_FALSE(session.canRedoEditableEdit());
+    EXPECT_EQ(session.redoDepth(), 0u);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
 }  // namespace levelbuilder::test

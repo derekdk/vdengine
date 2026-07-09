@@ -193,6 +193,9 @@ void TileMapSession::adoptTileMap(std::shared_ptr<vde::TileMap> tileMap, glm::ve
     }
 
     m_importedEditableTiles = captureEditableLayerTiles();
+    m_savedEditableTiles = m_importedEditableTiles;
+    clearEditHistory();
+    refreshDirtyState();
     m_hasUnsavedChanges = false;
     if (m_overlayPath.empty()) {
         m_overlayPath = kOverlayFileName;
@@ -275,7 +278,83 @@ int TileMapSession::editableTileId(const glm::ivec2& tileCoordinate) const {
     return m_tileMap->getTile(kEditableLayerIndex, clampedTile.x, clampedTile.y);
 }
 
+std::optional<int> TileMapSession::cycledEditableTileId(int currentTileId, int direction) const {
+    if (m_tileMap == nullptr || direction == 0) {
+        return std::nullopt;
+    }
+
+    const auto tileSet = m_tileMap->getTileSet();
+    if (tileSet == nullptr || tileSet->getSpriteCount() <= 0) {
+        return std::nullopt;
+    }
+
+    const int spriteCount = tileSet->getSpriteCount();
+    const int step = direction > 0 ? 1 : -1;
+    if (currentTileId == vde::TileMap::kEmptyTile) {
+        return step > 0 ? 0 : spriteCount - 1;
+    }
+
+    return (currentTileId + step + spriteCount) % spriteCount;
+}
+
 bool TileMapSession::setEditableTileId(const glm::ivec2& tileCoordinate, int tileId) {
+    if (!applyEditableTileId(tileCoordinate, tileId, true)) {
+        return false;
+    }
+
+    m_lastPersistenceStatus = m_hasUnsavedChanges
+                                  ? "Editable ground layer has unsaved changes."
+                                  : "Editable ground layer matches the saved overlay.";
+    return true;
+}
+
+bool TileMapSession::cycleEditableTile(const glm::ivec2& tileCoordinate, int direction) {
+    const auto nextTileId = cycledEditableTileId(editableTileId(tileCoordinate), direction);
+    if (!nextTileId.has_value()) {
+        return false;
+    }
+
+    return setEditableTileId(tileCoordinate, nextTileId.value());
+}
+
+bool TileMapSession::undoLastEditableEdit() {
+    if (!canUndoEditableEdit()) {
+        m_lastPersistenceStatus = "No tile edit is available to undo.";
+        return false;
+    }
+
+    const TileEditRecord& edit = m_editHistory.at(m_appliedEditCount - 1);
+    if (!applyEditableTileId(edit.tileCoordinate, edit.oldTileId, false)) {
+        return false;
+    }
+
+    --m_appliedEditCount;
+    m_lastPersistenceStatus = m_hasUnsavedChanges
+                                  ? "Undid the last tile edit. Overlay has unsaved changes."
+                                  : "Undid the last tile edit. Overlay matches the saved state.";
+    return true;
+}
+
+bool TileMapSession::redoLastEditableEdit() {
+    if (!canRedoEditableEdit()) {
+        m_lastPersistenceStatus = "No tile edit is available to redo.";
+        return false;
+    }
+
+    const TileEditRecord& edit = m_editHistory.at(m_appliedEditCount);
+    if (!applyEditableTileId(edit.tileCoordinate, edit.newTileId, false)) {
+        return false;
+    }
+
+    ++m_appliedEditCount;
+    m_lastPersistenceStatus = m_hasUnsavedChanges
+                                  ? "Redid the tile edit. Overlay has unsaved changes."
+                                  : "Redid the tile edit. Overlay matches the saved state.";
+    return true;
+}
+
+bool TileMapSession::applyEditableTileId(const glm::ivec2& tileCoordinate, int tileId,
+                                         bool recordHistory) {
     if (m_tileMap == nullptr) {
         m_lastPersistenceStatus = "Cannot edit tiles before a map is loaded.";
         return false;
@@ -296,30 +375,18 @@ bool TileMapSession::setEditableTileId(const glm::ivec2& tileCoordinate, int til
         rebuildCollisionCache();
     }
 
-    m_hasUnsavedChanges = true;
-    m_lastPersistenceStatus = "Editable ground layer has unsaved changes.";
+    if (recordHistory) {
+        m_editHistory.resize(m_appliedEditCount);
+        m_editHistory.push_back(TileEditRecord{
+            .tileCoordinate = clampedTile,
+            .oldTileId = oldTileId,
+            .newTileId = tileId,
+        });
+        m_appliedEditCount = m_editHistory.size();
+    }
 
+    refreshDirtyState();
     return true;
-}
-
-bool TileMapSession::cycleEditableTile(const glm::ivec2& tileCoordinate, int direction) {
-    if (m_tileMap == nullptr || direction == 0) {
-        return false;
-    }
-
-    const auto tileSet = m_tileMap->getTileSet();
-    if (tileSet == nullptr || tileSet->getSpriteCount() <= 0) {
-        return false;
-    }
-
-    const int spriteCount = tileSet->getSpriteCount();
-    const int step = direction > 0 ? 1 : -1;
-    const int currentTileId = editableTileId(tileCoordinate);
-    const int nextTileId = (currentTileId == vde::TileMap::kEmptyTile)
-                               ? (step > 0 ? 0 : spriteCount - 1)
-                               : (currentTileId + step + spriteCount) % spriteCount;
-
-    return setEditableTileId(tileCoordinate, nextTileId);
 }
 
 bool TileMapSession::saveEditableLayerOverlay() {
@@ -334,7 +401,8 @@ bool TileMapSession::saveEditableLayerOverlay() {
         const OrderedJson root =
             buildOverlayJson(*m_tileMap, captureEditableLayerTiles(), m_sourceMapId);
         writeTextFile(effectivePath, root.dump(2));
-        m_hasUnsavedChanges = false;
+        m_savedEditableTiles = captureEditableLayerTiles();
+        refreshDirtyState();
         m_lastPersistenceStatus = "Saved ground overlay to " + overlayFileName() + ".";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
@@ -356,6 +424,10 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         return false;
     }
 
+    clearEditHistory();
+    m_savedEditableTiles = captureEditableLayerTiles();
+    refreshDirtyState();
+
     const std::filesystem::path effectivePath =
         m_overlayPath.empty() ? std::filesystem::path(kOverlayFileName) : m_overlayPath;
     std::error_code existsError;
@@ -367,7 +439,6 @@ bool TileMapSession::reloadEditableLayerOverlay() {
     }
 
     if (!overlayExists) {
-        m_hasUnsavedChanges = false;
         m_lastPersistenceStatus = "No saved overlay found; using imported ground layer.";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
@@ -380,7 +451,9 @@ bool TileMapSession::reloadEditableLayerOverlay() {
             return false;
         }
 
-        m_hasUnsavedChanges = false;
+        clearEditHistory();
+        m_savedEditableTiles = captureEditableLayerTiles();
+        refreshDirtyState();
         m_lastPersistenceStatus = "Loaded ground overlay from " + overlayFileName() + ".";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
@@ -423,6 +496,15 @@ bool TileMapSession::applyEditableLayerTiles(const std::vector<int>& tiles) {
     m_tileMap->loadLayerFromArray(kEditableLayerIndex, tiles);
     rebuildCollisionCache();
     return true;
+}
+
+void TileMapSession::clearEditHistory() {
+    m_editHistory.clear();
+    m_appliedEditCount = 0;
+}
+
+void TileMapSession::refreshDirtyState() {
+    m_hasUnsavedChanges = captureEditableLayerTiles() != m_savedEditableTiles;
 }
 
 void TileMapSession::rebuildCollisionCache() {
