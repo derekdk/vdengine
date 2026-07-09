@@ -93,8 +93,10 @@ set(VDE_TEST_SOURCES
     # FLIP image comparison tests
     FlipCompare_test.cpp
     TileMap_test.cpp
+    TileMapSession_test.cpp
 
     ${CMAKE_SOURCE_DIR}/games/level_builder/DevModeController.cpp
+    ${CMAKE_SOURCE_DIR}/games/level_builder/TileMapSession.cpp
 
     # VLauncher storage utilities
     ${CMAKE_SOURCE_DIR}/tools/vlauncher/RunLogStorage.cpp
@@ -110,6 +112,7 @@ target_link_libraries(vde_tests PRIVATE
     vde
     GTest::gtest
     GTest::gtest_main
+    nlohmann_json::nlohmann_json
     tomlplusplus::tomlplusplus
 )
 

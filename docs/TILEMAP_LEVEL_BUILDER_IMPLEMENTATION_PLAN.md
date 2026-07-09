@@ -86,7 +86,21 @@ The engine currently exposes import support for Tiled maps, but not an obvious m
 - **Phase 3 is complete.** Development mode now has a real submode controller, and `MoveMode` supports collision-free scene navigation while preserving scrolling.
 - **Phase 4 is complete.** `SelectTileMode` now snaps to the nearest tile, shows a white selection outline, supports controller-driven tile navigation, and exposes an on-screen action legend.
 - **Phase 5 is complete.** `SelectTileMode` now edits the imported `ground` layer with next/previous tile cycling, copy/paste clipboard state, updated HUD/debug text, and smoke coverage for the tile-action path.
-- **The next active work is Phase 6.** The remaining milestones are about persistence, broader verification, and end-to-end authoring polish.
+- **Phase 6 is complete.** The level builder now persists the editable `ground` layer as a VDE-native overlay snapshot, extends smoke coverage across the authoring loop, and documents the save/load workflow.
+- **The first post-Phase-6 slices are complete.** `SelectTileMode` now uses a palette-driven paint workflow, and `TileMapSession` tracks undo/redo history on top of the persisted overlay state.
+- **The next recommended roadmap slice is region tools plus object-layer editing.** Brush selection and reversibility are in place; the next highest-value step is broader authoring coverage.
+
+---
+
+## Post-Phase-6 Follow-up Slices
+
+### Slice A: Undo / Redo ✅ COMPLETE
+
+`TileMapSession` now records per-tile edit history, supports undo and redo within the current session, and keeps dirty-state tracking aligned with the saved overlay snapshot instead of only marking the map dirty once.
+
+### Slice B: Palette-Driven Brush Selection ✅ COMPLETE
+
+`SelectTileMode` now treats the visible clipboard value as the active paint palette. Previous / next actions choose the palette tile first, copy samples tiles from the map into that palette, and paste paints the current selection from the active palette tile.
 
 ---
 
@@ -99,7 +113,7 @@ The engine currently exposes import support for Tiled maps, but not an obvious m
 | 3 | Complete | Milestone 3 | Development submode framework with Move Mode as the default Development submode |
 | 4 | Complete | Milestone 4 | Select Tile Mode with white outline, nearest-tile acquisition, and controller-driven navigation |
 | 5 | Complete | Milestone 5 | Tile editing actions: next/previous tile cycling, copy/paste clipboard, and action legend/debug state |
-| 6 | Planned | Milestone 6 | Persistence, smoke coverage, docs, polish, and final verification |
+| 6 | Complete | Milestone 6 | Persistence, smoke coverage, docs, polish, and final verification |
 
 ---
 
@@ -330,9 +344,11 @@ Development mode has a real submode framework, and `MoveMode` is usable as the d
 
 ---
 
-## Phase 6: Persistence, Smoke Coverage, Documentation, and Polish
+## Phase 6: Persistence, Smoke Coverage, Documentation, and Polish ✅ COMPLETE
 
 **Goal:** Persist authored changes and verify the full controller-first authoring workflow end to end.
+
+**Status:** Complete.
 
 ### Tasks
 

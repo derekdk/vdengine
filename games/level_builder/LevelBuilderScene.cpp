@@ -28,6 +28,9 @@ constexpr float kModeTextHeight = 0.28f;
 constexpr float kSelectionTextX = -10.6f;
 constexpr float kSelectionTextY = 5.10f;
 constexpr float kSelectionTextHeight = 0.22f;
+constexpr float kPersistenceTextX = -10.6f;
+constexpr float kPersistenceTextY = 4.76f;
+constexpr float kPersistenceTextHeight = 0.20f;
 constexpr float kActionLegendX = 6.2f;
 constexpr float kActionLegendTopY = 5.35f;
 constexpr float kActionLegendLineHeight = 0.22f;
@@ -145,6 +148,21 @@ void LevelBuilderScene::update(float deltaTime) {
         return;
     }
 
+    bool persistenceActionConsumed = false;
+    if (m_devModeController.isEnabled()) {
+        if (actions.consumePressed("save_overlay")) {
+            (void)m_tileMapSession.saveEditableLayerOverlay();
+            persistenceActionConsumed = true;
+        }
+        if (actions.consumePressed("load_overlay")) {
+            (void)m_tileMapSession.reloadEditableLayerOverlay();
+            persistenceActionConsumed = true;
+        }
+        if (persistenceActionConsumed) {
+            updatePersistenceText();
+        }
+    }
+
     if (m_devModeController.isEnabled()) {
         const DevelopmentSubmode previousSubmode = m_devModeController.activeSubmode();
         if (actions.consumePressed("prev_submode")) {
@@ -213,18 +231,33 @@ void LevelBuilderScene::update(float deltaTime) {
                                            moveAxis.y < 0.0f ? -1 : (moveAxis.y > 0.0f ? 1 : 0));
             bool selectionUiChanged = m_devModeController.updateSelectTileMode(
                 deltaTime, selectionAxis, m_tileMapSession.maxTileCoordinate());
+            selectionUiChanged = selectionUiChanged || persistenceActionConsumed;
 
             if (m_devModeController.hasSelection()) {
                 const glm::ivec2 selectedTile = m_devModeController.selectedTile();
+                const int selectedTileId = m_tileMapSession.editableTileId(selectedTile);
                 if (actions.consumePressed("next_tile")) {
-                    selectionUiChanged |= m_tileMapSession.cycleEditableTile(selectedTile, 1);
+                    const int paletteBaseTile =
+                        m_devModeController.clipboardTile().value_or(selectedTileId);
+                    const auto nextPaletteTile =
+                        m_tileMapSession.cycledEditableTileId(paletteBaseTile, 1);
+                    if (nextPaletteTile.has_value()) {
+                        m_devModeController.setClipboardTile(nextPaletteTile.value());
+                        selectionUiChanged = true;
+                    }
                 }
                 if (actions.consumePressed("previous_tile")) {
-                    selectionUiChanged |= m_tileMapSession.cycleEditableTile(selectedTile, -1);
+                    const int paletteBaseTile =
+                        m_devModeController.clipboardTile().value_or(selectedTileId);
+                    const auto previousPaletteTile =
+                        m_tileMapSession.cycledEditableTileId(paletteBaseTile, -1);
+                    if (previousPaletteTile.has_value()) {
+                        m_devModeController.setClipboardTile(previousPaletteTile.value());
+                        selectionUiChanged = true;
+                    }
                 }
                 if (actions.consumePressed("copy_tile")) {
-                    m_devModeController.setClipboardTile(
-                        m_tileMapSession.editableTileId(selectedTile));
+                    m_devModeController.setClipboardTile(selectedTileId);
                     selectionUiChanged = true;
                 }
                 if (actions.consumePressed("paste_tile")) {
@@ -233,6 +266,12 @@ void LevelBuilderScene::update(float deltaTime) {
                         selectionUiChanged |=
                             m_tileMapSession.setEditableTileId(selectedTile, clipboardTile.value());
                     }
+                }
+                if (actions.consumePressed("undo_tile_edit")) {
+                    selectionUiChanged |= m_tileMapSession.undoLastEditableEdit();
+                }
+                if (actions.consumePressed("redo_tile_edit")) {
+                    selectionUiChanged |= m_tileMapSession.redoLastEditableEdit();
                 }
             }
 
@@ -273,21 +312,21 @@ std::string LevelBuilderScene::getGameName() const {
 
 std::vector<std::string> LevelBuilderScene::getGameplaySummary() const {
     return {
-        "Phase 5 turns Select Tile Mode into a real editing workflow on the imported ground "
-        "layer.",
-        "Controller and keyboard actions now cycle tiles, copy the selected tile, and paste the "
-        "clipboard.",
-        "The HUD and debug overlay expose the selected tile ID and clipboard state while you "
-        "edit.",
+        "The post-Phase-6 slices turn Select Tile Mode into a palette-driven paint workflow on "
+        "top of the persisted ground-layer overlay.",
+        "Controller and keyboard actions now cycle the active palette tile, copy from the map, "
+        "paint with the palette, and undo or redo edits.",
+        "The HUD and debug overlay expose the selected tile ID, palette state, history depth, "
+        "and overlay save status while you edit.",
     };
 }
 
 std::vector<std::string> LevelBuilderScene::getGoals() const {
     return {
-        "Keep ground-layer tile mutations behind TileMapSession instead of mutating TileMap "
-        "directly in the scene.",
-        "Expose clipboard state clearly enough that controller-first editing is understandable "
-        "without opening code.",
+        "Keep edit history and persisted overlay state behind TileMapSession instead of leaking "
+        "authoring bookkeeping into the scene.",
+        "Reuse one visible palette or clipboard concept instead of adding a second brush state "
+        "model that controller-first users would have to learn separately.",
     };
 }
 
@@ -304,8 +343,10 @@ std::vector<std::string> LevelBuilderScene::getControls() const {
         "Gamepad Back - Reset",
         "Enter / Gamepad Start - Toggle Development mode",
         "Q / E or Gamepad LB / RB - Cycle Development submodes",
-        "Z / X or Gamepad B / A - Previous or next tile in Select Tile Mode",
-        "C / V or Gamepad X / Y - Copy or paste the selected ground-layer tile",
+        "Z / X or Gamepad B / A - Previous or next palette tile in Select Tile Mode",
+        "C / V or Gamepad X / Y - Copy a tile to the palette or paint the selection",
+        "U / I or Gamepad LT / RT - Undo or redo the last tile edit",
+        "F5 / F9 or Gamepad L3 / R3 - Save or reload the editable ground-layer overlay",
     };
 }
 
@@ -331,17 +372,25 @@ void LevelBuilderScene::drawDebugUI() {
             ImGui::Text("Editable Layer: %s", editableLayer.c_str());
             ImGui::Text("Tile ID: %s", formatTileId(tileId).c_str());
         }
-        ImGui::Text("Clipboard: %s", clipboardState.c_str());
+        ImGui::Text("Palette: %s", clipboardState.c_str());
+        ImGui::Text("Undo / Redo: %llu / %llu",
+                    static_cast<unsigned long long>(m_tileMapSession.undoDepth()),
+                    static_cast<unsigned long long>(m_tileMapSession.redoDepth()));
+        ImGui::Text("Overlay: %s (%s)", m_tileMapSession.hasUnsavedChanges() ? "Dirty" : "Clean",
+                    m_tileMapSession.overlayFileName().c_str());
+        ImGui::TextWrapped("Persistence: %s", m_tileMapSession.lastPersistenceStatus().c_str());
         ImGui::TextColored(ImVec4(0.65f, 0.82f, 0.95f, 1.0f),
                            "Start / Enter toggles Development mode");
         if (m_devModeController.isEnabled() &&
             m_devModeController.activeSubmode() == DevelopmentSubmode::MoveMode) {
             ImGui::Text("Move Mode: free movement, no collisions, no gravity");
+            ImGui::Text("L3 / R3: save / reload overlay");
         }
         if (m_devModeController.isEnabled() &&
             m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
             ImGui::Text("Select Tile Mode: movement controls step the tile selection");
-            ImGui::Text("A / B: next / previous tile, X / Y: copy / paste clipboard");
+            ImGui::Text("A / B: next / previous palette tile, X / Y: copy / paint");
+            ImGui::Text("LT / RT: undo / redo, L3 / R3: save / reload overlay");
         }
     }
     ImGui::End();
@@ -380,8 +429,15 @@ void LevelBuilderScene::createHud() {
     m_selectionText->setPosition(kSelectionTextX, kSelectionTextY, 1.2f);
     m_selectionText->setWorldHeight(kSelectionTextHeight);
 
+    m_persistenceText = addEntity<vde::TextEntity>();
+    m_persistenceText->setFont(vde::BitmapFont::small());
+    m_persistenceText->setStyle({.color = vde::Color(0.76f, 0.93f, 0.80f, 1.0f), .pixelScale = 1});
+    m_persistenceText->setAnchor(0.0f, 0.5f);
+    m_persistenceText->setPosition(kPersistenceTextX, kPersistenceTextY, 1.2f);
+    m_persistenceText->setWorldHeight(kPersistenceTextHeight);
+
     m_actionLegendLines.clear();
-    constexpr size_t kActionLegendLineCount = 8;
+    constexpr size_t kActionLegendLineCount = 10;
     for (size_t index = 0; index < kActionLegendLineCount; ++index) {
         auto line = addEntity<vde::TextEntity>();
         line->setFont(vde::BitmapFont::small());
@@ -396,6 +452,7 @@ void LevelBuilderScene::createHud() {
 
     updateActionLegendText();
     updateModeText();
+    updatePersistenceText();
     setSelectTileUiVisible(false);
 }
 
@@ -421,26 +478,24 @@ void LevelBuilderScene::updateSelectTileUi() {
         const int tileId = m_tileMapSession.editableTileId(selectedTile);
         const std::string selectionText =
             "TILE: " + std::to_string(selectedTile.x) + ", " + std::to_string(selectedTile.y) +
-            "  ID: " + formatTileId(tileId) + "  CLIP: " + formatClipboardState();
+            "  ID: " + formatTileId(tileId) + "  PAL: " + formatClipboardState();
         m_selectionText->setText(selectionText);
     }
 
     updateActionLegendText();
+    updatePersistenceText();
 }
 
 void LevelBuilderScene::updateActionLegendText() {
-    const char* pasteActionText =
-        m_devModeController.hasClipboardTile() ? "Y - PASTE TILE" : "Y - PASTE TILE (COPY FIRST)";
+    const char* paintActionText = m_devModeController.hasClipboardTile()
+                                      ? "Y - PAINT TILE"
+                                      : "Y - PAINT TILE (COPY OR CYCLE FIRST)";
 
     const std::vector<std::string> actionLines = {
-        "SELECT TILE MODE",
-        "DPAD / STICK - MOVE TILE",
-        "A - NEXT TILE",
-        "B - PREV TILE",
-        "X - COPY TILE",
-        pasteActionText,
-        "LB / RB - CHANGE SUBMODE",
-        "START - EXIT DEV MODE",
+        "SELECT TILE MODE",         "DPAD / STICK - MOVE TILE", "A - NEXT PALETTE",
+        "B - PREV PALETTE",         "X - COPY TILE TO PALETTE", paintActionText,
+        "LT / RT - UNDO / REDO",    "L3 - SAVE OVERLAY",        "R3 - RELOAD OVERLAY",
+        "LB / RB - CHANGE SUBMODE", "START - EXIT DEV MODE",
     };
 
     for (size_t index = 0; index < m_actionLegendLines.size() && index < actionLines.size();
@@ -449,6 +504,19 @@ void LevelBuilderScene::updateActionLegendText() {
             m_actionLegendLines.at(index)->setText(actionLines.at(index));
         }
     }
+}
+
+void LevelBuilderScene::updatePersistenceText() {
+    if (m_persistenceText == nullptr) {
+        return;
+    }
+
+    const bool hasUnsavedChanges = m_tileMapSession.hasUnsavedChanges();
+    const vde::Color textColor =
+        hasUnsavedChanges ? vde::Color::fromHex(0xffb56a) : vde::Color(0.76f, 0.93f, 0.80f, 1.0f);
+    m_persistenceText->setStyle({.color = textColor, .pixelScale = 1});
+    m_persistenceText->setText(std::string("OVERLAY: ") + (hasUnsavedChanges ? "DIRTY" : "CLEAN") +
+                               "  FILE: " + m_tileMapSession.overlayFileName());
 }
 
 void LevelBuilderScene::setSelectTileUiVisible(bool visible) {
@@ -503,6 +571,7 @@ void LevelBuilderScene::setDevelopmentMode(bool enabled) {
     }
 
     updateModeText();
+    updatePersistenceText();
     std::cout << (enabled ? "Development mode enabled\n" : "Development mode disabled\n");
 }
 
