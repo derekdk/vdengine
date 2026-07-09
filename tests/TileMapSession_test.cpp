@@ -4,6 +4,7 @@
  */
 
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -83,6 +84,31 @@ TEST(TileMapSessionTest, ReloadWithoutOverlayFallsBackToImportedLayer) {
     std::filesystem::remove(overlayPath, error);
 }
 
+TEST(TileMapSessionTest, ReloadFailurePreservesEditableLayerStateAndUndoHistory) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeEditableMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    ASSERT_TRUE(session.setEditableTileId({0, 0}, 8));
+    ASSERT_EQ(session.undoDepth(), 1u);
+    ASSERT_TRUE(session.hasUnsavedChanges());
+
+    std::ofstream output(overlayPath, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(output.is_open());
+    output << "{";
+    output.close();
+
+    EXPECT_FALSE(session.reloadEditableLayerOverlay());
+    EXPECT_EQ(session.editableTileId({0, 0}), 8);
+    EXPECT_TRUE(session.hasUnsavedChanges());
+    EXPECT_TRUE(session.canUndoEditableEdit());
+    EXPECT_EQ(session.undoDepth(), 1u);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
 TEST(TileMapSessionTest, UndoAndRedoRestoreEditableLayerState) {
     TileMapSession session;
     session.adoptTileMap(makeEditableMap(), {1.0f, 1.0f}, 0u, "test-map");
@@ -123,7 +149,7 @@ TEST(TileMapSessionTest, UndoToSavedStateClearsDirtyFlagAndBranchEditDropsRedoHi
 
     ASSERT_TRUE(session.setEditableTileId({1, 1}, 7));
     EXPECT_TRUE(session.hasUnsavedChanges());
-    EXPECT_TRUE(session.canRedoEditableEdit() == false);
+    EXPECT_FALSE(session.canRedoEditableEdit());
 
     ASSERT_TRUE(session.undoLastEditableEdit());
     EXPECT_FALSE(session.hasUnsavedChanges());

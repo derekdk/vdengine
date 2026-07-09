@@ -106,8 +106,8 @@ function Get-CppcheckTargetFiles {
         $relative = Get-VdeRelativePath -RepoRoot $projectRoot -Path $file
         if ($relative -and $relative -match '^games[\\/][^\\/]+[\\/].+\.(h|hpp|hh|hxx)$') {
             $gameDir = Split-Path -Parent $file
-            $siblingSources = Get-ChildItem -Path $gameDir -Filter *.cpp -File -ErrorAction SilentlyContinue |
-                Select-Object -ExpandProperty FullName
+            $siblingSources = @(Get-ChildItem -Path $gameDir -Filter *.cpp -File -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty FullName)
             if ($siblingSources.Count -eq 0) {
                 $cppcheckFiles.Add($file)
                 continue
