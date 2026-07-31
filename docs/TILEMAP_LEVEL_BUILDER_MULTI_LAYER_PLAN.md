@@ -122,7 +122,7 @@ Undo or redo history should remain session-only and should not be serialized.
 | Phase | Status | Milestone | Primary outcome |
 |-------|--------|-----------|-----------------|
 | 1 | Complete | Milestone A | Multi-layer session model and overlay schema exist |
-| 2 | Planned | Milestone B | Runtime rendering uses one TileMap entity per authorable layer |
+| 2 | Complete | Milestone B | Runtime rendering uses one TileMap entity per authorable layer |
 | 3 | Planned | Milestone C | User can add, select, hide, and depth-order layers |
 | 4 | Planned | Milestone D | User can configure per-layer scrolling rules |
 | 5 | Planned | Milestone E | Editing, collision, and history work correctly across layers |

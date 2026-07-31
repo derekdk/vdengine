@@ -72,6 +72,8 @@ class TileMapSession {
     [[nodiscard]] size_t layerCount() const { return m_layers.size(); }
     [[nodiscard]] size_t activeLayerIndex() const { return m_activeLayerIndex; }
     [[nodiscard]] const LayerDefinition* layerDefinition(size_t index) const;
+    [[nodiscard]] std::shared_ptr<vde::TileMap> createRuntimeTileMap(size_t layerIndex) const;
+    bool syncRuntimeTileMap(size_t layerIndex, vde::TileMap& runtimeTileMap) const;
     bool setActiveLayerIndex(size_t index);
     size_t addLayer(const std::string& name = "");
     bool setEditableTileId(const glm::ivec2& tileCoordinate, int tileId);
@@ -102,7 +104,7 @@ class TileMapSession {
     std::shared_ptr<vde::TileMap> m_tileMap;
     std::vector<vde::TileCollisionRect> m_solidRects;
     std::vector<vde::TileCollisionRect> m_oneWayRects;
-    std::vector<int> m_importedEditableTiles;
+    std::vector<LayerDefinition> m_importedLayers;
     std::vector<std::vector<int>> m_savedLayerTiles;
     std::vector<TileEditRecord> m_editHistory;
     size_t m_appliedEditCount = 0;

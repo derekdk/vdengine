@@ -2,6 +2,7 @@
 
 #include <vde/Texture.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -102,8 +103,8 @@ void LevelBuilderScene::onEnter() {
     createBackgrounds();
     m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
 
-    addEntity(std::static_pointer_cast<vde::Entity>(m_tileMapSession.tileMap()));
     m_tileMapSession.tileMap()->setPosition(0.0f, 0.0f, -0.4f);
+    rebuildLayerRuntimes();
 
     m_playerController.createEntities(*this);
     m_playerController.reset(m_tileMapSession, camera);
@@ -116,7 +117,7 @@ void LevelBuilderScene::onEnter() {
 
     std::cout << "Level builder baseline: " << m_tileMapSession.tileMap()->getColumnCount() << 'x'
               << m_tileMapSession.tileMap()->getRowCount() << " imported tiles across "
-              << m_tileMapSession.tileMap()->getLayerCount() << " layers, "
+              << m_tileMapSession.layerCount() << " authorable layers, "
               << m_tileMapSession.importedObjectCount() << " imported objects, extracted "
               << m_tileMapSession.solidRects().size() << " solid regions and "
               << m_tileMapSession.oneWayRects().size() << " one-way regions\n";
@@ -155,8 +156,11 @@ void LevelBuilderScene::update(float deltaTime) {
             persistenceActionConsumed = true;
         }
         if (actions.consumePressed("load_overlay")) {
-            (void)m_tileMapSession.reloadEditableLayerOverlay();
-            persistenceActionConsumed = true;
+            const bool reloaded = m_tileMapSession.reloadEditableLayerOverlay();
+            if (reloaded) {
+                rebuildLayerRuntimes();
+                persistenceActionConsumed = true;
+            }
         }
         if (persistenceActionConsumed) {
             updatePersistenceText();
@@ -263,15 +267,27 @@ void LevelBuilderScene::update(float deltaTime) {
                 if (actions.consumePressed("paste_tile")) {
                     const auto clipboardTile = m_devModeController.clipboardTile();
                     if (clipboardTile.has_value()) {
-                        selectionUiChanged |=
+                        const bool painted =
                             m_tileMapSession.setEditableTileId(selectedTile, clipboardTile.value());
+                        selectionUiChanged |= painted;
+                        if (painted) {
+                            syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                        }
                     }
                 }
                 if (actions.consumePressed("undo_tile_edit")) {
-                    selectionUiChanged |= m_tileMapSession.undoLastEditableEdit();
+                    const bool undid = m_tileMapSession.undoLastEditableEdit();
+                    selectionUiChanged |= undid;
+                    if (undid) {
+                        syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                    }
                 }
                 if (actions.consumePressed("redo_tile_edit")) {
-                    selectionUiChanged |= m_tileMapSession.redoLastEditableEdit();
+                    const bool redid = m_tileMapSession.redoLastEditableEdit();
+                    selectionUiChanged |= redid;
+                    if (redid) {
+                        syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                    }
                 }
             }
 
@@ -549,6 +565,42 @@ void LevelBuilderScene::updateModeText() {
 
     m_modeText->setStyle({.color = vde::Color(0.84f, 0.92f, 0.98f, 1.0f), .pixelScale = 1});
     m_modeText->setText("MODE: PLAY");
+}
+
+void LevelBuilderScene::clearLayerRuntimes() {
+    for (const auto& runtime : m_layerRuntimes) {
+        if (runtime.tileMap != nullptr) {
+            removeEntity(runtime.tileMap->getId());
+        }
+    }
+    m_layerRuntimes.clear();
+}
+
+void LevelBuilderScene::rebuildLayerRuntimes() {
+    clearLayerRuntimes();
+
+    m_layerRuntimes.reserve(m_tileMapSession.layerCount());
+    for (size_t layerIndex = 0; layerIndex < m_tileMapSession.layerCount(); ++layerIndex) {
+        auto runtimeTileMap = m_tileMapSession.createRuntimeTileMap(layerIndex);
+        if (runtimeTileMap == nullptr) {
+            continue;
+        }
+
+        addEntity(std::static_pointer_cast<vde::Entity>(runtimeTileMap));
+        m_layerRuntimes.push_back({.layerIndex = layerIndex, .tileMap = std::move(runtimeTileMap)});
+    }
+}
+
+void LevelBuilderScene::syncLayerRuntime(size_t layerIndex) {
+    const auto runtimeIt = std::find_if(
+        m_layerRuntimes.begin(), m_layerRuntimes.end(),
+        [layerIndex](const LayerRuntime& runtime) { return runtime.layerIndex == layerIndex; });
+    if (runtimeIt == m_layerRuntimes.end() || runtimeIt->tileMap == nullptr) {
+        rebuildLayerRuntimes();
+        return;
+    }
+
+    (void)m_tileMapSession.syncRuntimeTileMap(layerIndex, *runtimeIt->tileMap);
 }
 
 std::string LevelBuilderScene::formatClipboardState() const {

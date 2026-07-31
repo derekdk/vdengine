@@ -30,6 +30,27 @@ std::shared_ptr<vde::TileMap> makeEditableMap() {
     return tileMap;
 }
 
+std::shared_ptr<vde::TileMap> makeImportedMultiLayerMap() {
+    auto tileMap = std::make_shared<vde::TileMap>(1.0f, 1.0f, 3, 2);
+    tileMap->setLayerName(0, "ground");
+
+    tileMap->setTile(0, 0, 1);
+    tileMap->setTile(1, 0, 2);
+    tileMap->setTile(2, 0, 3);
+    tileMap->setTile(0, 1, 4);
+    tileMap->setTile(1, 1, 5);
+    tileMap->setTile(2, 1, 6);
+
+    const int accentsLayer = tileMap->addLayer("accents");
+    tileMap->setLayerDepth(accentsLayer, 0.35f);
+    tileMap->setLayerVisible(accentsLayer, true);
+    tileMap->setTile(accentsLayer, 1, 0, 8);
+    tileMap->setTile(accentsLayer, 2, 1, 9);
+    tileMap->setPosition(2.0f, 3.0f, -0.4f);
+
+    return tileMap;
+}
+
 std::filesystem::path makeTempOverlayPath() {
     const auto uniqueStamp =
         std::filesystem::file_time_type::clock::now().time_since_epoch().count();
@@ -231,6 +252,27 @@ TEST(TileMapSessionTest, SetActiveLayerIndexSwitchesEditTarget) {
     EXPECT_EQ(session.editableTileId({0, 0}), 1);  // original imported value
 }
 
+TEST(TileMapSessionTest, AdoptTileMapCapturesImportedTileLayersIntoSessionModel) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    ASSERT_EQ(session.layerCount(), 2u);
+
+    const LayerDefinition* ground = session.layerDefinition(0);
+    const LayerDefinition* accents = session.layerDefinition(1);
+    ASSERT_NE(ground, nullptr);
+    ASSERT_NE(accents, nullptr);
+
+    EXPECT_EQ(ground->name, "ground");
+    EXPECT_EQ(accents->name, "accents");
+    EXPECT_FLOAT_EQ(ground->depthZ, 0.0f);
+    EXPECT_FLOAT_EQ(accents->depthZ, 0.35f);
+    EXPECT_TRUE(ground->visible);
+    EXPECT_TRUE(accents->visible);
+    EXPECT_EQ(accents->tiles[1], 8);
+    EXPECT_EQ(accents->tiles[5], 9);
+}
+
 TEST(TileMapSessionTest, MultiLayerSaveAndReloadPreservesAllLayers) {
     TileMapSession session;
     const std::filesystem::path overlayPath = makeTempOverlayPath();
@@ -302,11 +344,46 @@ TEST(TileMapSessionTest, SavedOverlayUsesVersionTwoLayersArraySchema) {
     std::filesystem::remove(overlayPath, error);
 }
 
-TEST(TileMapSessionTest, OldV1OverlayLoadsAsImplicitSingleLayer) {
+TEST(TileMapSessionTest, RuntimeTileMapsUseOneEntityPerSessionLayer) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    auto groundRuntime = session.createRuntimeTileMap(0);
+    auto accentsRuntime = session.createRuntimeTileMap(1);
+
+    ASSERT_NE(groundRuntime, nullptr);
+    ASSERT_NE(accentsRuntime, nullptr);
+    EXPECT_EQ(groundRuntime->getLayerCount(), 1);
+    EXPECT_EQ(accentsRuntime->getLayerCount(), 1);
+    EXPECT_FLOAT_EQ(groundRuntime->getPosition().z, -0.4f);
+    EXPECT_FLOAT_EQ(accentsRuntime->getPosition().z, -0.05f);
+    EXPECT_EQ(groundRuntime->getTile(1, 0), 2);
+    EXPECT_EQ(accentsRuntime->getTile(1, 0), 8);
+    EXPECT_EQ(accentsRuntime->getTile(2, 1), 9);
+}
+
+TEST(TileMapSessionTest, SyncRuntimeTileMapRefreshesOnlyEditedLayer) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    auto groundRuntime = session.createRuntimeTileMap(0);
+    auto accentsRuntime = session.createRuntimeTileMap(1);
+    ASSERT_NE(groundRuntime, nullptr);
+    ASSERT_NE(accentsRuntime, nullptr);
+
+    ASSERT_TRUE(session.setActiveLayerIndex(1));
+    ASSERT_TRUE(session.setEditableTileId({2, 1}, 4));
+    ASSERT_TRUE(session.syncRuntimeTileMap(1, *accentsRuntime));
+
+    EXPECT_EQ(accentsRuntime->getTile(2, 1), 4);
+    EXPECT_EQ(groundRuntime->getTile(2, 1), 6);
+}
+
+TEST(TileMapSessionTest, OldV1OverlayLoadsWithPreservedImportedLayers) {
     TileMapSession session;
     const std::filesystem::path overlayPath = makeTempOverlayPath();
     session.setOverlayPath(overlayPath);
-    session.adoptTileMap(makeEditableMap(), {0.0f, 0.0f}, 0u, "test-map");
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
 
     // Write a v1-format overlay manually.
     const std::string v1Json = R"({
@@ -327,7 +404,7 @@ TEST(TileMapSessionTest, OldV1OverlayLoadsAsImplicitSingleLayer) {
     }
 
     ASSERT_TRUE(session.reloadEditableLayerOverlay());
-    EXPECT_EQ(session.layerCount(), 1u);
+    EXPECT_EQ(session.layerCount(), 2u);
     EXPECT_EQ(session.activeLayerIndex(), 0u);
     EXPECT_FALSE(session.hasUnsavedChanges());
 
@@ -335,6 +412,10 @@ TEST(TileMapSessionTest, OldV1OverlayLoadsAsImplicitSingleLayer) {
     EXPECT_EQ(session.editableTileId({0, 0}), 10);
     EXPECT_EQ(session.editableTileId({1, 0}), 11);
     EXPECT_EQ(session.editableTileId({2, 1}), 15);
+
+    ASSERT_TRUE(session.setActiveLayerIndex(1));
+    EXPECT_EQ(session.editableTileId({1, 0}), 8);
+    EXPECT_EQ(session.editableTileId({2, 1}), 9);
 
     std::error_code error;
     std::filesystem::remove(overlayPath, error);

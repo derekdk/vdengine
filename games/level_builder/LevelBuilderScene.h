@@ -29,6 +29,11 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     std::vector<std::string> getControls() const override;
 
   private:
+    struct LayerRuntime {
+        size_t layerIndex = 0;
+        std::shared_ptr<vde::TileMap> tileMap;
+    };
+
     void createBackgrounds();
     void createHud();
     void initializeSelectTileMode();
@@ -37,6 +42,9 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void updatePersistenceText();
     void setSelectTileUiVisible(bool visible);
     void updateModeText();
+    void clearLayerRuntimes();
+    void rebuildLayerRuntimes();
+    void syncLayerRuntime(size_t layerIndex);
     [[nodiscard]] std::string formatClipboardState() const;
     void setDevelopmentMode(bool enabled);
     LevelBuilderInput* input();
@@ -50,6 +58,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     std::shared_ptr<vde::TextEntity> m_selectionText;
     std::shared_ptr<vde::TextEntity> m_persistenceText;
     std::vector<std::shared_ptr<vde::TextEntity>> m_actionLegendLines;
+    std::vector<LayerRuntime> m_layerRuntimes;
 };
 
 }  // namespace levelbuilder
