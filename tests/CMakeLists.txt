@@ -71,6 +71,7 @@ set(VDE_TEST_SOURCES
     Timing_test.cpp
     Random_test.cpp
     DevModeController_test.cpp
+    PlayerController_test.cpp
     # Phase 2 animation engine tests
     PlaybackClock_test.cpp
     TimedEvents_test.cpp
@@ -96,6 +97,7 @@ set(VDE_TEST_SOURCES
     TileMapSession_test.cpp
 
     ${CMAKE_SOURCE_DIR}/games/level_builder/DevModeController.cpp
+    ${CMAKE_SOURCE_DIR}/games/level_builder/PlayerController.cpp
     ${CMAKE_SOURCE_DIR}/games/level_builder/TileMapSession.cpp
 
     # VLauncher storage utilities
