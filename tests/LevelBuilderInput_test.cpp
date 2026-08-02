@@ -15,6 +15,16 @@ TEST(LevelBuilderInputTest, MoveModeKeepsControllerMovementAndDepthBindingsDisti
     input.onGamepadAxis(0, vde::GAMEPAD_AXIS_LEFT_TRIGGER, 1.0f);
     EXPECT_TRUE(input.actions().isPressed("layer_depth_down"));
     EXPECT_FALSE(input.actions().isPressed("undo_tile_edit"));
+
+    input.finishFrame();
+    input.onGamepadAxis(0, vde::GAMEPAD_AXIS_RIGHT_X, 1.0f);
+    EXPECT_TRUE(input.actions().isPressed("next_scroll_preset"));
+    EXPECT_FALSE(input.actions().isPressed("move_right"));
+
+    input.finishFrame();
+    input.onGamepadAxis(0, vde::GAMEPAD_AXIS_RIGHT_X, 0.0f);
+    input.onKeyPress(vde::KEY_LEFT_BRACKET);
+    EXPECT_TRUE(input.actions().isPressed("previous_scroll_preset"));
 }
 
 TEST(LevelBuilderInputTest, ModeSwapReplacesKeyboardAndControllerActions) {

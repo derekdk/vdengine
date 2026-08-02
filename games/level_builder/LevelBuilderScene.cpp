@@ -157,6 +157,10 @@ void LevelBuilderScene::update(float deltaTime) {
         finishFrame();
         return;
     }
+    const auto finishSceneFrame = [this, &finishFrame, deltaTime]() {
+        advanceLayerRuntimeScroll(deltaTime);
+        finishFrame();
+    };
 
     bool persistenceActionConsumed = false;
     if (m_devModeController.isEnabled()) {
@@ -205,7 +209,7 @@ void LevelBuilderScene::update(float deltaTime) {
             m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
             initializeSelectTileMode();
         }
-        finishFrame();
+        finishSceneFrame();
         return;
     }
 
@@ -275,6 +279,22 @@ void LevelBuilderScene::update(float deltaTime) {
                     updatePersistenceText();
                 }
             }
+            if (actions.consumePressed("previous_scroll_preset")) {
+                if (m_tileMapSession.cycleLayerScrollPreset(m_tileMapSession.activeLayerIndex(),
+                                                            -1)) {
+                    resetLayerRuntimeScroll(m_tileMapSession.activeLayerIndex());
+                    updateLayerStatusText();
+                    updatePersistenceText();
+                }
+            }
+            if (actions.consumePressed("next_scroll_preset")) {
+                if (m_tileMapSession.cycleLayerScrollPreset(m_tileMapSession.activeLayerIndex(),
+                                                            1)) {
+                    resetLayerRuntimeScroll(m_tileMapSession.activeLayerIndex());
+                    updateLayerStatusText();
+                    updatePersistenceText();
+                }
+            }
 
             m_devModeController.updateMoveMode(deltaTime, moveAxis);
             m_playerController.stopMotion();
@@ -286,7 +306,7 @@ void LevelBuilderScene::update(float deltaTime) {
             camera->followTarget(m_playerController.getPosition() +
                                      glm::vec2(0.0f, kCameraTargetYOffset),
                                  kCameraFollowSpeed);
-            finishFrame();
+            finishSceneFrame();
             return;
 
         case DevelopmentSubmode::SelectTileMode: {
@@ -364,7 +384,7 @@ void LevelBuilderScene::update(float deltaTime) {
                     kCameraFollowSpeed);
             }
             m_playerController.stopMotion();
-            finishFrame();
+            finishSceneFrame();
             return;
         }
         }
@@ -376,13 +396,19 @@ void LevelBuilderScene::update(float deltaTime) {
     if (m_playerController.getPosition().y < kRespawnFloorY) {
         m_playerController.reset(m_tileMapSession, camera);
         m_devModeController.setPosition(m_playerController.getPosition());
-        finishFrame();
+        finishSceneFrame();
         return;
     }
 
     camera->followTarget(m_playerController.getPosition() + glm::vec2(0.0f, kCameraTargetYOffset),
                          kCameraFollowSpeed);
-    finishFrame();
+    finishSceneFrame();
+}
+
+void LevelBuilderScene::updateCameraDependentVisuals([[maybe_unused]] float deltaTime) {
+    if (const auto* camera = currentCamera(); camera != nullptr) {
+        applyLayerRuntimeTransforms(camera->getPosition());
+    }
 }
 
 std::string LevelBuilderScene::getGameName() const {
@@ -426,6 +452,7 @@ std::vector<std::string> LevelBuilderScene::getControls() const {
         "J / K or Gamepad X / Y (Dev Move Mode) - Select previous or next layer",
         "H / Gamepad B (Dev Move Mode) - Toggle the active layer visibility",
         "O / P or Gamepad LT / RT (Dev Move Mode) - Move the active layer depth down or up",
+        "[ / ] or Gamepad Right Stick Left / Right (Dev Move Mode) - Cycle layer scroll preset",
         "Z / X or Gamepad B / A - Previous or next palette tile in Select Tile Mode",
         "C / V or Gamepad X / Y - Copy a tile to the palette or paint the selection",
         "U / I or Gamepad LT / RT - Undo or redo the last tile edit",
@@ -457,6 +484,10 @@ void LevelBuilderScene::drawDebugUI() {
             ImGui::Text("Depth: %.2f  Visible: %s  Collision: %s", activeLayer->depthZ,
                         activeLayer->visible ? "ON" : "OFF",
                         activeLayer->collisionEnabled ? "ON" : "OFF");
+            ImGui::Text("Scroll: %s", activeLayerScrollPresetName().c_str());
+            ImGui::Text("Follow: %.2f, %.2f  Velocity: %.2f, %.2f", activeLayer->followFactorX,
+                        activeLayer->followFactorY, activeLayer->scrollVelocityX,
+                        activeLayer->scrollVelocityY);
         }
         if (m_devModeController.hasSelection()) {
             const std::string editableLayer = m_tileMapSession.editableLayerName();
@@ -531,7 +562,7 @@ void LevelBuilderScene::createHud() {
     m_persistenceText->setWorldHeight(kPersistenceTextHeight);
 
     m_actionLegendLines.clear();
-    constexpr size_t kActionLegendLineCount = 10;
+    constexpr size_t kActionLegendLineCount = 11;
     for (size_t index = 0; index < kActionLegendLineCount; ++index) {
         auto line = addEntity<vde::TextEntity>();
         line->setFont(vde::BitmapFont::small());
@@ -587,6 +618,7 @@ void LevelBuilderScene::updateActionLegendText() {
             "X / Y - PREV / NEXT",
             "B - TOGGLE VISIBILITY",
             "LT / RT - DEPTH - / +",
+            "RIGHT STICK L / R - SCROLL PRESET",
             "L3 - SAVE OVERLAY",
             "R3 - RELOAD OVERLAY",
             "LB / RB - CHANGE SUBMODE",
@@ -633,7 +665,8 @@ void LevelBuilderScene::updateLayerStatusText() {
                        std::to_string(m_tileMapSession.layerCount()) + ": " + activeLayer->name +
                        "  Z: " + formatDepth(activeLayer->depthZ) +
                        "  VIS: " + std::string(activeLayer->visible ? "ON" : "OFF") +
-                       "  COLL: " + std::string(activeLayer->collisionEnabled ? "ON" : "OFF");
+                       "  COLL: " + std::string(activeLayer->collisionEnabled ? "ON" : "OFF") +
+                       "  SCROLL: " + activeLayerScrollPresetName();
 
     if (m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode &&
         m_devModeController.hasSelection()) {
@@ -718,7 +751,9 @@ void LevelBuilderScene::rebuildLayerRuntimes() {
         }
 
         addEntity(std::static_pointer_cast<vde::Entity>(runtimeTileMap));
-        m_layerRuntimes.push_back({.layerIndex = layerIndex, .tileMap = std::move(runtimeTileMap)});
+        m_layerRuntimes.push_back({.layerIndex = layerIndex,
+                                   .tileMap = std::move(runtimeTileMap),
+                                   .scrollOffset = glm::vec2(0.0f)});
     }
 }
 
@@ -733,6 +768,47 @@ void LevelBuilderScene::syncLayerRuntime(size_t layerIndex) {
     }
 
     (void)m_tileMapSession.syncRuntimeTileMap(layerIndex, *runtimeIt->tileMap);
+}
+
+void LevelBuilderScene::resetLayerRuntimeScroll(size_t layerIndex) {
+    const auto runtimeIt =
+        std::ranges::find_if(m_layerRuntimes, [layerIndex](const LayerRuntime& runtime) {
+            return runtime.layerIndex == layerIndex;
+        });
+    if (runtimeIt == m_layerRuntimes.end()) {
+        return;
+    }
+    runtimeIt->scrollOffset = glm::vec2(0.0f);
+}
+
+void LevelBuilderScene::advanceLayerRuntimeScroll(float deltaTime) {
+    for (auto& runtime : m_layerRuntimes) {
+        const LayerDefinition* layer = m_tileMapSession.layerDefinition(runtime.layerIndex);
+        if (layer == nullptr) {
+            continue;
+        }
+
+        runtime.scrollOffset +=
+            glm::vec2(layer->scrollVelocityX, layer->scrollVelocityY) * deltaTime;
+    }
+}
+
+void LevelBuilderScene::applyLayerRuntimeTransforms(const glm::vec2& cameraPosition) {
+    for (auto& runtime : m_layerRuntimes) {
+        if (runtime.tileMap == nullptr) {
+            continue;
+        }
+        const auto position = m_tileMapSession.runtimeLayerPosition(
+            runtime.layerIndex, cameraPosition, runtime.scrollOffset);
+        if (position.has_value()) {
+            runtime.tileMap->setPosition(position->x, position->y, position->z);
+        }
+    }
+}
+
+std::string LevelBuilderScene::activeLayerScrollPresetName() const {
+    const auto preset = m_tileMapSession.layerScrollPreset(m_tileMapSession.activeLayerIndex());
+    return preset.has_value() ? TileMapSession::layerScrollPresetName(preset.value()) : "Custom";
 }
 
 std::string LevelBuilderScene::formatClipboardState() const {

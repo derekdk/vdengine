@@ -422,6 +422,47 @@ TEST(TileMapSessionTest, SyncRuntimeTileMapRefreshesDepthAndVisibilityChanges) {
     EXPECT_FLOAT_EQ(accentsRuntime->getPosition().z, 0.20f);
 }
 
+TEST(TileMapSessionTest, ScrollPresetChangesPersistAndRestoreSavedMetadata) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    ASSERT_TRUE(session.setLayerScrollPreset(1, LayerScrollPreset::DriftingDecorative));
+    EXPECT_TRUE(session.hasUnsavedChanges());
+    const LayerDefinition* accents = session.layerDefinition(1);
+    ASSERT_NE(accents, nullptr);
+    EXPECT_FLOAT_EQ(accents->followFactorX, 0.25f);
+    EXPECT_FLOAT_EQ(accents->followFactorY, 0.50f);
+    EXPECT_FLOAT_EQ(accents->scrollVelocityX, 0.35f);
+
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+    ASSERT_TRUE(session.setLayerScrollPreset(1, LayerScrollPreset::Gameplay));
+    ASSERT_TRUE(session.reloadEditableLayerOverlay());
+
+    accents = session.layerDefinition(1);
+    ASSERT_NE(accents, nullptr);
+    EXPECT_EQ(session.layerScrollPreset(1), LayerScrollPreset::DriftingDecorative);
+    EXPECT_FLOAT_EQ(accents->scrollVelocityX, 0.35f);
+    EXPECT_FALSE(session.hasUnsavedChanges());
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
+TEST(TileMapSessionTest, RuntimeLayerPositionCombinesCameraFollowSavedBaseAndRuntimeOffsets) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+    ASSERT_TRUE(session.setLayerScrollPreset(1, LayerScrollPreset::StrongParallax));
+
+    const auto position = session.runtimeLayerPosition(1, {10.0f, 4.0f}, {1.0f, -2.0f});
+
+    ASSERT_TRUE(position.has_value());
+    EXPECT_FLOAT_EQ(position->x, 9.0f);
+    EXPECT_FLOAT_EQ(position->y, 2.4f);
+    EXPECT_FLOAT_EQ(position->z, -0.05f);
+}
+
 TEST(TileMapSessionTest, OldV1OverlayLoadsWithPreservedImportedLayers) {
     TileMapSession session;
     const std::filesystem::path overlayPath = makeTempOverlayPath();

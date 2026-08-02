@@ -169,6 +169,14 @@ class LevelBuilderInput : public vde::games::BaseGameInputHandler {
                             {vde::InputActionBinding::key(vde::KEY_P),
                              vde::InputActionBinding::gamepadAxisPositive(
                                  vde::GAMEPAD_AXIS_RIGHT_TRIGGER, 0.55f)}});
+        bindings.push_back(
+            {"previous_scroll_preset",
+             {vde::InputActionBinding::key(vde::KEY_LEFT_BRACKET),
+              vde::InputActionBinding::gamepadAxisNegative(vde::GAMEPAD_AXIS_RIGHT_X, 0.55f)}});
+        bindings.push_back(
+            {"next_scroll_preset",
+             {vde::InputActionBinding::key(vde::KEY_RIGHT_BRACKET),
+              vde::InputActionBinding::gamepadAxisPositive(vde::GAMEPAD_AXIS_RIGHT_X, 0.55f)}});
         return bindings;
     }
 

@@ -31,6 +31,13 @@ struct LayerDefinition {
     float scrollOffsetY = 0.0f;
 };
 
+enum class LayerScrollPreset {
+    Gameplay,
+    MildParallax,
+    StrongParallax,
+    DriftingDecorative,
+};
+
 class TileMapSession {
   public:
     void load(vde::VulkanContext* context);
@@ -72,6 +79,11 @@ class TileMapSession {
     [[nodiscard]] size_t layerCount() const { return m_layers.size(); }
     [[nodiscard]] size_t activeLayerIndex() const { return m_activeLayerIndex; }
     [[nodiscard]] const LayerDefinition* layerDefinition(size_t index) const;
+    [[nodiscard]] std::optional<LayerScrollPreset> layerScrollPreset(size_t index) const;
+    [[nodiscard]] static const char* layerScrollPresetName(LayerScrollPreset preset);
+    [[nodiscard]] std::optional<glm::vec3>
+    runtimeLayerPosition(size_t index, const glm::vec2& cameraPosition,
+                         const glm::vec2& runtimeScrollOffset = glm::vec2(0.0f)) const;
     [[nodiscard]] std::shared_ptr<vde::TileMap> createRuntimeTileMap(size_t layerIndex) const;
     bool syncRuntimeTileMap(size_t layerIndex, vde::TileMap& runtimeTileMap) const;
     bool setActiveLayerIndex(size_t index);
@@ -79,6 +91,8 @@ class TileMapSession {
     bool toggleLayerVisibility(size_t index);
     bool setLayerDepthZ(size_t index, float depthZ);
     bool adjustLayerDepthZ(size_t index, float deltaZ);
+    bool setLayerScrollPreset(size_t index, LayerScrollPreset preset);
+    bool cycleLayerScrollPreset(size_t index, int direction);
     size_t addLayer(const std::string& name = "");
     bool setEditableTileId(const glm::ivec2& tileCoordinate, int tileId);
     bool cycleEditableTile(const glm::ivec2& tileCoordinate, int direction);

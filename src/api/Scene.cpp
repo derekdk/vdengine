@@ -112,6 +112,8 @@ void Scene::updateAudio([[maybe_unused]] float deltaTime) {
     m_audioEventQueue.clear();
 }
 
+void Scene::updateCameraDependentVisuals([[maybe_unused]] float deltaTime) {}
+
 void Scene::updateVisuals([[maybe_unused]] float deltaTime) {
     // Default: no-op.  Derived scenes override this when using phase callbacks.
 }

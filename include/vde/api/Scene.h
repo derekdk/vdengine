@@ -187,6 +187,14 @@ class Scene {
      */
     virtual void updateVisuals(float deltaTime);
 
+    /**
+     * @brief Update visuals that depend on the camera's final position for this frame.
+     *
+     * Called after Camera::update() in both legacy and phase-callback scene modes.
+     * The default implementation is a no-op.
+     */
+    virtual void updateCameraDependentVisuals(float deltaTime);
+
     // Timed events
 
     /**

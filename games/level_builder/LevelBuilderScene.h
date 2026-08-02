@@ -20,6 +20,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
 
     void onEnter() override;
     void update(float deltaTime) override;
+    void updateCameraDependentVisuals(float deltaTime) override;
     void drawDebugUI() override;
 
   protected:
@@ -32,6 +33,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     struct LayerRuntime {
         size_t layerIndex = 0;
         std::shared_ptr<vde::TileMap> tileMap;
+        glm::vec2 scrollOffset{0.0f};
     };
 
     void createBackgrounds();
@@ -47,6 +49,10 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void clearLayerRuntimes();
     void rebuildLayerRuntimes();
     void syncLayerRuntime(size_t layerIndex);
+    void resetLayerRuntimeScroll(size_t layerIndex);
+    void advanceLayerRuntimeScroll(float deltaTime);
+    void applyLayerRuntimeTransforms(const glm::vec2& cameraPosition);
+    [[nodiscard]] std::string activeLayerScrollPresetName() const;
     [[nodiscard]] std::string formatClipboardState() const;
     void setDevelopmentMode(bool enabled);
     void syncInputMode();

@@ -400,6 +400,61 @@ const LayerDefinition* TileMapSession::layerDefinition(size_t index) const {
     return &m_layers[index];
 }
 
+std::optional<LayerScrollPreset> TileMapSession::layerScrollPreset(size_t index) const {
+    if (index >= m_layers.size()) {
+        return std::nullopt;
+    }
+
+    const LayerDefinition& layer = m_layers[index];
+    if (layer.followFactorX == 1.0f && layer.followFactorY == 1.0f &&
+        layer.scrollVelocityX == 0.0f && layer.scrollVelocityY == 0.0f) {
+        return LayerScrollPreset::Gameplay;
+    }
+    if (layer.followFactorX == 0.75f && layer.followFactorY == 0.90f &&
+        layer.scrollVelocityX == 0.0f && layer.scrollVelocityY == 0.0f) {
+        return LayerScrollPreset::MildParallax;
+    }
+    if (layer.followFactorX == 0.40f && layer.followFactorY == 0.65f &&
+        layer.scrollVelocityX == 0.0f && layer.scrollVelocityY == 0.0f) {
+        return LayerScrollPreset::StrongParallax;
+    }
+    if (layer.followFactorX == 0.25f && layer.followFactorY == 0.50f &&
+        layer.scrollVelocityX == 0.35f && layer.scrollVelocityY == 0.0f) {
+        return LayerScrollPreset::DriftingDecorative;
+    }
+    return std::nullopt;
+}
+
+const char* TileMapSession::layerScrollPresetName(LayerScrollPreset preset) {
+    switch (preset) {
+    case LayerScrollPreset::Gameplay:
+        return "Gameplay";
+    case LayerScrollPreset::MildParallax:
+        return "Mild Parallax";
+    case LayerScrollPreset::StrongParallax:
+        return "Strong Parallax";
+    case LayerScrollPreset::DriftingDecorative:
+        return "Drifting Decorative";
+    }
+    return "Custom";
+}
+
+std::optional<glm::vec3>
+TileMapSession::runtimeLayerPosition(size_t index, const glm::vec2& cameraPosition,
+                                     const glm::vec2& runtimeScrollOffset) const {
+    if (m_tileMap == nullptr || index >= m_layers.size()) {
+        return std::nullopt;
+    }
+
+    const LayerDefinition& layer = m_layers[index];
+    const auto& basePosition = m_tileMap->getPosition();
+    return glm::vec3(basePosition.x + layer.scrollOffsetX + runtimeScrollOffset.x +
+                         cameraPosition.x * (1.0f - layer.followFactorX),
+                     basePosition.y + layer.scrollOffsetY + runtimeScrollOffset.y +
+                         cameraPosition.y * (1.0f - layer.followFactorY),
+                     basePosition.z + layer.depthZ);
+}
+
 std::shared_ptr<vde::TileMap> TileMapSession::createRuntimeTileMap(size_t layerIndex) const {
     if (m_tileMap == nullptr || layerIndex >= m_layers.size()) {
         return nullptr;
@@ -440,8 +495,8 @@ bool TileMapSession::syncRuntimeTileMap(size_t layerIndex, vde::TileMap& runtime
     runtimeTileMap.setLayerVisible(0, layer.visible);
     runtimeTileMap.loadLayerFromArray(0, layer.tiles);
 
-    const auto& basePosition = m_tileMap->getPosition();
-    runtimeTileMap.setPosition(basePosition.x, basePosition.y, basePosition.z + layer.depthZ);
+    const auto position = runtimeLayerPosition(layerIndex, glm::vec2(0.0f));
+    runtimeTileMap.setPosition(position->x, position->y, position->z);
     return true;
 }
 
@@ -501,6 +556,60 @@ bool TileMapSession::adjustLayerDepthZ(size_t index, float deltaZ) {
         return false;
     }
     return setLayerDepthZ(index, m_layers[index].depthZ + deltaZ);
+}
+
+bool TileMapSession::setLayerScrollPreset(size_t index, LayerScrollPreset preset) {
+    if (index >= m_layers.size()) {
+        return false;
+    }
+
+    glm::vec2 followFactor(1.0f);
+    glm::vec2 scrollVelocity(0.0f);
+    switch (preset) {
+    case LayerScrollPreset::Gameplay:
+        followFactor = {1.0f, 1.0f};
+        scrollVelocity = {0.0f, 0.0f};
+        break;
+    case LayerScrollPreset::MildParallax:
+        followFactor = {0.75f, 0.90f};
+        scrollVelocity = {0.0f, 0.0f};
+        break;
+    case LayerScrollPreset::StrongParallax:
+        followFactor = {0.40f, 0.65f};
+        scrollVelocity = {0.0f, 0.0f};
+        break;
+    case LayerScrollPreset::DriftingDecorative:
+        followFactor = {0.25f, 0.50f};
+        scrollVelocity = {0.35f, 0.0f};
+        break;
+    }
+
+    LayerDefinition& layer = m_layers[index];
+    if (layer.followFactorX == followFactor.x && layer.followFactorY == followFactor.y &&
+        layer.scrollVelocityX == scrollVelocity.x && layer.scrollVelocityY == scrollVelocity.y) {
+        return false;
+    }
+
+    layer.followFactorX = followFactor.x;
+    layer.followFactorY = followFactor.y;
+    layer.scrollVelocityX = scrollVelocity.x;
+    layer.scrollVelocityY = scrollVelocity.y;
+    refreshDirtyState();
+    return true;
+}
+
+bool TileMapSession::cycleLayerScrollPreset(size_t index, int direction) {
+    if (index >= m_layers.size() || direction == 0) {
+        return false;
+    }
+
+    constexpr int kPresetCount = 4;
+    const auto currentPreset = layerScrollPreset(index);
+    const int currentIndex = currentPreset.has_value() ? static_cast<int>(currentPreset.value())
+                                                       : (direction > 0 ? -1 : 0);
+    const int step = direction > 0 ? 1 : -1;
+    const int nextIndex = (currentIndex + step + kPresetCount) % kPresetCount;
+    return setLayerScrollPreset(index, static_cast<LayerScrollPreset>(nextIndex));
 }
 
 size_t TileMapSession::addLayer(const std::string& name) {

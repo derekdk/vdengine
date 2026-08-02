@@ -10,6 +10,9 @@ wait_frames 2
 press ENTER
 wait_frames 3
 
+press RIGHTBRACKET
+wait_frames 3
+
 keydown D
 wait 250
 keyup D

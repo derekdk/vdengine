@@ -561,6 +561,7 @@ When enabled, the scheduler splits `update()` into three ordered phases:
 | `virtual void updateGameLogic(float dt)` | GameLogic phase (AI, input, spawning) |
 | `virtual void updateAudio(float dt)` | Audio phase (drains audio event queue) |
 | `virtual void updateVisuals(float dt)` | Visual phase (animation, particles) |
+| `virtual void updateCameraDependentVisuals(float dt)` | Post-camera visual phase for transforms that need the final camera position |
 
 ### Audio Event Queue
 
