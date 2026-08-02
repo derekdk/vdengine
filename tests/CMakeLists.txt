@@ -53,6 +53,7 @@ set(VDE_TEST_SOURCES
     Joystick_test.cpp
     # Input / KeyStateTracker tests
     InputActionMap_test.cpp
+    LevelBuilderInput_test.cpp
     KeyStateTracker_test.cpp
     # Input script tests
     InputScript_test.cpp

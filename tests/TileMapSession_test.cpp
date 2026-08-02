@@ -379,6 +379,49 @@ TEST(TileMapSessionTest, SyncRuntimeTileMapRefreshesOnlyEditedLayer) {
     EXPECT_EQ(groundRuntime->getTile(2, 1), 6);
 }
 
+TEST(TileMapSessionTest, LayerMetadataChangesSetDirtyAndPersistAcrossSaveLoad) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    ASSERT_TRUE(session.setLayerVisibility(1, false));
+    ASSERT_TRUE(session.adjustLayerDepthZ(1, 0.20f));
+    EXPECT_TRUE(session.hasUnsavedChanges());
+
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+    EXPECT_FALSE(session.hasUnsavedChanges());
+
+    ASSERT_TRUE(session.setLayerVisibility(1, true));
+    ASSERT_TRUE(session.setLayerDepthZ(1, 0.10f));
+    EXPECT_TRUE(session.hasUnsavedChanges());
+
+    ASSERT_TRUE(session.reloadEditableLayerOverlay());
+    const LayerDefinition* accents = session.layerDefinition(1);
+    ASSERT_NE(accents, nullptr);
+    EXPECT_FALSE(accents->visible);
+    EXPECT_FLOAT_EQ(accents->depthZ, 0.55f);
+    EXPECT_FALSE(session.hasUnsavedChanges());
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
+TEST(TileMapSessionTest, SyncRuntimeTileMapRefreshesDepthAndVisibilityChanges) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    auto accentsRuntime = session.createRuntimeTileMap(1);
+    ASSERT_NE(accentsRuntime, nullptr);
+
+    ASSERT_TRUE(session.setLayerVisibility(1, false));
+    ASSERT_TRUE(session.adjustLayerDepthZ(1, 0.25f));
+    ASSERT_TRUE(session.syncRuntimeTileMap(1, *accentsRuntime));
+
+    EXPECT_FALSE(accentsRuntime->isLayerVisible(0));
+    EXPECT_FLOAT_EQ(accentsRuntime->getPosition().z, 0.20f);
+}
+
 TEST(TileMapSessionTest, OldV1OverlayLoadsWithPreservedImportedLayers) {
     TileMapSession session;
     const std::filesystem::path overlayPath = makeTempOverlayPath();

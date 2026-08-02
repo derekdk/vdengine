@@ -130,6 +130,16 @@ levelbuilder::LayerDefinition buildImportedLayerDefinition(const vde::TileMap& t
     return layer;
 }
 
+bool sameLayerMetadata(const levelbuilder::LayerDefinition& lhs,
+                       const levelbuilder::LayerDefinition& rhs) {
+    return lhs.id == rhs.id && lhs.name == rhs.name && lhs.depthZ == rhs.depthZ &&
+           lhs.visible == rhs.visible && lhs.collisionEnabled == rhs.collisionEnabled &&
+           lhs.followFactorX == rhs.followFactorX && lhs.followFactorY == rhs.followFactorY &&
+           lhs.scrollVelocityX == rhs.scrollVelocityX &&
+           lhs.scrollVelocityY == rhs.scrollVelocityY && lhs.scrollOffsetX == rhs.scrollOffsetX &&
+           lhs.scrollOffsetY == rhs.scrollOffsetY;
+}
+
 using LayerAndTiles = std::pair<levelbuilder::LayerDefinition, std::vector<int>>;
 
 // Parse a single layer entry from the v2 layers array.
@@ -361,6 +371,7 @@ void TileMapSession::adoptTileMap(std::shared_ptr<vde::TileMap> tileMap, glm::ve
     }
 
     m_layers = m_importedLayers;
+    m_savedLayers = m_layers;
     m_savedLayerTiles.clear();
     m_savedLayerTiles.reserve(m_layers.size());
     for (const auto& layer : m_layers) {
@@ -440,6 +451,56 @@ bool TileMapSession::setActiveLayerIndex(size_t index) {
     }
     m_activeLayerIndex = index;
     return true;
+}
+
+bool TileMapSession::setLayerVisibility(size_t index, bool visible) {
+    if (index >= m_layers.size()) {
+        return false;
+    }
+    LayerDefinition& layer = m_layers[index];
+    if (layer.visible == visible) {
+        return false;
+    }
+
+    layer.visible = visible;
+    if (m_tileMap != nullptr && index < static_cast<size_t>(m_tileMap->getLayerCount())) {
+        m_tileMap->setLayerVisible(static_cast<int>(index), visible);
+    }
+
+    refreshDirtyState();
+    return true;
+}
+
+bool TileMapSession::toggleLayerVisibility(size_t index) {
+    if (index >= m_layers.size()) {
+        return false;
+    }
+    return setLayerVisibility(index, !m_layers[index].visible);
+}
+
+bool TileMapSession::setLayerDepthZ(size_t index, float depthZ) {
+    if (index >= m_layers.size()) {
+        return false;
+    }
+    LayerDefinition& layer = m_layers[index];
+    if (layer.depthZ == depthZ) {
+        return false;
+    }
+
+    layer.depthZ = depthZ;
+    if (m_tileMap != nullptr && index < static_cast<size_t>(m_tileMap->getLayerCount())) {
+        m_tileMap->setLayerDepth(static_cast<int>(index), depthZ);
+    }
+
+    refreshDirtyState();
+    return true;
+}
+
+bool TileMapSession::adjustLayerDepthZ(size_t index, float deltaZ) {
+    if (index >= m_layers.size() || deltaZ == 0.0f) {
+        return false;
+    }
+    return setLayerDepthZ(index, m_layers[index].depthZ + deltaZ);
 }
 
 size_t TileMapSession::addLayer(const std::string& name) {
@@ -703,6 +764,7 @@ bool TileMapSession::saveEditableLayerOverlay() {
         const OrderedJson root =
             buildOverlayJson(*m_tileMap, m_layers, currentTiles, m_sourceMapId);
         writeTextFile(effectivePath, root.dump(2));
+        m_savedLayers = m_layers;
         m_savedLayerTiles = currentTiles;
         m_hasUnsavedChanges = false;
         m_lastPersistenceStatus = "Saved ground overlay to " + overlayFileName() + ".";
@@ -733,6 +795,7 @@ bool TileMapSession::reloadEditableLayerOverlay() {
 
     if (!overlayExists) {
         m_layers = m_importedLayers;
+        m_savedLayers = m_importedLayers;
         m_savedLayerTiles.clear();
         m_savedLayerTiles.reserve(m_importedLayers.size());
         for (size_t layerIndex = 0; layerIndex < m_importedLayers.size(); ++layerIndex) {
@@ -800,6 +863,7 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         rebuildCollisionCache();
 
         m_layers = std::move(newLayers);
+        m_savedLayers = m_layers;
         m_savedLayerTiles = std::move(newSavedTiles);
         if (m_activeLayerIndex >= m_layers.size()) {
             m_activeLayerIndex = 0;
@@ -893,12 +957,16 @@ void TileMapSession::refreshDirtyStateForTileEdit(size_t layerIndex,
 }
 
 void TileMapSession::refreshDirtyState() {
-    if (m_layers.size() != m_savedLayerTiles.size()) {
+    if (m_layers.size() != m_savedLayerTiles.size() || m_layers.size() != m_savedLayers.size()) {
         m_hasUnsavedChanges = true;
         return;
     }
 
     for (size_t i = 0; i < m_layers.size(); ++i) {
+        if (!sameLayerMetadata(m_layers[i], m_savedLayers[i])) {
+            m_hasUnsavedChanges = true;
+            return;
+        }
         if (captureLayerTiles(i) != m_savedLayerTiles[i]) {
             m_hasUnsavedChanges = true;
             return;

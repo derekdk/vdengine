@@ -75,6 +75,10 @@ class TileMapSession {
     [[nodiscard]] std::shared_ptr<vde::TileMap> createRuntimeTileMap(size_t layerIndex) const;
     bool syncRuntimeTileMap(size_t layerIndex, vde::TileMap& runtimeTileMap) const;
     bool setActiveLayerIndex(size_t index);
+    bool setLayerVisibility(size_t index, bool visible);
+    bool toggleLayerVisibility(size_t index);
+    bool setLayerDepthZ(size_t index, float depthZ);
+    bool adjustLayerDepthZ(size_t index, float deltaZ);
     size_t addLayer(const std::string& name = "");
     bool setEditableTileId(const glm::ivec2& tileCoordinate, int tileId);
     bool cycleEditableTile(const glm::ivec2& tileCoordinate, int direction);
@@ -105,6 +109,7 @@ class TileMapSession {
     std::vector<vde::TileCollisionRect> m_solidRects;
     std::vector<vde::TileCollisionRect> m_oneWayRects;
     std::vector<LayerDefinition> m_importedLayers;
+    std::vector<LayerDefinition> m_savedLayers;
     std::vector<std::vector<int>> m_savedLayerTiles;
     std::vector<TileEditRecord> m_editHistory;
     size_t m_appliedEditCount = 0;

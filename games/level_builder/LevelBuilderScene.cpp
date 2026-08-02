@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -36,6 +38,7 @@ constexpr float kActionLegendX = 6.2f;
 constexpr float kActionLegendTopY = 5.35f;
 constexpr float kActionLegendLineHeight = 0.22f;
 constexpr float kActionLegendLineSpacing = 0.32f;
+constexpr float kLayerDepthAdjustStep = 0.06f;
 
 struct RGBA {
     constexpr RGBA() = default;
@@ -80,6 +83,12 @@ std::shared_ptr<vde::Texture> createBackdropTexture(uint32_t width, uint32_t hei
 
 std::string formatTileId(int tileId) {
     return tileId == vde::TileMap::kEmptyTile ? "EMPTY" : std::to_string(tileId);
+}
+
+std::string formatDepth(float depth) {
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(2) << depth;
+    return stream.str();
 }
 
 }  // namespace
@@ -163,6 +172,7 @@ void LevelBuilderScene::update(float deltaTime) {
             }
         }
         if (persistenceActionConsumed) {
+            updateModeText();
             updatePersistenceText();
         }
     }
@@ -177,6 +187,7 @@ void LevelBuilderScene::update(float deltaTime) {
         }
 
         if (previousSubmode != m_devModeController.activeSubmode()) {
+            syncInputMode();
             if (m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode) {
                 initializeSelectTileMode();
             } else {
@@ -215,11 +226,63 @@ void LevelBuilderScene::update(float deltaTime) {
     if (m_devModeController.isEnabled()) {
         switch (m_devModeController.activeSubmode()) {
         case DevelopmentSubmode::MoveMode:
+            if (actions.consumePressed("add_layer")) {
+                const size_t newLayerIndex = m_tileMapSession.addLayer();
+                (void)m_tileMapSession.setActiveLayerIndex(newLayerIndex);
+                rebuildLayerRuntimes();
+                updateModeText();
+                updateLayerStatusText();
+                updatePersistenceText();
+            }
+            if (actions.consumePressed("previous_layer") && m_tileMapSession.layerCount() > 0) {
+                const size_t newIndex =
+                    (m_tileMapSession.activeLayerIndex() + m_tileMapSession.layerCount() - 1) %
+                    m_tileMapSession.layerCount();
+                (void)m_tileMapSession.setActiveLayerIndex(newIndex);
+                updateModeText();
+                updateLayerStatusText();
+            }
+            if (actions.consumePressed("next_layer") && m_tileMapSession.layerCount() > 0) {
+                const size_t newIndex =
+                    (m_tileMapSession.activeLayerIndex() + 1) % m_tileMapSession.layerCount();
+                (void)m_tileMapSession.setActiveLayerIndex(newIndex);
+                updateModeText();
+                updateLayerStatusText();
+            }
+            if (actions.consumePressed("toggle_layer_visibility")) {
+                if (m_tileMapSession.toggleLayerVisibility(m_tileMapSession.activeLayerIndex())) {
+                    syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                    updateModeText();
+                    updateLayerStatusText();
+                    updatePersistenceText();
+                }
+            }
+            if (actions.consumePressed("layer_depth_down")) {
+                if (m_tileMapSession.adjustLayerDepthZ(m_tileMapSession.activeLayerIndex(),
+                                                       -kLayerDepthAdjustStep)) {
+                    syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                    updateModeText();
+                    updateLayerStatusText();
+                    updatePersistenceText();
+                }
+            }
+            if (actions.consumePressed("layer_depth_up")) {
+                if (m_tileMapSession.adjustLayerDepthZ(m_tileMapSession.activeLayerIndex(),
+                                                       kLayerDepthAdjustStep)) {
+                    syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                    updateModeText();
+                    updateLayerStatusText();
+                    updatePersistenceText();
+                }
+            }
+
             m_devModeController.updateMoveMode(deltaTime, moveAxis);
             m_playerController.stopMotion();
             m_playerController.setPosition(m_devModeController.position());
             m_playerController.setFacingFromHorizontal(moveAxis.x);
-            setSelectTileUiVisible(false);
+            m_tileCursor.hide();
+            updateLayerStatusText();
+            updateActionLegendText();
             camera->followTarget(m_playerController.getPosition() +
                                      glm::vec2(0.0f, kCameraTargetYOffset),
                                  kCameraFollowSpeed);
@@ -359,6 +422,10 @@ std::vector<std::string> LevelBuilderScene::getControls() const {
         "Gamepad Back - Reset",
         "Enter / Gamepad Start - Toggle Development mode",
         "Q / E or Gamepad LB / RB - Cycle Development submodes",
+        "N / Gamepad A (Dev Move Mode) - Add a new layer and select it",
+        "J / K or Gamepad X / Y (Dev Move Mode) - Select previous or next layer",
+        "H / Gamepad B (Dev Move Mode) - Toggle the active layer visibility",
+        "O / P or Gamepad LT / RT (Dev Move Mode) - Move the active layer depth down or up",
         "Z / X or Gamepad B / A - Previous or next palette tile in Select Tile Mode",
         "C / V or Gamepad X / Y - Copy a tile to the palette or paint the selection",
         "U / I or Gamepad LT / RT - Undo or redo the last tile edit",
@@ -380,6 +447,17 @@ void LevelBuilderScene::drawDebugUI() {
                                        : "N/A");
         ImGui::Text("Player: %.2f, %.2f", m_playerController.getPosition().x,
                     m_playerController.getPosition().y);
+        if (const LayerDefinition* activeLayer =
+                m_tileMapSession.layerDefinition(m_tileMapSession.activeLayerIndex());
+            activeLayer != nullptr) {
+            ImGui::Text("Active Layer: %llu / %llu",
+                        static_cast<unsigned long long>(m_tileMapSession.activeLayerIndex() + 1),
+                        static_cast<unsigned long long>(m_tileMapSession.layerCount()));
+            ImGui::Text("Layer Name: %s", activeLayer->name.c_str());
+            ImGui::Text("Depth: %.2f  Visible: %s  Collision: %s", activeLayer->depthZ,
+                        activeLayer->visible ? "ON" : "OFF",
+                        activeLayer->collisionEnabled ? "ON" : "OFF");
+        }
         if (m_devModeController.hasSelection()) {
             const std::string editableLayer = m_tileMapSession.editableLayerName();
             const int tileId = m_tileMapSession.editableTileId(m_devModeController.selectedTile());
@@ -468,8 +546,10 @@ void LevelBuilderScene::createHud() {
 
     updateActionLegendText();
     updateModeText();
+    updateLayerStatusText();
     updatePersistenceText();
     setSelectTileUiVisible(false);
+    setActionLegendVisible(false);
 }
 
 void LevelBuilderScene::initializeSelectTileMode() {
@@ -481,6 +561,7 @@ void LevelBuilderScene::initializeSelectTileMode() {
 void LevelBuilderScene::updateSelectTileUi() {
     if (!m_devModeController.hasSelection()) {
         setSelectTileUiVisible(false);
+        updateLayerStatusText();
         return;
     }
 
@@ -490,36 +571,81 @@ void LevelBuilderScene::updateSelectTileUi() {
     m_tileCursor.show(tileCenter, m_tileMapSession.tileMap()->getTileWidth(),
                       m_tileMapSession.tileMap()->getTileHeight());
 
-    if (m_selectionText != nullptr) {
-        const int tileId = m_tileMapSession.editableTileId(selectedTile);
-        const std::string selectionText =
-            "TILE: " + std::to_string(selectedTile.x) + ", " + std::to_string(selectedTile.y) +
-            "  ID: " + formatTileId(tileId) + "  PAL: " + formatClipboardState();
-        m_selectionText->setText(selectionText);
-    }
-
+    updateLayerStatusText();
     updateActionLegendText();
     updatePersistenceText();
 }
 
 void LevelBuilderScene::updateActionLegendText() {
-    const char* paintActionText = m_devModeController.hasClipboardTile()
-                                      ? "Y - PAINT TILE"
-                                      : "Y - PAINT TILE (COPY OR CYCLE FIRST)";
+    std::vector<std::string> actionLines;
+    if (m_devModeController.isEnabled() &&
+        m_devModeController.activeSubmode() == DevelopmentSubmode::MoveMode) {
+        actionLines = {
+            "MOVE MODE",
+            "DPAD / STICK - MOVE",
+            "A - ADD LAYER",
+            "X / Y - PREV / NEXT",
+            "B - TOGGLE VISIBILITY",
+            "LT / RT - DEPTH - / +",
+            "L3 - SAVE OVERLAY",
+            "R3 - RELOAD OVERLAY",
+            "LB / RB - CHANGE SUBMODE",
+            "START - EXIT DEV MODE",
+        };
+    } else {
+        const char* paintActionText = m_devModeController.hasClipboardTile()
+                                          ? "Y - PAINT TILE"
+                                          : "Y - PAINT TILE (COPY FIRST)";
+        actionLines = {
+            "SELECT TILE MODE",         "DPAD / STICK - MOVE TILE", "A - NEXT PALETTE",
+            "B - PREV PALETTE",         "X - COPY TILE TO PALETTE", paintActionText,
+            "LT / RT - UNDO / REDO",    "L3 - SAVE OVERLAY",        "R3 - RELOAD OVERLAY",
+            "LB / RB - CHANGE SUBMODE", "START - EXIT DEV MODE",
+        };
+    }
 
-    const std::vector<std::string> actionLines = {
-        "SELECT TILE MODE",         "DPAD / STICK - MOVE TILE", "A - NEXT PALETTE",
-        "B - PREV PALETTE",         "X - COPY TILE TO PALETTE", paintActionText,
-        "LT / RT - UNDO / REDO",    "L3 - SAVE OVERLAY",        "R3 - RELOAD OVERLAY",
-        "LB / RB - CHANGE SUBMODE", "START - EXIT DEV MODE",
-    };
-
-    for (size_t index = 0; index < m_actionLegendLines.size() && index < actionLines.size();
-         ++index) {
+    for (size_t index = 0; index < m_actionLegendLines.size(); ++index) {
         if (m_actionLegendLines.at(index) != nullptr) {
-            m_actionLegendLines.at(index)->setText(actionLines.at(index));
+            m_actionLegendLines.at(index)->setText(
+                index < actionLines.size() ? actionLines.at(index) : "");
         }
     }
+}
+
+void LevelBuilderScene::updateLayerStatusText() {
+    if (m_selectionText == nullptr) {
+        return;
+    }
+
+    if (!m_devModeController.isEnabled()) {
+        m_selectionText->setVisible(false);
+        return;
+    }
+
+    const LayerDefinition* activeLayer =
+        m_tileMapSession.layerDefinition(m_tileMapSession.activeLayerIndex());
+    if (activeLayer == nullptr) {
+        m_selectionText->setVisible(false);
+        return;
+    }
+
+    std::string text = "LAYER " + std::to_string(m_tileMapSession.activeLayerIndex() + 1) + "/" +
+                       std::to_string(m_tileMapSession.layerCount()) + ": " + activeLayer->name +
+                       "  Z: " + formatDepth(activeLayer->depthZ) +
+                       "  VIS: " + std::string(activeLayer->visible ? "ON" : "OFF") +
+                       "  COLL: " + std::string(activeLayer->collisionEnabled ? "ON" : "OFF");
+
+    if (m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode &&
+        m_devModeController.hasSelection()) {
+        const glm::ivec2 selectedTile = m_devModeController.selectedTile();
+        const int tileId = m_tileMapSession.editableTileId(selectedTile);
+        text += "  TILE: " + std::to_string(selectedTile.x) + ", " +
+                std::to_string(selectedTile.y) + "  ID: " + formatTileId(tileId) +
+                "  PAL: " + formatClipboardState();
+    }
+
+    m_selectionText->setText(text);
+    m_selectionText->setVisible(true);
 }
 
 void LevelBuilderScene::updatePersistenceText() {
@@ -543,7 +669,9 @@ void LevelBuilderScene::setSelectTileUiVisible(bool visible) {
     if (m_selectionText != nullptr) {
         m_selectionText->setVisible(visible);
     }
+}
 
+void LevelBuilderScene::setActionLegendVisible(bool visible) {
     for (const auto& line : m_actionLegendLines) {
         if (line != nullptr) {
             line->setVisible(visible);
@@ -560,11 +688,14 @@ void LevelBuilderScene::updateModeText() {
         m_modeText->setStyle({.color = vde::Color::fromHex(0xffd36b), .pixelScale = 1});
         m_modeText->setText(std::string("MODE: DEVELOPMENT / ") +
                             m_devModeController.activeSubmodeName());
+        updateLayerStatusText();
+        updateActionLegendText();
         return;
     }
 
     m_modeText->setStyle({.color = vde::Color(0.84f, 0.92f, 0.98f, 1.0f), .pixelScale = 1});
     m_modeText->setText("MODE: PLAY");
+    updateLayerStatusText();
 }
 
 void LevelBuilderScene::clearLayerRuntimes() {
@@ -592,9 +723,10 @@ void LevelBuilderScene::rebuildLayerRuntimes() {
 }
 
 void LevelBuilderScene::syncLayerRuntime(size_t layerIndex) {
-    const auto runtimeIt = std::find_if(
-        m_layerRuntimes.begin(), m_layerRuntimes.end(),
-        [layerIndex](const LayerRuntime& runtime) { return runtime.layerIndex == layerIndex; });
+    const auto runtimeIt =
+        std::ranges::find_if(m_layerRuntimes, [layerIndex](const LayerRuntime& runtime) {
+            return runtime.layerIndex == layerIndex;
+        });
     if (runtimeIt == m_layerRuntimes.end() || runtimeIt->tileMap == nullptr) {
         rebuildLayerRuntimes();
         return;
@@ -616,15 +748,34 @@ void LevelBuilderScene::setDevelopmentMode(bool enabled) {
     if (enabled) {
         m_devModeController.enter(m_playerController.getPosition());
         m_playerController.stopMotion();
+        setActionLegendVisible(true);
     } else {
         m_devModeController.exit();
         m_playerController.stopMotion();
         setSelectTileUiVisible(false);
+        setActionLegendVisible(false);
     }
 
+    syncInputMode();
     updateModeText();
     updatePersistenceText();
     std::cout << (enabled ? "Development mode enabled\n" : "Development mode disabled\n");
+}
+
+void LevelBuilderScene::syncInputMode() {
+    auto* controls = input();
+    if (controls == nullptr) {
+        return;
+    }
+
+    if (!m_devModeController.isEnabled()) {
+        controls->setMode(LevelBuilderInputMode::Play);
+        return;
+    }
+
+    controls->setMode(m_devModeController.activeSubmode() == DevelopmentSubmode::MoveMode
+                          ? LevelBuilderInputMode::DevelopmentMove
+                          : LevelBuilderInputMode::DevelopmentSelectTile);
 }
 
 LevelBuilderInput* LevelBuilderScene::input() {

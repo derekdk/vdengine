@@ -39,14 +39,17 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void initializeSelectTileMode();
     void updateSelectTileUi();
     void updateActionLegendText();
+    void updateLayerStatusText();
     void updatePersistenceText();
     void setSelectTileUiVisible(bool visible);
+    void setActionLegendVisible(bool visible);
     void updateModeText();
     void clearLayerRuntimes();
     void rebuildLayerRuntimes();
     void syncLayerRuntime(size_t layerIndex);
     [[nodiscard]] std::string formatClipboardState() const;
     void setDevelopmentMode(bool enabled);
+    void syncInputMode();
     LevelBuilderInput* input();
     vde::Camera2D* currentCamera();
 
