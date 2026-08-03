@@ -1,6 +1,6 @@
-# Smoke test: Level Builder post-Phase-6 authoring flow
-# Enter Development mode, exercise Move Mode, paint with the palette, undo and redo edits,
-# save and reload the overlay, then return to play.
+# Smoke test: Level Builder multi-layer authoring flow
+# Add and configure a layer, paint on both layers, replay history across them, then return to
+# play without persisting test state for later render verification.
 wait startup
 wait_frames 2
 
@@ -10,12 +10,13 @@ wait_frames 2
 press ENTER
 wait_frames 3
 
+press N
+wait_frames 3
+
 press RIGHTBRACKET
 wait_frames 3
 
-keydown D
-wait 250
-keyup D
+press P
 wait_frames 3
 
 press E
@@ -30,22 +31,13 @@ wait_frames 3
 press V
 wait_frames 3
 
-press U
+press Q
 wait_frames 3
 
-press I
+press J
 wait_frames 3
 
-press C
-wait_frames 3
-
-press A
-wait_frames 3
-
-press V
-wait_frames 3
-
-press F5
+press E
 wait_frames 3
 
 press X
@@ -54,7 +46,16 @@ wait_frames 3
 press V
 wait_frames 3
 
-press F9
+press U
+wait_frames 3
+
+press U
+wait_frames 3
+
+press I
+wait_frames 3
+
+press I
 wait_frames 3
 
 press Q

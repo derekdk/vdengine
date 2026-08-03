@@ -98,6 +98,9 @@ class TileMapSession {
     bool cycleEditableTile(const glm::ivec2& tileCoordinate, int direction);
     bool undoLastEditableEdit();
     bool redoLastEditableEdit();
+    [[nodiscard]] std::optional<size_t> lastEditedLayerIndex() const {
+        return m_lastEditedLayerIndex;
+    }
 
   private:
     struct TileEditRecord {
@@ -135,6 +138,7 @@ class TileMapSession {
     std::string m_lastPersistenceStatus;
     std::vector<LayerDefinition> m_layers;
     size_t m_activeLayerIndex = 0;
+    std::optional<size_t> m_lastEditedLayerIndex;
 };
 
 }  // namespace levelbuilder

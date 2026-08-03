@@ -362,14 +362,20 @@ void LevelBuilderScene::update(float deltaTime) {
                     const bool undid = m_tileMapSession.undoLastEditableEdit();
                     selectionUiChanged |= undid;
                     if (undid) {
-                        syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                        if (const auto layerIndex = m_tileMapSession.lastEditedLayerIndex();
+                            layerIndex.has_value()) {
+                            syncLayerRuntime(layerIndex.value());
+                        }
                     }
                 }
                 if (actions.consumePressed("redo_tile_edit")) {
                     const bool redid = m_tileMapSession.redoLastEditableEdit();
                     selectionUiChanged |= redid;
                     if (redid) {
-                        syncLayerRuntime(m_tileMapSession.activeLayerIndex());
+                        if (const auto layerIndex = m_tileMapSession.lastEditedLayerIndex();
+                            layerIndex.has_value()) {
+                            syncLayerRuntime(layerIndex.value());
+                        }
                     }
                 }
             }

@@ -51,6 +51,18 @@ std::shared_ptr<vde::TileMap> makeImportedMultiLayerMap() {
     return tileMap;
 }
 
+std::shared_ptr<vde::TileMap> makeCollisionMultiLayerMap() {
+    auto tileMap = std::make_shared<vde::TileMap>(1.0f, 1.0f, 3, 2);
+    tileMap->setLayerName(0, "ground");
+    tileMap->setCollisionKind(1, vde::TileCollisionKind::Solid);
+    tileMap->setTile(0, 0, 0, 1);
+
+    const int decorationsLayer = tileMap->addLayer("decorations");
+    tileMap->setCollisionKind(2, vde::TileCollisionKind::Solid);
+    tileMap->setTile(decorationsLayer, 2, 1, 2);
+    return tileMap;
+}
+
 std::filesystem::path makeTempOverlayPath() {
     const auto uniqueStamp =
         std::filesystem::file_time_type::clock::now().time_since_epoch().count();
@@ -522,21 +534,54 @@ TEST(TileMapSessionTest, TileEditRecordIncludesLayerIdentityForUndoRedo) {
 
     // Undo the layer-1 edit.
     ASSERT_TRUE(session.undoLastEditableEdit());
+    EXPECT_EQ(session.lastEditedLayerIndex(), layer1);
     ASSERT_TRUE(session.setActiveLayerIndex(layer1));
     EXPECT_EQ(session.editableTileId({1, 0}), vde::TileMap::kEmptyTile);
 
     // Undo the layer-0 edit.
     ASSERT_TRUE(session.undoLastEditableEdit());
+    EXPECT_EQ(session.lastEditedLayerIndex(), 0u);
     ASSERT_TRUE(session.setActiveLayerIndex(0));
     EXPECT_EQ(session.editableTileId({0, 0}), 1);  // original value
 
     // Redo both.
     ASSERT_TRUE(session.redoLastEditableEdit());
+    EXPECT_EQ(session.lastEditedLayerIndex(), 0u);
     EXPECT_EQ(session.editableTileId({0, 0}), 8);
 
     ASSERT_TRUE(session.redoLastEditableEdit());
+    EXPECT_EQ(session.lastEditedLayerIndex(), layer1);
     ASSERT_TRUE(session.setActiveLayerIndex(layer1));
     EXPECT_EQ(session.editableTileId({1, 0}), 7);
+}
+
+TEST(TileMapSessionTest, CollisionCacheExcludesDisabledLayers) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeCollisionMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    ASSERT_EQ(session.solidRects().size(), 2u);
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+
+    nlohmann::ordered_json root;
+    {
+        std::ifstream input(overlayPath, std::ios::binary);
+        ASSERT_TRUE(input.is_open());
+        root = nlohmann::ordered_json::parse(input);
+    }
+    root.at("layers").at(1).at("collision_enabled") = false;
+    {
+        std::ofstream output(overlayPath, std::ios::binary | std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << root.dump(2);
+    }
+
+    ASSERT_TRUE(session.reloadEditableLayerOverlay());
+    EXPECT_EQ(session.solidRects().size(), 1u);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
 }
 
 TEST(TileMapSessionTest, LayerDefinitionDefaultsAfterAdoptTileMap) {

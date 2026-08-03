@@ -760,6 +760,7 @@ bool TileMapSession::setEditableTileId(const glm::ivec2& tileCoordinate, int til
         return false;
     }
 
+    m_lastEditedLayerIndex = m_activeLayerIndex;
     m_lastPersistenceStatus = m_hasUnsavedChanges
                                   ? "Editable ground layer has unsaved changes."
                                   : "Editable ground layer matches the saved overlay.";
@@ -786,6 +787,7 @@ bool TileMapSession::undoLastEditableEdit() {
         return false;
     }
 
+    m_lastEditedLayerIndex = edit.layerIndex;
     --m_appliedEditCount;
     m_lastPersistenceStatus = m_hasUnsavedChanges
                                   ? "Undid the last tile edit. Overlay has unsaved changes."
@@ -804,6 +806,7 @@ bool TileMapSession::redoLastEditableEdit() {
         return false;
     }
 
+    m_lastEditedLayerIndex = edit.layerIndex;
     ++m_appliedEditCount;
     m_lastPersistenceStatus = m_hasUnsavedChanges
                                   ? "Redid the tile edit. Overlay has unsaved changes."
@@ -969,11 +972,10 @@ bool TileMapSession::reloadEditableLayerOverlay() {
                 m_tileMap->setLayerVisible(layerIndex, false);
             }
         }
-        rebuildCollisionCache();
-
         m_layers = std::move(newLayers);
         m_savedLayers = m_layers;
         m_savedLayerTiles = std::move(newSavedTiles);
+        rebuildCollisionCache();
         if (m_activeLayerIndex >= m_layers.size()) {
             m_activeLayerIndex = 0;
         }
@@ -1038,6 +1040,7 @@ bool TileMapSession::applyLayerTiles(size_t layerIndex, const std::vector<int>& 
 void TileMapSession::clearEditHistory() {
     m_editHistory.clear();
     m_appliedEditCount = 0;
+    m_lastEditedLayerIndex.reset();
 }
 
 void TileMapSession::refreshDirtyStateForTileEdit(size_t layerIndex,
@@ -1091,14 +1094,21 @@ void TileMapSession::rebuildCollisionCache() {
         return;
     }
 
-    const std::vector<vde::TileCollisionRect> collisions = m_tileMap->extractCollisionRects();
     m_solidRects.clear();
     m_oneWayRects.clear();
-    for (const auto& rect : collisions) {
-        if (rect.kind == vde::TileCollisionKind::Solid) {
-            m_solidRects.push_back(rect);
-        } else if (rect.kind == vde::TileCollisionKind::OneWay) {
-            m_oneWayRects.push_back(rect);
+    const size_t layerCount =
+        std::min(m_layers.size(), static_cast<size_t>(m_tileMap->getLayerCount()));
+    for (size_t layerIndex = 0; layerIndex < layerCount; ++layerIndex) {
+        if (!m_layers[layerIndex].collisionEnabled) {
+            continue;
+        }
+
+        for (const auto& rect : m_tileMap->extractCollisionRects(static_cast<int>(layerIndex))) {
+            if (rect.kind == vde::TileCollisionKind::Solid) {
+                m_solidRects.push_back(rect);
+            } else if (rect.kind == vde::TileCollisionKind::OneWay) {
+                m_oneWayRects.push_back(rect);
+            }
         }
     }
 }

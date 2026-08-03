@@ -125,7 +125,7 @@ Undo or redo history should remain session-only and should not be serialized.
 | 2 | Complete | Milestone B | Runtime rendering uses one TileMap entity per authorable layer |
 | 3 | Complete | Milestone C | User can add, select, hide, and depth-order layers |
 | 4 | Complete | Milestone D | User can configure per-layer scrolling rules |
-| 5 | Planned | Milestone E | Editing, collision, and history work correctly across layers |
+| 5 | Complete | Milestone E | Editing, collision, and history work correctly across layers |
 | 6 | Planned | Milestone F | Save/load, smoke coverage, docs, and polish are complete |
 
 ---
