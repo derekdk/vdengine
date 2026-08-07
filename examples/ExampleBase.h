@@ -32,7 +32,8 @@
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <climits>
-#include <mach-o/dyld.h
+
+#include <mach-o/dyld.h>
 #elif defined(__linux__)
 #include <climits>
 
