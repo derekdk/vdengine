@@ -54,6 +54,21 @@ The current build keeps the tilemap runtime baseline while adding multi-layer au
 - Overlay entries preserve layer name, tile payload, depth, visibility, collision participation, and scrolling metadata. Legacy one-layer overlays load as a ground layer plus imported supporting layers.
 - Object edits and export back to Tiled remain future work.
 
+### Overlay schema and compatibility
+
+New overlays use version 2 of the `vde.level_builder.ground_overlay` format. The top-level
+object contains `format`, `version`, `base_map`, and a `layers` array. Each layer records:
+
+- `id` and `name` for identity and display;
+- `depth_z`, `visible`, and `collision_enabled` for rendering and gameplay participation;
+- `follow_factor_x`, `follow_factor_y`, `scroll_velocity_x`, `scroll_velocity_y`,
+  `scroll_offset_x`, and `scroll_offset_y` for camera-relative movement; and
+- `columns`, `rows`, and row-major `tiles` for the tile payload.
+
+Version 1 overlays with the former `editable_layer` object remain supported. Their ground-layer
+tiles are loaded into layer zero, while any other imported map layers retain their source-map
+definitions. New saves are always written in version 2.
+
 ## Next milestones
 
 - Add region tools for multi-tile paint, fill, or marquee workflows.

@@ -1,6 +1,6 @@
 # Smoke test: Level Builder multi-layer authoring flow
-# Add and configure a layer, paint on both layers, replay history across them, then return to
-# play without persisting test state for later render verification.
+# Add and configure a layer, paint on both layers, replay history across them, save and reload,
+# then return to play. Smoke metadata cleans the generated overlay before and after this run.
 wait startup
 wait_frames 2
 
@@ -56,6 +56,12 @@ press I
 wait_frames 3
 
 press I
+wait_frames 3
+
+press F5
+wait_frames 3
+
+press F9
 wait_frames 3
 
 press Q

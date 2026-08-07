@@ -260,8 +260,9 @@ function Get-SmokeSectionMap {
                 $currentSection = $Matches[1]
                 if ($currentSection -like 'smoke*' -and -not $sectionMap.ContainsKey($currentSection)) {
                     $sectionMap[$currentSection] = [ordered]@{
-                        Scripts  = @()
-                        Priority = $null
+                        Scripts      = @()
+                        Priority     = $null
+                        CleanupFiles = @()
                     }
                 }
                 continue
@@ -282,6 +283,18 @@ function Get-SmokeSectionMap {
 
             if ($line -match '^priority\s*=\s*([0-9]+)\s*$') {
                 $sectionMap[$currentSection]['Priority'] = [int]$Matches[1]
+                continue
+            }
+
+            if ($line -match '^cleanup_files\s*=\s*\[(.*)\]\s*$') {
+                $cleanupFiles = @()
+                foreach ($cleanupMatch in [regex]::Matches($Matches[1], '"([^"]+)"')) {
+                    $cleanupFile = [System.IO.Path]::GetFileName($cleanupMatch.Groups[1].Value)
+                    if ($cleanupFile) {
+                        $cleanupFiles += $cleanupFile
+                    }
+                }
+                $sectionMap[$currentSection]['CleanupFiles'] = @($cleanupFiles)
             }
         }
     }
@@ -339,9 +352,15 @@ function Get-AppSmokeMetadata {
         }
     }
 
+    $cleanupFiles = @()
+    if ($section -and $section['CleanupFiles']) {
+        $cleanupFiles = @($section['CleanupFiles'])
+    }
+
     return [pscustomobject]@{
         SmokeScript   = $smokeScript
         SmokePriority = $smokePriority
+        CleanupFiles  = $cleanupFiles
         SourceDir     = $sourceDir
         TomlPath      = $tomlPath
     }
@@ -441,6 +460,7 @@ function Get-ExampleExes {
                 Category      = "Example"
                 SmokeScript   = $metadata.SmokeScript
                 SmokePriority = $metadata.SmokePriority
+                CleanupFiles  = $metadata.CleanupFiles
             }
         }
     return @($exes)
@@ -465,6 +485,7 @@ function Get-GameExes {
                 Category      = "Game"
                 SmokeScript   = $metadata.SmokeScript
                 SmokePriority = $metadata.SmokePriority
+                CleanupFiles  = $metadata.CleanupFiles
             }
         }
     return @($exes)
@@ -495,6 +516,7 @@ function Get-ToolExes {
                 Category      = "Tool"
                 SmokeScript   = $smokeScript
                 SmokePriority = 1
+                CleanupFiles  = @()
             }
         }
     return @($exes)
@@ -575,6 +597,21 @@ Write-Info ""
 Write-Info "Running smoke tests..."
 Write-Info "=========================================="
 
+function Remove-SmokeGeneratedFiles {
+    param([pscustomobject]$Executable)
+
+    foreach ($cleanupFile in @($Executable.CleanupFiles)) {
+        if (-not $cleanupFile) {
+            continue
+        }
+
+        $cleanupPath = Join-Path $Executable.WorkDir $cleanupFile
+        if (Test-Path $cleanupPath) {
+            Remove-Item -Path $cleanupPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 foreach ($exe in $allExes) {
     # Print category header when it changes
     if ($exe.Category -ne $currentCategory) {
@@ -619,6 +656,7 @@ foreach ($exe in $allExes) {
     $startError = $null
 
     try {
+        Remove-SmokeGeneratedFiles -Executable $exe
         if ($Verbose) {
             Write-Info "  Testing: $($exe.Name) with $smokeScript"
         } elseif (-not $ProblemsOnly) {
@@ -719,6 +757,7 @@ foreach ($exe in $allExes) {
     # Clean up temp files
     if (Test-Path $stdout) { Remove-Item $stdout -ErrorAction SilentlyContinue }
     if (Test-Path $stderr) { Remove-Item $stderr -ErrorAction SilentlyContinue }
+    Remove-SmokeGeneratedFiles -Executable $exe
 }
 
 # --- Summary ---

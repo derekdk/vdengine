@@ -224,7 +224,7 @@ Run unit tests with optional filtering and building.
 
 ### smoke-test.ps1
 
-Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output.
+Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output. A game's or example's `[smoke]` metadata can declare `cleanup_files = ["generated-file"]` to remove generated files from its executable directory before and after its smoke script runs.
 
 **Syntax:**
 ```powershell
