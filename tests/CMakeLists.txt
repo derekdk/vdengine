@@ -24,6 +24,7 @@ set(VDE_TEST_SOURCES
     # Phase 1 tests
     Entity_test.cpp
     Scene_test.cpp
+    SceneOrdering_test.cpp
     GameCamera_test.cpp
     LightBox_test.cpp
     # Phase 2.5 tests

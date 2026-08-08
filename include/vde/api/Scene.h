@@ -392,6 +392,13 @@ class Scene {
     Entity* getEntity(EntityId id);
 
     /**
+     * @brief Move an entity to the beginning of the scene update and render order.
+     * @param id Entity ID
+     * @return true if the entity exists, otherwise false
+     */
+    bool moveEntityToBack(EntityId id);
+
+    /**
      * @brief Get an entity by name.
      * @param name Entity name
      * @return Pointer to first matching entity, or nullptr

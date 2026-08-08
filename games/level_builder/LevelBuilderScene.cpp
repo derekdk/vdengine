@@ -759,17 +759,20 @@ void LevelBuilderScene::rebuildLayerRuntimes() {
     clearLayerRuntimes();
 
     m_layerRuntimes.reserve(m_tileMapSession.layerCount());
-    for (size_t layerIndex = 0; layerIndex < m_tileMapSession.layerCount(); ++layerIndex) {
+    for (size_t layerOffset = 0; layerOffset < m_tileMapSession.layerCount(); ++layerOffset) {
+        const size_t layerIndex = m_tileMapSession.layerCount() - layerOffset - 1;
         auto runtimeTileMap = m_tileMapSession.createRuntimeTileMap(layerIndex);
         if (runtimeTileMap == nullptr) {
             continue;
         }
 
         addEntity(std::static_pointer_cast<vde::Entity>(runtimeTileMap));
+        (void)moveEntityToBack(runtimeTileMap->getId());
         m_layerRuntimes.push_back({.layerIndex = layerIndex,
                                    .tileMap = std::move(runtimeTileMap),
                                    .scrollOffset = glm::vec2(0.0f)});
     }
+    std::ranges::reverse(m_layerRuntimes);
 }
 
 void LevelBuilderScene::syncLayerRuntime(size_t layerIndex) {
