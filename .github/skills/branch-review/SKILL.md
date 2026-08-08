@@ -16,7 +16,7 @@ Use this workflow as the common foundation for a review prompt. The invoking pro
 - Treat generated files, vendored dependencies, build output, and binary assets as out of scope unless the branch intentionally changes them and they materially affect the review perspective.
 - Inspect enough surrounding code and call sites to verify each finding. A suspicious diff alone is not evidence of a defect.
 - Report only actionable findings introduced or exposed by the branch. Do not report unrelated pre-existing issues.
-- Do not run commands that modify the worktree. Run focused validation only when it materially confirms or rejects a suspected finding.
+- Do not run commands that modify the worktree or run tests, builds, linters, or other executable validation. Assume the branch builds cleanly and its tests pass; use static inspection and existing test code only to assess findings.
 
 ## Establish the Review Range
 

@@ -1,5 +1,5 @@
 ---
-name: performance-branch-review
+name: review-performance
 description: 'Review all changes on the currently checked-out branch only for CPU, GPU, memory, I/O, synchronization, and scalability regressions.'
 agent: agent
 ---

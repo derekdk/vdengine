@@ -1,5 +1,5 @@
 ---
-name: graphics-branch-review
+name: review-graphics
 description: 'Review all changes on the currently checked-out branch only for Vulkan rendering correctness, visual regressions, GPU resource use, and shader or pipeline issues.'
 agent: agent
 ---
