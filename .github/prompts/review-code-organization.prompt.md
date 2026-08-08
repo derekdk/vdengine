@@ -1,5 +1,5 @@
 ---
-name: code-organization-branch-review
+name: review-code-organization
 description: 'Review all changes on the currently checked-out branch only for architecture, ownership, dependency, API, and maintainability problems.'
 agent: agent
 ---

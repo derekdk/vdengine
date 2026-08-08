@@ -1,5 +1,5 @@
 ---
-name: security-branch-review
+name: review-security
 description: 'Review all changes on the currently checked-out branch only for security vulnerabilities, unsafe trust boundaries, and exploitable misuse.'
 agent: agent
 ---
