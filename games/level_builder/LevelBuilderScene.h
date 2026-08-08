@@ -9,6 +9,7 @@
 #include "PlayerController.h"
 #include "TileCursor.h"
 #include "TileMapSession.h"
+#include "TilePalette.h"
 
 namespace levelbuilder {
 
@@ -60,6 +61,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     vde::Camera2D* currentCamera();
 
     DevModeController m_devModeController;
+    TilePalette m_tilePalette;
     TileCursor m_tileCursor;
     TileMapSession m_tileMapSession;
     PlayerController m_playerController;

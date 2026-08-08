@@ -11,6 +11,7 @@ The current build keeps the tilemap runtime baseline while adding multi-layer au
 - Adds a default Development Move Mode for free scene navigation with no collisions or gravity.
 - Adds Select Tile Mode with nearest-tile acquisition, a white selection outline, and controller-driven tile navigation.
 - Uses the clipboard as an explicit paint palette so next/previous actions choose a brush tile before painting.
+- Shows a floating tile palette in Select Tile Mode with every tileset tile and a highlighted current cut tile.
 - Supports layer creation, selection, visibility, depth, and scroll-preset authoring in Development Move Mode.
 - Paints only the active layer and restores the correct layer during undo or redo.
 - Limits gameplay collision to layers marked `collisionEnabled`; new decorative layers start disabled.

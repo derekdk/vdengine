@@ -120,6 +120,10 @@ void LevelBuilderScene::onEnter() {
     m_devModeController.setPosition(m_playerController.getPosition());
 
     createHud();
+    m_tilePalette.initialize(*this);
+    m_tilePalette.setTileSet(m_tileMapSession.tileMap()->getTileSet(),
+                             m_tileMapSession.tileMap()->getTileWidth(),
+                             m_tileMapSession.tileMap()->getTileHeight());
     // Create the selection cursor after the HUD so the white outline renders on top of text.
     m_tileCursor.initialize(*this);
     setSelectTileUiVisible(false);
@@ -414,6 +418,7 @@ void LevelBuilderScene::update(float deltaTime) {
 void LevelBuilderScene::updateCameraDependentVisuals([[maybe_unused]] float deltaTime) {
     if (const auto* camera = currentCamera(); camera != nullptr) {
         applyLayerRuntimeTransforms(camera->getPosition());
+        m_tilePalette.updatePosition(camera->getVisibleRect());
     }
 }
 
@@ -603,6 +608,7 @@ void LevelBuilderScene::updateSelectTileUi() {
     }
 
     setSelectTileUiVisible(true);
+    m_tilePalette.setCurrentTile(m_devModeController.clipboardTile());
     const glm::ivec2 selectedTile = m_devModeController.selectedTile();
     const glm::vec2 tileCenter = m_tileMapSession.tileCenterWorld(selectedTile);
     m_tileCursor.show(tileCenter, m_tileMapSession.tileMap()->getTileWidth(),
@@ -703,6 +709,9 @@ void LevelBuilderScene::updatePersistenceText() {
 void LevelBuilderScene::setSelectTileUiVisible(bool visible) {
     if (!visible) {
         m_tileCursor.hide();
+        m_tilePalette.hide();
+    } else {
+        m_tilePalette.show();
     }
 
     if (m_selectionText != nullptr) {
