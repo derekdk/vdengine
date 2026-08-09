@@ -3,6 +3,7 @@
 #include <vde/api/GameAPI.h>
 
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 #include <filesystem>
 #include <memory>
@@ -41,13 +42,17 @@ enum class LayerScrollPreset {
 class TileMapSession {
   public:
     void load(vde::VulkanContext* context);
-    void adoptTileMap(std::shared_ptr<vde::TileMap> tileMap, glm::vec2 spawnPoint,
+    void adoptTileMap(const std::shared_ptr<const vde::TileMap>& tileMap, glm::vec2 spawnPoint,
                       size_t importedObjectCount = 0, const std::string& sourceMapId = {});
     void setOverlayPath(std::filesystem::path overlayPath);
     bool saveEditableLayerOverlay();
     bool reloadEditableLayerOverlay();
 
-    [[nodiscard]] std::shared_ptr<vde::TileMap> tileMap() const { return m_tileMap; }
+    [[nodiscard]] std::shared_ptr<const vde::TileMap> tileMap() const { return m_tileMap; }
+    bool setMapPosition(const glm::vec3& position);
+    [[nodiscard]] size_t runtimeRevision() const { return m_runtimeRevision; }
+    [[nodiscard]] size_t runtimeLayoutRevision() const { return m_runtimeLayoutRevision; }
+    [[nodiscard]] size_t runtimeLayerSyncRevision(size_t index) const;
     [[nodiscard]] const std::vector<vde::TileCollisionRect>& solidRects() const {
         return m_solidRects;
     }
@@ -113,12 +118,13 @@ class TileMapSession {
     bool applyEditableTileId(size_t layerIndex, const glm::ivec2& tileCoordinate, int tileId,
                              bool recordHistory);
     [[nodiscard]] std::vector<int> captureLayerTiles(size_t layerIndex) const;
-    bool applyLayerTiles(size_t layerIndex, const std::vector<int>& tiles);
     void clearEditHistory();
     void refreshDirtyStateForTileEdit(size_t layerIndex, const glm::ivec2& tileCoordinate,
                                       int oldTileId, int newTileId);
     void refreshDirtyState();
     void rebuildCollisionCache();
+    void markRuntimeChanged(std::optional<size_t> layerIndex = std::nullopt);
+    void markRuntimeLayoutChanged();
     [[nodiscard]] int readLayerTile(size_t layerIndex, const glm::ivec2& tileCoord) const;
     void writeLayerTile(size_t layerIndex, const glm::ivec2& tileCoord, int tileId);
 
@@ -139,6 +145,9 @@ class TileMapSession {
     std::vector<LayerDefinition> m_layers;
     size_t m_activeLayerIndex = 0;
     std::optional<size_t> m_lastEditedLayerIndex;
+    size_t m_runtimeRevision = 0;
+    size_t m_runtimeLayoutRevision = 0;
+    std::vector<size_t> m_runtimeLayerSyncRevisions;
 };
 
 }  // namespace levelbuilder

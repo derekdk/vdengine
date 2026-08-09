@@ -8,6 +8,8 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <type_traits>
+#include <utility>
 
 #include "../games/level_builder/TileMapSession.h"
 #include <gtest/gtest.h>
@@ -15,6 +17,9 @@
 
 namespace levelbuilder::test {
 namespace {
+
+static_assert(std::is_same_v<decltype(std::declval<const TileMapSession&>().tileMap()),
+                             std::shared_ptr<const vde::TileMap>>);
 
 std::shared_ptr<vde::TileMap> makeEditableMap() {
     auto tileMap = std::make_shared<vde::TileMap>(1.0f, 1.0f, 3, 2);
@@ -372,6 +377,123 @@ TEST(TileMapSessionTest, RuntimeTileMapsUseOneEntityPerSessionLayer) {
     EXPECT_EQ(groundRuntime->getTile(1, 0), 2);
     EXPECT_EQ(accentsRuntime->getTile(1, 0), 8);
     EXPECT_EQ(accentsRuntime->getTile(2, 1), 9);
+
+    const size_t addedLayer = session.addLayer("sky");
+    auto skyRuntime = session.createRuntimeTileMap(addedLayer);
+    ASSERT_NE(skyRuntime, nullptr);
+    EXPECT_EQ(skyRuntime->getLayerCount(), 1);
+    EXPECT_EQ(skyRuntime->getTile(0, 0), vde::TileMap::kEmptyTile);
+}
+
+TEST(TileMapSessionTest, RuntimeRevisionTracksSessionOwnedMapAndLayerChanges) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    const auto initialRevision = session.runtimeRevision();
+    const auto readOnlyMap = session.tileMap();
+    ASSERT_NE(readOnlyMap, nullptr);
+    EXPECT_FLOAT_EQ(readOnlyMap->getPosition().x, 2.0f);
+    EXPECT_FALSE(session.setMapPosition({2.0f, 3.0f, -0.4f}));
+    EXPECT_EQ(session.runtimeRevision(), initialRevision);
+
+    ASSERT_TRUE(session.setMapPosition({4.0f, 5.0f, -0.4f}));
+    const auto positionedRevision = session.runtimeRevision();
+    EXPECT_GT(positionedRevision, initialRevision);
+
+    ASSERT_TRUE(session.setActiveLayerIndex(1));
+    ASSERT_TRUE(session.setEditableTileId({1, 0}, 7));
+    EXPECT_GT(session.runtimeRevision(), positionedRevision);
+
+    auto runtime = session.createRuntimeTileMap(1);
+    ASSERT_NE(runtime, nullptr);
+    EXPECT_FLOAT_EQ(runtime->getPosition().x, 4.0f);
+    EXPECT_FLOAT_EQ(runtime->getPosition().y, 5.0f);
+    EXPECT_EQ(runtime->getTile(1, 0), 7);
+}
+
+TEST(TileMapSessionTest, AdoptTileMapClonesSourceOwnership) {
+    auto sourceMap = makeImportedMultiLayerMap();
+    TileMapSession session;
+    session.adoptTileMap(sourceMap, {0.0f, 0.0f}, 0u, "test-map");
+
+    sourceMap->setPosition(20.0f, 30.0f, 4.0f);
+    sourceMap->setTile(0, 0, 99);
+
+    const auto sessionMap = session.tileMap();
+    ASSERT_NE(sessionMap, nullptr);
+    EXPECT_FLOAT_EQ(sessionMap->getPosition().x, 2.0f);
+    EXPECT_FLOAT_EQ(sessionMap->getPosition().y, 3.0f);
+    EXPECT_EQ(session.editableTileId({0, 0}), 1);
+}
+
+TEST(TileMapSessionTest, MapPositionRefreshesCollisionCache) {
+    TileMapSession session;
+    session.adoptTileMap(makeCollisionMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    const auto before = session.solidRects();
+    ASSERT_EQ(before.size(), 2u);
+
+    ASSERT_TRUE(session.setMapPosition({3.0f, 4.0f, 0.0f}));
+
+    const auto& after = session.solidRects();
+    ASSERT_EQ(after.size(), before.size());
+    for (size_t index = 0; index < before.size(); ++index) {
+        EXPECT_FLOAT_EQ(after.at(index).center.x, before.at(index).center.x + 3.0f);
+        EXPECT_FLOAT_EQ(after.at(index).center.y, before.at(index).center.y + 4.0f);
+    }
+}
+
+TEST(TileMapSessionTest, LayerSyncRevisionsOnlyChangeForAffectedLayers) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    const size_t groundRevision = session.runtimeLayerSyncRevision(0);
+    const size_t accentsRevision = session.runtimeLayerSyncRevision(1);
+
+    ASSERT_TRUE(session.setActiveLayerIndex(1));
+    ASSERT_TRUE(session.setEditableTileId({1, 0}, 7));
+    EXPECT_EQ(session.runtimeLayerSyncRevision(0), groundRevision);
+    EXPECT_GT(session.runtimeLayerSyncRevision(1), accentsRevision);
+
+    const size_t editedAccentsRevision = session.runtimeLayerSyncRevision(1);
+    ASSERT_TRUE(session.setLayerScrollPreset(1, LayerScrollPreset::StrongParallax));
+    EXPECT_EQ(session.runtimeLayerSyncRevision(1), editedAccentsRevision);
+}
+
+TEST(TileMapSessionTest, ReloadFailureLeavesAllStateUnchanged) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+    ASSERT_TRUE(session.setEditableTileId({0, 0}, 7));
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+
+    nlohmann::ordered_json root;
+    {
+        std::ifstream input(overlayPath, std::ios::binary);
+        ASSERT_TRUE(input.is_open());
+        root = nlohmann::ordered_json::parse(input);
+    }
+    root.at("layers").at(0).at("tiles").at(0) = 9;
+    root.at("layers").at(1).at("tiles").at(0) = -2;
+    {
+        std::ofstream output(overlayPath, std::ios::binary | std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << root.dump(2);
+    }
+
+    const size_t revision = session.runtimeRevision();
+    const size_t layoutRevision = session.runtimeLayoutRevision();
+    ASSERT_FALSE(session.reloadEditableLayerOverlay());
+
+    EXPECT_EQ(session.editableTileId({0, 0}), 7);
+    ASSERT_NE(session.tileMap(), nullptr);
+    EXPECT_EQ(session.tileMap()->getTile(0, 0), 7);
+    EXPECT_EQ(session.runtimeRevision(), revision);
+    EXPECT_EQ(session.runtimeLayoutRevision(), layoutRevision);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
 }
 
 TEST(TileMapSessionTest, SyncRuntimeTileMapRefreshesOnlyEditedLayer) {
@@ -449,11 +571,13 @@ TEST(TileMapSessionTest, ScrollPresetChangesPersistAndRestoreSavedMetadata) {
     EXPECT_FLOAT_EQ(accents->scrollVelocityX, 0.35f);
 
     ASSERT_TRUE(session.saveEditableLayerOverlay());
+    const size_t layoutRevisionBeforeReload = session.runtimeLayoutRevision();
     ASSERT_TRUE(session.setLayerScrollPreset(1, LayerScrollPreset::Gameplay));
     ASSERT_TRUE(session.reloadEditableLayerOverlay());
 
     accents = session.layerDefinition(1);
     ASSERT_NE(accents, nullptr);
+    EXPECT_GT(session.runtimeLayoutRevision(), layoutRevisionBeforeReload);
     EXPECT_EQ(session.layerScrollPreset(1), LayerScrollPreset::DriftingDecorative);
     EXPECT_FLOAT_EQ(accents->scrollVelocityX, 0.35f);
     EXPECT_FALSE(session.hasUnsavedChanges());

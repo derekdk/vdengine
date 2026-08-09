@@ -910,6 +910,7 @@ TileMap(float tileWidth, float tileHeight, int columns, int rows);
 | `void setLayerDepth(int layerIndex, float depth)` | Set the layer's local Z depth |
 | `void setTileSet(shared_ptr<SpriteSheet>)` | Bind the SpriteSheet used for tile IDs |
 | `shared_ptr<SpriteSheet> getTileSet() const` | Get the bound SpriteSheet |
+| `shared_ptr<TileMap> clone() const` | Copy CPU-side tile, layer, collision, transform, and tileset state without scene or mesh ownership |
 | `void setTile(int column, int row, int tileId)` | Set a tile on the base layer |
 | `void setTile(int layerIndex, int column, int row, int tileId)` | Set a tile on a specific layer |
 | `int getTile(int column, int row) const` | Read a tile from the base layer |

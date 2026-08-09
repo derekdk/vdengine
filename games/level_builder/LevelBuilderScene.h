@@ -35,6 +35,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
         size_t layerIndex = 0;
         std::shared_ptr<vde::TileMap> tileMap;
         glm::vec2 scrollOffset{0.0f};
+        size_t appliedSyncRevision = 0;
     };
 
     void createBackgrounds();
@@ -49,7 +50,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void updateModeText();
     void clearLayerRuntimes();
     void rebuildLayerRuntimes();
-    void syncLayerRuntime(size_t layerIndex);
+    void synchronizeLayerRuntimes();
     void resetLayerRuntimeScroll(size_t layerIndex);
     void advanceLayerRuntimeScroll(float deltaTime);
     void applyLayerRuntimeTransforms(const glm::vec2& cameraPosition);
@@ -70,6 +71,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     std::shared_ptr<vde::TextEntity> m_persistenceText;
     std::vector<std::shared_ptr<vde::TextEntity>> m_actionLegendLines;
     std::vector<LayerRuntime> m_layerRuntimes;
+    size_t m_appliedRuntimeLayoutRevision = 0;
 };
 
 }  // namespace levelbuilder

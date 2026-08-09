@@ -112,7 +112,7 @@ void LevelBuilderScene::onEnter() {
     createBackgrounds();
     m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
 
-    m_tileMapSession.tileMap()->setPosition(0.0f, 0.0f, -0.4f);
+    (void)m_tileMapSession.setMapPosition({0.0f, 0.0f, -0.4f});
     rebuildLayerRuntimes();
 
     m_playerController.createEntities(*this);
@@ -162,6 +162,7 @@ void LevelBuilderScene::update(float deltaTime) {
         return;
     }
     const auto finishSceneFrame = [this, &finishFrame, deltaTime]() {
+        synchronizeLayerRuntimes();
         advanceLayerRuntimeScroll(deltaTime);
         finishFrame();
     };
@@ -175,7 +176,6 @@ void LevelBuilderScene::update(float deltaTime) {
         if (actions.consumePressed("load_overlay")) {
             const bool reloaded = m_tileMapSession.reloadEditableLayerOverlay();
             if (reloaded) {
-                rebuildLayerRuntimes();
                 persistenceActionConsumed = true;
             }
         }
@@ -237,7 +237,6 @@ void LevelBuilderScene::update(float deltaTime) {
             if (actions.consumePressed("add_layer")) {
                 const size_t newLayerIndex = m_tileMapSession.addLayer();
                 (void)m_tileMapSession.setActiveLayerIndex(newLayerIndex);
-                rebuildLayerRuntimes();
                 updateModeText();
                 updateLayerStatusText();
                 updatePersistenceText();
@@ -259,7 +258,6 @@ void LevelBuilderScene::update(float deltaTime) {
             }
             if (actions.consumePressed("toggle_layer_visibility")) {
                 if (m_tileMapSession.toggleLayerVisibility(m_tileMapSession.activeLayerIndex())) {
-                    syncLayerRuntime(m_tileMapSession.activeLayerIndex());
                     updateModeText();
                     updateLayerStatusText();
                     updatePersistenceText();
@@ -268,7 +266,6 @@ void LevelBuilderScene::update(float deltaTime) {
             if (actions.consumePressed("layer_depth_down")) {
                 if (m_tileMapSession.adjustLayerDepthZ(m_tileMapSession.activeLayerIndex(),
                                                        -kLayerDepthAdjustStep)) {
-                    syncLayerRuntime(m_tileMapSession.activeLayerIndex());
                     updateModeText();
                     updateLayerStatusText();
                     updatePersistenceText();
@@ -277,7 +274,6 @@ void LevelBuilderScene::update(float deltaTime) {
             if (actions.consumePressed("layer_depth_up")) {
                 if (m_tileMapSession.adjustLayerDepthZ(m_tileMapSession.activeLayerIndex(),
                                                        kLayerDepthAdjustStep)) {
-                    syncLayerRuntime(m_tileMapSession.activeLayerIndex());
                     updateModeText();
                     updateLayerStatusText();
                     updatePersistenceText();
@@ -357,30 +353,15 @@ void LevelBuilderScene::update(float deltaTime) {
                         const bool painted =
                             m_tileMapSession.setEditableTileId(selectedTile, clipboardTile.value());
                         selectionUiChanged |= painted;
-                        if (painted) {
-                            syncLayerRuntime(m_tileMapSession.activeLayerIndex());
-                        }
                     }
                 }
                 if (actions.consumePressed("undo_tile_edit")) {
                     const bool undid = m_tileMapSession.undoLastEditableEdit();
                     selectionUiChanged |= undid;
-                    if (undid) {
-                        if (const auto layerIndex = m_tileMapSession.lastEditedLayerIndex();
-                            layerIndex.has_value()) {
-                            syncLayerRuntime(layerIndex.value());
-                        }
-                    }
                 }
                 if (actions.consumePressed("redo_tile_edit")) {
                     const bool redid = m_tileMapSession.redoLastEditableEdit();
                     selectionUiChanged |= redid;
-                    if (redid) {
-                        if (const auto layerIndex = m_tileMapSession.lastEditedLayerIndex();
-                            layerIndex.has_value()) {
-                            syncLayerRuntime(layerIndex.value());
-                        }
-                    }
                 }
             }
 
@@ -769,24 +750,37 @@ void LevelBuilderScene::rebuildLayerRuntimes() {
 
         addEntity(std::static_pointer_cast<vde::Entity>(runtimeTileMap));
         (void)moveEntityToBack(runtimeTileMap->getId());
-        m_layerRuntimes.push_back({.layerIndex = layerIndex,
-                                   .tileMap = std::move(runtimeTileMap),
-                                   .scrollOffset = glm::vec2(0.0f)});
+        m_layerRuntimes.push_back(
+            {.layerIndex = layerIndex,
+             .tileMap = std::move(runtimeTileMap),
+             .scrollOffset = glm::vec2(0.0f),
+             .appliedSyncRevision = m_tileMapSession.runtimeLayerSyncRevision(layerIndex)});
     }
     std::ranges::reverse(m_layerRuntimes);
+    if (m_layerRuntimes.size() == m_tileMapSession.layerCount()) {
+        m_appliedRuntimeLayoutRevision = m_tileMapSession.runtimeLayoutRevision();
+    }
 }
 
-void LevelBuilderScene::syncLayerRuntime(size_t layerIndex) {
-    const auto runtimeIt =
-        std::ranges::find_if(m_layerRuntimes, [layerIndex](const LayerRuntime& runtime) {
-            return runtime.layerIndex == layerIndex;
-        });
-    if (runtimeIt == m_layerRuntimes.end() || runtimeIt->tileMap == nullptr) {
+void LevelBuilderScene::synchronizeLayerRuntimes() {
+    if (m_layerRuntimes.size() != m_tileMapSession.layerCount() ||
+        m_appliedRuntimeLayoutRevision != m_tileMapSession.runtimeLayoutRevision()) {
         rebuildLayerRuntimes();
         return;
     }
 
-    (void)m_tileMapSession.syncRuntimeTileMap(layerIndex, *runtimeIt->tileMap);
+    for (auto& runtime : m_layerRuntimes) {
+        const size_t revision = m_tileMapSession.runtimeLayerSyncRevision(runtime.layerIndex);
+        if (runtime.appliedSyncRevision == revision) {
+            continue;
+        }
+        if (runtime.tileMap == nullptr ||
+            !m_tileMapSession.syncRuntimeTileMap(runtime.layerIndex, *runtime.tileMap)) {
+            rebuildLayerRuntimes();
+            return;
+        }
+        runtime.appliedSyncRevision = revision;
+    }
 }
 
 void LevelBuilderScene::resetLayerRuntimeScroll(size_t layerIndex) {

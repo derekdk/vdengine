@@ -113,6 +113,20 @@ std::vector<int> parseTilesArray(const OrderedJson& tilesJson, size_t expectedCo
     return tiles;
 }
 
+void validateTileIds(const vde::TileMap& tileMap, const std::vector<int>& tiles,
+                     std::string_view context) {
+    const auto tileSet = tileMap.getTileSet();
+    const int spriteCount = tileSet != nullptr ? tileSet->getSpriteCount() : 0;
+    for (const int tileId : tiles) {
+        if (tileId < vde::TileMap::kEmptyTile ||
+            (tileId >= 0 && tileSet != nullptr && tileId >= spriteCount)) {
+            throw std::invalid_argument(std::string("LevelBuilder overlay ") +
+                                        std::string(context) + " contains invalid tile ID " +
+                                        std::to_string(tileId));
+        }
+    }
+}
+
 std::vector<int> captureTileMapLayerTiles(const vde::TileMap& tileMap, int layerIndex);
 
 levelbuilder::LayerDefinition buildImportedLayerDefinition(const vde::TileMap& tileMap,
@@ -174,6 +188,7 @@ LayerAndTiles parseLayerJsonV2(const OrderedJson& layerJson, const vde::TileMap&
     const size_t expectedTileCount =
         static_cast<size_t>(tileMap.getColumnCount()) * static_cast<size_t>(tileMap.getRowCount());
     std::vector<int> tiles = parseTilesArray(layerJson.at("tiles"), expectedTileCount, context);
+    validateTileIds(tileMap, tiles, context);
     return {std::move(def), std::move(tiles)};
 }
 
@@ -221,6 +236,7 @@ std::vector<LayerAndTiles> parseOverlayLayers(const OrderedJson& root, const vde
                                          static_cast<size_t>(tileMap.getRowCount());
         std::vector<int> tiles =
             parseTilesArray(editableLayer.at("tiles"), expectedTileCount, "editable_layer");
+        validateTileIds(tileMap, tiles, "editable_layer");
 
         levelbuilder::LayerDefinition def;
         def.id = "layer_0";
@@ -253,11 +269,11 @@ std::vector<LayerAndTiles> parseOverlayLayers(const OrderedJson& root, const vde
         std::vector<LayerAndTiles> result;
         result.reserve(layersJson.size());
         for (size_t i = 0; i < layersJson.size(); ++i) {
-            if (!layersJson[i].is_object()) {
+            if (!layersJson.at(i).is_object()) {
                 throw std::invalid_argument("LevelBuilder overlay layer " + std::to_string(i) +
                                             " must be an object");
             }
-            result.push_back(parseLayerJsonV2(layersJson[i], tileMap, i));
+            result.push_back(parseLayerJsonV2(layersJson.at(i), tileMap, i));
         }
         return result;
     }
@@ -299,6 +315,26 @@ OrderedJson buildOverlayJson(const vde::TileMap& tileMap,
                        {"version", kOverlayFormatVersion},
                        {"base_map", sourceMapId},
                        {"layers", std::move(layersJson)}};
+}
+
+void applyLayerStackToTileMap(vde::TileMap& tileMap,
+                              const std::vector<levelbuilder::LayerDefinition>& layers,
+                              const std::vector<std::vector<int>>& tileData) {
+    const std::vector<int> emptyTiles(static_cast<size_t>(tileMap.getColumnCount()) *
+                                          static_cast<size_t>(tileMap.getRowCount()),
+                                      vde::TileMap::kEmptyTile);
+    for (int layerIndex = 0; layerIndex < tileMap.getLayerCount(); ++layerIndex) {
+        if (static_cast<size_t>(layerIndex) < tileData.size()) {
+            const auto& layer = layers.at(static_cast<size_t>(layerIndex));
+            tileMap.loadLayerFromArray(layerIndex, tileData.at(static_cast<size_t>(layerIndex)));
+            tileMap.setLayerName(layerIndex, layer.name);
+            tileMap.setLayerVisible(layerIndex, layer.visible);
+            tileMap.setLayerDepth(layerIndex, layer.depthZ);
+        } else {
+            tileMap.loadLayerFromArray(layerIndex, emptyTiles);
+            tileMap.setLayerVisible(layerIndex, false);
+        }
+    }
 }
 
 std::vector<int> captureTileMapLayerTiles(const vde::TileMap& tileMap, int layerIndex) {
@@ -350,13 +386,14 @@ void TileMapSession::load(vde::VulkanContext* context) {
     (void)reloadEditableLayerOverlay();
 }
 
-void TileMapSession::adoptTileMap(std::shared_ptr<vde::TileMap> tileMap, glm::vec2 spawnPoint,
-                                  size_t importedObjectCount, const std::string& sourceMapId) {
+void TileMapSession::adoptTileMap(const std::shared_ptr<const vde::TileMap>& tileMap,
+                                  glm::vec2 spawnPoint, size_t importedObjectCount,
+                                  const std::string& sourceMapId) {
     if (tileMap == nullptr) {
         throw std::invalid_argument("TileMapSession requires a valid tilemap");
     }
 
-    m_tileMap = std::move(tileMap);
+    m_tileMap = tileMap->clone();
     m_spawnPoint = spawnPoint;
     m_importedObjectCount = importedObjectCount;
     m_sourceMapId = sourceMapId.empty() ? std::string(kImportedMapPath) : sourceMapId;
@@ -385,12 +422,51 @@ void TileMapSession::adoptTileMap(std::shared_ptr<vde::TileMap> tileMap, glm::ve
     }
     m_lastPersistenceStatus = "Using imported ground layer.";
 
+    m_runtimeLayerSyncRevisions.assign(m_layers.size(), 0);
     rebuildCollisionCache();
+    markRuntimeLayoutChanged();
 }
 
 void TileMapSession::setOverlayPath(std::filesystem::path overlayPath) {
     m_overlayPath =
         overlayPath.empty() ? std::filesystem::path(kOverlayFileName) : std::move(overlayPath);
+}
+
+void TileMapSession::markRuntimeChanged(std::optional<size_t> layerIndex) {
+    ++m_runtimeRevision;
+    if (layerIndex.has_value() && layerIndex.value() < m_runtimeLayerSyncRevisions.size()) {
+        m_runtimeLayerSyncRevisions.at(layerIndex.value()) = m_runtimeRevision;
+    }
+}
+
+void TileMapSession::markRuntimeLayoutChanged() {
+    ++m_runtimeLayoutRevision;
+    markRuntimeChanged();
+    m_runtimeLayerSyncRevisions.assign(m_layers.size(), 0);
+}
+
+size_t TileMapSession::runtimeLayerSyncRevision(size_t index) const {
+    if (index >= m_runtimeLayerSyncRevisions.size()) {
+        return 0;
+    }
+    return m_runtimeLayerSyncRevisions.at(index);
+}
+
+bool TileMapSession::setMapPosition(const glm::vec3& position) {
+    if (m_tileMap == nullptr) {
+        return false;
+    }
+
+    const auto& currentPosition = m_tileMap->getPosition();
+    if (currentPosition.x == position.x && currentPosition.y == position.y &&
+        currentPosition.z == position.z) {
+        return false;
+    }
+
+    m_tileMap->setPosition(position);
+    rebuildCollisionCache();
+    markRuntimeChanged();
+    return true;
 }
 
 const LayerDefinition* TileMapSession::layerDefinition(size_t index) const {
@@ -496,6 +572,9 @@ bool TileMapSession::syncRuntimeTileMap(size_t layerIndex, vde::TileMap& runtime
     runtimeTileMap.loadLayerFromArray(0, layer.tiles);
 
     const auto position = runtimeLayerPosition(layerIndex, glm::vec2(0.0f));
+    if (!position.has_value()) {
+        return false;
+    }
     runtimeTileMap.setPosition(position->x, position->y, position->z);
     return true;
 }
@@ -523,6 +602,7 @@ bool TileMapSession::setLayerVisibility(size_t index, bool visible) {
     }
 
     refreshDirtyState();
+    markRuntimeChanged(index);
     return true;
 }
 
@@ -548,6 +628,7 @@ bool TileMapSession::setLayerDepthZ(size_t index, float depthZ) {
     }
 
     refreshDirtyState();
+    markRuntimeChanged(index);
     return true;
 }
 
@@ -595,6 +676,7 @@ bool TileMapSession::setLayerScrollPreset(size_t index, LayerScrollPreset preset
     layer.scrollVelocityX = scrollVelocity.x;
     layer.scrollVelocityY = scrollVelocity.y;
     refreshDirtyState();
+    markRuntimeChanged();
     return true;
 }
 
@@ -630,6 +712,7 @@ size_t TileMapSession::addLayer(const std::string& name) {
 
     m_layers.push_back(std::move(layer));
     m_hasUnsavedChanges = true;
+    markRuntimeLayoutChanged();
 
     return newIndex;
 }
@@ -854,6 +937,7 @@ bool TileMapSession::applyEditableTileId(size_t layerIndex, const glm::ivec2& ti
     }
 
     refreshDirtyStateForTileEdit(layerIndex, clampedTile, oldTileId, tileId);
+    markRuntimeChanged(layerIndex);
     return true;
 }
 
@@ -906,30 +990,26 @@ bool TileMapSession::reloadEditableLayerOverlay() {
     }
 
     if (!overlayExists) {
-        m_layers = m_importedLayers;
-        m_savedLayers = m_importedLayers;
-        m_savedLayerTiles.clear();
-        m_savedLayerTiles.reserve(m_importedLayers.size());
-        for (size_t layerIndex = 0; layerIndex < m_importedLayers.size(); ++layerIndex) {
-            if (!applyLayerTiles(layerIndex, m_importedLayers[layerIndex].tiles)) {
-                m_lastPersistenceStatus = "Failed to restore the imported layer stack.";
-                return false;
-            }
-            m_savedLayerTiles.push_back(m_importedLayers[layerIndex].tiles);
+        std::vector<LayerDefinition> restoredLayers = m_importedLayers;
+        std::vector<std::vector<int>> restoredTiles;
+        restoredTiles.reserve(restoredLayers.size());
+        for (const auto& layer : restoredLayers) {
+            restoredTiles.push_back(layer.tiles);
         }
 
-        const std::vector<int> emptyTiles(static_cast<size_t>(m_tileMap->getColumnCount()) *
-                                              static_cast<size_t>(m_tileMap->getRowCount()),
-                                          vde::TileMap::kEmptyTile);
-        for (int layerIndex = static_cast<int>(m_importedLayers.size());
-             layerIndex < m_tileMap->getLayerCount(); ++layerIndex) {
-            m_tileMap->loadLayerFromArray(layerIndex, emptyTiles);
-            m_tileMap->setLayerVisible(layerIndex, false);
-        }
+        auto stagedTileMap = m_tileMap->clone();
+        applyLayerStackToTileMap(*stagedTileMap, restoredLayers, restoredTiles);
+
+        m_tileMap = std::move(stagedTileMap);
+        m_layers = std::move(restoredLayers);
+        m_savedLayers = m_layers;
+        m_savedLayerTiles = std::move(restoredTiles);
+        rebuildCollisionCache();
 
         clearEditHistory();
         m_hasUnsavedChanges = false;
         m_activeLayerIndex = 0;
+        markRuntimeLayoutChanged();
         m_lastPersistenceStatus = "No saved overlay found; using imported ground layer.";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
@@ -958,20 +1038,10 @@ bool TileMapSession::reloadEditableLayerOverlay() {
             newSavedTiles.push_back(std::move(tiles));
         }
 
-        const std::vector<int> emptyTiles(static_cast<size_t>(m_tileMap->getColumnCount()) *
-                                              static_cast<size_t>(m_tileMap->getRowCount()),
-                                          vde::TileMap::kEmptyTile);
-        for (int layerIndex = 0; layerIndex < m_tileMap->getLayerCount(); ++layerIndex) {
-            if (layerIndex < static_cast<int>(newSavedTiles.size())) {
-                m_tileMap->loadLayerFromArray(layerIndex, newSavedTiles[layerIndex]);
-                m_tileMap->setLayerName(layerIndex, newLayers[layerIndex].name);
-                m_tileMap->setLayerVisible(layerIndex, newLayers[layerIndex].visible);
-                m_tileMap->setLayerDepth(layerIndex, newLayers[layerIndex].depthZ);
-            } else {
-                m_tileMap->loadLayerFromArray(layerIndex, emptyTiles);
-                m_tileMap->setLayerVisible(layerIndex, false);
-            }
-        }
+        auto stagedTileMap = m_tileMap->clone();
+        applyLayerStackToTileMap(*stagedTileMap, newLayers, newSavedTiles);
+
+        m_tileMap = std::move(stagedTileMap);
         m_layers = std::move(newLayers);
         m_savedLayers = m_layers;
         m_savedLayerTiles = std::move(newSavedTiles);
@@ -981,6 +1051,7 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         }
         clearEditHistory();
         m_hasUnsavedChanges = false;
+        markRuntimeLayoutChanged();
         m_lastPersistenceStatus = "Loaded ground overlay from " + overlayFileName() + ".";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
@@ -1004,37 +1075,6 @@ std::vector<int> TileMapSession::captureLayerTiles(size_t layerIndex) const {
     }
 
     return {};
-}
-
-bool TileMapSession::applyLayerTiles(size_t layerIndex, const std::vector<int>& tiles) {
-    if (m_tileMap == nullptr) {
-        return false;
-    }
-
-    const size_t expectedTileCount = static_cast<size_t>(m_tileMap->getColumnCount()) *
-                                     static_cast<size_t>(m_tileMap->getRowCount());
-    if (tiles.size() != expectedTileCount) {
-        return false;
-    }
-
-    if (layerIndex < static_cast<size_t>(m_tileMap->getLayerCount())) {
-        m_tileMap->loadLayerFromArray(static_cast<int>(layerIndex), tiles);
-        if (layerIndex < m_layers.size()) {
-            m_tileMap->setLayerName(static_cast<int>(layerIndex), m_layers[layerIndex].name);
-            m_tileMap->setLayerVisible(static_cast<int>(layerIndex), m_layers[layerIndex].visible);
-            m_tileMap->setLayerDepth(static_cast<int>(layerIndex), m_layers[layerIndex].depthZ);
-            m_layers[layerIndex].tiles = tiles;
-        }
-        rebuildCollisionCache();
-        return true;
-    }
-
-    if (layerIndex < m_layers.size()) {
-        m_layers[layerIndex].tiles = tiles;
-        return true;
-    }
-
-    return false;
 }
 
 void TileMapSession::clearEditHistory() {
