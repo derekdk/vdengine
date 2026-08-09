@@ -749,6 +749,7 @@ void LevelBuilderScene::updateModeText() {
 void LevelBuilderScene::clearLayerRuntimes() {
     for (const auto& runtime : m_layerRuntimes) {
         if (runtime.tileMap != nullptr) {
+            retireResource(runtime.tileMap);
             removeEntity(runtime.tileMap->getId());
         }
     }
