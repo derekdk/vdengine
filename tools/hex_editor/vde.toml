@@ -1,3 +1,4 @@
 [smoke]
+source_paths = [".", "../geometry_repl"]
 scripts = ["smoke_hex_editor.vdescript"]
 sections = ["entity"]

@@ -12,6 +12,7 @@
 #   .\scripts\verify.ps1 -SkipBuild                               # Tests + smoke only
 #   .\scripts\verify.ps1 -SkipSmoke                               # Build + unit tests + lint only
 #   .\scripts\verify.ps1 -SmokeExtended                           # Include priority 2 examples in smoke tests
+#   .\scripts\verify.ps1 -SmokeChangedOnly                        # Smoke only apps owning changed source/headers
 #   .\scripts\verify.ps1 -Filter "Suite.*"                        # Targeted unit tests
 #   .\scripts\verify.ps1 -SmokeFilter "*emoji*"                   # Targeted smoke test
 #   .\scripts\verify.ps1 -SkipBuild -SkipSmoke -Filter "Suite.*"  # Fast inner loop with targeted lint
@@ -40,6 +41,8 @@ param(
     [string]$SmokeFilter = "",
 
     [switch]$SmokeExtended,
+
+    [switch]$SmokeChangedOnly,
 
     [ValidateSet("MSBuild", "Ninja")]
     [string]$Generator = "Ninja",
@@ -176,6 +179,7 @@ if (-not $SkipSmoke) {
     $smokeArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
     if ($SmokeFilter) { $smokeArgs += "-Filter", $SmokeFilter }
     if ($SmokeExtended) { $smokeArgs += "-Extended" }
+    if ($SmokeChangedOnly) { $smokeArgs += "-ChangedOnly" }
     $smokePass = Invoke-Stage "SMOKE TESTS" "smoke-test.ps1" $smokeArgs
     $stageResults["SMOKE TESTS"] = $smokePass
     if (-not $smokePass) { $overallPass = $false }

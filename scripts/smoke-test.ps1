@@ -10,6 +10,7 @@
 #   .\scripts\smoke-test.ps1 -Category Tools              # Tools only
 #   .\scripts\smoke-test.ps1 -Filter "*physics*"          # Filter by name
 #   .\scripts\smoke-test.ps1 -Build -Verbose              # Build first, verbose output
+#   .\scripts\smoke-test.ps1 -ChangedOnly                 # Run only tests owning changed code/headers
 #   .\scripts\smoke-test.ps1 -ProblemsOnly                # Emit only warnings/failures plus final PASS/FAIL
 
 param(
@@ -28,6 +29,8 @@ param(
 
     [switch]$Extended = $false,  # Include priority 2 examples/games
 
+    [switch]$ChangedOnly = $false,  # Run only smoke tests affected by changed source/header files
+
     [switch]$Verbose = $false,  # Verbose output
 
     [switch]$ProblemsOnly = $false  # Emit only warnings/failures plus a final PASS/FAIL line
@@ -35,9 +38,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$failurePattern = '(?i)(assert failed|test failed|unknown file: Failure|\[\s*failed\s*\]|^\s*error\b|\berror:|\bfailed to\b|\bfatal\b|\bexception\b)'
-$warningPattern = '(?i)\b(warn|warning|validation)\b'
-$problemPattern = '(?i)(assert failed|test failed|unknown file: Failure|\[\s*failed\s*\]|^\s*error\b|\berror:|\bfailed to\b|\bfatal\b|\bexception\b|^\s*warn(ing)?\b|\bwarning:|\bvalidation\b)'
 $outputFailurePattern = '(?i)(assert failed|test failed|unknown file: Failure|\[\s*failed\s*\]|^\s*error\b|\berror:|\bfailed to\b|\bfatal\b|\bexception\b)'
 
 . "$PSScriptRoot\vde-problems-only-helpers.ps1"
@@ -48,6 +48,7 @@ Write-Info "=========================================="
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $vdeRoot = Split-Path -Parent $scriptDir
+Import-Module (Join-Path $scriptDir "lint-common.psm1") -Force
 
 # Select build directory based on generator
 if ($Generator -eq "Ninja") {
@@ -61,10 +62,15 @@ Write-Info "Generator: $Generator"
 Write-Info "Build Directory: $buildDir"
 Write-Info "Configuration: $Config"
 Write-Info "Category: $Category"
-if ($Extended) {
+if ($ChangedOnly) {
+    Write-Info "Smoke Set: Changed source/header owners (all priorities)"
+} elseif ($Extended) {
     Write-Info "Smoke Set: Extended (priority 1 and 2 examples/games)"
 } else {
     Write-Info "Smoke Set: Normal (priority 1 examples/games only)"
+}
+if ($ChangedOnly) {
+    Write-Info "Smoke Selection: Changed source/header owners only"
 }
 if ($Filter) {
     Write-Info "Filter: $Filter"
@@ -119,6 +125,8 @@ $missingExampleMetadataWarnings = @{}
 $gameTargetSourceMap = @{}
 $explicitGameTomlTargetMap = @{}
 $missingGameMetadataWarnings = @{}
+$toolTargetSourceMap = @{}
+$missingToolMetadataWarnings = @{}
 $smokeTomlCache = @{}
 
 function Add-TargetSourceMapEntry {
@@ -147,12 +155,15 @@ function Add-TargetSourceMapEntry {
         }
 
         $sourceDir = $sourcePath.Split('/')[0]
-        if (-not $sourceDir -or $sourceDir -in @('assets', 'shaders')) {
+        if (-not $sourceDir -or $sourceDir -in @('.', '..', 'assets', 'shaders')) {
             continue
         }
 
-        $TargetMap[$TargetName] = Join-Path $SourceRootPath $sourceDir
-        return
+        $candidateSourceDir = Join-Path $SourceRootPath $sourceDir
+        if (Test-Path $candidateSourceDir -PathType Container) {
+            $TargetMap[$TargetName] = $candidateSourceDir
+            return
+        }
     }
 
     if ([string]::IsNullOrWhiteSpace($CmakeDirectoryPath)) {
@@ -261,6 +272,7 @@ function Get-SmokeSectionMap {
                 if ($currentSection -like 'smoke*' -and -not $sectionMap.ContainsKey($currentSection)) {
                     $sectionMap[$currentSection] = [ordered]@{
                         Scripts      = @()
+                        SourcePaths  = @()
                         Priority     = $null
                         CleanupFiles = @()
                     }
@@ -278,6 +290,15 @@ function Get-SmokeSectionMap {
                     $scripts += [System.IO.Path]::GetFileName($scriptMatch.Groups[1].Value)
                 }
                 $sectionMap[$currentSection]['Scripts'] = @($scripts)
+                continue
+            }
+
+            if ($line -match '^source_paths\s*=\s*\[(.*)\]\s*$') {
+                $sourcePaths = @()
+                foreach ($sourcePathMatch in [regex]::Matches($Matches[1], '"([^"]+)"')) {
+                    $sourcePaths += $sourcePathMatch.Groups[1].Value
+                }
+                $sectionMap[$currentSection]['SourcePaths'] = @($sourcePaths)
                 continue
             }
 
@@ -343,6 +364,11 @@ function Get-AppSmokeMetadata {
         $smokeScript = $section['Scripts'][0]
     }
 
+    $sourcePaths = @('.')
+    if ($section -and $section['SourcePaths'].Count -gt 0) {
+        $sourcePaths = @($section['SourcePaths'])
+    }
+
     $smokePriority = $defaultSmokePriority
     if ($section -and $null -ne $section['Priority']) {
         $smokePriority = [int]$section['Priority']
@@ -361,6 +387,7 @@ function Get-AppSmokeMetadata {
         SmokeScript   = $smokeScript
         SmokePriority = $smokePriority
         CleanupFiles  = $cleanupFiles
+        SourcePaths   = $sourcePaths
         SourceDir     = $sourceDir
         TomlPath      = $tomlPath
     }
@@ -434,6 +461,7 @@ $exampleTargetSourceMap = Get-CategoryTargetSourceMap -SourceRootPath (Join-Path
 $explicitExampleTomlTargetMap = Get-ExplicitTomlTargetMap -SourceDir (Join-Path $vdeRoot 'examples')
 $gameTargetSourceMap = Get-CategoryTargetSourceMap -SourceRootPath (Join-Path $vdeRoot 'games') -CommandNames @('add_vde_game', 'add_executable')
 $explicitGameTomlTargetMap = Get-ExplicitTomlTargetMap -SourceDir (Join-Path $vdeRoot 'games')
+$toolTargetSourceMap = Get-CategoryTargetSourceMap -SourceRootPath (Join-Path $vdeRoot 'tools') -CommandNames @('add_vde_tool', 'add_executable')
 
 # --- Executable Discovery ---
 
@@ -461,6 +489,8 @@ function Get-ExampleExes {
                 SmokeScript   = $metadata.SmokeScript
                 SmokePriority = $metadata.SmokePriority
                 CleanupFiles  = $metadata.CleanupFiles
+                SourcePaths   = $metadata.SourcePaths
+                SourceDir     = $metadata.SourceDir
             }
         }
     return @($exes)
@@ -486,6 +516,8 @@ function Get-GameExes {
                 SmokeScript   = $metadata.SmokeScript
                 SmokePriority = $metadata.SmokePriority
                 CleanupFiles  = $metadata.CleanupFiles
+                SourcePaths   = $metadata.SourcePaths
+                SourceDir     = $metadata.SourceDir
             }
         }
     return @($exes)
@@ -508,6 +540,10 @@ function Get-ToolExes {
             if ($toolSmokeScriptMap.ContainsKey($_.Name)) {
                 $smokeScript = $toolSmokeScriptMap[$_.Name]
             }
+            $metadata = Get-AppSmokeMetadata -ExeName $_.Name -CategoryRoot 'tools' -TargetSourceMap $toolTargetSourceMap -ExplicitTomlTargetMap @{} -MissingMetadataWarnings $missingToolMetadataWarnings -CategoryLabel 'tool'
+            if ($metadata.SmokeScript -ne $defaultSmoke) {
+                $smokeScript = $metadata.SmokeScript
+            }
 
             [pscustomobject]@{
                 Name          = $_.Name
@@ -515,8 +551,10 @@ function Get-ToolExes {
                 WorkDir       = $_.DirectoryName
                 Category      = "Tool"
                 SmokeScript   = $smokeScript
-                SmokePriority = 1
+                SmokePriority = $metadata.SmokePriority
                 CleanupFiles  = @()
+                SourcePaths   = $metadata.SourcePaths
+                SourceDir     = $metadata.SourceDir
             }
         }
     return @($exes)
@@ -543,13 +581,116 @@ if ($Filter) {
 }
 
 $discoveredCount = $allExes.Count
+
+if ($ChangedOnly) {
+    $sourceExtensions = @('.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx', '.inl', '.ipp', '.tpp', '.vert', '.frag', '.comp', '.geom', '.tesc', '.tese')
+    try {
+        $changedFiles = @(Get-VdeChangedFiles -RepoRoot $vdeRoot -IncludeDeleted)
+    }
+    catch {
+        Write-Err "Unable to determine changed files: $($_.Exception.Message)"
+        exit 1
+    }
+
+    $changedCodeFiles = @($changedFiles | Where-Object {
+        [System.IO.Path]::GetExtension($_) -in $sourceExtensions
+    })
+
+    if ($changedCodeFiles.Count -eq 0) {
+        Write-Pass "No changed source/header files found; smoke tests skipped."
+        exit 0
+    }
+
+    function Test-PathWithinDirectory {
+        param(
+            [string]$Path,
+            [string]$Directory
+        )
+
+        if ([string]::IsNullOrWhiteSpace($Path) -or [string]::IsNullOrWhiteSpace($Directory)) {
+            return $false
+        }
+
+        $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+        $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd('\', '/')
+        $directoryPrefix = $fullDirectory + [System.IO.Path]::DirectorySeparatorChar
+
+        return $fullPath.StartsWith($directoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+    }
+
+    function Test-ChangedFileMatchesSourcePaths {
+        param(
+            [string]$ChangedFile,
+            [string]$SourceDir,
+            [string[]]$SourcePaths
+        )
+
+        if ([string]::IsNullOrWhiteSpace($SourceDir)) {
+            return $false
+        }
+
+        foreach ($sourcePath in @($SourcePaths)) {
+            if ([string]::IsNullOrWhiteSpace($sourcePath)) {
+                continue
+            }
+
+            $declaredPath = Join-Path $SourceDir $sourcePath
+            $fullChangedFile = [System.IO.Path]::GetFullPath($ChangedFile)
+            $fullDeclaredPath = [System.IO.Path]::GetFullPath($declaredPath)
+            if ([string]::Equals($fullChangedFile, $fullDeclaredPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $true
+            }
+
+            if (Test-PathWithinDirectory -Path $ChangedFile -Directory $declaredPath) {
+                return $true
+            }
+        }
+
+        return $false
+    }
+
+    function Test-ExecutableHasChangedCode {
+        param(
+            [pscustomobject]$Executable,
+            [string[]]$ChangedFiles
+        )
+
+        foreach ($changedFile in $ChangedFiles) {
+            $relativePath = Get-VdeRelativePath -RepoRoot $vdeRoot -Path $changedFile
+            if ($relativePath -match '^(src|include|third_party|shaders)[\\/]') {
+                return $true
+            }
+
+            if (Test-ChangedFileMatchesSourcePaths -ChangedFile $changedFile -SourceDir $Executable.SourceDir -SourcePaths $Executable.SourcePaths) {
+                return $true
+            }
+        }
+
+        return $false
+    }
+
+    $applicableExes = @($allExes | Where-Object {
+        Test-ExecutableHasChangedCode -Executable $_ -ChangedFiles $changedCodeFiles
+    })
+    $notApplicableCount = $allExes.Count - $applicableExes.Count
+    $allExes = $applicableExes
+
+    Write-Info "Changed source/header files considered: $($changedCodeFiles.Count)"
+    Write-Info "Changed-only selection: $($allExes.Count) applicable executable(s); $notApplicableCount skipped"
+}
+
 $filteredPriority2Count = 0
-if (-not $Extended) {
+if (-not $Extended -and -not $ChangedOnly) {
     $filteredPriority2Count = @($allExes | Where-Object { ($_.Category -eq 'Example' -or $_.Category -eq 'Game') -and $_.SmokePriority -eq 2 }).Count
     $allExes = @($allExes | Where-Object { (($_.Category -ne 'Example') -and ($_.Category -ne 'Game')) -or $_.SmokePriority -eq 1 })
 }
 
 if ($allExes.Count -eq 0) {
+    if ($ChangedOnly -and $discoveredCount -gt 0) {
+        Write-Pass "No applicable smoke tests found for the changed source/header files; smoke tests skipped."
+        exit 0
+    }
+
     Write-Warn "No executables found to test."
     if ($Filter) {
         Write-Warn "Filter '$Filter' matched nothing. Try a different pattern."

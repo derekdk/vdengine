@@ -77,6 +77,7 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 | Games only | `.\scripts\smoke-test.ps1 -Category Games` |
 | Tools only | `.\scripts\smoke-test.ps1 -Category Tools` |
 | Filter by name | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
+| Changed source/header owners only | `.\scripts\smoke-test.ps1 -ChangedOnly` |
 | Build first | `.\scripts\smoke-test.ps1 -Build` |
 | Verbose output | `.\scripts\smoke-test.ps1 -Verbose` |
 | Build + smoke test | `.\scripts\smoke-test.ps1 -Build -Verbose` |
@@ -92,6 +93,7 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 | `-Generator` | `MSBuild`, `Ninja` | `Ninja` | Which build system output to test |
 | `-Config` | `Debug`, `Release` | `Debug` | Build configuration |
 | `-Build` | switch | `$false` | Build the project before testing |
+| `-ChangedOnly` | switch | `$false` | Run only executables whose `vde.toml` `source_paths` own changed source/header or shader files; shared engine changes select all executables |
 | `-Verbose` | switch | `$false` | Show detailed error output for failures |
 
 ## Smoke Priority Model
@@ -116,6 +118,7 @@ When adding a new example or game, set its priority in `examples/<name>/vde.toml
 ```toml
 [smoke]
 scripts = ["smoke_my_demo.vdescript"]
+source_paths = ["."]
 priority = 1
 sections = ["entity", "input"]
 ```
@@ -242,6 +245,7 @@ sections = ["entity", "input"]
 - Set **priority = 1** if this is the primary (or only) smoke coverage for its API sections.
 - Set **priority = 2** if other priority-1 examples already cover the same sections.
 - Use the canonical section identifiers from `API-DOC.md`.
+- Keep `source_paths` relative to the project directory; add shared project directories when a target consumes source from outside its own directory.
 
 For tools, add the mapping to `$toolSmokeScriptMap` in `scripts/smoke-test.ps1` instead.
 

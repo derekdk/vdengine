@@ -36,13 +36,18 @@ function Get-VdeRelativePath {
 
     $fullRepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
     $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $normalizedRepoRoot = $fullRepoRoot.TrimEnd('\', '/')
 
-    if (-not $fullPath.StartsWith($fullRepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ([string]::Equals($fullPath, $normalizedRepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return ''
+    }
+
+    $repoPrefix = $normalizedRepoRoot + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $fullPath.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         return $null
     }
 
-    $relative = $fullPath.Substring($fullRepoRoot.Length)
-    return $relative.TrimStart('\', '/')
+    return $fullPath.Substring($repoPrefix.Length)
 }
 
 function Resolve-VdeFiles {
@@ -79,29 +84,47 @@ function Resolve-VdeFiles {
 function Get-VdeChangedFiles {
     param(
         [string]$RepoRoot,
-        [string]$Since = ""
+        [string]$Since = "",
+        [switch]$IncludeDeleted
     )
 
     $git = Get-Command git -ErrorAction SilentlyContinue
     if (-not $git) {
-        throw "git is required for changed-file linting."
+        throw "git is required for changed-file detection."
     }
 
     Push-Location $RepoRoot
     try {
         $paths = @()
+        $diffFilter = if ($IncludeDeleted) { 'ACMRD' } else { 'ACMR' }
 
-        if ([string]::IsNullOrWhiteSpace($Since)) {
-            $paths += (& git diff --name-only --diff-filter=ACMR)
-            $paths += (& git diff --cached --name-only --diff-filter=ACMR)
-        } else {
-            $paths += (& git diff --name-only --diff-filter=ACMR $Since --)
+        function Invoke-GitPathCommand {
+            param([string[]]$Arguments)
+
+            $output = @(& git @Arguments 2>&1)
+            if ($LASTEXITCODE -ne 0) {
+                $details = ($output | ForEach-Object { [string]$_ }) -join ' '
+                throw "git $($Arguments -join ' ') failed with exit code $LASTEXITCODE. $details"
+            }
+
+            return @($output | ForEach-Object { [string]$_ })
         }
 
-        $paths += (& git ls-files --others --exclude-standard)
+        if ([string]::IsNullOrWhiteSpace($Since)) {
+            $paths += Invoke-GitPathCommand -Arguments @('diff', '--name-only', "--diff-filter=$diffFilter")
+            $paths += Invoke-GitPathCommand -Arguments @('diff', '--cached', '--name-only', "--diff-filter=$diffFilter")
+        } else {
+            $paths += Invoke-GitPathCommand -Arguments @('diff', '--name-only', "--diff-filter=$diffFilter", $Since, '--')
+        }
+
+        $paths += Invoke-GitPathCommand -Arguments @('ls-files', '--others', '--exclude-standard')
 
         $fullPaths = foreach ($path in ($paths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)) {
             ConvertTo-VdeFullPath -RepoRoot $RepoRoot -Path $path
+        }
+
+        if ($IncludeDeleted) {
+            return @($fullPaths | Where-Object { $_ } | Sort-Object -Unique)
         }
 
         return @($fullPaths | Where-Object { $_ -and (Test-Path $_ -PathType Leaf) } | Sort-Object -Unique)

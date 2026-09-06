@@ -61,6 +61,8 @@ When creating a new example, game, or tool:
    }
    ```
 
-Examples and games should prefer `vde.toml` smoke metadata next to the source. Tools still use an explicit mapping.
+Every example, game, and tool project declares `source_paths = ["."]` in its `[smoke]` metadata. Paths are relative to the project directory and may be narrowed or expanded when a smoke test owns only part of a project. Tools also retain the explicit executable-to-script fallback mapping in `scripts/smoke-test.ps1`.
+
+When `smoke-test.ps1 -ChangedOnly` is used, source/header and shader changes inside those paths are considered and all applicable priorities are included. Changes under `src`, `include`, `third_party`, or `shaders` are treated as shared engine changes and select all discovered executables. Deleted source/header files are included. No smoke process is launched when no applicable source/header changes exist.
 
 See the **writing-examples**, **writing-games**, or **writing-tools** skills for detailed guidance.

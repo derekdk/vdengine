@@ -184,12 +184,14 @@ if ($NoRenderVerify) {
     $TomlContent = @"
 [smoke]
 scripts = ["smoke_${Name}.vdescript"]
+source_paths = ["."]
 sections = $SectionsToml
 "@
 } else {
     $TomlContent = @"
 [smoke]
 scripts = ["smoke_${Name}.vdescript"]
+source_paths = ["."]
 sections = $SectionsToml
 
 [render_verify]

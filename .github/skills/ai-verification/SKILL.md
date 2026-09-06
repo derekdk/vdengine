@@ -126,6 +126,14 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 .\scripts\verify.ps1 -SmokeExtended
 ```
 
+### Changed-only smoke tests
+
+```powershell
+.\scripts\verify.ps1 -SmokeChangedOnly
+```
+
+This selects every-priority executable whose `vde.toml` `[smoke]` metadata owns changed source/header or shader paths. Shared changes under `src`, `include`, `third_party`, or `shaders` select all executables; deleted source/header files are included. With no applicable source/header changes, the smoke stage exits successfully without launching a test process.
+
 ### Release configuration
 
 ```powershell
@@ -146,6 +154,7 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 | `-Filter <pattern>` | `*` | GoogleTest filter for unit tests (e.g. `"EmojiFont*"`) |
 | `-SmokeFilter <pattern>` | — | Exe wildcard for smoke tests (e.g. `"*emoji*"`) |
 | `-SmokeExtended` | — | Include priority 2 examples in smoke tests |
+| `-SmokeChangedOnly` | — | Run only smoke tests affected by changed source/header files |
 | `-Generator` | `Ninja` | `Ninja` or `MSBuild` |
 | `-Config` | `Debug` | `Debug` or `Release` |
 

@@ -224,11 +224,11 @@ Run unit tests with optional filtering and building.
 
 ### smoke-test.ps1
 
-Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output. A game's or example's `[smoke]` metadata can declare `cleanup_files = ["generated-file"]` to remove generated files from its executable directory before and after its smoke script runs.
+Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, changed-source selection, and AI-friendly failure-only output. A project's `[smoke]` metadata declares `source_paths` relative to its project directory and can declare `cleanup_files = ["generated-file"]` to remove generated files from its executable directory before and after its smoke script runs.
 
 **Syntax:**
 ```powershell
-.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-Verbose] [-ProblemsOnly]
+.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-ChangedOnly] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
@@ -238,6 +238,7 @@ Run smoke tests against examples, games, and tools, with optional filtering, pri
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests
 - `-Extended` - Include priority 2 examples and games; default runs only priority 1 examples/games while tools always run
+- `-ChangedOnly` - Run every-priority executable whose declared `source_paths` contain changed source/header files; changes under `src`, `include`, `third_party`, or `shaders` select all executables. Deleted source/header files are included. Exits successfully without launching a smoke process when no applicable source/header changes exist
 - `-Verbose` - Verbose output with detailed error messages
 - `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
 
@@ -260,6 +261,9 @@ Run smoke tests against examples, games, and tools, with optional filtering, pri
 
 # Build, then smoke test
 .\scripts\smoke-test.ps1 -Build
+
+# Run only smoke tests affected by the current source/header changes
+.\scripts\smoke-test.ps1 -ChangedOnly
 
 # AI-friendly failure summary output
 .\scripts\smoke-test.ps1 -ProblemsOnly
@@ -521,7 +525,7 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 **Syntax:**
 ```powershell
 .\scripts\verify.ps1 [-SkipBuild] [-SkipSmoke] [-SkipRenderVerify] [-SkipLint] [-FullLint]
-                     [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended]
+                     [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended] [-SmokeChangedOnly]
                      [-Generator MSBuild|Ninja] [-Config Debug|Release]
 ```
 
@@ -534,6 +538,7 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 - `-Filter` - GoogleTest filter pattern passed to `test.ps1`
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
 - `-SmokeExtended` - Include priority 2 examples in the smoke run
+- `-SmokeChangedOnly` - Pass changed-source selection to the smoke stage; unrelated smoke executables are not launched
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 
@@ -553,6 +558,9 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 
 # Targeted smoke test
 .\scripts\verify.ps1 -SkipBuild -SkipRenderVerify -SmokeFilter "*emoji*"
+
+# Smoke only applications affected by changed source/header files
+.\scripts\verify.ps1 -SkipBuild -SkipRenderVerify -SmokeChangedOnly
 
 # Fast inner loop (unit tests only, with filter)
 .\scripts\verify.ps1 -SkipBuild -SkipSmoke -SkipRenderVerify -Filter "CameraTest.*"
