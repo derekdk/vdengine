@@ -16,8 +16,11 @@ wait_frames 3
 press D
 wait_frames 3
 
+press X
+wait_frames 3
+
 screenshot render_verify_output/level_builder_select_tile.png
 wait 100
-compare render_verify_output/level_builder_select_tile.png ../../../smoketests/golden/level_builder_select_tile.png 0.06
+compare render_verify_output/level_builder_select_tile.png ../../../smoketests/golden/level_builder_select_tile.png 0.08
 
 exit

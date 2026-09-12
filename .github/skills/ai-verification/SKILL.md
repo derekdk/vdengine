@@ -81,7 +81,7 @@ If the log is long, read the tail first (last ~80 lines) to see the summary, the
 
 ## Common Patterns
 
-### Full verification (all gates)
+### Full verification (all gates, changed-only smoke by default)
 
 ```powershell
 .\scripts\verify.ps1
@@ -117,14 +117,24 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 ### Full verification targeting one smoke test
 
 ```powershell
-.\scripts\verify.ps1 -SmokeFilter "*emoji*"
+.\scripts\verify.ps1 -SmokeFull -SmokeFilter "*emoji*"
 ```
 
-### Extended smoke tests (include priority 2)
+### Full smoke suite
 
 ```powershell
-.\scripts\verify.ps1 -SmokeExtended
+.\scripts\verify.ps1 -SmokeFull
 ```
+
+`-SmokeExtended` remains supported as a legacy alias for the full priority-1 + priority-2 smoke suite.
+
+### Changed-only smoke tests (explicit)
+
+```powershell
+.\scripts\verify.ps1 -SmokeChangedOnly
+```
+
+This selects every-priority executable whose `vde.toml` `[smoke]` metadata owns changed source/header or shader paths. Shared changes under `src`, `include`, `third_party`, or `shaders` select all executables; deleted source/header files are included. With no applicable source/header changes, the smoke stage exits successfully without launching a test process.
 
 ### Release configuration
 
@@ -145,7 +155,9 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 | `-FullLint` | — | Run full-repo lint instead of targeted changed-file lint |
 | `-Filter <pattern>` | `*` | GoogleTest filter for unit tests (e.g. `"EmojiFont*"`) |
 | `-SmokeFilter <pattern>` | — | Exe wildcard for smoke tests (e.g. `"*emoji*"`) |
-| `-SmokeExtended` | — | Include priority 2 examples in smoke tests |
+| `-SmokeExtended` | — | Legacy full-suite mode including priority 1 and 2 examples/games |
+| `-SmokeChangedOnly` | — | Explicitly run only smoke tests affected by changed source/header files; this is the default |
+| `-SmokeFull` | — | Run every discovered smoke executable and all priorities |
 | `-Generator` | `Ninja` | `Ninja` or `MSBuild` |
 | `-Config` | `Debug` | `Debug` or `Release` |
 
@@ -184,13 +196,15 @@ Use `verify.ps1` for final verification gates. Use VS Code tasks or individual s
 | Iterating on a single failing test | `.\scripts\test.ps1 -Filter "Suite.Test"` |
 | Full build (standard, default config) | `scripts: build` task |
 | Full unit test run (standard) | `scripts: test` task or `scripts: build-and-test` task |
-| Full smoke test run (standard) | `scripts: smoke-test` task |
+| Changed-only smoke test run (standard) | `scripts: smoke-test` task |
 | Watching build progress live (colored) | `scripts: build` task or `.\scripts\build.ps1` |
-| Running a specific smoke test interactively | `.\scripts\smoke-test.ps1 -Filter "*emoji*"` |
-| Full gate after completing a feature | `.\scripts\verify.ps1` |
+| Full smoke test run | `scripts: smoke-test` task with `-Full`, or `.\scripts\verify.ps1 -SmokeFull` |
+| Running a changed smoke test interactively | `.\scripts\smoke-test.ps1 -Filter "*emoji*"` |
+| Running a specific smoke test regardless of changed files | `.\scripts\smoke-test.ps1 -Full -Filter "*emoji*"` |
+| Full gate after completing a feature (changed-only smoke by default) | `.\scripts\verify.ps1` |
 | Full gate with full-repo lint | `.\scripts\verify.ps1 -FullLint` |
 
-Tasks are preferred over scripts for full runs at default config. Scripts are required when you need parameters (filter, generator, config, category).
+Tasks are preferred over scripts for standard runs at default config. Use `-Full` or `-SmokeFull` when complete smoke coverage is required. Scripts are required when you need parameters (filter, generator, config, category).
 
 ---
 

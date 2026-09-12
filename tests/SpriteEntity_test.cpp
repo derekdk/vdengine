@@ -7,6 +7,10 @@
 #include <vde/api/Entity.h>
 #include <vde/api/GameTypes.h>
 
+#include <glm/gtc/matrix_access.hpp>
+
+#include <cstddef>
+
 #include <gtest/gtest.h>
 
 namespace vde {
@@ -173,12 +177,13 @@ TEST_F(SpriteEntityTest, GetModelMatrixWorks) {
     sprite->setScale(2.0f);
 
     glm::mat4 model = sprite->getModelMatrix();
+    const glm::vec4 translation = glm::column(model, 3);
 
     // The matrix should have translation and scale applied
     // Check translation component (column 3)
-    EXPECT_FLOAT_EQ(model[3][0], 1.0f);
-    EXPECT_FLOAT_EQ(model[3][1], 2.0f);
-    EXPECT_FLOAT_EQ(model[3][2], 0.0f);
+    EXPECT_FLOAT_EQ(translation.x, 1.0f);
+    EXPECT_FLOAT_EQ(translation.y, 2.0f);
+    EXPECT_FLOAT_EQ(translation.z, 0.0f);
 }
 
 TEST_F(SpriteEntityTest, VisibilityWorks) {
@@ -232,7 +237,7 @@ TEST_F(SpriteEntityTest, SizeToFitPlaceholderTextureDoesNothing) {
 TEST_F(SpriteEntityTest, SizeToFitSetsCorrectAspectRatio) {
     // Create a 200x100 texture (aspect 2:1)
     auto tex = std::make_shared<Texture>();
-    std::vector<uint8_t> pixels(200 * 100 * 4, 255);
+    std::vector<uint8_t> pixels(std::size_t{200} * 100 * 4, 255);
     tex->loadFromData(pixels.data(), 200, 100);
     sprite->setTexture(tex);
 
@@ -245,7 +250,7 @@ TEST_F(SpriteEntityTest, SizeToFitSetsCorrectAspectRatio) {
 TEST_F(SpriteEntityTest, SizeToFitWithMaxWidthClamps) {
     // Create a 200x100 texture (aspect 2:1)
     auto tex = std::make_shared<Texture>();
-    std::vector<uint8_t> pixels(200 * 100 * 4, 255);
+    std::vector<uint8_t> pixels(std::size_t{200} * 100 * 4, 255);
     tex->loadFromData(pixels.data(), 200, 100);
     sprite->setTexture(tex);
 
@@ -260,7 +265,7 @@ TEST_F(SpriteEntityTest, SizeToFitWithMaxWidthClamps) {
 TEST_F(SpriteEntityTest, SizeToFitMaxWidthNotExceeded) {
     // Create a 100x100 texture (aspect 1:1)
     auto tex = std::make_shared<Texture>();
-    std::vector<uint8_t> pixels(100 * 100 * 4, 255);
+    std::vector<uint8_t> pixels(std::size_t{100} * 100 * 4, 255);
     tex->loadFromData(pixels.data(), 100, 100);
     sprite->setTexture(tex);
 

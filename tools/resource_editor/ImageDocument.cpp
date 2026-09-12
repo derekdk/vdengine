@@ -6,9 +6,13 @@
 #include "ImageDocument.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
+#include <numbers>
 #include <stack>
+#include <utility>
 
 #include "stb_image.h"
 #include "stb_image_write.h"
@@ -60,10 +64,13 @@ void ImageDocument::setPixel(uint32_t x, uint32_t y, RGBAColor color) {
 
 RGBAColor ImageDocument::getPixel(uint32_t x, uint32_t y) const {
     if (x >= m_width || y >= m_height) {
-        return RGBAColor{0, 0, 0, 0};
+        return RGBAColor{.r = 0, .g = 0, .b = 0, .a = 0};
     }
     size_t idx = (static_cast<size_t>(y) * m_width + x) * 4;
-    return RGBAColor{m_pixels[idx], m_pixels[idx + 1], m_pixels[idx + 2], m_pixels[idx + 3]};
+    return RGBAColor{.r = m_pixels.at(idx),
+                     .g = m_pixels.at(idx + 1),
+                     .b = m_pixels.at(idx + 2),
+                     .a = m_pixels.at(idx + 3)};
 }
 
 const uint8_t* ImageDocument::getPixelData() const {
@@ -80,10 +87,12 @@ uint32_t ImageDocument::getHeight() const {
 
 void ImageDocument::setPixelUnchecked(uint32_t x, uint32_t y, RGBAColor color) {
     size_t idx = (static_cast<size_t>(y) * m_width + x) * 4;
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     m_pixels[idx + 0] = color.r;
     m_pixels[idx + 1] = color.g;
     m_pixels[idx + 2] = color.b;
     m_pixels[idx + 3] = color.a;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 }
 
 // =============================================================================
@@ -92,10 +101,10 @@ void ImageDocument::setPixelUnchecked(uint32_t x, uint32_t y, RGBAColor color) {
 
 void ImageDocument::fill(RGBAColor color) {
     for (size_t i = 0; i < m_pixels.size(); i += 4) {
-        m_pixels[i + 0] = color.r;
-        m_pixels[i + 1] = color.g;
-        m_pixels[i + 2] = color.b;
-        m_pixels[i + 3] = color.a;
+        m_pixels.at(i + 0) = color.r;
+        m_pixels.at(i + 1) = color.g;
+        m_pixels.at(i + 2) = color.b;
+        m_pixels.at(i + 3) = color.a;
     }
     ++m_generation;
     m_dirty = true;
@@ -105,8 +114,7 @@ void ImageDocument::drawLine(int x1, int y1, int x2, int y2, RGBAColor color, in
     // Bresenham's line algorithm
     auto plotPixel = [&](int px, int py) {
         if (thickness <= 1) {
-            if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
-                static_cast<uint32_t>(py) < m_height) {
+            if (px >= 0 && py >= 0 && std::cmp_less(px, m_width) && std::cmp_less(py, m_height)) {
                 setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
             }
         } else {
@@ -117,8 +125,8 @@ void ImageDocument::drawLine(int x1, int y1, int x2, int y2, RGBAColor color, in
                     if (dx * dx + dy * dy <= r * r) {
                         int fx = px + dx;
                         int fy = py + dy;
-                        if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
-                            static_cast<uint32_t>(fy) < m_height) {
+                        if (fx >= 0 && fy >= 0 && std::cmp_less(fx, m_width) &&
+                            std::cmp_less(fy, m_height)) {
                             setPixelUnchecked(static_cast<uint32_t>(fx), static_cast<uint32_t>(fy),
                                               color);
                         }
@@ -158,8 +166,8 @@ void ImageDocument::drawRect(int x, int y, int w, int h, RGBAColor color, bool f
     if (filled) {
         for (int row = y; row < y + h; ++row) {
             for (int col = x; col < x + w; ++col) {
-                if (col >= 0 && row >= 0 && static_cast<uint32_t>(col) < m_width &&
-                    static_cast<uint32_t>(row) < m_height) {
+                if (col >= 0 && row >= 0 && std::cmp_less(col, m_width) &&
+                    std::cmp_less(row, m_height)) {
                     setPixelUnchecked(static_cast<uint32_t>(col), static_cast<uint32_t>(row),
                                       color);
                 }
@@ -179,8 +187,7 @@ void ImageDocument::drawRect(int x, int y, int w, int h, RGBAColor color, bool f
 
 void ImageDocument::drawCircle(int cx, int cy, int r, RGBAColor color, bool filled) {
     if (r <= 0) {
-        if (cx >= 0 && cy >= 0 && static_cast<uint32_t>(cx) < m_width &&
-            static_cast<uint32_t>(cy) < m_height) {
+        if (cx >= 0 && cy >= 0 && std::cmp_less(cx, m_width) && std::cmp_less(cy, m_height)) {
             setPixelUnchecked(static_cast<uint32_t>(cx), static_cast<uint32_t>(cy), color);
         }
         ++m_generation;
@@ -190,15 +197,14 @@ void ImageDocument::drawCircle(int cx, int cy, int r, RGBAColor color, bool fill
 
     // Helper to set a clamped pixel
     auto safePlot = [&](int px, int py) {
-        if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
-            static_cast<uint32_t>(py) < m_height) {
+        if (px >= 0 && py >= 0 && std::cmp_less(px, m_width) && std::cmp_less(py, m_height)) {
             setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
         }
     };
 
     // Helper to draw a horizontal span (clamped)
     auto hLine = [&](int lx, int rx, int py) {
-        if (py < 0 || static_cast<uint32_t>(py) >= m_height) {
+        if (py < 0 || std::cmp_greater_equal(py, m_height)) {
             return;
         }
         lx = std::max(lx, 0);
@@ -245,8 +251,7 @@ void ImageDocument::drawCircle(int cx, int cy, int r, RGBAColor color, bool fill
 
 void ImageDocument::drawEllipse(int cx, int cy, int rx, int ry, RGBAColor color, bool filled) {
     if (rx <= 0 && ry <= 0) {
-        if (cx >= 0 && cy >= 0 && static_cast<uint32_t>(cx) < m_width &&
-            static_cast<uint32_t>(cy) < m_height) {
+        if (cx >= 0 && cy >= 0 && std::cmp_less(cx, m_width) && std::cmp_less(cy, m_height)) {
             setPixelUnchecked(static_cast<uint32_t>(cx), static_cast<uint32_t>(cy), color);
         }
         ++m_generation;
@@ -255,14 +260,13 @@ void ImageDocument::drawEllipse(int cx, int cy, int rx, int ry, RGBAColor color,
     }
 
     auto safePlot = [&](int px, int py) {
-        if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
-            static_cast<uint32_t>(py) < m_height) {
+        if (px >= 0 && py >= 0 && std::cmp_less(px, m_width) && std::cmp_less(py, m_height)) {
             setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
         }
     };
 
     auto hLine = [&](int lx, int rxEnd, int py) {
-        if (py < 0 || static_cast<uint32_t>(py) >= m_height) {
+        if (py < 0 || std::cmp_greater_equal(py, m_height)) {
             return;
         }
         lx = std::max(lx, 0);
@@ -306,17 +310,9 @@ void ImageDocument::drawEllipse(int cx, int cy, int rx, int ry, RGBAColor color,
     }
 
     // Region 2: slope magnitude >= 1
-    long long p2 = rySq * (static_cast<long long>(x) * x + x) +
-                   rxSq * (static_cast<long long>(y - 1) * (y - 1)) - rxSq * rySq;
-    // Adjust: use standard formulation
-    p2 = rySq * (2 * x + 1) * (2 * x + 1) / 4 + rxSq * (static_cast<long long>(y) - 1) * (y - 1) -
-         rxSq * rySq;
-    // Simpler: recompute
-    {
-        long long tx = x;
-        long long ty = y;
-        p2 = rySq * (tx + 1) * (tx + 1) + rxSq * (ty - 1) * (ty - 1) - rxSq * rySq;
-    }
+    long long tx = x;
+    long long ty = y;
+    long long p2 = rySq * (tx + 1) * (tx + 1) + rxSq * (ty - 1) * (ty - 1) - rxSq * rySq;
 
     while (y >= 0) {
         if (filled) {
@@ -352,8 +348,7 @@ void ImageDocument::drawArc(int cx, int cy, int r, float startAngle, float endAn
 
     auto plotPixel = [&](int px, int py) {
         if (thickness <= 1) {
-            if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
-                static_cast<uint32_t>(py) < m_height) {
+            if (px >= 0 && py >= 0 && std::cmp_less(px, m_width) && std::cmp_less(py, m_height)) {
                 setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
             }
         } else {
@@ -363,8 +358,8 @@ void ImageDocument::drawArc(int cx, int cy, int r, float startAngle, float endAn
                     if (dx * dx + dy * dy <= hr * hr) {
                         int fx = px + dx;
                         int fy = py + dy;
-                        if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
-                            static_cast<uint32_t>(fy) < m_height) {
+                        if (fx >= 0 && fy >= 0 && std::cmp_less(fx, m_width) &&
+                            std::cmp_less(fy, m_height)) {
                             setPixelUnchecked(static_cast<uint32_t>(fx), static_cast<uint32_t>(fy),
                                               color);
                         }
@@ -375,20 +370,25 @@ void ImageDocument::drawArc(int cx, int cy, int r, float startAngle, float endAn
     };
 
     // Convert degrees to radians
-    constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+    constexpr float kDegToRad = std::numbers::pi_v<float> / 180.0f;
     float startRad = startAngle * kDegToRad;
     float endRad = endAngle * kDegToRad;
 
     // Normalize so we always sweep forward
     while (endRad < startRad) {
-        endRad += 2.0f * 3.14159265358979323846f;
+        endRad += 2.0f * std::numbers::pi_v<float>;
     }
 
     // Step in ~0.5-degree increments
-    float step = 0.5f * kDegToRad;
-    for (float a = startRad; a <= endRad; a += step) {
-        int px = cx + static_cast<int>(std::round(r * std::cos(a)));
-        int py = cy + static_cast<int>(std::round(r * std::sin(a)));
+    const float step = 0.5f * kDegToRad;
+    const float sweep = endRad - startRad;
+    const auto sampleCount = sweep > 0.0f && std::isfinite(sweep)
+                                 ? static_cast<std::size_t>(std::ceil(sweep / step))
+                                 : 0;
+    for (std::size_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
+        const float angle = startRad + static_cast<float>(sampleIndex) * step;
+        int px = cx + static_cast<int>(std::round(r * std::cos(angle)));
+        int py = cy + static_cast<int>(std::round(r * std::sin(angle)));
         plotPixel(px, py);
     }
 
@@ -411,8 +411,7 @@ void ImageDocument::drawBezier(const std::vector<std::pair<int, int>>& points, R
 
     auto plotPixel = [&](int px, int py) {
         if (thickness <= 1) {
-            if (px >= 0 && py >= 0 && static_cast<uint32_t>(px) < m_width &&
-                static_cast<uint32_t>(py) < m_height) {
+            if (px >= 0 && py >= 0 && std::cmp_less(px, m_width) && std::cmp_less(py, m_height)) {
                 setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
             }
         } else {
@@ -422,8 +421,8 @@ void ImageDocument::drawBezier(const std::vector<std::pair<int, int>>& points, R
                     if (dx * dx + dy * dy <= hr * hr) {
                         int fx = px + dx;
                         int fy = py + dy;
-                        if (fx >= 0 && fy >= 0 && static_cast<uint32_t>(fx) < m_width &&
-                            static_cast<uint32_t>(fy) < m_height) {
+                        if (fx >= 0 && fy >= 0 && std::cmp_less(fx, m_width) &&
+                            std::cmp_less(fy, m_height)) {
                             setPixelUnchecked(static_cast<uint32_t>(fx), static_cast<uint32_t>(fy),
                                               color);
                         }
@@ -433,14 +432,14 @@ void ImageDocument::drawBezier(const std::vector<std::pair<int, int>>& points, R
         }
     };
 
-    float p0x = static_cast<float>(points[0].first);
-    float p0y = static_cast<float>(points[0].second);
-    float p1x = static_cast<float>(points[1].first);
-    float p1y = static_cast<float>(points[1].second);
-    float p2x = static_cast<float>(points[2].first);
-    float p2y = static_cast<float>(points[2].second);
-    float p3x = static_cast<float>(points[3].first);
-    float p3y = static_cast<float>(points[3].second);
+    const auto p0x = static_cast<float>(points.at(0).first);
+    const auto p0y = static_cast<float>(points.at(0).second);
+    const auto p1x = static_cast<float>(points.at(1).first);
+    const auto p1y = static_cast<float>(points.at(1).second);
+    const auto p2x = static_cast<float>(points.at(2).first);
+    const auto p2y = static_cast<float>(points.at(2).second);
+    const auto p3x = static_cast<float>(points.at(3).first);
+    const auto p3y = static_cast<float>(points.at(3).second);
 
     // Adaptive step count based on rough arc length estimate
     float chordLen = std::sqrt((p3x - p0x) * (p3x - p0x) + (p3y - p0y) * (p3y - p0y));
@@ -469,8 +468,8 @@ void ImageDocument::drawBezier(const std::vector<std::pair<int, int>>& points, R
 }
 
 void ImageDocument::floodFill(int x, int y, RGBAColor color) {
-    if (x < 0 || y < 0 || static_cast<uint32_t>(x) >= m_width ||
-        static_cast<uint32_t>(y) >= m_height) {
+    if (x < 0 || y < 0 || std::cmp_greater_equal(x, m_width) ||
+        std::cmp_greater_equal(y, m_height)) {
         return;
     }
 
@@ -482,14 +481,14 @@ void ImageDocument::floodFill(int x, int y, RGBAColor color) {
     }
 
     std::stack<std::pair<int, int>> stack;
-    stack.push({x, y});
+    stack.emplace(x, y);
 
     while (!stack.empty()) {
         auto [px, py] = stack.top();
         stack.pop();
 
-        if (px < 0 || py < 0 || static_cast<uint32_t>(px) >= m_width ||
-            static_cast<uint32_t>(py) >= m_height) {
+        if (px < 0 || py < 0 || std::cmp_greater_equal(px, m_width) ||
+            std::cmp_greater_equal(py, m_height)) {
             continue;
         }
 
@@ -501,10 +500,10 @@ void ImageDocument::floodFill(int x, int y, RGBAColor color) {
 
         setPixelUnchecked(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color);
 
-        stack.push({px + 1, py});
-        stack.push({px - 1, py});
-        stack.push({px, py + 1});
-        stack.push({px, py - 1});
+        stack.emplace(px + 1, py);
+        stack.emplace(px - 1, py);
+        stack.emplace(px, py + 1);
+        stack.emplace(px, py - 1);
     }
 
     ++m_generation;
@@ -518,7 +517,7 @@ void ImageDocument::flipHorizontal() {
             size_t idxA = (static_cast<size_t>(y) * m_width + x) * 4;
             size_t idxB = (static_cast<size_t>(y) * m_width + mirrorX) * 4;
             for (int c = 0; c < 4; ++c) {
-                std::swap(m_pixels[idxA + c], m_pixels[idxB + c]);
+                std::swap(m_pixels.at(idxA + c), m_pixels.at(idxB + c));
             }
         }
     }
@@ -532,7 +531,7 @@ void ImageDocument::flipVertical() {
         size_t rowA = static_cast<size_t>(y) * m_width * 4;
         size_t rowB = static_cast<size_t>(mirrorY) * m_width * 4;
         for (size_t i = 0; i < static_cast<size_t>(m_width) * 4; ++i) {
-            std::swap(m_pixels[rowA + i], m_pixels[rowB + i]);
+            std::swap(m_pixels.at(rowA + i), m_pixels.at(rowB + i));
         }
     }
     ++m_generation;
@@ -549,17 +548,17 @@ void ImageDocument::resize(uint32_t newW, uint32_t newH) {
     // Nearest-neighbor sampling
     for (uint32_t ny = 0; ny < newH; ++ny) {
         for (uint32_t nx = 0; nx < newW; ++nx) {
-            uint32_t srcX = static_cast<uint32_t>(static_cast<float>(nx) * m_width / newW);
-            uint32_t srcY = static_cast<uint32_t>(static_cast<float>(ny) * m_height / newH);
+            auto srcX = static_cast<uint32_t>(static_cast<float>(nx) * m_width / newW);
+            auto srcY = static_cast<uint32_t>(static_cast<float>(ny) * m_height / newH);
             srcX = std::min(srcX, m_width - 1);
             srcY = std::min(srcY, m_height - 1);
 
             size_t srcIdx = (static_cast<size_t>(srcY) * m_width + srcX) * 4;
             size_t dstIdx = (static_cast<size_t>(ny) * newW + nx) * 4;
-            newPixels[dstIdx + 0] = m_pixels[srcIdx + 0];
-            newPixels[dstIdx + 1] = m_pixels[srcIdx + 1];
-            newPixels[dstIdx + 2] = m_pixels[srcIdx + 2];
-            newPixels[dstIdx + 3] = m_pixels[srcIdx + 3];
+            newPixels.at(dstIdx + 0) = m_pixels.at(srcIdx + 0);
+            newPixels.at(dstIdx + 1) = m_pixels.at(srcIdx + 1);
+            newPixels.at(dstIdx + 2) = m_pixels.at(srcIdx + 2);
+            newPixels.at(dstIdx + 3) = m_pixels.at(srcIdx + 3);
         }
     }
 
@@ -589,14 +588,14 @@ void ImageDocument::crop(int x, int y, uint32_t w, uint32_t h) {
         for (uint32_t col = 0; col < w; ++col) {
             int srcX = x + static_cast<int>(col);
             int srcY = y + static_cast<int>(row);
-            if (srcX >= 0 && srcY >= 0 && static_cast<uint32_t>(srcX) < m_width &&
-                static_cast<uint32_t>(srcY) < m_height) {
+            if (srcX >= 0 && srcY >= 0 && std::cmp_less(srcX, m_width) &&
+                std::cmp_less(srcY, m_height)) {
                 size_t srcIdx = (static_cast<size_t>(srcY) * m_width + srcX) * 4;
                 size_t dstIdx = (static_cast<size_t>(row) * w + col) * 4;
-                newPixels[dstIdx + 0] = m_pixels[srcIdx + 0];
-                newPixels[dstIdx + 1] = m_pixels[srcIdx + 1];
-                newPixels[dstIdx + 2] = m_pixels[srcIdx + 2];
-                newPixels[dstIdx + 3] = m_pixels[srcIdx + 3];
+                newPixels.at(dstIdx + 0) = m_pixels.at(srcIdx + 0);
+                newPixels.at(dstIdx + 1) = m_pixels.at(srcIdx + 1);
+                newPixels.at(dstIdx + 2) = m_pixels.at(srcIdx + 2);
+                newPixels.at(dstIdx + 3) = m_pixels.at(srcIdx + 3);
             }
         }
     }
@@ -609,7 +608,7 @@ void ImageDocument::crop(int x, int y, uint32_t w, uint32_t h) {
 }
 
 void ImageDocument::clear() {
-    fill(RGBAColor{0, 0, 0, 0});
+    fill(RGBAColor{.r = 0, .g = 0, .b = 0, .a = 0});
 }
 
 // =============================================================================
@@ -617,7 +616,7 @@ void ImageDocument::clear() {
 // =============================================================================
 
 void ImageDocument::snapshotForUndo() {
-    m_undoStack.push_back({m_pixels, m_width, m_height});
+    m_undoStack.push_back({.pixels = m_pixels, .width = m_width, .height = m_height});
     if (m_undoStack.size() > kMaxUndoLevels) {
         m_undoStack.erase(m_undoStack.begin());
     }
@@ -628,7 +627,7 @@ bool ImageDocument::undo() {
     if (m_undoStack.empty()) {
         return false;
     }
-    m_redoStack.push_back({m_pixels, m_width, m_height});
+    m_redoStack.push_back({.pixels = m_pixels, .width = m_width, .height = m_height});
     auto& snap = m_undoStack.back();
     m_pixels = std::move(snap.pixels);
     m_width = snap.width;
@@ -643,7 +642,7 @@ bool ImageDocument::redo() {
     if (m_redoStack.empty()) {
         return false;
     }
-    m_undoStack.push_back({m_pixels, m_width, m_height});
+    m_undoStack.push_back({.pixels = m_pixels, .width = m_width, .height = m_height});
     auto& snap = m_redoStack.back();
     m_pixels = std::move(snap.pixels);
     m_width = snap.width;
@@ -677,7 +676,9 @@ static std::string detectFormat(const std::string& path) {
         return "png";
     }
     std::string ext = path.substr(dot + 1);
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    std::ranges::transform(ext, ext.begin(), [](char character) {
+        return static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+    });
     return ext;
 }
 

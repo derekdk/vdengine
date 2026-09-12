@@ -339,11 +339,13 @@ VDE currently ships with 44 registered example targets across 43 example directo
 .\run-vlauncher.ps1
 ```
 
-Or run smoke tests across all examples to verify they start successfully:
+Or run changed-only smoke tests for affected examples:
 
 ```powershell
 .\scripts\smoke-test.ps1
 ```
+
+Use `-Full` to run the smoke suite across every discovered example, game, and tool.
 
 Notable examples:
 

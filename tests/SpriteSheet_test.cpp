@@ -8,6 +8,7 @@
 #include <vde/api/SpriteSheet.h>
 
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -20,7 +21,7 @@ namespace test {
 // Helper: create a CPU-only Texture with known dimensions (no GPU needed).
 static std::shared_ptr<Texture> makeTestTexture(uint32_t w, uint32_t h) {
     auto tex = std::make_shared<Texture>();
-    std::vector<uint8_t> pixels(w * h * 4, 255);  // RGBA white
+    std::vector<uint8_t> pixels(std::size_t{w} * h * 4, 255);  // RGBA white
     tex->loadFromData(pixels.data(), w, h);
     return tex;
 }

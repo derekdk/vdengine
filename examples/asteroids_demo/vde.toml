@@ -1,9 +1,11 @@
 [smoke.vde_asteroids_demo]
+source_paths = ["."]
 scripts = ["smoke_asteroids.vdescript"]
 priority = 1
 sections = ["entity", "input", "camera"]
 
 [smoke.vde_asteroids_physics_demo]
+source_paths = ["."]
 scripts = ["smoke_asteroids_physics.vdescript"]
 priority = 2
 sections = ["physics", "input", "camera"]

@@ -11,7 +11,7 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
 | **clean-all.ps1** | Clean both Ninja and MSBuild build directories | `.\scripts\clean-all.ps1 -Full` |
 | **test.ps1** | Run unit tests | `.\scripts\test.ps1 -Filter "Camera*"` |
-| **smoke-test.ps1** | Run smoke tests on examples, games, and tools | `.\scripts\smoke-test.ps1 -Extended -Filter "*physics*"` |
+| **smoke-test.ps1** | Run changed-only smoke tests by default | `.\scripts\smoke-test.ps1` |
 | **render-verify.ps1** | Run golden-image comparison tests using FLIP | `.\scripts\render-verify.ps1` |
 | **verify.ps1** | Full end-to-end verification: build → tests → smoke → render → lint | `.\scripts\verify.ps1` |
 | **lint.ps1** | Run all available linters (full by default, targeted with `-ChangedOnly`) | `.\scripts\lint.ps1` |
@@ -54,14 +54,14 @@ This directory contains PowerShell scripts to simplify building, testing, and ma
 .\scripts\test.ps1 -Build
 ```
 
-### Run Smoke Tests
+### Run Changed Smoke Tests (Default)
 ```powershell
 .\scripts\smoke-test.ps1
 ```
 
-### Run Extended Smoke Tests
+### Run Full Smoke Suite
 ```powershell
-.\scripts\smoke-test.ps1 -Extended
+.\scripts\smoke-test.ps1 -Full
 ```
 
 ### Clean Rebuild
@@ -224,11 +224,11 @@ Run unit tests with optional filtering and building.
 
 ### smoke-test.ps1
 
-Run smoke tests against examples, games, and tools, with optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output.
+Run smoke tests against examples, games, and tools, with changed-source selection by default, optional filtering, priority-based selection for metadata-driven apps, and AI-friendly failure-only output. Use `-Full` to run every discovered executable. A project's `[smoke]` metadata declares `source_paths` relative to its project directory and can declare `cleanup_files = ["generated-file"]` to remove generated files from its executable directory before and after its smoke script runs.
 
 **Syntax:**
 ```powershell
-.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-Verbose] [-ProblemsOnly]
+.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-ChangedOnly] [-Full] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
@@ -237,29 +237,37 @@ Run smoke tests against examples, games, and tools, with optional filtering, pri
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests
-- `-Extended` - Include priority 2 examples and games; default runs only priority 1 examples/games while tools always run
+- `-Extended` - Legacy full-suite mode that includes priority 1 and 2 examples/games; use `-Full` for the explicit full-suite option
+- `-ChangedOnly` - Explicitly select every-priority executable whose declared `source_paths` contain changed source/header files; this is the default when neither `-Full` nor `-Extended` is supplied
+- `-Full` - Run every discovered executable and all priorities, bypassing changed-only selection
 - `-Verbose` - Verbose output with detailed error messages
 - `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
 
 **Examples:**
 ```powershell
-# Run all smoke tests
+# Run smoke tests for changed source/header owners (default)
 .\scripts\smoke-test.ps1
 
-# Run the extended example set (priority 1 + 2)
+# Run the full smoke suite
+.\scripts\smoke-test.ps1 -Full
+
+# Run the legacy extended full suite (priority 1 + 2)
 .\scripts\smoke-test.ps1 -Extended
 
-# Run only example smoke tests
+# Run changed example smoke tests
 .\scripts\smoke-test.ps1 -Category Examples
 
 # Run only games
 .\scripts\smoke-test.ps1 -Category Games
 
-# Run one subset
-.\scripts\smoke-test.ps1 -Filter "*physics*"
+# Run one subset from the full suite
+.\scripts\smoke-test.ps1 -Full -Filter "*physics*"
 
 # Build, then smoke test
 .\scripts\smoke-test.ps1 -Build
+
+# Explicitly select smoke tests affected by the current source/header changes
+.\scripts\smoke-test.ps1 -ChangedOnly
 
 # AI-friendly failure summary output
 .\scripts\smoke-test.ps1 -ProblemsOnly
@@ -516,12 +524,12 @@ Run golden-image comparison tests against examples that declare a `[render_verif
 
 ### verify.ps1
 
-Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Tests → Render Verification → Lint. By default, the lint stage targets only changed files for regular local verification. Writes all output to `logs/verify-latest.log` (always overwritten) and a timestamped archive in `logs/`.
+Orchestrates the full verification pipeline: Build → Unit Tests → changed-only Smoke Tests → Render Verification → Lint. Use `-SmokeFull` to run every discovered smoke executable. By default, the lint stage targets only changed files for regular local verification. Writes all output to `logs/verify-latest.log` (always overwritten) and a timestamped archive in `logs/`.
 
 **Syntax:**
 ```powershell
 .\scripts\verify.ps1 [-SkipBuild] [-SkipSmoke] [-SkipRenderVerify] [-SkipLint] [-FullLint]
-                     [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended]
+                     [-Filter <pattern>] [-SmokeFilter <pattern>] [-SmokeExtended] [-SmokeChangedOnly] [-SmokeFull]
                      [-Generator MSBuild|Ninja] [-Config Debug|Release]
 ```
 
@@ -533,14 +541,19 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 - `-FullLint` - Run full-repo lint instead of targeted changed-file lint
 - `-Filter` - GoogleTest filter pattern passed to `test.ps1`
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
-- `-SmokeExtended` - Include priority 2 examples in the smoke run
+- `-SmokeExtended` - Legacy full-suite smoke mode including priority 1 and 2 examples/games
+- `-SmokeChangedOnly` - Explicitly pass changed-source selection to the smoke stage; this is the default
+- `-SmokeFull` - Run every discovered smoke executable and all priorities
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 
 **Examples:**
 ```powershell
-# Full verification (all stages)
+# Full verification (all stages, changed-only smoke by default)
 .\scripts\verify.ps1
+
+# Full verification with every smoke executable
+.\scripts\verify.ps1 -SmokeFull
 
 # Build + unit tests + targeted lint only (skip smoke and render)
 .\scripts\verify.ps1 -SkipSmoke -SkipRenderVerify
@@ -551,8 +564,11 @@ Orchestrates the full verification pipeline: Build → Unit Tests → Smoke Test
 # Full verification with full-repo lint at the end
 .\scripts\verify.ps1 -FullLint
 
-# Targeted smoke test
-.\scripts\verify.ps1 -SkipBuild -SkipRenderVerify -SmokeFilter "*emoji*"
+# Targeted smoke test, regardless of the current Git delta
+.\scripts\verify.ps1 -SkipBuild -SkipRenderVerify -SmokeFull -SmokeFilter "*emoji*"
+
+# Smoke only applications affected by changed source/header files
+.\scripts\verify.ps1 -SkipBuild -SkipRenderVerify -SmokeChangedOnly
 
 # Fast inner loop (unit tests only, with filter)
 .\scripts\verify.ps1 -SkipBuild -SkipSmoke -SkipRenderVerify -Filter "CameraTest.*"

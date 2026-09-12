@@ -112,6 +112,8 @@ void Scene::updateAudio([[maybe_unused]] float deltaTime) {
     m_audioEventQueue.clear();
 }
 
+void Scene::updateCameraDependentVisuals([[maybe_unused]] float deltaTime) {}
+
 void Scene::updateVisuals([[maybe_unused]] float deltaTime) {
     // Default: no-op.  Derived scenes override this when using phase callbacks.
 }
@@ -166,6 +168,25 @@ Entity* Scene::getEntity(EntityId id) {
     }
     // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     return nullptr;
+}
+
+bool Scene::moveEntityToBack(EntityId id) {
+    const auto entityIt = m_entityIndex.find(id);
+    if (entityIt == m_entityIndex.end() || entityIt->second >= m_entities.size()) {
+        return false;
+    }
+
+    const size_t index = entityIt->second;
+    if (index == 0) {
+        return true;
+    }
+
+    std::rotate(m_entities.begin(), m_entities.begin() + static_cast<std::ptrdiff_t>(index),
+                m_entities.begin() + static_cast<std::ptrdiff_t>(index + 1));
+    for (size_t updatedIndex = 0; updatedIndex <= index; ++updatedIndex) {
+        m_entityIndex[m_entities.at(updatedIndex)->getId()] = updatedIndex;
+    }
+    return true;
 }
 
 Entity* Scene::getEntityByName(const std::string& name) {

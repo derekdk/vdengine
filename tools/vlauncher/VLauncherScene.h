@@ -73,6 +73,8 @@ class VLauncherScene : public BaseToolScene {
 
     static constexpr size_t kMaxStoredOutputBytes = 256 * 1024;
     static constexpr const char* kCompactViewStorageKey = "vlauncher.ui.compactView";
+    static constexpr const char* kWindowPositionXStorageKey = "vlauncher.window.position.x";
+    static constexpr const char* kWindowPositionYStorageKey = "vlauncher.window.position.y";
     static constexpr const char* kGroupDefaultKeyPrefix = "vlauncher.group.default.";
     static constexpr float kCompactAppWidth = 560.0f;
     static constexpr float kCompactAppHeight = 440.0f;
@@ -90,6 +92,8 @@ class VLauncherScene : public BaseToolScene {
     void refreshSelectedRunLogs();
     void drawRunLogViewer();
     void loadViewPreferences();
+    void loadWindowPosition();
+    void saveWindowPosition() const;
     void saveCompactViewPreference() const;
     void applyCompactWindowPresetIfRequested();
 

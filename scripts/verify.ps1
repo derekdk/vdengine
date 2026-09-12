@@ -12,8 +12,10 @@
 #   .\scripts\verify.ps1 -SkipBuild                               # Tests + smoke only
 #   .\scripts\verify.ps1 -SkipSmoke                               # Build + unit tests + lint only
 #   .\scripts\verify.ps1 -SmokeExtended                           # Include priority 2 examples in smoke tests
+#   .\scripts\verify.ps1 -SmokeChangedOnly                        # Smoke only apps owning changed source/headers
+#   .\scripts\verify.ps1 -SmokeFull                               # Run the full discovered smoke suite
 #   .\scripts\verify.ps1 -Filter "Suite.*"                        # Targeted unit tests
-#   .\scripts\verify.ps1 -SmokeFilter "*emoji*"                   # Targeted smoke test
+#   .\scripts\verify.ps1 -SmokeFull -SmokeFilter "*emoji*"       # Run a named smoke test regardless of Git changes
 #   .\scripts\verify.ps1 -SkipBuild -SkipSmoke -Filter "Suite.*"  # Fast inner loop with targeted lint
 #   .\scripts\verify.ps1 -SkipRenderVerify                        # Skip render verification
 #   .\scripts\verify.ps1 -SkipLint                                # Skip lint stage
@@ -41,6 +43,10 @@ param(
 
     [switch]$SmokeExtended,
 
+    [switch]$SmokeChangedOnly,
+
+    [switch]$SmokeFull,
+
     [ValidateSet("MSBuild", "Ninja")]
     [string]$Generator = "Ninja",
 
@@ -49,6 +55,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if (($SmokeChangedOnly -and $SmokeFull) -or ($SmokeChangedOnly -and $SmokeExtended)) {
+    throw "Use -SmokeChangedOnly by itself, or use -SmokeExtended/-SmokeFull for the full smoke suite."
+}
 
 $scriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot   = Split-Path -Parent $scriptDir
@@ -83,6 +93,14 @@ function Write-Log {
 
 function Write-LogDivider { param([string]$Color = "Cyan") Write-Log $bar $Color }
 
+$scriptHost = if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+    'pwsh'
+} elseif (Get-Command powershell -ErrorAction SilentlyContinue) {
+    'powershell'
+} else {
+    throw 'Neither pwsh nor powershell was found in PATH.'
+}
+
 # --- Stage runner -----------------------------------------------------------
 # Runs each stage as a child pwsh.exe process so that exit calls in the
 # child scripts (build.ps1, test.ps1, smoke-test.ps1) terminate only
@@ -110,7 +128,7 @@ function Invoke-Stage {
     ) + $ExtraArgs
 
     # Run as external process; $LASTEXITCODE captures its exit code
-    $stageOutput = & pwsh @psArgs 2>&1
+    $stageOutput = & $scriptHost @psArgs 2>&1
     $stageExit   = $LASTEXITCODE
     $stagePass   = ($stageExit -eq 0)
 
@@ -176,6 +194,11 @@ if (-not $SkipSmoke) {
     $smokeArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
     if ($SmokeFilter) { $smokeArgs += "-Filter", $SmokeFilter }
     if ($SmokeExtended) { $smokeArgs += "-Extended" }
+    if ($SmokeFull) {
+        $smokeArgs += "-Full"
+    } elseif ($SmokeChangedOnly) {
+        $smokeArgs += "-ChangedOnly"
+    }
     $smokePass = Invoke-Stage "SMOKE TESTS" "smoke-test.ps1" $smokeArgs
     $stageResults["SMOKE TESTS"] = $smokePass
     if (-not $smokePass) { $overallPass = $false }

@@ -1,13 +1,10 @@
 #include <vde/VulkanContext.h>
 #include <vde/api/TileMapImport.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <limits>
-#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -15,6 +12,7 @@
 #include <utility>
 
 #include <nlohmann/json.hpp>
+
 namespace vde {
 
 namespace {
@@ -293,26 +291,17 @@ ParsedTileSet parseTileSet(const OrderedJson& root, const std::shared_ptr<Textur
     parsed.columns = getRequiredInt(tileset, "columns", "tileset");
     parsed.spacingPx = getOptionalInt(tileset, "spacing", 0, "tileset");
     const int marginPx = getOptionalInt(tileset, "margin", 0, "tileset");
-    const int tileWidthPx = getRequiredInt(tileset, "tilewidth", "tileset");
-    const int tileHeightPx = getRequiredInt(tileset, "tileheight", "tileset");
     if (marginPx != 0) {
         throw std::invalid_argument(
             "TileMapImport does not support tileset margins; export with margin 0");
     }
     if (parsed.firstGid <= 0 || parsed.tileCount <= 0 || parsed.columns <= 0 ||
-        parsed.spacingPx < 0 || tileWidthPx <= 0 || tileHeightPx <= 0) {
+        parsed.spacingPx < 0) {
         throw std::invalid_argument("TileMapImport tileset metadata contains invalid dimensions");
     }
     if ((parsed.tileCount % parsed.columns) != 0) {
         throw std::invalid_argument(
             "TileMapImport requires a full grid tileset where tilecount divides evenly by columns");
-    }
-
-    const int mapTileWidthPx = getRequiredInt(root, "tilewidth", "map");
-    const int mapTileHeightPx = getRequiredInt(root, "tileheight", "map");
-    if (tileWidthPx != mapTileWidthPx || tileHeightPx != mapTileHeightPx) {
-        throw std::invalid_argument("TileMapImport requires tileset tilewidth/tileheight to match "
-                                    "the root map tilewidth/tileheight");
     }
 
     parsed.rows = parsed.tileCount / parsed.columns;
@@ -321,15 +310,6 @@ ParsedTileSet parseTileSet(const OrderedJson& root, const std::shared_ptr<Textur
     const int imageHeight = getRequiredInt(tileset, "imageheight", "tileset");
     if (imageWidth <= 0 || imageHeight <= 0) {
         throw std::invalid_argument("TileMapImport tileset image dimensions must be positive");
-    }
-
-    const int expectedImageWidth =
-        parsed.columns * tileWidthPx + parsed.spacingPx * (parsed.columns - 1);
-    const int expectedImageHeight =
-        parsed.rows * tileHeightPx + parsed.spacingPx * (parsed.rows - 1);
-    if (imageWidth != expectedImageWidth || imageHeight != expectedImageHeight) {
-        throw std::invalid_argument("TileMapImport tileset image dimensions do not match the "
-                                    "tileset columns/rows, tile size, and spacing");
     }
 
     parsed.imageWidth = static_cast<uint32_t>(imageWidth);
@@ -411,14 +391,6 @@ std::vector<int> parseLayerTiles(const OrderedJson& layer, const ParsedTileSet& 
             "' uses layer offsets, which are unsupported in the current subset");
     }
 
-    const int layerX = getOptionalInt(layer, "x", 0, "tile layer");
-    const int layerY = getOptionalInt(layer, "y", 0, "tile layer");
-    if (layerX != 0 || layerY != 0) {
-        throw std::invalid_argument(
-            "TileMapImport tile layer '" + layerName +
-            "' uses layer x/y offsets, which are unsupported in the current subset");
-    }
-
     const float opacity = getOptionalFloat(layer, "opacity", 1.0f, "tile layer");
     if (std::abs(opacity - 1.0f) > 1e-4f) {
         throw std::invalid_argument("TileMapImport tile layer '" + layerName +
@@ -448,17 +420,7 @@ std::vector<int> parseLayerTiles(const OrderedJson& layer, const ParsedTileSet& 
                                             "' contains a non-integer tile GID");
             }
 
-            uint32_t rawGid = 0u;
-            if (gidValue.is_number_integer()) {
-                const int64_t signedGid = gidValue.get<int64_t>();
-                if (signedGid < 0) {
-                    throw std::invalid_argument("TileMapImport tile layer '" + layerName +
-                                                "' contains a negative tile GID");
-                }
-                rawGid = static_cast<uint32_t>(signedGid);
-            } else {
-                rawGid = gidValue.get<uint32_t>();
-            }
+            const uint32_t rawGid = gidValue.get<uint32_t>();
             if ((rawGid & kTiledFlipMask) != 0u) {
                 throw std::invalid_argument(
                     "TileMapImport does not support flipped or rotated Tiled tile GIDs on layer '" +
@@ -508,18 +470,14 @@ ImportedTileObject parseObject(const OrderedJson& object, const std::string& lay
     imported.point = getOptionalBool(object, "point", false);
     imported.visible = getOptionalBool(object, "visible", true);
     imported.rotationDegrees = getOptionalFloat(object, "rotation", 0.0f, "object");
-    if (!imported.point && std::abs(imported.rotationDegrees) > 1e-4f) {
-        throw std::invalid_argument(
-            "TileMapImport supports only axis-aligned rectangle objects (rotation must be 0)");
-    }
     imported.properties = parseProperties(object, "object");
+
     const float xPixels = getRequiredFloat(object, "x", "object");
     const float yPixels = getRequiredFloat(object, "y", "object");
     const float widthPixels = getOptionalFloat(object, "width", 0.0f, "object");
     const float heightPixels = getOptionalFloat(object, "height", 0.0f, "object");
-    if (!imported.point && (widthPixels <= 0.0f || heightPixels <= 0.0f)) {
-        throw std::invalid_argument(
-            "TileMapImport rectangle objects require positive width and height");
+    if (widthPixels < 0.0f || heightPixels < 0.0f) {
+        throw std::invalid_argument("TileMapImport object width and height must be non-negative");
     }
 
     if (imported.point) {
@@ -567,14 +525,6 @@ void parseObjectLayer(const OrderedJson& layer, ImportedTileMap& imported, int m
             "' uses layer offsets, which are unsupported in the current subset");
     }
 
-    const int layerX = getOptionalInt(layer, "x", 0, "object layer");
-    const int layerY = getOptionalInt(layer, "y", 0, "object layer");
-    if (layerX != 0 || layerY != 0) {
-        throw std::invalid_argument(
-            "TileMapImport object layer '" + layerName +
-            "' uses layer x/y offsets, which are unsupported in the current subset");
-    }
-
     for (const auto& object : layer.at("objects")) {
         imported.objects.push_back(
             parseObject(object, layerName, mapPixelWidth, mapPixelHeight, unitScaleX, unitScaleY));
@@ -604,14 +554,9 @@ ImportedTileMap importTiledJsonImpl(const std::shared_ptr<Texture>& texture,
 
     validateImportOptions(options);
 
-    OrderedJson root;
-    try {
-        root = OrderedJson::parse(jsonText);
-    } catch (const nlohmann::json::parse_error& ex) {
-        throw std::invalid_argument(std::string("TileMapImport failed to parse JSON text: ") +
-                                    ex.what());
-    }
+    OrderedJson root = OrderedJson::parse(jsonText);
     validateSupportedRoot(root);
+
     const int columns = getRequiredInt(root, "width", "map");
     const int rows = getRequiredInt(root, "height", "map");
     const int tilePixelWidth = getRequiredInt(root, "tilewidth", "map");
@@ -635,10 +580,6 @@ ImportedTileMap importTiledJsonImpl(const std::shared_ptr<Texture>& texture,
         imported.tileMap->setCollisionKind(tileId, collisionKind);
     }
 
-    if (columns > std::numeric_limits<int>::max() / tilePixelWidth ||
-        rows > std::numeric_limits<int>::max() / tilePixelHeight) {
-        throw std::invalid_argument("TileMapImport map pixel dimensions would overflow");
-    }
     const int mapPixelWidth = columns * tilePixelWidth;
     const int mapPixelHeight = rows * tilePixelHeight;
     const float unitScaleX = options.tileWidth / static_cast<float>(tilePixelWidth);
@@ -701,20 +642,16 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
     }
 
     const std::filesystem::path path(jsonPath);
-    const std::string fileText = readTextFile(path);
-
-    OrderedJson root;
-    try {
-        root = OrderedJson::parse(fileText);
-    } catch (const nlohmann::json::parse_error& ex) {
-        throw std::invalid_argument(std::string("TileMapImport failed to parse JSON file '") +
-                                    path.string() + "': " + ex.what());
-    }
+    OrderedJson root = OrderedJson::parse(readTextFile(path));
     validateSupportedRoot(root);
+
     auto texture = std::make_shared<Texture>();
     const ParsedTileSet tileset = parseTileSet(root, nullptr);
+    (void)tileset;
 
-    const std::filesystem::path imagePath = path.parent_path() / tileset.imagePath;
+    const auto& tilesetJson = root.at("tilesets").at(0);
+    const std::filesystem::path imagePath =
+        path.parent_path() / getRequiredString(tilesetJson, "image", "tileset");
     if (!texture->loadFromFile(imagePath.string())) {
         throw std::runtime_error("TileMapImport failed to load tileset image: " +
                                  imagePath.string());
@@ -724,7 +661,7 @@ ImportedTileMap TileMapImport::importTiledJsonFile(VulkanContext* context,
                                  imagePath.string());
     }
 
-    return importTiledJsonImpl(texture, fileText, options);
+    return importTiledJsonImpl(texture, root.dump(), options);
 }
 
 }  // namespace vde
