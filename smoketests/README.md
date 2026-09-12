@@ -31,17 +31,20 @@ See the **smoke-testing** skill in `.github/skills/smoke-testing/SKILL.md` for d
 
 Quick reference:
 ```powershell
-# Run all smoke tests
+# Run smoke tests for changed source/header owners (default)
 .\scripts\smoke-test.ps1
 
-# Run examples only
+# Run all discovered smoke tests
+.\scripts\smoke-test.ps1 -Full
+
+# Run changed examples only
 .\scripts\smoke-test.ps1 -Category Examples
 
-# Run games only
+# Run changed games only
 .\scripts\smoke-test.ps1 -Category Games
 
-# Run specific test
-.\scripts\smoke-test.ps1 -Filter "*physics*"
+# Run a specific test regardless of the current Git delta
+.\scripts\smoke-test.ps1 -Full -Filter "*physics*"
 ```
 
 ## Verification Images

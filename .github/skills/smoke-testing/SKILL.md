@@ -18,7 +18,7 @@ This skill describes how to run smoke tests, interpret their results, add smoke 
 
 ## Required: Smoke tests are long-running
 
-Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the script launches every discovered example, game, and tool one at a time.
+Smoke tests are not a quick command. A full run usually takes 2-4 minutes because the `-Full` mode launches every discovered example, game, and tool one at a time. The default run selects only executables affected by changed source/header or shader files.
 
 ### Preferred approach for AI agents: use verify.ps1
 
@@ -71,12 +71,14 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 
 | Task | Command |
 |------|---------|
-| Run priority 1 smoke tests | `.\scripts\smoke-test.ps1` |
-| Run all (priority 1 + 2) | `.\scripts\smoke-test.ps1 -Extended` |
-| Examples only | `.\scripts\smoke-test.ps1 -Category Examples` |
-| Games only | `.\scripts\smoke-test.ps1 -Category Games` |
-| Tools only | `.\scripts\smoke-test.ps1 -Category Tools` |
-| Filter by name | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
+| Run changed-only smoke tests | `.\scripts\smoke-test.ps1` |
+| Run all discovered smoke tests | `.\scripts\smoke-test.ps1 -Full` |
+| Run all priority 1 + 2 tests | `.\scripts\smoke-test.ps1 -Extended` |
+| Changed examples only | `.\scripts\smoke-test.ps1 -Category Examples` |
+| Changed games only | `.\scripts\smoke-test.ps1 -Category Games` |
+| Changed tools only | `.\scripts\smoke-test.ps1 -Category Tools` |
+| Filter changed-only selection by name | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
+| Filter the full suite by name | `.\scripts\smoke-test.ps1 -Full -Filter "*physics*"` |
 | Changed source/header owners only | `.\scripts\smoke-test.ps1 -ChangedOnly` |
 | Build first | `.\scripts\smoke-test.ps1 -Build` |
 | Verbose output | `.\scripts\smoke-test.ps1 -Verbose` |
@@ -89,27 +91,32 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 |-----------|--------|---------|-------------|
 | `-Category` | `All`, `Examples`, `Games`, `Tools` | `All` | Which category of executables to test |
 | `-Filter` | Wildcard pattern | (none) | Filter executable names (e.g. `"*physics*"`, `"vde_vlauncher*"`) |
-| `-Extended` | switch | `$false` | Include priority 2 examples and games (default run only tests priority 1) |
+| `-Extended` | switch | `$false` | Legacy full-suite mode including priority 2 examples and games |
 | `-Generator` | `MSBuild`, `Ninja` | `Ninja` | Which build system output to test |
 | `-Config` | `Debug`, `Release` | `Debug` | Build configuration |
 | `-Build` | switch | `$false` | Build the project before testing |
-| `-ChangedOnly` | switch | `$false` | Run only executables whose `vde.toml` `source_paths` own changed source/header or shader files; shared engine changes select all executables |
+| `-ChangedOnly` | switch | `$false` | Explicitly run only executables whose `vde.toml` `source_paths` own changed source/header or shader files; this is the default |
+| `-Full` | switch | `$false` | Run every discovered executable and all priorities |
 | `-Verbose` | switch | `$false` | Show detailed error output for failures |
 
 ## Smoke Priority Model
 
 Each metadata-driven app category declares a **smoke priority** (1 or 2) in its `vde.toml` file. This applies to examples and games:
 
-- **Priority 1** — Core examples/games that cover unique API subsystems. Run by default in every smoke test invocation, `verify.ps1`, and CI. The priority-1 set is chosen so that every canonical API section (`core`, `entity`, `resource`, `input`, `camera`, `lighting`, `physics`, `audio`, `multi_scene`, `transitions`, `text`, `ui`, `storage`, `world_bounds`) is covered by at least one priority-1 executable.
-- **Priority 2** — Extended examples/games that provide additional coverage or showcase variations of already-covered features. Only included when `-Extended` is passed.
+- **Priority 1** — Core examples/games that cover unique API subsystems. The priority-1 set is chosen so that every canonical API section (`core`, `entity`, `resource`, `input`, `camera`, `lighting`, `physics`, `audio`, `multi_scene`, `transitions`, `text`, `ui`, `storage`, `world_bounds`) is covered by at least one priority-1 executable.
+- **Priority 2** — Extended examples/games that provide additional coverage or showcase variations of already-covered features.
+
+Changed-only mode includes every priority for affected executables. `-Full` and legacy `-Extended` include every discovered executable and priority.
 
 Tools always run regardless of priority.
 
-### When to use `-Extended`
+### When to use `-Full`
 
 - Before merging a feature branch that touches many subsystems
 - When investigating a failure that only reproduces in less-common examples
 - Periodic full-coverage CI runs
+
+Use `-Extended` when compatibility with existing commands or documentation requires the legacy full-suite spelling.
 
 ### Assigning priority to a new example or game
 
@@ -165,11 +172,12 @@ The script prints results as it runs. Early lines are not the final result; keep
 VDE Smoke Test Script
 ==========================================
 ...
-Smoke Set: Normal (priority 1 examples only)
-Selected 18 executable(s) to test (from 35 discovered):
-  Examples: 15
-  Tools:    3
-  Priority 2 examples excluded: 17
+Smoke Set: Changed source/header owners (all priorities)
+Smoke Selection: Changed source/header owners only
+Selected applicable executable(s) to test (from discovered executables):
+  Examples: affected examples
+  Games:    affected games
+  Tools:    affected tools
 
 Running smoke tests...
 ==========================================
@@ -339,7 +347,7 @@ exit
 Run with `-Verbose` to see error output:
 
 ```powershell
-.\scripts\smoke-test.ps1 -Filter "vde_failing_example*" -Verbose
+.\scripts\smoke-test.ps1 -Full -Filter "vde_failing_example*" -Verbose
 ```
 
 Then run the executable manually to reproduce:

@@ -116,8 +116,11 @@ The smoke runner reads example metadata from `vde.toml`. Explicit script maps in
 
 **Run smoke tests:**
 ```bash
-# Run all example smoke tests
+# Run changed-only smoke tests (default)
 .\scripts\smoke-test.ps1
+
+# Run all discovered smoke tests
+.\scripts\smoke-test.ps1 -Full
 
 # VS Code task: "scripts: smoke-test"
 ```

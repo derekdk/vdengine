@@ -3,14 +3,15 @@
 # Auto-discovers vde_*.exe in the build directory for examples, games, and tools.
 #
 # Usage:
-#   .\scripts\smoke-test.ps1                              # Run all (examples + games + tools)
+#   .\scripts\smoke-test.ps1                              # Run smoke tests for changed source/header owners
+#   .\scripts\smoke-test.ps1 -Full                        # Run all discovered smoke tests
 #   .\scripts\smoke-test.ps1 -Extended                    # Run priority 1 and 2 examples/games
 #   .\scripts\smoke-test.ps1 -Category Examples           # Examples only
 #   .\scripts\smoke-test.ps1 -Category Games              # Games only
 #   .\scripts\smoke-test.ps1 -Category Tools              # Tools only
-#   .\scripts\smoke-test.ps1 -Filter "*physics*"          # Filter by name
+#   .\scripts\smoke-test.ps1 -Full -Filter "*physics*"    # Filter the full suite by name
 #   .\scripts\smoke-test.ps1 -Build -Verbose              # Build first, verbose output
-#   .\scripts\smoke-test.ps1 -ChangedOnly                 # Run only tests owning changed code/headers
+#   .\scripts\smoke-test.ps1 -ChangedOnly                 # Explicitly select changed source/header owners
 #   .\scripts\smoke-test.ps1 -ProblemsOnly                # Emit only warnings/failures plus final PASS/FAIL
 
 param(
@@ -31,12 +32,24 @@ param(
 
     [switch]$ChangedOnly = $false,  # Run only smoke tests affected by changed source/header files
 
+    [switch]$Full = $false,  # Run the full discovered smoke suite instead of changed-only selection
+
     [switch]$Verbose = $false,  # Verbose output
 
     [switch]$ProblemsOnly = $false  # Emit only warnings/failures plus a final PASS/FAIL line
 )
 
 $ErrorActionPreference = "Stop"
+
+if (($ChangedOnly -and $Full) -or ($ChangedOnly -and $Extended)) {
+    throw "Use -ChangedOnly by itself, or use -Extended/-Full for the full smoke suite."
+}
+
+if ($Extended -and -not $ChangedOnly -and -not $Full) {
+    $Full = $true
+} elseif (-not $Full) {
+    $ChangedOnly = $true
+}
 
 $outputFailurePattern = '(?i)(assert failed|test failed|unknown file: Failure|\[\s*failed\s*\]|^\s*error\b|\berror:|\bfailed to\b|\bfatal\b|\bexception\b)'
 
@@ -64,6 +77,8 @@ Write-Info "Configuration: $Config"
 Write-Info "Category: $Category"
 if ($ChangedOnly) {
     Write-Info "Smoke Set: Changed source/header owners (all priorities)"
+} elseif ($Full) {
+    Write-Info "Smoke Set: Full discovered suite (all priorities)"
 } elseif ($Extended) {
     Write-Info "Smoke Set: Extended (priority 1 and 2 examples/games)"
 } else {
@@ -680,7 +695,7 @@ if ($ChangedOnly) {
 }
 
 $filteredPriority2Count = 0
-if (-not $Extended -and -not $ChangedOnly) {
+if (-not $Extended -and -not $ChangedOnly -and -not $Full) {
     $filteredPriority2Count = @($allExes | Where-Object { ($_.Category -eq 'Example' -or $_.Category -eq 'Game') -and $_.SmokePriority -eq 2 }).Count
     $allExes = @($allExes | Where-Object { (($_.Category -ne 'Example') -and ($_.Category -ne 'Game')) -or $_.SmokePriority -eq 1 })
 }
