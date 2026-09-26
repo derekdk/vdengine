@@ -470,6 +470,10 @@ ImportedTileObject parseObject(const OrderedJson& object, const std::string& lay
     imported.point = getOptionalBool(object, "point", false);
     imported.visible = getOptionalBool(object, "visible", true);
     imported.rotationDegrees = getOptionalFloat(object, "rotation", 0.0f, "object");
+    if (!imported.point && std::abs(imported.rotationDegrees) > 1e-4f) {
+        throw std::invalid_argument(
+            "TileMapImport supports only axis-aligned rectangle objects (rotation must be 0)");
+    }
     imported.properties = parseProperties(object, "object");
 
     const float xPixels = getRequiredFloat(object, "x", "object");
@@ -523,6 +527,14 @@ void parseObjectLayer(const OrderedJson& layer, ImportedTileMap& imported, int m
         throw std::invalid_argument(
             "TileMapImport object layer '" + layerName +
             "' uses layer offsets, which are unsupported in the current subset");
+    }
+
+    const int layerX = getOptionalInt(layer, "x", 0, "object layer");
+    const int layerY = getOptionalInt(layer, "y", 0, "object layer");
+    if (layerX != 0 || layerY != 0) {
+        throw std::invalid_argument(
+            "TileMapImport object layer '" + layerName +
+            "' uses layer x/y offsets, which are unsupported in the current subset");
     }
 
     for (const auto& object : layer.at("objects")) {

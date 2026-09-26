@@ -417,6 +417,114 @@ TEST(TileMapImportTest, ImportTiledJsonRejectsRectangleObjectsOutsideBounds) {
     }
 }
 
+TEST(TileMapImportTest, ImportTiledJsonRejectsRotatedRectangleObjects) {
+    auto texture = makeTestTileSet(2, 1)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 2,
+    "height": 2,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {
+            "type": "tilelayer",
+            "name": "ground",
+            "data": [1, 0, 0, 0]
+        },
+        {
+            "type": "objectgroup",
+            "name": "markers",
+            "objects": [
+                {
+                    "id": 8,
+                    "name": "gate",
+                    "x": 0,
+                    "y": 0,
+                    "width": 16,
+                    "height": 16,
+                    "rotation": 45
+                }
+            ]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 2,
+            "columns": 2,
+            "image": "terrain.png",
+            "imagewidth": 32,
+            "imageheight": 16
+        }
+    ]
+}
+)json";
+
+    try {
+        (void)TileMapImport::importTiledJson(texture, jsonText);
+        FAIL() << "Expected import to reject rotated rectangle objects";
+    } catch (const std::invalid_argument& ex) {
+        EXPECT_NE(std::string(ex.what()).find("rotation must be 0"), std::string::npos);
+    }
+}
+
+TEST(TileMapImportTest, ImportTiledJsonRejectsObjectLayerXYOffsets) {
+    auto texture = makeTestTileSet(2, 1)->getTexture();
+
+    const std::string jsonText = R"json(
+{
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 2,
+    "height": 2,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {
+            "type": "tilelayer",
+            "name": "ground",
+            "data": [1, 0, 0, 0]
+        },
+        {
+            "type": "objectgroup",
+            "name": "markers",
+            "x": 1,
+            "y": 0,
+            "objects": []
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 16,
+            "tileheight": 16,
+            "tilecount": 2,
+            "columns": 2,
+            "image": "terrain.png",
+            "imagewidth": 32,
+            "imageheight": 16
+        }
+    ]
+}
+)json";
+
+    try {
+        (void)TileMapImport::importTiledJson(texture, jsonText);
+        FAIL() << "Expected import to reject object layer x/y offsets";
+    } catch (const std::invalid_argument& ex) {
+        EXPECT_NE(std::string(ex.what()).find("x/y offsets"), std::string::npos);
+    }
+}
+
 TEST(TileMapImportTest, ImportTiledJsonRejectsMapsWithoutTileLayers) {
     auto texture = makeTestTileSet(1, 1)->getTexture();
 
