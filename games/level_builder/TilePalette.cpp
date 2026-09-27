@@ -74,12 +74,14 @@ void TilePalette::setTileSet(std::shared_ptr<vde::SpriteSheet> tileSet, float ti
 
     for (const auto& tile : m_tileSprites) {
         if (tile != nullptr && m_scene != nullptr) {
+            m_scene->retireResource(tile);
             m_scene->removeEntity(tile->getId());
         }
     }
     for (const auto& frame : m_selectionFrames) {
         for (const auto& segment : frame) {
             if (segment != nullptr && m_scene != nullptr) {
+                m_scene->retireResource(segment);
                 m_scene->removeEntity(segment->getId());
             }
         }
