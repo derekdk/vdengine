@@ -370,9 +370,9 @@ void LevelBuilderScene::update(float deltaTime) {
             }
 
             if (m_devModeController.hasSelection()) {
-                camera->followTarget(
-                    m_tileMapSession.tileCenterWorld(m_devModeController.selectedTile()),
-                    kCameraFollowSpeed);
+                camera->followTarget(activeLayerTileCenter(m_devModeController.selectedTile(),
+                                                           camera->getPosition()),
+                                     kCameraFollowSpeed);
             }
             m_playerController.stopMotion();
             finishSceneFrame();
@@ -399,6 +399,12 @@ void LevelBuilderScene::update(float deltaTime) {
 void LevelBuilderScene::updateCameraDependentVisuals([[maybe_unused]] float deltaTime) {
     if (const auto* camera = currentCamera(); camera != nullptr) {
         applyLayerRuntimeTransforms(camera->getPosition());
+        if (m_tileCursor.isVisible() && m_devModeController.hasSelection()) {
+            m_tileCursor.show(
+                activeLayerTileCenter(m_devModeController.selectedTile(), camera->getPosition()),
+                m_tileMapSession.tileMap()->getTileWidth(),
+                m_tileMapSession.tileMap()->getTileHeight());
+        }
         m_tilePalette.updatePosition(camera->getVisibleRect());
     }
 }
@@ -591,7 +597,10 @@ void LevelBuilderScene::updateSelectTileUi() {
     setSelectTileUiVisible(true);
     m_tilePalette.setCurrentTile(m_devModeController.clipboardTile());
     const glm::ivec2 selectedTile = m_devModeController.selectedTile();
-    const glm::vec2 tileCenter = m_tileMapSession.tileCenterWorld(selectedTile);
+    const auto* camera = currentCamera();
+    const glm::vec2 tileCenter = camera != nullptr
+                                     ? activeLayerTileCenter(selectedTile, camera->getPosition())
+                                     : m_tileMapSession.tileCenterWorld(selectedTile);
     m_tileCursor.show(tileCenter, m_tileMapSession.tileMap()->getTileWidth(),
                       m_tileMapSession.tileMap()->getTileHeight());
 
@@ -731,6 +740,8 @@ void LevelBuilderScene::clearLayerRuntimes() {
     for (const auto& runtime : m_layerRuntimes) {
         if (runtime.tileMap != nullptr) {
             retireResource(runtime.tileMap);
+            // Move to the end first so swap-removal does not reorder HUD/cursor entities.
+            (void)moveEntityToFront(runtime.tileMap->getId());
             removeEntity(runtime.tileMap->getId());
         }
     }
@@ -817,6 +828,35 @@ void LevelBuilderScene::applyLayerRuntimeTransforms(const glm::vec2& cameraPosit
             runtime.tileMap->setPosition(position->x, position->y, position->z);
         }
     }
+}
+
+glm::vec2 LevelBuilderScene::activeLayerTileCenter(const glm::ivec2& tileCoordinate,
+                                                   const glm::vec2& cameraPosition) const {
+    const glm::vec2 baseCenter = m_tileMapSession.tileCenterWorld(tileCoordinate);
+    const auto tileMap = m_tileMapSession.tileMap();
+    if (tileMap == nullptr) {
+        return baseCenter;
+    }
+
+    const size_t activeLayerIndex = m_tileMapSession.activeLayerIndex();
+    glm::vec2 scrollOffset(0.0f);
+    const auto runtimeIt =
+        std::ranges::find_if(m_layerRuntimes, [activeLayerIndex](const LayerRuntime& runtime) {
+            return runtime.layerIndex == activeLayerIndex;
+        });
+    if (runtimeIt != m_layerRuntimes.end()) {
+        scrollOffset = runtimeIt->scrollOffset;
+    }
+
+    const auto layerPosition =
+        m_tileMapSession.runtimeLayerPosition(activeLayerIndex, cameraPosition, scrollOffset);
+    if (!layerPosition.has_value()) {
+        return baseCenter;
+    }
+
+    const auto& basePosition = tileMap->getPosition();
+    return baseCenter +
+           glm::vec2(layerPosition->x - basePosition.x, layerPosition->y - basePosition.y);
 }
 
 std::string LevelBuilderScene::activeLayerScrollPresetName() const {

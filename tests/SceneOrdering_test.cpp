@@ -28,4 +28,26 @@ TEST(SceneOrderingTest, MoveEntityToBackPreservesEntityLookup) {
     EXPECT_FALSE(scene.moveEntityToBack(99999));
 }
 
+TEST(SceneOrderingTest, MoveEntityToFrontPreservesRelativeOrderAndLookup) {
+    Scene scene;
+    auto first = scene.addEntity<MeshEntity>();
+    auto second = scene.addEntity<SpriteEntity>();
+    auto third = scene.addEntity<TextEntity>();
+
+    EXPECT_TRUE(scene.moveEntityToFront(first->getId()));
+    ASSERT_EQ(scene.getEntities().size(), 3u);
+    EXPECT_EQ(scene.getEntities().at(0), second);
+    EXPECT_EQ(scene.getEntities().at(1), third);
+    EXPECT_EQ(scene.getEntities().at(2), first);
+    EXPECT_EQ(scene.getEntity(first->getId()), first.get());
+    EXPECT_EQ(scene.getEntity(second->getId()), second.get());
+    EXPECT_EQ(scene.getEntity(third->getId()), third.get());
+
+    scene.removeEntity(first->getId());
+    ASSERT_EQ(scene.getEntities().size(), 2u);
+    EXPECT_EQ(scene.getEntities().at(0), second);
+    EXPECT_EQ(scene.getEntities().at(1), third);
+    EXPECT_FALSE(scene.moveEntityToFront(99999));
+}
+
 }  // namespace vde::test

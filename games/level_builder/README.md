@@ -11,10 +11,10 @@ The current build keeps the tilemap runtime baseline while adding multi-layer au
 - Adds a default Development Move Mode for free scene navigation with no collisions or gravity.
 - Adds Select Tile Mode with nearest-tile acquisition, a white selection outline, and controller-driven tile navigation.
 - Uses the clipboard as an explicit paint palette so next/previous actions choose a brush tile before painting.
-- Shows a floating tile palette in Select Tile Mode with every tileset tile and a highlighted current cut tile.
+- Shows a floating tile palette in Select Tile Mode with up to 256 tileset tiles and a highlighted current cut tile.
 - Supports layer creation, selection, visibility, depth, and scroll-preset authoring in Development Move Mode.
 - Paints only the active layer and restores the correct layer during undo or redo.
-- Limits gameplay collision to layers marked `collisionEnabled`; new decorative layers start disabled.
+- Limits gameplay collision to layers marked `collisionEnabled`; new decorative layers start disabled. Collision-enabled layers stay on the Gameplay scroll preset so rendered tiles match collision geometry.
 - Saves and reloads the complete layer stack as a VDE-native overlay snapshot.
 - Surfaces active-layer state, selected-tile IDs, palette state, undo/redo depth, and overlay save status in the HUD and debug overlay.
 
@@ -65,6 +65,9 @@ object contains `format`, `version`, `base_map`, and a `layers` array. Each laye
 - `follow_factor_x`, `follow_factor_y`, `scroll_velocity_x`, `scroll_velocity_y`,
   `scroll_offset_x`, and `scroll_offset_y` for camera-relative movement; and
 - `columns`, `rows`, and row-major `tiles` for the tile payload.
+
+Collision-enabled layers must keep the default follow factors and zero scroll velocity and offsets.
+Overlays are limited to 64 MiB, 64 layers, and 4,194,304 serialized tiles in total.
 
 Version 1 overlays with the former `editable_layer` object remain supported. Their ground-layer
 tiles are loaded into layer zero, while any other imported map layers retain their source-map

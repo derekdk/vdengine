@@ -189,6 +189,25 @@ bool Scene::moveEntityToBack(EntityId id) {
     return true;
 }
 
+bool Scene::moveEntityToFront(EntityId id) {
+    const auto entityIt = m_entityIndex.find(id);
+    if (entityIt == m_entityIndex.end() || entityIt->second >= m_entities.size()) {
+        return false;
+    }
+
+    const size_t index = entityIt->second;
+    if (index + 1 == m_entities.size()) {
+        return true;
+    }
+
+    std::rotate(m_entities.begin() + static_cast<std::ptrdiff_t>(index),
+                m_entities.begin() + static_cast<std::ptrdiff_t>(index + 1), m_entities.end());
+    for (size_t updatedIndex = index; updatedIndex < m_entities.size(); ++updatedIndex) {
+        m_entityIndex[m_entities.at(updatedIndex)->getId()] = updatedIndex;
+    }
+    return true;
+}
+
 Entity* Scene::getEntityByName(const std::string& name) {
     for (auto& entity : m_entities) {
         if (entity && entity->getName() == name) {

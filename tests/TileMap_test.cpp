@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -613,6 +614,65 @@ TEST(TileMapImportTest, ImportTiledJsonRejectsUnsupportedInfiniteMaps) {
     } catch (const std::invalid_argument& ex) {
         EXPECT_NE(std::string(ex.what()).find("finite orthogonal"), std::string::npos);
     }
+}
+
+namespace {
+
+std::string makeSingleTileMapJson(const std::string& mapWidth, const std::string& layerExtras,
+                                  const std::string& gid, const std::string& tilesetTileWidth,
+                                  const std::string& imageWidth) {
+    return R"json({
+    "type": "map",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": )json" +
+           mapWidth + R"json(,
+    "height": 1,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "layers": [
+        {"type": "tilelayer", "name": "ground")json" +
+           layerExtras + R"json(, "data": [)json" + gid + R"json(]}
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": )json" +
+           tilesetTileWidth + R"json(,
+            "tileheight": 16,
+            "tilecount": 1,
+            "columns": 1,
+            "image": "terrain.png",
+            "imagewidth": )json" +
+           imageWidth + R"json(,
+            "imageheight": 16
+        }
+    ]
+})json";
+}
+
+void expectImportRejects(const std::string& jsonText, const std::string& expectedMessage) {
+    auto texture = makeTestTileSet(1, 1)->getTexture();
+    try {
+        (void)TileMapImport::importTiledJson(texture, jsonText);
+        FAIL() << "Expected import to fail with: " << expectedMessage;
+    } catch (const std::invalid_argument& ex) {
+        EXPECT_NE(std::string(ex.what()).find(expectedMessage), std::string::npos) << ex.what();
+    }
+}
+
+}  // namespace
+
+TEST(TileMapImportTest, ImportTiledJsonRejectsInvalidTilesetAndLayerMetadata) {
+    expectImportRejects(makeSingleTileMapJson("1", "", "1", "8", "16"),
+                        "tilewidth/tileheight to match");
+    expectImportRejects(makeSingleTileMapJson("1", "", "1", "16", "32"),
+                        "image dimensions do not match");
+    expectImportRejects(makeSingleTileMapJson("1", R"(, "x": 1)", "1", "16", "16"), "x/y offsets");
+    expectImportRejects(makeSingleTileMapJson("1", "", "-1", "16", "16"), "negative tile GID");
+    expectImportRejects(makeSingleTileMapJson("2147483647", "", "1", "16", "16"), "would overflow");
+    expectImportRejects("{ not json", "failed to parse JSON text");
 }
 
 TEST(RepeatingBackgroundTest, InvalidArgumentsThrow) {

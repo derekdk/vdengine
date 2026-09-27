@@ -735,4 +735,53 @@ TEST(TileMapSessionTest, LayerDefinitionDefaultsAfterAdoptTileMap) {
     EXPECT_EQ(session.layerDefinition(1), nullptr);
 }
 
+TEST(TileMapSessionTest, CollisionLayersRejectNonGameplayScrollPresets) {
+    TileMapSession session;
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    EXPECT_FALSE(session.setLayerScrollPreset(0, LayerScrollPreset::StrongParallax));
+    EXPECT_FALSE(session.cycleLayerScrollPreset(0, 1));
+    EXPECT_EQ(session.layerScrollPreset(0), LayerScrollPreset::Gameplay);
+    EXPECT_FALSE(session.hasUnsavedChanges());
+    EXPECT_TRUE(session.setLayerScrollPreset(1, LayerScrollPreset::StrongParallax));
+}
+
+TEST(TileMapSessionTest, ReloadRejectsScrolledCollisionLayersAndOversizedLayerStacks) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeImportedMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+
+    nlohmann::ordered_json root;
+    {
+        std::ifstream input(overlayPath, std::ios::binary);
+        ASSERT_TRUE(input.is_open());
+        root = nlohmann::ordered_json::parse(input);
+    }
+    const auto writeOverlay = [&overlayPath](const nlohmann::ordered_json& json) {
+        std::ofstream output(overlayPath, std::ios::binary | std::ios::trunc);
+        output << json.dump(2);
+    };
+
+    nlohmann::ordered_json scrolledCollision = root;
+    scrolledCollision.at("layers").at(0).at("follow_factor_x") = 0.5f;
+    writeOverlay(scrolledCollision);
+    EXPECT_FALSE(session.reloadEditableLayerOverlay());
+    EXPECT_NE(session.lastPersistenceStatus().find("parallax"), std::string::npos);
+
+    nlohmann::ordered_json tooManyLayers = root;
+    const nlohmann::ordered_json extraLayer = root.at("layers").at(1);
+    while (tooManyLayers.at("layers").size() <= 64u) {
+        tooManyLayers.at("layers").push_back(extraLayer);
+    }
+    writeOverlay(tooManyLayers);
+    EXPECT_FALSE(session.reloadEditableLayerOverlay());
+    EXPECT_NE(session.lastPersistenceStatus().find("maximum"), std::string::npos);
+    EXPECT_EQ(session.layerCount(), 2u);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
 }  // namespace levelbuilder::test

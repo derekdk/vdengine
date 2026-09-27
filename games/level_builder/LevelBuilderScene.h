@@ -54,6 +54,8 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void resetLayerRuntimeScroll(size_t layerIndex);
     void advanceLayerRuntimeScroll(float deltaTime);
     void applyLayerRuntimeTransforms(const glm::vec2& cameraPosition);
+    [[nodiscard]] glm::vec2 activeLayerTileCenter(const glm::ivec2& tileCoordinate,
+                                                  const glm::vec2& cameraPosition) const;
     [[nodiscard]] std::string activeLayerScrollPresetName() const;
     [[nodiscard]] std::string formatClipboardState() const;
     void setDevelopmentMode(bool enabled);

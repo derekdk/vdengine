@@ -399,6 +399,15 @@ class Scene {
     bool moveEntityToBack(EntityId id);
 
     /**
+     * @brief Move an entity to the end of the scene update and render order.
+     *
+     * The relative order of all other entities is preserved.
+     * @param id Entity ID
+     * @return true if the entity exists, otherwise false
+     */
+    bool moveEntityToFront(EntityId id);
+
+    /**
      * @brief Get an entity by name.
      * @param name Entity name
      * @return Pointer to first matching entity, or nullptr

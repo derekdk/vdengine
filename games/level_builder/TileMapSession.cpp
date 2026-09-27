@@ -23,8 +23,18 @@ constexpr const char* kOverlayFileName = "level_builder_ground.overlay.json";
 constexpr const char* kOverlayFormatId = "vde.level_builder.ground_overlay";
 constexpr int kOverlayFormatVersionLegacy = 1;
 constexpr int kOverlayFormatVersion = 2;
+constexpr size_t kMaxOverlayFileBytes = 64u * 1024u * 1024u;
+constexpr size_t kMaxOverlayLayers = 64;
+constexpr size_t kMaxOverlayTotalTiles = 4u * 1024u * 1024u;
 
 std::string readTextFile(const std::filesystem::path& path) {
+    std::error_code sizeError;
+    const auto fileSize = std::filesystem::file_size(path, sizeError);
+    if (!sizeError && fileSize > kMaxOverlayFileBytes) {
+        throw std::runtime_error("Overlay file exceeds the maximum size of " +
+                                 std::to_string(kMaxOverlayFileBytes) + " bytes: " + path.string());
+    }
+
     std::ifstream input(path, std::ios::binary);
     if (!input) {
         throw std::runtime_error("Failed to open overlay file: " + path.string());
@@ -173,6 +183,12 @@ LayerAndTiles parseLayerJsonV2(const OrderedJson& layerJson, const vde::TileMap&
     def.scrollVelocityY = optionalFloat(layerJson, "scroll_velocity_y", 0.0f);
     def.scrollOffsetX = optionalFloat(layerJson, "scroll_offset_x", 0.0f);
     def.scrollOffsetY = optionalFloat(layerJson, "scroll_offset_y", 0.0f);
+    if (def.collisionEnabled &&
+        (def.followFactorX != 1.0f || def.followFactorY != 1.0f || def.scrollVelocityX != 0.0f ||
+         def.scrollVelocityY != 0.0f || def.scrollOffsetX != 0.0f || def.scrollOffsetY != 0.0f)) {
+        throw std::invalid_argument("LevelBuilder overlay layer " + std::to_string(layerIndex) +
+                                    " enables collision but uses parallax or scroll offsets");
+    }
 
     if (requireInt(layerJson, "columns", context) != tileMap.getColumnCount() ||
         requireInt(layerJson, "rows", context) != tileMap.getRowCount()) {
@@ -264,6 +280,16 @@ std::vector<LayerAndTiles> parseOverlayLayers(const OrderedJson& root, const vde
         const OrderedJson& layersJson = root.at("layers");
         if (layersJson.empty()) {
             throw std::invalid_argument("LevelBuilder overlay layers array is empty");
+        }
+        if (layersJson.size() > kMaxOverlayLayers) {
+            throw std::invalid_argument("LevelBuilder overlay exceeds the maximum of " +
+                                        std::to_string(kMaxOverlayLayers) + " layers");
+        }
+        const size_t tilesPerLayer = static_cast<size_t>(tileMap.getColumnCount()) *
+                                     static_cast<size_t>(tileMap.getRowCount());
+        if (tilesPerLayer != 0 && layersJson.size() > kMaxOverlayTotalTiles / tilesPerLayer) {
+            throw std::invalid_argument("LevelBuilder overlay exceeds the maximum of " +
+                                        std::to_string(kMaxOverlayTotalTiles) + " total tiles");
         }
 
         std::vector<LayerAndTiles> result;
@@ -666,6 +692,10 @@ bool TileMapSession::setLayerScrollPreset(size_t index, LayerScrollPreset preset
     }
 
     LayerDefinition& layer = m_layers[index];
+    if (layer.collisionEnabled && preset != LayerScrollPreset::Gameplay) {
+        m_lastPersistenceStatus = "Collision-enabled layers must use the Gameplay scroll preset.";
+        return false;
+    }
     if (layer.followFactorX == followFactor.x && layer.followFactorY == followFactor.y &&
         layer.scrollVelocityX == scrollVelocity.x && layer.scrollVelocityY == scrollVelocity.y) {
         return false;
@@ -844,9 +874,9 @@ bool TileMapSession::setEditableTileId(const glm::ivec2& tileCoordinate, int til
     }
 
     m_lastEditedLayerIndex = m_activeLayerIndex;
-    m_lastPersistenceStatus = m_hasUnsavedChanges
-                                  ? "Editable ground layer has unsaved changes."
-                                  : "Editable ground layer matches the saved overlay.";
+    m_lastPersistenceStatus =
+        m_hasUnsavedChanges ? "Layer '" + editableLayerName() + "' has unsaved changes."
+                            : "Layer '" + editableLayerName() + "' matches the saved overlay.";
     return true;
 }
 
@@ -963,7 +993,7 @@ bool TileMapSession::saveEditableLayerOverlay() {
         m_savedLayers = m_layers;
         m_savedLayerTiles = currentTiles;
         m_hasUnsavedChanges = false;
-        m_lastPersistenceStatus = "Saved ground overlay to " + overlayFileName() + ".";
+        m_lastPersistenceStatus = "Saved layer overlay to " + overlayFileName() + ".";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
     } catch (const std::exception& ex) {
@@ -1052,7 +1082,7 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         clearEditHistory();
         m_hasUnsavedChanges = false;
         markRuntimeLayoutChanged();
-        m_lastPersistenceStatus = "Loaded ground overlay from " + overlayFileName() + ".";
+        m_lastPersistenceStatus = "Loaded layer overlay from " + overlayFileName() + ".";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
     } catch (const std::exception& ex) {

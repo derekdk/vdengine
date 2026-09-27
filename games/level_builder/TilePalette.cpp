@@ -8,6 +8,8 @@
 namespace {
 
 constexpr int kPaletteColumns = 8;
+// Upper bound on palette entries so oversized tilesets cannot exhaust scene entities.
+constexpr int kMaxPaletteTiles = 256;
 constexpr float kTileDisplayScale = 0.72f;
 constexpr float kTileGap = 0.14f;
 constexpr float kPanelPadding = 0.22f;
@@ -107,7 +109,7 @@ void TilePalette::hide() {
 }
 
 void TilePalette::updatePosition(const vde::Rect2D& visibleRect) {
-    if (!m_initialized || m_tileSprites.empty()) {
+    if (!m_initialized || !m_visible || m_tileSprites.empty()) {
         return;
     }
 
@@ -167,7 +169,7 @@ void TilePalette::createEntries() {
     }
 
     const auto texture = m_tileSet->getTexture();
-    const int tileCount = std::max(0, m_tileSet->getSpriteCount());
+    const int tileCount = std::clamp(m_tileSet->getSpriteCount(), 0, kMaxPaletteTiles);
     m_tileSprites.reserve(static_cast<size_t>(tileCount));
     m_selectionFrames.reserve(static_cast<size_t>(tileCount));
 
