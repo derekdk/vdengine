@@ -1,15 +1,19 @@
 # RunGame
 
-TODO: One-paragraph description of the game.
+A small endless runner inspired by the Parallax demo. Jump over obstacles while a
+procedurally assembled landscape scrolls at several independent speeds.
 
 ## How to play
 
-TODO: Describe gameplay, objective, and controls.
+Stay on the road, jump over the obstacles, and run as far as you can. The scenery
+loops continuously and the running speed gradually increases.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
+| SPACE / UP / W | Jump |
+| R | Restart |
 | ESC | Exit |
 | F1  | Toggle debug UI |
 

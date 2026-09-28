@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -8,16 +9,17 @@
 namespace rungame {
 
 class RunGameInput;
+class ParallaxBackground;
+class RunnerCharacter;
+class ObstacleCourse;
 
 class RunGameScene : public vde::games::BaseGameScene {
   public:
     RunGameScene();
+    ~RunGameScene() override;
 
     void onEnter() override;
     void update(float deltaTime) override;
-
-    // Optional: uncomment if you add ImGui debug panels
-    // void drawDebugUI() override;
 
   protected:
     std::string getGameName() const override;
@@ -26,7 +28,20 @@ class RunGameScene : public vde::games::BaseGameScene {
     std::vector<std::string> getControls() const override;
 
   private:
-    // TODO: Add member variables for game state here.
+    void createHud();
+    void resetGame();
+    void updateHud();
+
+    std::unique_ptr<ParallaxBackground> m_background;
+    std::unique_ptr<RunnerCharacter> m_runner;
+    std::unique_ptr<ObstacleCourse> m_obstacles;
+    std::shared_ptr<vde::TextEntity> m_titleText;
+    std::shared_ptr<vde::TextEntity> m_scoreText;
+    std::shared_ptr<vde::TextEntity> m_statusText;
+    float m_elapsed = 0.0f;
+    float m_distance = 0.0f;
+    int m_displayedScore = -1;
+    bool m_gameOver = false;
 };
 
 }  // namespace rungame

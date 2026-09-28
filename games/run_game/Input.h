@@ -7,10 +7,10 @@ namespace rungame {
 class RunGameInput : public vde::games::BaseGameInputHandler {
   public:
     RunGameInput() {
-        // Bind keys here. Examples:
-        //   keys.bindHeld(vde::KEY_LEFT,  "left");
-        //   keys.bindHeld(vde::KEY_RIGHT, "right");
-        //   keys.bindOneShot(vde::KEY_SPACE, "action");
+        keys.bindOneShot(vde::KEY_SPACE, "jump");
+        keys.bindOneShot(vde::KEY_UP, "jump");
+        keys.bindOneShot(vde::KEY_W, "jump");
+        keys.bindOneShot(vde::KEY_R, "restart");
     }
 
     void onKeyPress(int key) override {
