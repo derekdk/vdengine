@@ -2,6 +2,13 @@ add_vde_game(vde_run_game
     main.cpp
     RunGameScene.cpp
     ParallaxBackground.cpp
+    ParallaxLayer.cpp
+    SkyLayer.cpp
+    CloudLayer.cpp
+    MountainLayer.cpp
+    WaterLayer.cpp
+    FoliageLayer.cpp
+    RoadLayer.cpp
     RunnerCharacter.cpp
     ObstacleCourse.cpp
 )

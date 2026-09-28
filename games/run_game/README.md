@@ -3,6 +3,9 @@
 A small endless runner inspired by the Parallax demo. Jump over obstacles while a
 procedurally assembled landscape scrolls at several independent speeds.
 
+The scene, player, obstacle course, and each parallax layer are implemented in
+separate files. Every landscape layer updates its own motion independently.
+
 ## How to play
 
 Stay on the road, jump over the obstacles, and run as far as you can. The scenery
