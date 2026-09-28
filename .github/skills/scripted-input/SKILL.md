@@ -109,6 +109,16 @@ exit                  # Quit the application
 | `loop <label> <count>` | Jump back to label N times | `loop loop_start 5` |
 | `exit` (or `quit`) | Quit the application | `exit` |
 
+### Assertions
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `assert rendered_scene_count <op> <value>` | Compare the number of active scenes | `assert rendered_scene_count == 2` |
+| `assert scene "name" <field> <op> <value>` | Compare a built-in scene diagnostic such as `entity_count` or `was_rendered` | `assert scene "main" entity_count > 0` |
+| `assert scene "name" state.<key> <op> <value>` | Compare game-defined state returned by an override of `Scene::getScriptStateValue(key)` | `assert scene "main" state.layer_count == 3` |
+
+A failed assertion logs `ASSERT FAILED` and makes the process exit with code 1, which fails the smoke test. `state.` keys are lowercased by the parser, and a key the scene does not expose is reported as an assertion error. Games built on `BaseGame` register their scene as `"main"`. Prefer `state.` assertions over crash-only smoke flows when a script mutates game state; see `smoketests/scripts/smoke_level_builder.vdescript`.
+
 ### Screenshot and Image Comparison
 
 | Command | Description | Example |

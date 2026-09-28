@@ -39,6 +39,12 @@ constexpr float kActionLegendTopY = 5.35f;
 constexpr float kActionLegendLineHeight = 0.22f;
 constexpr float kActionLegendLineSpacing = 0.32f;
 constexpr float kLayerDepthAdjustStep = 0.06f;
+constexpr float kStatusTextHeight = 0.22f;
+constexpr float kStatusTextMargin = 0.35f;
+constexpr float kStatusTextDepth = 1.9f;
+constexpr float kStatusDisplaySeconds = 4.0f;
+constexpr float kDiscardConfirmSeconds = 3.0f;
+constexpr double kNoTileValue = -2.0;
 
 struct RGBA {
     constexpr RGBA() = default;
@@ -110,7 +116,8 @@ void LevelBuilderScene::onEnter() {
     }
 
     createBackgrounds();
-    m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
+    const bool overlayApplied =
+        m_tileMapSession.load(getGame() ? getGame()->getVulkanContext() : nullptr);
 
     (void)m_tileMapSession.setMapPosition({0.0f, 0.0f, -0.4f});
     rebuildLayerRuntimes();
@@ -120,6 +127,9 @@ void LevelBuilderScene::onEnter() {
     m_devModeController.setPosition(m_playerController.getPosition());
 
     createHud();
+    if (!overlayApplied) {
+        showSessionStatus();
+    }
     m_tilePalette.initialize(*this);
     m_tilePalette.setTileSet(m_tileMapSession.tileMap()->getTileSet(),
                              m_tileMapSession.tileMap()->getTileWidth(),
@@ -137,9 +147,15 @@ void LevelBuilderScene::onEnter() {
 }
 
 void LevelBuilderScene::update(float deltaTime) {
-    BaseGameScene::update(deltaTime);
-
     auto* controls = input();
+    // Consume Escape before BaseGameScene::update so unsaved edits can block its default quit.
+    if (controls != nullptr && controls->isEscapePressed()) {
+        requestQuit();
+    }
+
+    BaseGameScene::update(deltaTime);
+    tickTransientState(deltaTime);
+
     const auto finishFrame = [&controls]() {
         if (controls != nullptr) {
             controls->finishFrame();
@@ -171,10 +187,15 @@ void LevelBuilderScene::update(float deltaTime) {
     if (m_devModeController.isEnabled()) {
         if (actions.consumePressed("save_overlay")) {
             (void)m_tileMapSession.saveEditableLayerOverlay();
+            showSessionStatus();
             persistenceActionConsumed = true;
         }
-        if (actions.consumePressed("load_overlay")) {
+        if (actions.consumePressed("load_overlay") &&
+            (!m_tileMapSession.hasUnsavedChanges() ||
+             confirmDiscard(PendingDiscard::Reload,
+                            "Unsaved changes: press F9 / R3 again to discard and reload."))) {
             const bool reloaded = m_tileMapSession.reloadEditableLayerOverlay();
+            showSessionStatus();
             if (reloaded) {
                 persistenceActionConsumed = true;
             }
@@ -236,7 +257,10 @@ void LevelBuilderScene::update(float deltaTime) {
         case DevelopmentSubmode::MoveMode:
             if (actions.consumePressed("add_layer")) {
                 const size_t newLayerIndex = m_tileMapSession.addLayer();
-                (void)m_tileMapSession.setActiveLayerIndex(newLayerIndex);
+                if (newLayerIndex < m_tileMapSession.layerCount()) {
+                    (void)m_tileMapSession.setActiveLayerIndex(newLayerIndex);
+                }
+                showSessionStatus();
                 updateModeText();
                 updateLayerStatusText();
                 updatePersistenceText();
@@ -285,6 +309,8 @@ void LevelBuilderScene::update(float deltaTime) {
                     resetLayerRuntimeScroll(m_tileMapSession.activeLayerIndex());
                     updateLayerStatusText();
                     updatePersistenceText();
+                } else {
+                    showSessionStatus();
                 }
             }
             if (actions.consumePressed("next_scroll_preset")) {
@@ -293,6 +319,8 @@ void LevelBuilderScene::update(float deltaTime) {
                     resetLayerRuntimeScroll(m_tileMapSession.activeLayerIndex());
                     updateLayerStatusText();
                     updatePersistenceText();
+                } else {
+                    showSessionStatus();
                 }
             }
 
@@ -357,10 +385,12 @@ void LevelBuilderScene::update(float deltaTime) {
                 }
                 if (actions.consumePressed("undo_tile_edit")) {
                     const bool undid = m_tileMapSession.undoLastEditableEdit();
+                    showSessionStatus();
                     selectionUiChanged |= undid;
                 }
                 if (actions.consumePressed("redo_tile_edit")) {
                     const bool redid = m_tileMapSession.redoLastEditableEdit();
+                    showSessionStatus();
                     selectionUiChanged |= redid;
                 }
             }
@@ -405,7 +435,14 @@ void LevelBuilderScene::updateCameraDependentVisuals([[maybe_unused]] float delt
                 m_tileMapSession.tileMap()->getTileWidth(),
                 m_tileMapSession.tileMap()->getTileHeight());
         }
-        m_tilePalette.updatePosition(camera->getVisibleRect());
+        const vde::Rect2D visibleRect = camera->getVisibleRect();
+        m_tilePalette.updatePosition(visibleRect);
+        if (m_statusText != nullptr && m_statusText->isVisible()) {
+            m_statusText->setPosition(visibleRect.left + kStatusTextMargin,
+                                      visibleRect.bottom + kStatusTextMargin +
+                                          (kStatusTextHeight * 0.5f),
+                                      kStatusTextDepth);
+        }
     }
 }
 
@@ -415,12 +452,12 @@ std::string LevelBuilderScene::getGameName() const {
 
 std::vector<std::string> LevelBuilderScene::getGameplaySummary() const {
     return {
-        "The post-Phase-6 slices turn Select Tile Mode into a palette-driven paint workflow on "
-        "top of the persisted ground-layer overlay.",
-        "Controller and keyboard actions now cycle the active palette tile, copy from the map, "
-        "paint with the palette, and undo or redo edits.",
-        "The HUD and debug overlay expose the selected tile ID, palette state, history depth, "
-        "and overlay save status while you edit.",
+        "Imports the Tiled sample map into a multi-layer authoring session on top of the "
+        "playable side-view baseline.",
+        "Development mode adds free movement, layer management, and palette-driven tile "
+        "painting with undo and redo.",
+        "The HUD and debug overlay expose the active layer, selected tile, palette, history "
+        "depth, and overlay save status while you edit.",
     };
 }
 
@@ -454,7 +491,8 @@ std::vector<std::string> LevelBuilderScene::getControls() const {
         "Z / X or Gamepad B / A - Previous or next palette tile in Select Tile Mode",
         "C / V or Gamepad X / Y - Copy a tile to the palette or paint the selection",
         "U / I or Gamepad LT / RT - Undo or redo the last tile edit",
-        "F5 / F9 or Gamepad L3 / R3 - Save or reload the editable ground-layer overlay",
+        "F5 / F9 or Gamepad L3 / R3 - Save or reload the layer-stack overlay",
+        "F9 / R3 and Esc ask for a second press when there are unsaved changes",
     };
 }
 
@@ -488,11 +526,11 @@ void LevelBuilderScene::drawDebugUI() {
                         activeLayer->scrollVelocityY);
         }
         if (m_devModeController.hasSelection()) {
-            const std::string editableLayer = m_tileMapSession.editableLayerName();
+            const std::string paintLayer = m_tileMapSession.editableLayerName();
             const int tileId = m_tileMapSession.editableTileId(m_devModeController.selectedTile());
             ImGui::Text("Selected Tile: %d, %d", m_devModeController.selectedTile().x,
                         m_devModeController.selectedTile().y);
-            ImGui::Text("Editable Layer: %s", editableLayer.c_str());
+            ImGui::Text("Paint Layer: %s", paintLayer.c_str());
             ImGui::Text("Tile ID: %s", formatTileId(tileId).c_str());
         }
         ImGui::Text("Palette: %s", clipboardState.c_str());
@@ -558,6 +596,13 @@ void LevelBuilderScene::createHud() {
     m_persistenceText->setAnchor(0.0f, 0.5f);
     m_persistenceText->setPosition(kPersistenceTextX, kPersistenceTextY, 1.2f);
     m_persistenceText->setWorldHeight(kPersistenceTextHeight);
+
+    m_statusText = addEntity<vde::TextEntity>();
+    m_statusText->setFont(vde::BitmapFont::small());
+    m_statusText->setStyle({.color = vde::Color::fromHex(0xffe6a0), .pixelScale = 1});
+    m_statusText->setAnchor(0.0f, 0.5f);
+    m_statusText->setWorldHeight(kStatusTextHeight);
+    m_statusText->setVisible(false);
 
     m_actionLegendLines.clear();
     constexpr size_t kActionLegendLineCount = 11;
@@ -889,6 +934,108 @@ void LevelBuilderScene::setDevelopmentMode(bool enabled) {
     updateModeText();
     updatePersistenceText();
     std::cout << (enabled ? "Development mode enabled\n" : "Development mode disabled\n");
+}
+
+void LevelBuilderScene::showStatus(const std::string& message) {
+    if (m_statusText == nullptr || message.empty()) {
+        return;
+    }
+
+    m_statusText->setText(message);
+    m_statusText->setVisible(true);
+    m_statusTimeRemaining = kStatusDisplaySeconds;
+}
+
+void LevelBuilderScene::showSessionStatus() {
+    showStatus(m_tileMapSession.lastPersistenceStatus());
+}
+
+void LevelBuilderScene::tickTransientState(float deltaTime) {
+    if (m_statusTimeRemaining > 0.0f) {
+        m_statusTimeRemaining -= deltaTime;
+        if (m_statusTimeRemaining <= 0.0f && m_statusText != nullptr) {
+            m_statusText->setVisible(false);
+        }
+    }
+
+    if (m_pendingDiscardTimeRemaining > 0.0f) {
+        m_pendingDiscardTimeRemaining -= deltaTime;
+        if (m_pendingDiscardTimeRemaining <= 0.0f) {
+            m_pendingDiscard = PendingDiscard::None;
+        }
+    }
+}
+
+bool LevelBuilderScene::confirmDiscard(PendingDiscard action, const std::string& prompt) {
+    if (m_pendingDiscard == action) {
+        m_pendingDiscard = PendingDiscard::None;
+        m_pendingDiscardTimeRemaining = 0.0f;
+        return true;
+    }
+
+    m_pendingDiscard = action;
+    m_pendingDiscardTimeRemaining = kDiscardConfirmSeconds;
+    showStatus(prompt);
+    return false;
+}
+
+void LevelBuilderScene::requestQuit() {
+    if (m_tileMapSession.hasUnsavedChanges() &&
+        !confirmDiscard(PendingDiscard::Quit,
+                        "Unsaved changes: press Esc again to quit without saving.")) {
+        return;
+    }
+
+    if (auto* game = getGame(); game != nullptr) {
+        game->quit();
+    }
+}
+
+std::optional<double> LevelBuilderScene::getScriptStateValue(const std::string& key) const {
+    const auto flag = [](bool value) { return value ? 1.0 : 0.0; };
+
+    if (key == "layer_count") {
+        return static_cast<double>(m_tileMapSession.layerCount());
+    }
+    if (key == "active_layer") {
+        return static_cast<double>(m_tileMapSession.activeLayerIndex());
+    }
+    if (key == "dirty") {
+        return flag(m_tileMapSession.hasUnsavedChanges());
+    }
+    if (key == "undo_depth") {
+        return static_cast<double>(m_tileMapSession.undoDepth());
+    }
+    if (key == "redo_depth") {
+        return static_cast<double>(m_tileMapSession.redoDepth());
+    }
+    if (key == "dev_mode") {
+        return flag(m_devModeController.isEnabled());
+    }
+    if (key == "select_tile_mode") {
+        return flag(m_devModeController.isEnabled() &&
+                    m_devModeController.activeSubmode() == DevelopmentSubmode::SelectTileMode);
+    }
+    if (key == "selected_tile_id") {
+        return m_devModeController.hasSelection()
+                   ? static_cast<double>(
+                         m_tileMapSession.editableTileId(m_devModeController.selectedTile()))
+                   : kNoTileValue;
+    }
+    if (key == "palette_tile") {
+        const auto paletteTile = m_devModeController.clipboardTile();
+        return paletteTile.has_value() ? static_cast<double>(paletteTile.value()) : kNoTileValue;
+    }
+    if (key == "solid_rect_count") {
+        return static_cast<double>(m_tileMapSession.solidRects().size());
+    }
+    if (key == "pending_discard") {
+        return flag(m_pendingDiscard != PendingDiscard::None);
+    }
+    if (key == "status_visible") {
+        return flag(m_statusText != nullptr && m_statusText->isVisible());
+    }
+    return std::nullopt;
 }
 
 void LevelBuilderScene::syncInputMode() {

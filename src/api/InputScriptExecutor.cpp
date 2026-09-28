@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <string_view>
 #include <vector>
 
 #include "FLIP.h"
@@ -200,6 +201,20 @@ bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, S
         if (targetScene) {
             fieldValue = targetScene->getDiagnostics().isFocused ? 1.0 : 0.0;
         }
+        return true;
+    }
+
+    constexpr std::string_view kStatePrefix = "state.";
+    if (cmd.assertField.starts_with(kStatePrefix)) {
+        if (!targetScene) {
+            return true;
+        }
+        const auto value =
+            targetScene->getScriptStateValue(cmd.assertField.substr(kStatePrefix.size()));
+        if (!value.has_value()) {
+            return false;
+        }
+        fieldValue = value.value();
         return true;
     }
 

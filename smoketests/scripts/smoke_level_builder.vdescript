@@ -1,17 +1,24 @@
 # Smoke test: Level Builder multi-layer authoring flow
 # Add and configure a layer, paint on both layers, replay history across them, save and reload,
-# then return to play. Smoke metadata cleans the generated overlay before and after this run.
+# exercise the unsaved-changes guards, then return to play. Smoke metadata cleans the generated
+# overlay before and after this run. State assertions use LevelBuilderScene::getScriptStateValue.
 wait startup
 wait_frames 2
+assert scene "main" state.layer_count == 2
+assert scene "main" state.dirty == 0
 
 press R
 wait_frames 2
 
 press ENTER
 wait_frames 3
+assert scene "main" state.dev_mode == 1
 
 press N
 wait_frames 3
+assert scene "main" state.layer_count == 3
+assert scene "main" state.active_layer == 2
+assert scene "main" state.dirty == 1
 
 press RIGHTBRACKET
 wait_frames 3
@@ -21,21 +28,26 @@ wait_frames 3
 
 press E
 wait_frames 3
+assert scene "main" state.select_tile_mode == 1
 
 press X
 wait_frames 3
+assert scene "main" state.palette_tile == 0
 
 press D
 wait_frames 3
 
 press V
 wait_frames 3
+assert scene "main" state.selected_tile_id == 0
+assert scene "main" state.undo_depth == 1
 
 press Q
 wait_frames 3
 
 press J
 wait_frames 3
+assert scene "main" state.active_layer == 1
 
 press E
 wait_frames 3
@@ -45,30 +57,78 @@ wait_frames 3
 
 press V
 wait_frames 3
+assert scene "main" state.selected_tile_id == 1
+assert scene "main" state.undo_depth == 2
 
 press U
 wait_frames 3
 
 press U
 wait_frames 3
+assert scene "main" state.undo_depth == 0
+assert scene "main" state.redo_depth == 2
 
 press I
 wait_frames 3
 
 press I
 wait_frames 3
+assert scene "main" state.undo_depth == 2
+assert scene "main" state.redo_depth == 0
 
 press F5
 wait_frames 3
+assert scene "main" state.dirty == 0
+assert scene "main" state.status_visible == 1
 
 press F9
 wait_frames 3
+assert scene "main" state.dirty == 0
+assert scene "main" state.layer_count == 3
+assert scene "main" state.undo_depth == 0
+
+# Reload with unsaved edits needs a second press.
+press X
+wait_frames 3
+
+press V
+wait_frames 3
+assert scene "main" state.dirty == 1
+
+press F9
+wait_frames 3
+assert scene "main" state.dirty == 1
+assert scene "main" state.pending_discard == 1
+
+press F9
+wait_frames 3
+assert scene "main" state.dirty == 0
+assert scene "main" state.pending_discard == 0
+assert scene "main" state.selected_tile_id == 1
+
+# Quitting with unsaved edits needs a second press; a single press must keep running.
+press X
+wait_frames 3
+
+press V
+wait_frames 3
+assert scene "main" state.dirty == 1
+
+press ESCAPE
+wait_frames 3
+assert scene "main" state.pending_discard == 1
+assert scene "main" state.dev_mode == 1
+
+press F5
+wait_frames 3
+assert scene "main" state.dirty == 0
 
 press Q
 wait_frames 3
 
 press ENTER
 wait_frames 3
+assert scene "main" state.dev_mode == 0
 
 keydown D
 wait 1100
