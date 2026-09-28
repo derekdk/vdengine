@@ -81,7 +81,9 @@ void writeTextFile(const std::filesystem::path& path, const std::string& text) {
 
     std::error_code replaceError;
 #ifdef _WIN32
-    if (!::MoveFileExW(tempPath.c_str(), path.c_str(),
+    const std::wstring tempPathWide = tempPath.wstring();
+    const std::wstring pathWide = path.wstring();
+    if (!::MoveFileExW(tempPathWide.c_str(), pathWide.c_str(),
                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         replaceError = std::error_code(static_cast<int>(::GetLastError()), std::system_category());
     }
