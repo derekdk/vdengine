@@ -1,0 +1,13 @@
+# Smoke test: RunGame
+# Verify the game starts and runs without crashing.
+wait startup
+wait 2s
+
+# TODO: Add game-specific interactions here, e.g.:
+#   press SPACE
+#   wait 500
+#   keydown LEFT
+#   wait 1000
+#   keyup LEFT
+
+exit

@@ -43,3 +43,5 @@ endfunction()
 add_subdirectory(fishing_game)
 add_subdirectory(level_builder)
 add_subdirectory(pong)
+
+add_subdirectory(run_game)
