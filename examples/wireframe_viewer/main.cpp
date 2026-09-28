@@ -31,8 +31,8 @@
 // Constants
 // =============================================================================
 
-enum class ShapeType { Pyramid = 0, Cube, Sphere };
-enum class RenderMode { Wireframe = 0, Solid, SolidPlusWireframe };
+enum class ShapeType : uint8_t { Pyramid = 0, Cube, Sphere };
+enum class RenderMode : uint8_t { Wireframe = 0, Solid, SolidPlusWireframe };
 
 static constexpr float kWireframeThickness = 0.015f;
 static constexpr float kWireframeOverlayScale = 1.005f;
@@ -46,14 +46,18 @@ class ViewerInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == vde::KEY_1)
+        if (key == vde::KEY_1) {
             m_shapeRequest = ShapeType::Pyramid;
-        if (key == vde::KEY_2)
+        }
+        if (key == vde::KEY_2) {
             m_shapeRequest = ShapeType::Cube;
-        if (key == vde::KEY_3)
+        }
+        if (key == vde::KEY_3) {
             m_shapeRequest = ShapeType::Sphere;
-        if (key == vde::KEY_S)
+        }
+        if (key == vde::KEY_S) {
             m_toggleMode = true;
+        }
     }
 
     void onMouseButtonPress(int button, double x, double y) override {
@@ -132,9 +136,9 @@ class ViewerInputHandler : public vde::examples::BaseExampleInputHandler {
         m_dragDeltaY = 0.0;
     }
 
-    bool isMouseDown() const { return m_mouseDown; }
+    [[nodiscard]] bool isMouseDown() const { return m_mouseDown; }
     void setHitObject(bool hit) { m_hitObject = hit; }
-    bool getHitObject() const { return m_hitObject; }
+    [[nodiscard]] bool getHitObject() const { return m_hitObject; }
 
   private:
     std::optional<ShapeType> m_shapeRequest;
@@ -213,8 +217,9 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<ViewerInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // --- Shape switching (1/2/3) ---
         ShapeType requested;
@@ -257,9 +262,9 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Wireframe Viewer"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Wireframe Viewer"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Wireframe / solid / solid+wireframe rendering",
             "Pyramid, cube, and sphere shapes",
@@ -268,7 +273,7 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "A wireframe pyramid centered on screen (initial)",
             "Shapes switch when pressing 1/2/3",
@@ -276,7 +281,7 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "1     - Show pyramid",  "2     - Show cube",
             "3     - Show sphere",   "S     - Cycle: wireframe -> solid -> solid+wireframe",
@@ -335,7 +340,7 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
         applyRenderMode();
 
         const char* names[] = {"Pyramid", "Cube", "Sphere"};
-        std::cout << "Shape: " << names[static_cast<int>(shape)] << std::endl;
+        std::cout << "Shape: " << names[static_cast<int>(shape)] << '\n';
     }
 
     void cycleRenderMode() {
@@ -353,7 +358,7 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
         applyRenderMode();
 
         const char* modes[] = {"Wireframe", "Solid", "Solid + Wireframe"};
-        std::cout << "Mode: " << modes[static_cast<int>(m_currentMode)] << std::endl;
+        std::cout << "Mode: " << modes[static_cast<int>(m_currentMode)] << '\n';
     }
 
     void applyRenderMode() {
@@ -386,11 +391,12 @@ class WireframeViewerScene : public vde::examples::BaseExampleScene {
     bool performHitTest(double mouseX, double mouseY) {
         auto* cam = getCamera();
         auto* game = getGame();
-        if (!cam || !game || !game->getWindow())
+        if (!cam || !game || !game->getWindow()) {
             return false;
+        }
 
-        float w = static_cast<float>(game->getWindow()->getWidth());
-        float h = static_cast<float>(game->getWindow()->getHeight());
+        auto w = static_cast<float>(game->getWindow()->getWidth());
+        auto h = static_cast<float>(game->getWindow()->getHeight());
 
         // Use camera's screenToWorldRay + the solid mesh's bounding radius
         vde::Ray ray =
@@ -416,6 +422,7 @@ class WireframeViewerGame
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     WireframeViewerGame game;
     return vde::examples::runExample(game, "VDE Wireframe Viewer", 1280, 720, argc, argv);

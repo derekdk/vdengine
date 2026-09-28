@@ -25,10 +25,11 @@ constexpr char32_t kReplacementChar = 0xFFFD;
  * @return Decoded codepoint, or kReplacementChar on invalid sequences
  */
 inline char32_t decode(const std::string& s, std::size_t& pos) {
-    if (pos >= s.size())
+    if (pos >= s.size()) {
         return kReplacementChar;
+    }
 
-    uint8_t b0 = static_cast<uint8_t>(s[pos]);
+    auto b0 = static_cast<uint8_t>(s[pos]);
 
     // 1-byte (ASCII)
     if (b0 < 0x80) {
@@ -42,7 +43,7 @@ inline char32_t decode(const std::string& s, std::size_t& pos) {
             pos = s.size();
             return kReplacementChar;
         }
-        uint8_t b1 = static_cast<uint8_t>(s[pos + 1]);
+        auto b1 = static_cast<uint8_t>(s[pos + 1]);
         if ((b1 & 0xC0) != 0x80) {
             pos += 1;
             return kReplacementChar;
@@ -58,8 +59,8 @@ inline char32_t decode(const std::string& s, std::size_t& pos) {
             pos = s.size();
             return kReplacementChar;
         }
-        uint8_t b1 = static_cast<uint8_t>(s[pos + 1]);
-        uint8_t b2 = static_cast<uint8_t>(s[pos + 2]);
+        auto b1 = static_cast<uint8_t>(s[pos + 1]);
+        auto b2 = static_cast<uint8_t>(s[pos + 2]);
         if ((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80) {
             pos += 1;
             return kReplacementChar;
@@ -67,11 +68,13 @@ inline char32_t decode(const std::string& s, std::size_t& pos) {
         char32_t cp = (static_cast<char32_t>(b0 & 0x0F) << 12) |
                       (static_cast<char32_t>(b1 & 0x3F) << 6) | static_cast<char32_t>(b2 & 0x3F);
         pos += 3;
-        if (cp < 0x800)  // reject overlong encodings
+        if (cp < 0x800) {  // reject overlong encodings
             return kReplacementChar;
+        }
         if (cp >= 0xD800 &&
-            cp <= 0xDFFF)  // reject surrogate range (not valid Unicode scalar values)
+            cp <= 0xDFFF) {  // reject surrogate range (not valid Unicode scalar values)
             return kReplacementChar;
+        }
         return cp;
     }
 
@@ -81,9 +84,9 @@ inline char32_t decode(const std::string& s, std::size_t& pos) {
             pos = s.size();
             return kReplacementChar;
         }
-        uint8_t b1 = static_cast<uint8_t>(s[pos + 1]);
-        uint8_t b2 = static_cast<uint8_t>(s[pos + 2]);
-        uint8_t b3 = static_cast<uint8_t>(s[pos + 3]);
+        auto b1 = static_cast<uint8_t>(s[pos + 1]);
+        auto b2 = static_cast<uint8_t>(s[pos + 2]);
+        auto b3 = static_cast<uint8_t>(s[pos + 3]);
         if ((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80) {
             pos += 1;
             return kReplacementChar;
@@ -92,8 +95,9 @@ inline char32_t decode(const std::string& s, std::size_t& pos) {
                       (static_cast<char32_t>(b1 & 0x3F) << 12) |
                       (static_cast<char32_t>(b2 & 0x3F) << 6) | static_cast<char32_t>(b3 & 0x3F);
         pos += 4;
-        if (cp < 0x10000 || cp > 0x10FFFF)
+        if (cp < 0x10000 || cp > 0x10FFFF) {
             return kReplacementChar;
+        }
         return cp;
     }
 
@@ -132,65 +136,89 @@ inline void encode(char32_t cp, std::string& out) {
  */
 inline bool isEmoji(char32_t cp) {
     // Miscellaneous Symbols
-    if (cp >= 0x2600 && cp <= 0x26FF)
+    if (cp >= 0x2600 && cp <= 0x26FF) {
         return true;
+    }
     // Dingbats
-    if (cp >= 0x2700 && cp <= 0x27BF)
+    if (cp >= 0x2700 && cp <= 0x27BF) {
         return true;
+    }
     // Emoticons
-    if (cp >= 0x1F600 && cp <= 0x1F64F)
+    if (cp >= 0x1F600 && cp <= 0x1F64F) {
         return true;
+    }
     // Miscellaneous Symbols and Pictographs
-    if (cp >= 0x1F300 && cp <= 0x1F5FF)
+    if (cp >= 0x1F300 && cp <= 0x1F5FF) {
         return true;
+    }
     // Transport and Map Symbols
-    if (cp >= 0x1F680 && cp <= 0x1F6FF)
+    if (cp >= 0x1F680 && cp <= 0x1F6FF) {
         return true;
+    }
     // Supplemental Symbols and Pictographs
-    if (cp >= 0x1F900 && cp <= 0x1F9FF)
+    if (cp >= 0x1F900 && cp <= 0x1F9FF) {
         return true;
+    }
     // Symbols and Pictographs Extended-A
-    if (cp >= 0x1FA00 && cp <= 0x1FA6F)
+    if (cp >= 0x1FA00 && cp <= 0x1FA6F) {
         return true;
+    }
     // Symbols and Pictographs Extended-B
-    if (cp >= 0x1FA70 && cp <= 0x1FAFF)
+    if (cp >= 0x1FA70 && cp <= 0x1FAFF) {
         return true;
+    }
     // Regional indicator symbols
-    if (cp >= 0x1F1E0 && cp <= 0x1F1FF)
+    if (cp >= 0x1F1E0 && cp <= 0x1F1FF) {
         return true;
+    }
     // Mahjong Tiles and Domino Tiles
-    if (cp >= 0x1F000 && cp <= 0x1F0FF)
+    if (cp >= 0x1F000 && cp <= 0x1F0FF) {
         return true;
+    }
     // Variation selectors and ZWJ used in emoji sequences
-    if (cp == 0x200D || cp == 0xFE0F || cp == 0x20E3)
+    if (cp == 0x200D || cp == 0xFE0F || cp == 0x20E3) {
         return true;
+    }
     // Common BMP emoji symbols
-    if (cp == 0x2764 || cp == 0x2763)
+    if (cp == 0x2764 || cp == 0x2763) {
         return true;  // hearts
-    if (cp == 0x231A || cp == 0x231B)
+    }
+    if (cp == 0x231A || cp == 0x231B) {
         return true;
-    if (cp >= 0x23E9 && cp <= 0x23F3)
+    }
+    if (cp >= 0x23E9 && cp <= 0x23F3) {
         return true;
-    if (cp == 0x23F8 || cp == 0x23F9 || cp == 0x23FA)
+    }
+    if (cp == 0x23F8 || cp == 0x23F9 || cp == 0x23FA) {
         return true;
-    if (cp >= 0x25AA && cp <= 0x25AB)
+    }
+    if (cp >= 0x25AA && cp <= 0x25AB) {
         return true;
-    if (cp == 0x25B6 || cp == 0x25C0)
+    }
+    if (cp == 0x25B6 || cp == 0x25C0) {
         return true;
-    if (cp >= 0x25FB && cp <= 0x25FE)
+    }
+    if (cp >= 0x25FB && cp <= 0x25FE) {
         return true;
-    if (cp >= 0x2648 && cp <= 0x2653)
+    }
+    if (cp >= 0x2648 && cp <= 0x2653) {
         return true;  // zodiac
-    if (cp >= 0x2B05 && cp <= 0x2B55)
+    }
+    if (cp >= 0x2B05 && cp <= 0x2B55) {
         return true;  // arrows and geometric shapes (⬅⬆⬇⬛⬜⭐⭕)
-    if (cp == 0x203C || cp == 0x2049)
+    }
+    if (cp == 0x203C || cp == 0x2049) {
         return true;
-    if (cp == 0x2122 || cp == 0x2139)
+    }
+    if (cp == 0x2122 || cp == 0x2139) {
         return true;
-    if (cp >= 0x2194 && cp <= 0x2199)
+    }
+    if (cp >= 0x2194 && cp <= 0x2199) {
         return true;
-    if (cp == 0x21A9 || cp == 0x21AA)
+    }
+    if (cp == 0x21A9 || cp == 0x21AA) {
         return true;
+    }
     return false;
 }
 

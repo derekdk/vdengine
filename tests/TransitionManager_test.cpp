@@ -28,7 +28,7 @@ class MockVulkanContextForTransition : public VulkanContext {
     }
 
     // Override so nothing real happens
-    VkDevice getDevice() const override { return VK_NULL_HANDLE; }
+    [[nodiscard]] VkDevice getDevice() const override { return VK_NULL_HANDLE; }
 };
 
 /// A concrete test transition.
@@ -47,8 +47,8 @@ class TestTransition : public Transition {
 
     ~TestTransition() override { state->destroyed = true; }
 
-    const char* getName() const override { return "Test"; }
-    std::string getFragmentShaderPath() const override { return "test.frag"; }
+    [[nodiscard]] const char* getName() const override { return "Test"; }
+    [[nodiscard]] std::string getFragmentShaderPath() const override { return "test.frag"; }
 
     std::shared_ptr<State> state;
 

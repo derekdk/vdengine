@@ -83,7 +83,7 @@ struct ViewportRect {
      * @param normalizedY Y position in [0,1] (0 = top edge of window)
      * @return true if the point is inside (inclusive of edges)
      */
-    bool contains(float normalizedX, float normalizedY) const {
+    [[nodiscard]] bool contains(float normalizedX, float normalizedY) const {
         return normalizedX >= x && normalizedX <= x + width && normalizedY >= y &&
                normalizedY <= y + height;
     }
@@ -98,7 +98,7 @@ struct ViewportRect {
      * @param swapchainHeight Swapchain height in pixels
      * @return VkViewport with pixel coordinates and standard depth range
      */
-    VkViewport toVkViewport(uint32_t swapchainWidth, uint32_t swapchainHeight) const {
+    [[nodiscard]] VkViewport toVkViewport(uint32_t swapchainWidth, uint32_t swapchainHeight) const {
         VkViewport vp{};
         vp.x = x * static_cast<float>(swapchainWidth);
         vp.y = y * static_cast<float>(swapchainHeight);
@@ -115,7 +115,7 @@ struct ViewportRect {
      * @param swapchainHeight Swapchain height in pixels
      * @return VkRect2D with pixel coordinates
      */
-    VkRect2D toVkScissor(uint32_t swapchainWidth, uint32_t swapchainHeight) const {
+    [[nodiscard]] VkRect2D toVkScissor(uint32_t swapchainWidth, uint32_t swapchainHeight) const {
         VkRect2D scissor{};
         scissor.offset.x = static_cast<int32_t>(x * static_cast<float>(swapchainWidth));
         scissor.offset.y = static_cast<int32_t>(y * static_cast<float>(swapchainHeight));
@@ -130,7 +130,7 @@ struct ViewportRect {
      * @param swapchainHeight Swapchain height in pixels
      * @return Aspect ratio (width / height in pixels)
      */
-    float getAspectRatio(uint32_t swapchainWidth, uint32_t swapchainHeight) const {
+    [[nodiscard]] float getAspectRatio(uint32_t swapchainWidth, uint32_t swapchainHeight) const {
         float pw = width * static_cast<float>(swapchainWidth);
         float ph = height * static_cast<float>(swapchainHeight);
         return (ph > 0.0f) ? (pw / ph) : 1.0f;

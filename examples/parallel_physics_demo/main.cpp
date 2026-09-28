@@ -18,6 +18,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -34,7 +35,10 @@
 // Thread logging utility
 // ============================================================================
 
-static std::mutex g_logMutex;
+static std::mutex& logMutex() {
+    static std::mutex mutex;
+    return mutex;
+}
 
 // ============================================================================
 // Input Handler
@@ -44,10 +48,12 @@ class ParallelPhysicsInputHandler : public vde::examples::BaseExampleInputHandle
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
-        if (key == vde::KEY_R)
+        }
+        if (key == vde::KEY_R) {
             m_resetPressed = true;
+        }
     }
 
     bool isSpacePressed() {
@@ -73,10 +79,10 @@ class ParallelPhysicsInputHandler : public vde::examples::BaseExampleInputHandle
 
 class PhysicsWorldScene : public vde::Scene {
   public:
-    PhysicsWorldScene(const std::string& name, const vde::Color& bgColor,
-                      const vde::Color& groundColor, const vde::Color& boxColor, float gravityY)
-        : m_sceneName(name), m_bgColor(bgColor), m_groundColor(groundColor), m_boxColor(boxColor),
-          m_gravityY(gravityY) {
+    PhysicsWorldScene(std::string name, const vde::Color& bgColor, const vde::Color& groundColor,
+                      const vde::Color& boxColor, float gravityY)
+        : m_sceneName(std::move(name)), m_bgColor(bgColor), m_groundColor(groundColor),
+          m_boxColor(boxColor), m_gravityY(gravityY) {
         enablePhaseCallbacks();
     }
 
@@ -112,7 +118,7 @@ class PhysicsWorldScene : public vde::Scene {
 
         std::cout << "[" << m_sceneName << "] Initialized with "
                   << getPhysicsScene()->getBodyCount() << " bodies (gravity y=" << m_gravityY << ")"
-                  << std::endl;
+                  << '\n';
     }
 
     void updateGameLogic(float deltaTime) override {
@@ -123,9 +129,9 @@ class PhysicsWorldScene : public vde::Scene {
             m_statusTimer = 0.0f;
             size_t threadHash = m_lastPhysicsThreadHash.load(std::memory_order_relaxed);
             if (threadHash != 0) {
-                std::lock_guard<std::mutex> lock(g_logMutex);
+                std::scoped_lock lock(logMutex());
                 std::cout << "[Physics] Scene '" << m_sceneName
-                          << "' last stepped on thread hash: " << threadHash << std::endl;
+                          << "' last stepped on thread hash: " << threadHash << '\n';
             }
         }
     }
@@ -143,7 +149,7 @@ class PhysicsWorldScene : public vde::Scene {
         }
         m_physicsSprites.clear();
         spawnBoxes();
-        std::cout << "[" << m_sceneName << "] Reset" << std::endl;
+        std::cout << "[" << m_sceneName << "] Reset" << '\n';
     }
 
   protected:
@@ -169,8 +175,8 @@ class PhysicsWorldScene : public vde::Scene {
             {-1.0f, 4.0f}, {0.0f, 5.5f}, {1.0f, 4.5f}, {-0.5f, 6.5f}, {0.5f, 7.5f},
         };
 
-        for (int i = 0; i < 5; ++i) {
-            spawnSingleBox(positions[i][0], positions[i][1]);
+        for (auto& position : positions) {
+            spawnSingleBox(position[0], position[1]);
         }
     }
 
@@ -222,37 +228,43 @@ class CoordinatorScene : public vde::examples::BaseExampleScene {
         auto* input = dynamic_cast<ParallelPhysicsInputHandler*>(getInputHandler());
         if (input) {
             if (input->isSpacePressed()) {
-                if (m_leftScene)
+                if (m_leftScene) {
                     m_leftScene->spawnExtraBox();
-                if (m_rightScene)
+                }
+                if (m_rightScene) {
                     m_rightScene->spawnExtraBox();
+                }
             }
             if (input->isResetPressed()) {
-                if (m_leftScene)
+                if (m_leftScene) {
                     m_leftScene->resetBoxes();
-                if (m_rightScene)
+                }
+                if (m_rightScene) {
                     m_rightScene->resetBoxes();
+                }
             }
         }
     }
 
   protected:
-    std::string getExampleName() const override { return "Parallel Physics (Thread Pool)"; }
+    [[nodiscard]] std::string getExampleName() const override {
+        return "Parallel Physics (Thread Pool)";
+    }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"ThreadPool with 2 worker threads", "Two independent PhysicsScene instances",
                 "Per-scene physics stepping on worker threads",
                 "Split-screen viewports (left/right)", "Scheduler parallel task dispatch"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Left half: blue world with falling boxes (normal gravity)",
                 "Right half: red world with falling boxes (lower gravity)",
                 "Boxes falling and stacking on ground platforms",
                 "Console output showing different thread IDs per scene"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SPACE - Spawn extra boxes in both scenes", "R     - Reset both scenes"};
     }
 
@@ -282,8 +294,8 @@ class ParallelPhysicsGame : public vde::Game {
         // Enable thread pool with 2 workers
         getScheduler().setWorkerThreadCount(2);
 
-        std::cout << "\n[ThreadPool] Enabled with 2 worker threads" << std::endl;
-        std::cout << "[ThreadPool] Main thread: " << std::this_thread::get_id() << std::endl;
+        std::cout << "\n[ThreadPool] Enabled with 2 worker threads" << '\n';
+        std::cout << "[ThreadPool] Main thread: " << std::this_thread::get_id() << '\n';
 
         // Create left physics scene (blue, normal gravity)
         auto* leftScene =
@@ -323,8 +335,9 @@ class ParallelPhysicsGame : public vde::Game {
 
     void onRender() override {
 #ifdef VDE_EXAMPLE_USE_IMGUI
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -365,7 +378,7 @@ class ParallelPhysicsGame : public vde::Game {
         getScheduler().setWorkerThreadCount(0);
     }
 
-    int getExitCode() const override { return 0; }
+    [[nodiscard]] int getExitCode() const override { return 0; }
 
   private:
     std::unique_ptr<ParallelPhysicsInputHandler> m_input;
@@ -390,8 +403,9 @@ class ParallelPhysicsGame : public vde::Game {
     void initImGui() {
         auto* ctx = getVulkanContext();
         auto* win = getWindow();
-        if (!ctx || !win)
+        if (!ctx || !win) {
             return;
+        }
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -400,8 +414,9 @@ class ParallelPhysicsGame : public vde::Game {
         ImGui::StyleColorsDark();
 
         float dpiScale = getDPIScale();
-        if (dpiScale > 0.0f)
+        if (dpiScale > 0.0f) {
             io.FontGlobalScale = dpiScale;
+        }
 
         ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
         m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
@@ -425,8 +440,9 @@ class ParallelPhysicsGame : public vde::Game {
     }
 
     void cleanupImGui() {
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -446,6 +462,7 @@ class ParallelPhysicsGame : public vde::Game {
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ParallelPhysicsGame game;
 
@@ -466,13 +483,13 @@ int main(int argc, char** argv) {
 
     try {
         if (!game.initialize(settings)) {
-            std::cerr << "Failed to initialize!" << std::endl;
+            std::cerr << "Failed to initialize!" << '\n';
             return 1;
         }
         game.run();
         return game.getExitCode();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << '\n';
         return 1;
     }
 }

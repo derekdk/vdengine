@@ -138,17 +138,18 @@ bool Mesh::loadFromFile(const std::string& path) {
 
             glm::vec3 extents = boundsMax - boundsMin;
             std::array<int, 3> axes = {0, 1, 2};
-            std::sort(axes.begin(), axes.end(),
-                      [&extents](int a, int b) { return extents[a] > extents[b]; });
+            std::ranges::sort(axes, [&extents](int a, int b) { return extents[a] > extents[b]; });
 
             int uAxis = axes[0];
             int vAxis = axes[1];
 
             auto axisValue = [](const glm::vec3& value, int axis) -> float {
-                if (axis == 0)
+                if (axis == 0) {
                     return value.x;
-                if (axis == 1)
+                }
+                if (axis == 1) {
                     return value.y;
+                }
                 return value.z;
             };
 
@@ -271,7 +272,7 @@ ResourcePtr<Mesh> Mesh::createSphere(float radius, int segments, int rings) {
             float sinPhi = std::sin(phi);
             float cosPhi = std::cos(phi);
 
-            Vertex vertex;
+            Vertex vertex{};
             vertex.position = glm::vec3(radius * sinTheta * cosPhi, radius * cosTheta,
                                         radius * sinTheta * sinPhi);
 
@@ -325,7 +326,7 @@ ResourcePtr<Mesh> Mesh::createPlane(float width, float height, int subdivisionsX
             float u = static_cast<float>(x) / static_cast<float>(subdivisionsX);
             float posX = -halfWidth + u * width;
 
-            Vertex vertex;
+            Vertex vertex{};
             vertex.position = glm::vec3(posX, posY, 0.0f);
             vertex.color = glm::vec3(1.0f);  // White
             vertex.texCoord = glm::vec2(u, v);
@@ -374,14 +375,14 @@ ResourcePtr<Mesh> Mesh::createCylinder(float radius, float height, int segments)
         float u = static_cast<float>(i) / static_cast<float>(segments);
 
         // Bottom vertex
-        Vertex bottomVertex;
+        Vertex bottomVertex{};
         bottomVertex.position = glm::vec3(radius * cosTheta, -halfHeight, radius * sinTheta);
         bottomVertex.color = glm::vec3(1.0f, 0.0f, 0.0f);  // Red
         bottomVertex.texCoord = glm::vec2(u, 0.0f);
         vertices.push_back(bottomVertex);
 
         // Top vertex
-        Vertex topVertex;
+        Vertex topVertex{};
         topVertex.position = glm::vec3(radius * cosTheta, halfHeight, radius * sinTheta);
         topVertex.color = glm::vec3(0.0f, 1.0f, 0.0f);  // Green
         topVertex.texCoord = glm::vec2(u, 1.0f);
@@ -405,15 +406,15 @@ ResourcePtr<Mesh> Mesh::createCylinder(float radius, float height, int segments)
     }
 
     // Add cap centers
-    uint32_t bottomCenterIdx = static_cast<uint32_t>(vertices.size());
-    Vertex bottomCenter;
+    auto bottomCenterIdx = static_cast<uint32_t>(vertices.size());
+    Vertex bottomCenter{};
     bottomCenter.position = glm::vec3(0.0f, -halfHeight, 0.0f);
     bottomCenter.color = glm::vec3(0.0f, 0.0f, 1.0f);  // Blue
     bottomCenter.texCoord = glm::vec2(0.5f, 0.5f);
     vertices.push_back(bottomCenter);
 
-    uint32_t topCenterIdx = static_cast<uint32_t>(vertices.size());
-    Vertex topCenter;
+    auto topCenterIdx = static_cast<uint32_t>(vertices.size());
+    Vertex topCenter{};
     topCenter.position = glm::vec3(0.0f, halfHeight, 0.0f);
     topCenter.color = glm::vec3(1.0f, 1.0f, 0.0f);  // Yellow
     topCenter.texCoord = glm::vec2(0.5f, 0.5f);
@@ -463,7 +464,7 @@ ResourcePtr<Mesh> Mesh::createPyramid(float baseSize, float height) {
     // field (the mesh shader uses vertex.color as the surface normal).
     auto addTri = [&](const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
         glm::vec3 normal = glm::normalize(glm::cross(b - a, c - a));
-        uint32_t base = static_cast<uint32_t>(vertices.size());
+        auto base = static_cast<uint32_t>(vertices.size());
         vertices.push_back({a, normal, uv});
         vertices.push_back({b, normal, uv});
         vertices.push_back({c, normal, uv});
@@ -502,8 +503,9 @@ void addEdgeTube(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices,
                  const glm::vec3& start, const glm::vec3& end, float thickness) {
     glm::vec3 dir = end - start;
     float len = glm::length(dir);
-    if (len < 0.0001f)
+    if (len < 0.0001f) {
         return;
+    }
     dir /= len;
 
     // Build a perpendicular frame around the edge direction
@@ -512,7 +514,7 @@ void addEdgeTube(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices,
     glm::vec3 forward = glm::normalize(glm::cross(right, dir));
 
     float halfT = thickness * 0.5f;
-    uint32_t base = static_cast<uint32_t>(vertices.size());
+    auto base = static_cast<uint32_t>(vertices.size());
     glm::vec2 uv(0.0f, 0.0f);
 
     // Four corner offsets and their outward normals
@@ -539,7 +541,7 @@ void addEdgeTube(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices,
 
     // 4 side quads (2 tris each)
     for (int i = 0; i < 4; i++) {
-        uint32_t next = static_cast<uint32_t>((i + 1) % 4);
+        auto next = static_cast<uint32_t>((i + 1) % 4);
         indices.push_back(base + i);
         indices.push_back(base + i + 4);
         indices.push_back(base + next + 4);

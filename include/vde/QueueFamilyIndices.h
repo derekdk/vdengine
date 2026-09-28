@@ -24,7 +24,9 @@ struct QueueFamilyIndices {
      * @brief Check if all required queue families have been found.
      * @return true if both graphics and present families are set
      */
-    bool isComplete() const { return graphicsFamily.has_value() && presentFamily.has_value(); }
+    [[nodiscard]] bool isComplete() const {
+        return graphicsFamily.has_value() && presentFamily.has_value();
+    }
 };
 
 }  // namespace vde

@@ -470,7 +470,7 @@ TEST(InputScriptParseLine, PrintMissingMessageReportsError) {
     std::string error;
     EXPECT_FALSE(parseScriptLine("print", 3, cmd, error));
     EXPECT_FALSE(error.empty());
-    EXPECT_NE(error.find("3"), std::string::npos);
+    EXPECT_NE(error.find('3'), std::string::npos);
 }
 
 // ============================================================================
@@ -496,7 +496,7 @@ TEST(InputScriptParseLine, InvalidVerbReportsError) {
     EXPECT_FALSE(parseScriptLine("foobar", 5, cmd, error));
     EXPECT_FALSE(error.empty());
     // Error should mention line number
-    EXPECT_NE(error.find("5"), std::string::npos);
+    EXPECT_NE(error.find('5'), std::string::npos);
 }
 
 TEST(InputScriptParseLine, MissingArgsReportsError) {
@@ -791,31 +791,31 @@ TEST_F(InputScriptFileTest, ParsesMouseCommands) {
 
 TEST(InputScriptCLI, ParsesInputScriptArg) {
     const char* argv[] = {"program", "--input-script", "test.vdescript"};
-    std::string result = getInputScriptArg(3, const_cast<char**>(argv));
+    std::string result = getInputScriptArg(3, argv);
     EXPECT_EQ(result, "test.vdescript");
 }
 
 TEST(InputScriptCLI, ParsesInputScriptArgEquals) {
     const char* argv[] = {"program", "--input-script=test.vdescript"};
-    std::string result = getInputScriptArg(2, const_cast<char**>(argv));
+    std::string result = getInputScriptArg(2, argv);
     EXPECT_EQ(result, "test.vdescript");
 }
 
 TEST(InputScriptCLI, ReturnsEmptyWhenNoArg) {
     const char* argv[] = {"program", "--other-flag"};
-    std::string result = getInputScriptArg(2, const_cast<char**>(argv));
+    std::string result = getInputScriptArg(2, argv);
     EXPECT_EQ(result, "");
 }
 
 TEST(InputScriptCLI, ReturnsEmptyWhenNoArgs) {
     const char* argv[] = {"program"};
-    std::string result = getInputScriptArg(1, const_cast<char**>(argv));
+    std::string result = getInputScriptArg(1, argv);
     EXPECT_EQ(result, "");
 }
 
 TEST(InputScriptCLI, ReturnsEmptyWhenArgMissesValue) {
     const char* argv[] = {"program", "--input-script"};
-    std::string result = getInputScriptArg(2, const_cast<char**>(argv));
+    std::string result = getInputScriptArg(2, argv);
     EXPECT_EQ(result, "");
 }
 

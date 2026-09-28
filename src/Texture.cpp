@@ -13,6 +13,8 @@ Texture::~Texture() {
     cleanup();
 }
 
+// Only the Resource base subobject is moved first; derived members are still valid to read.
+// NOLINTBEGIN(bugprone-use-after-move)
 Texture::Texture(Texture&& other) noexcept
     : Resource(std::move(other)), m_pixelData(std::move(other.m_pixelData)), m_width(other.m_width),
       m_height(other.m_height), m_channels(other.m_channels), m_device(other.m_device),
@@ -32,10 +34,10 @@ Texture::Texture(Texture&& other) noexcept
     other.m_imageView = VK_NULL_HANDLE;
     other.m_sampler = VK_NULL_HANDLE;
 }
+// NOLINTEND(bugprone-use-after-move)
 
 Texture& Texture::operator=(Texture&& other) noexcept {
     if (this != &other) {
-        Resource::operator=(std::move(other));
         m_pixelData = std::move(other.m_pixelData);
         m_width = other.m_width;
         m_height = other.m_height;
@@ -59,6 +61,7 @@ Texture& Texture::operator=(Texture&& other) noexcept {
         other.m_imageMemory = VK_NULL_HANDLE;
         other.m_imageView = VK_NULL_HANDLE;
         other.m_sampler = VK_NULL_HANDLE;
+        Resource::operator=(std::move(other));
     }
     return *this;
 }

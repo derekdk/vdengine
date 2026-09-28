@@ -29,6 +29,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -50,8 +51,8 @@ struct FontEntry {
 };
 
 static std::string toLowerCopy(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::ranges::transform(value, value.begin(),
+                           [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     return value;
 }
 
@@ -78,15 +79,18 @@ static std::vector<FontEntry> enumerateSystemFonts() {
 
     for (auto& dir : dirs) {
         std::error_code ec;
-        if (!std::filesystem::is_directory(dir, ec))
+        if (!std::filesystem::is_directory(dir, ec)) {
             continue;
+        }
 
         for (auto& entry : std::filesystem::directory_iterator(
                  dir, std::filesystem::directory_options::skip_permission_denied, ec)) {
-            if (ec)
+            if (ec) {
                 break;
-            if (!entry.is_regular_file(ec))
+            }
+            if (!entry.is_regular_file(ec)) {
                 continue;
+            }
             auto ext = toLowerCopy(entry.path().extension().string());
             if (ext == ".ttf") {
                 FontEntry fe;
@@ -98,7 +102,7 @@ static std::vector<FontEntry> enumerateSystemFonts() {
     }
 
     // Sort by display name (case-insensitive)
-    std::sort(fonts.begin(), fonts.end(), [](const FontEntry& a, const FontEntry& b) {
+    std::ranges::sort(fonts, [](const FontEntry& a, const FontEntry& b) {
         return toLowerCopy(a.displayName) < toLowerCopy(b.displayName);
     });
 
@@ -145,7 +149,11 @@ static std::vector<std::string> wordWrap(const vde::TrueTypeFont& font, const st
     std::string currentLine;
 
     while (stream >> word) {
-        std::string testLine = currentLine.empty() ? word : currentLine + " " + word;
+        std::string testLine = currentLine;
+        if (!testLine.empty()) {
+            testLine += ' ';
+        }
+        testLine += word;
         if (measureTextWidthPx(font, testLine) > maxWidthPx && !currentLine.empty()) {
             lines.push_back(currentLine);
             currentLine = word;
@@ -157,7 +165,7 @@ static std::vector<std::string> wordWrap(const vde::TrueTypeFont& font, const st
         lines.push_back(currentLine);
     }
     if (lines.empty()) {
-        lines.push_back("");
+        lines.emplace_back("");
     }
     return lines;
 }
@@ -246,22 +254,23 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
         m_systemFonts = enumerateSystemFonts();
 
         // Insert the bundled VDE font at position 0 so it's always available
-        m_fontPaths.push_back("assets/fonts/VDE_default.ttf");
-        m_fontNames.push_back("VDE_default (bundled)");
+        m_fontPaths.emplace_back("assets/fonts/VDE_default.ttf");
+        m_fontNames.emplace_back("VDE_default (bundled)");
         for (auto& fe : m_systemFonts) {
             m_fontPaths.push_back(fe.path);
             m_fontNames.push_back(fe.displayName);
         }
         m_selectedFontIdx = 0;
 
-        std::cout << "Found " << m_systemFonts.size() << " system TTF fonts." << std::endl;
+        std::cout << "Found " << m_systemFonts.size() << " system TTF fonts." << '\n';
 
         // Load TrueType font
         m_ttfFont = std::make_unique<vde::TrueTypeFont>();
         if (!m_ttfFont->loadFromFile(m_ctx, m_fontPaths[0], m_ttfSizePx)) {
             std::cerr << "ERROR: Failed to load TTF font. Demo requires TrueType font.\n";
-            if (getGame())
+            if (getGame()) {
                 getGame()->quit();
+            }
             return;
         }
 
@@ -359,12 +368,13 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
 
                 // Listbox with filtered font names
                 if (ImGui::BeginListBox("##fontlist", ImVec2(-FLT_MIN, 150 * scale))) {
-                    for (int i = 0; i < static_cast<int>(m_fontNames.size()); ++i) {
+                    for (int i = 0; std::cmp_less(i, m_fontNames.size()); ++i) {
                         // Apply filter
                         if (!filterLower.empty()) {
                             std::string nameLower = toLowerCopy(m_fontNames[i]);
-                            if (nameLower.find(filterLower) == std::string::npos)
+                            if (nameLower.find(filterLower) == std::string::npos) {
                                 continue;
+                            }
                         }
 
                         bool selected = (i == m_selectedFontIdx);
@@ -463,9 +473,9 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Text Metrics Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Text Metrics Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Horizontal alignment: left, center, right",
             "Vertical alignment: top, center, bottom",
@@ -476,7 +486,7 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Top row: three boxes with left / center / right aligned text",
             "Each alignment box also shows top, center, and bottom vertical alignment",
@@ -486,7 +496,7 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "SPACE - Pause/resume animation",
         };
@@ -576,8 +586,8 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
 
                 m_alignTexts[h][v].sprite = sprite;
                 m_alignTexts[h][v].texture = tex;
-                float w = static_cast<float>(tex->getWidth());
-                float ht = static_cast<float>(tex->getHeight());
+                auto w = static_cast<float>(tex->getWidth());
+                auto ht = static_cast<float>(tex->getHeight());
                 m_alignTexts[h][v].aspectRatio = (ht > 0) ? w / ht : 1.0f;
             }
         }
@@ -615,8 +625,9 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             // Position text lines
             for (int v = 0; v < 3; ++v) {
                 auto& at = m_alignTexts[h][v];
-                if (!at.sprite)
+                if (!at.sprite) {
                     continue;
+                }
 
                 float tw = textHeight * at.aspectRatio;
                 at.sprite->setScale(tw, textHeight, 1.0f);
@@ -772,8 +783,9 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
             // Reuse pooled sprites; grow pool if needed; cache textures by content
             size_t activeCount = 0;
             for (auto& line : newLines) {
-                if (line.empty())
+                if (line.empty()) {
                     continue;
+                }
 
                 // Grow sprite pool if needed
                 if (activeCount >= m_wrapLineSprites.size()) {
@@ -809,15 +821,16 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
 
         for (size_t i = 0; i < m_wrapLineSprites.size(); ++i) {
             auto& sprite = m_wrapLineSprites[i];
-            if (i >= m_wrapActiveCount || static_cast<int>(i) >= maxVisibleLines) {
+            if (i >= m_wrapActiveCount || std::cmp_greater_equal(i, maxVisibleLines)) {
                 sprite->setVisible(false);
                 continue;
             }
             sprite->setVisible(true);
 
             auto tex = sprite->getTexture();
-            if (!tex)
+            if (!tex) {
                 continue;
+            }
 
             float aspect =
                 static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
@@ -874,8 +887,8 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
 
             m_fitTextTexture =
                 vde::TextRenderer::createTexture(m_ctx, "FIT ME!", *m_ttfFont, style);
-            float w = static_cast<float>(m_fitTextTexture->getWidth());
-            float h = static_cast<float>(m_fitTextTexture->getHeight());
+            auto w = static_cast<float>(m_fitTextTexture->getWidth());
+            auto h = static_cast<float>(m_fitTextTexture->getHeight());
             m_fitTextAspect = (h > 0) ? w / h : 1.0f;
 
             auto sprite = addEntity<vde::SpriteEntity>();
@@ -964,7 +977,7 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
         VisualBox box;
         auto makePart = [&](std::shared_ptr<vde::Texture> tex, const vde::Color& color) {
             auto sprite = addEntity<vde::SpriteEntity>();
-            sprite->setTexture(tex);
+            sprite->setTexture(std::move(tex));
             sprite->setColor(color);
             return sprite;
         };
@@ -987,8 +1000,7 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
     void reloadFont() {
         auto newFont = std::make_unique<vde::TrueTypeFont>();
         if (!newFont->loadFromFile(m_ctx, m_fontPaths[m_selectedFontIdx], m_ttfSizePx)) {
-            std::cerr << "WARNING: Failed to load font: " << m_fontPaths[m_selectedFontIdx]
-                      << std::endl;
+            std::cerr << "WARNING: Failed to load font: " << m_fontPaths[m_selectedFontIdx] << '\n';
             // Revert to the last working font index
             m_selectedFontIdx = m_lastWorkingFontIdx;
             return;
@@ -1001,11 +1013,12 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
     void rebuildAll() {
         // Rebuild alignment text textures
         const char* lines[] = {"Top line", "Middle line", "Bottom line"};
-        for (int h = 0; h < 3; ++h) {
+        for (auto& m_alignText : m_alignTexts) {
             for (int v = 0; v < 3; ++v) {
-                auto& at = m_alignTexts[h][v];
-                if (!at.sprite)
+                auto& at = m_alignText[v];
+                if (!at.sprite) {
                     continue;
+                }
 
                 vde::TextStyle style;
                 style.color = vde::Color(m_textColor[0], m_textColor[1], m_textColor[2]);
@@ -1015,8 +1028,8 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
                 auto tex = vde::TextRenderer::createTexture(m_ctx, lines[v], *m_ttfFont, style);
                 at.sprite->setTexture(tex);
                 at.texture = tex;
-                float w = static_cast<float>(tex->getWidth());
-                float ht = static_cast<float>(tex->getHeight());
+                auto w = static_cast<float>(tex->getWidth());
+                auto ht = static_cast<float>(tex->getHeight());
                 at.aspectRatio = (ht > 0) ? w / ht : 1.0f;
             }
         }
@@ -1030,8 +1043,8 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
 
             m_fitTextTexture =
                 vde::TextRenderer::createTexture(m_ctx, "FIT ME!", *m_ttfFont, style);
-            float w = static_cast<float>(m_fitTextTexture->getWidth());
-            float h = static_cast<float>(m_fitTextTexture->getHeight());
+            auto w = static_cast<float>(m_fitTextTexture->getWidth());
+            auto h = static_cast<float>(m_fitTextTexture->getHeight());
             m_fitTextAspect = (h > 0) ? w / h : 1.0f;
             if (m_fitTextSprite) {
                 m_fitTextSprite->setTexture(m_fitTextTexture);
@@ -1067,20 +1080,25 @@ class TextMetricsScene : public vde::examples::BaseExampleScene {
         vde::Color borderColor(m_borderColor[0], m_borderColor[1], m_borderColor[2]);
 
         auto applyToBox = [&](VisualBox& box) {
-            if (box.background)
+            if (box.background) {
                 box.background->setColor(bgColor);
-            if (box.borderTop)
+            }
+            if (box.borderTop) {
                 box.borderTop->setColor(borderColor);
-            if (box.borderBottom)
+            }
+            if (box.borderBottom) {
                 box.borderBottom->setColor(borderColor);
-            if (box.borderLeft)
+            }
+            if (box.borderLeft) {
                 box.borderLeft->setColor(borderColor);
-            if (box.borderRight)
+            }
+            if (box.borderRight) {
                 box.borderRight->setColor(borderColor);
+            }
         };
 
-        for (int i = 0; i < 3; ++i) {
-            applyToBox(m_alignBoxes[i]);
+        for (auto& m_alignBoxe : m_alignBoxes) {
+            applyToBox(m_alignBoxe);
         }
         applyToBox(m_wrapBox);
         applyToBox(m_fitBox);
@@ -1096,10 +1114,11 @@ class TextMetricsDemo
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     TextMetricsDemo demo;
     float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
-    uint32_t width = static_cast<uint32_t>(1280 * dpiScale);
-    uint32_t height = static_cast<uint32_t>(720 * dpiScale);
+    auto width = static_cast<uint32_t>(1280 * dpiScale);
+    auto height = static_cast<uint32_t>(720 * dpiScale);
     return vde::examples::runExample(demo, "VDE Text Metrics Demo", width, height, argc, argv);
 }

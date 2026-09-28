@@ -19,8 +19,8 @@ namespace vde {
  */
 class FadeTransition : public Transition {
   public:
-    const char* getName() const override { return "Fade"; }
-    std::string getFragmentShaderPath() const override;
+    [[nodiscard]] const char* getName() const override { return "Fade"; }
+    [[nodiscard]] std::string getFragmentShaderPath() const override;
 };
 
 }  // namespace vde

@@ -125,17 +125,17 @@ struct SceneGroup {
     /**
      * @brief Check if the group has explicit viewport entries.
      */
-    bool hasViewports() const { return !entries.empty(); }
+    [[nodiscard]] bool hasViewports() const { return !entries.empty(); }
 
     /**
      * @brief Check if the group is empty (contains no scenes).
      */
-    bool empty() const { return sceneNames.empty(); }
+    [[nodiscard]] bool empty() const { return sceneNames.empty(); }
 
     /**
      * @brief Get the number of scenes in the group.
      */
-    size_t size() const { return sceneNames.size(); }
+    [[nodiscard]] size_t size() const { return sceneNames.size(); }
 };
 
 }  // namespace vde

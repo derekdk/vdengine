@@ -10,6 +10,7 @@
 
 #include <glm/glm.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -20,7 +21,7 @@ namespace vde {
 /**
  * @brief Type of light source.
  */
-enum class LightType {
+enum class LightType : uint8_t {
     Directional,  ///< Parallel light rays (like the sun)
     Point,        ///< Light emanating from a point
     Spot          ///< Cone-shaped light
@@ -92,7 +93,7 @@ class LightBox {
     /**
      * @brief Get the ambient light color.
      */
-    const Color& getAmbientColor() const { return m_ambientColor; }
+    [[nodiscard]] const Color& getAmbientColor() const { return m_ambientColor; }
 
     /**
      * @brief Set the ambient light intensity.
@@ -102,7 +103,7 @@ class LightBox {
     /**
      * @brief Get the ambient light intensity.
      */
-    float getAmbientIntensity() const { return m_ambientIntensity; }
+    [[nodiscard]] float getAmbientIntensity() const { return m_ambientIntensity; }
 
     /**
      * @brief Add a light to the scene.
@@ -119,18 +120,18 @@ class LightBox {
     /**
      * @brief Get all lights.
      */
-    const std::vector<Light>& getLights() const { return m_lights; }
+    [[nodiscard]] const std::vector<Light>& getLights() const { return m_lights; }
 
     /**
      * @brief Get a light by index.
      */
     Light& getLight(size_t index) { return m_lights[index]; }
-    const Light& getLight(size_t index) const { return m_lights[index]; }
+    [[nodiscard]] const Light& getLight(size_t index) const { return m_lights[index]; }
 
     /**
      * @brief Get the number of lights.
      */
-    size_t getLightCount() const { return m_lights.size(); }
+    [[nodiscard]] size_t getLightCount() const { return m_lights.size(); }
 
     /**
      * @brief Clear all lights.

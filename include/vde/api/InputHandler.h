@@ -179,14 +179,16 @@ class InputHandler {
      * @param key The key code
      * @return true if the key is pressed
      */
-    virtual bool isKeyPressed([[maybe_unused]] int key) const { return false; }
+    [[nodiscard]] virtual bool isKeyPressed([[maybe_unused]] int key) const { return false; }
 
     /**
      * @brief Check if a mouse button is currently pressed.
      * @param button The mouse button
      * @return true if the button is pressed
      */
-    virtual bool isMouseButtonPressed([[maybe_unused]] int button) const { return false; }
+    [[nodiscard]] virtual bool isMouseButtonPressed([[maybe_unused]] int button) const {
+        return false;
+    }
 
     /**
      * @brief Get the current mouse position.
@@ -203,9 +205,10 @@ class InputHandler {
      * @param gamepadId The gamepad slot (JOYSTICK_1 through JOYSTICK_16)
      * @return true if the gamepad is connected and has a valid mapping
      */
-    bool isGamepadConnected(int gamepadId) const {
-        if (gamepadId < 0 || gamepadId >= MAX_GAMEPADS)
+    [[nodiscard]] bool isGamepadConnected(int gamepadId) const {
+        if (gamepadId < 0 || gamepadId >= MAX_GAMEPADS) {
             return false;
+        }
         return m_gamepadConnected[gamepadId];
     }
 
@@ -215,11 +218,13 @@ class InputHandler {
      * @param button The button index (see GAMEPAD_BUTTON_* in KeyCodes.h)
      * @return true if the button is pressed
      */
-    bool isGamepadButtonPressed(int gamepadId, int button) const {
-        if (gamepadId < 0 || gamepadId >= MAX_GAMEPADS)
+    [[nodiscard]] bool isGamepadButtonPressed(int gamepadId, int button) const {
+        if (gamepadId < 0 || gamepadId >= MAX_GAMEPADS) {
             return false;
-        if (button < 0 || button > GAMEPAD_BUTTON_LAST)
+        }
+        if (button < 0 || button > GAMEPAD_BUTTON_LAST) {
             return false;
+        }
         return m_gamepadButtons[gamepadId][button];
     }
 
@@ -230,11 +235,13 @@ class InputHandler {
      * @return Axis value (-1.0 to 1.0 for sticks, 0.0 to 1.0 for triggers),
      *         or 0.0 if the gamepad or axis is invalid
      */
-    float getGamepadAxis(int gamepadId, int axis) const {
-        if (gamepadId < 0 || gamepadId >= MAX_GAMEPADS)
+    [[nodiscard]] float getGamepadAxis(int gamepadId, int axis) const {
+        if (gamepadId < 0 || gamepadId >= MAX_GAMEPADS) {
             return 0.0f;
-        if (axis < 0 || axis > GAMEPAD_AXIS_LAST)
+        }
+        if (axis < 0 || axis > GAMEPAD_AXIS_LAST) {
             return 0.0f;
+        }
         return m_gamepadAxes[gamepadId][axis];
     }
 
@@ -242,7 +249,7 @@ class InputHandler {
      * @brief Get the dead zone threshold for analog axes.
      * @return Dead zone value (default: GAMEPAD_AXIS_DEADZONE)
      */
-    float getDeadZone() const { return m_deadZone; }
+    [[nodiscard]] float getDeadZone() const { return m_deadZone; }
 
     /**
      * @brief Set the dead zone threshold for analog axes.
@@ -259,16 +266,19 @@ class InputHandler {
 
     /// @cond INTERNAL
     void _setGamepadConnected(int id, bool connected) {
-        if (id >= 0 && id < MAX_GAMEPADS)
+        if (id >= 0 && id < MAX_GAMEPADS) {
             m_gamepadConnected[id] = connected;
+        }
     }
     void _setGamepadButton(int id, int button, bool pressed) {
-        if (id >= 0 && id < MAX_GAMEPADS && button >= 0 && button <= GAMEPAD_BUTTON_LAST)
+        if (id >= 0 && id < MAX_GAMEPADS && button >= 0 && button <= GAMEPAD_BUTTON_LAST) {
             m_gamepadButtons[id][button] = pressed;
+        }
     }
     void _setGamepadAxis(int id, int axis, float value) {
-        if (id >= 0 && id < MAX_GAMEPADS && axis >= 0 && axis <= GAMEPAD_AXIS_LAST)
+        if (id >= 0 && id < MAX_GAMEPADS && axis >= 0 && axis <= GAMEPAD_AXIS_LAST) {
             m_gamepadAxes[id][axis] = value;
+        }
     }
     /// @endcond
 

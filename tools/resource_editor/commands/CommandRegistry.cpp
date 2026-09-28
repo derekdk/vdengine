@@ -46,30 +46,35 @@ CommandBase* CommandRegistry::find(const std::string& name) const {
     // Try the full string first
     {
         auto it = m_nameIndex.find(name);
-        if (it != m_nameIndex.end())
+        if (it != m_nameIndex.end()) {
             return it->second;
+        }
     }
     {
         auto it = m_aliasIndex.find(name);
-        if (it != m_aliasIndex.end())
+        if (it != m_aliasIndex.end()) {
             return it->second;
+        }
     }
 
     // Progressively try shorter prefixes by splitting on the last space
     std::string candidate = name;
     while (true) {
         auto pos = candidate.rfind(' ');
-        if (pos == std::string::npos)
+        if (pos == std::string::npos) {
             break;
+        }
         candidate.resize(pos);
 
         auto it = m_nameIndex.find(candidate);
-        if (it != m_nameIndex.end())
+        if (it != m_nameIndex.end()) {
             return it->second;
+        }
 
         auto ait = m_aliasIndex.find(candidate);
-        if (ait != m_aliasIndex.end())
+        if (ait != m_aliasIndex.end()) {
             return ait->second;
+        }
     }
 
     return nullptr;
@@ -81,11 +86,13 @@ CommandBase* CommandRegistry::find(const std::string& name) const {
 
 CommandBase* CommandRegistry::findExact(const std::string& name) const {
     auto it = m_nameIndex.find(name);
-    if (it != m_nameIndex.end())
+    if (it != m_nameIndex.end()) {
         return it->second;
+    }
     auto ait = m_aliasIndex.find(name);
-    if (ait != m_aliasIndex.end())
+    if (ait != m_aliasIndex.end()) {
         return ait->second;
+    }
     return nullptr;
 }
 

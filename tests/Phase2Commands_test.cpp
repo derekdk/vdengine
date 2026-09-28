@@ -334,8 +334,9 @@ TEST_F(Phase2CommandsTest, DrawArc_Success) {
                 break;
             }
         }
-        if (anyPixelSet)
+        if (anyPixelSet) {
             break;
+        }
     }
     EXPECT_TRUE(anyPixelSet);
 }
@@ -363,8 +364,9 @@ TEST_F(Phase2CommandsTest, DrawArc_UndoWorks) {
                 break;
             }
         }
-        if (anyPixelSet)
+        if (anyPixelSet) {
             break;
+        }
     }
     EXPECT_FALSE(anyPixelSet);
 }
@@ -386,8 +388,9 @@ TEST_F(Phase2CommandsTest, DrawBezier_Success) {
                 break;
             }
         }
-        if (anyPixelSet)
+        if (anyPixelSet) {
             break;
+        }
     }
     EXPECT_TRUE(anyPixelSet);
 }
@@ -408,8 +411,9 @@ TEST_F(Phase2CommandsTest, DrawBezier_UndoWorks) {
                 break;
             }
         }
-        if (hasGreen)
+        if (hasGreen) {
             break;
+        }
     }
     EXPECT_TRUE(hasGreen);
 
@@ -425,8 +429,9 @@ TEST_F(Phase2CommandsTest, DrawBezier_UndoWorks) {
                 break;
             }
         }
-        if (anyGreenRemains)
+        if (anyGreenRemains) {
             break;
+        }
     }
     EXPECT_FALSE(anyGreenRemains);
 }
@@ -445,8 +450,9 @@ TEST_F(Phase2CommandsTest, ImageDocument_DrawArc) {
                 break;
             }
         }
-        if (anyPixelSet)
+        if (anyPixelSet) {
             break;
+        }
     }
     EXPECT_TRUE(anyPixelSet);
 

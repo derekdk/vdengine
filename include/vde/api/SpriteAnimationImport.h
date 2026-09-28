@@ -20,6 +20,7 @@ namespace vde {
 /**
  * @brief Imported atlas and animation clips.
  */
+// NOLINTNEXTLINE(bugprone-exception-escape) MSVC debug-STL container moves may allocate
 struct ImportedSpriteAnimationSet {
     SpriteSheet::Ref spriteSheet;
     std::unordered_map<std::string, SpriteAnimation> animations;
@@ -41,7 +42,7 @@ class SpriteAnimationImport {
      * @param jsonText Aseprite JSON export text.
      * @return Imported atlas plus any named animation clips from frame tags.
      */
-    static ImportedSpriteAnimationSet importAsepriteJson(std::shared_ptr<Texture> texture,
+    static ImportedSpriteAnimationSet importAsepriteJson(const std::shared_ptr<Texture>& texture,
                                                          const std::string& jsonText);
 
     /**
@@ -50,8 +51,8 @@ class SpriteAnimationImport {
      * @param jsonPath Path to the exported Aseprite JSON metadata file.
      * @return Imported atlas plus any named animation clips from frame tags.
      */
-    static ImportedSpriteAnimationSet importAsepriteJsonFile(std::shared_ptr<Texture> texture,
-                                                             const std::string& jsonPath);
+    static ImportedSpriteAnimationSet
+    importAsepriteJsonFile(const std::shared_ptr<Texture>& texture, const std::string& jsonPath);
 };
 
 }  // namespace vde

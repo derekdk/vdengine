@@ -116,7 +116,7 @@ TEST_F(PhysicsSceneTest, GetBodyState) {
 }
 
 TEST_F(PhysicsSceneTest, GetBodyStateThrowsForMissing) {
-    EXPECT_THROW(physics->getBodyState(999), std::runtime_error);
+    EXPECT_THROW((void)physics->getBodyState(999), std::runtime_error);
 }
 
 TEST_F(PhysicsSceneTest, GetBodyDef) {

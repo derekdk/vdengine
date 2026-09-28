@@ -132,6 +132,7 @@ TEST_F(TextureTest, MoveConstructorTransfersData) {
     EXPECT_EQ(texture2.getHeight(), 2u);
 
     // Original should be in valid but undefined state
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
     EXPECT_EQ(texture1.getWidth(), 0u);
     EXPECT_EQ(texture1.getHeight(), 0u);
 }
@@ -148,6 +149,7 @@ TEST_F(TextureTest, MoveAssignmentTransfersData) {
     EXPECT_EQ(texture2.getWidth(), 2u);
     EXPECT_EQ(texture2.getHeight(), 2u);
 
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
     EXPECT_EQ(texture1.getWidth(), 0u);
     EXPECT_EQ(texture1.getHeight(), 0u);
 }

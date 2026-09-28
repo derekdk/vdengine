@@ -88,25 +88,25 @@ class OffscreenRenderTarget {
     // ---- Accessors ----
 
     /** @brief Whether the render target has been successfully created. */
-    bool isValid() const { return m_colorImage != VK_NULL_HANDLE; }
+    [[nodiscard]] bool isValid() const { return m_colorImage != VK_NULL_HANDLE; }
 
     /** @brief Get the color image (for layout transitions, etc.). */
-    VkImage getColorImage() const { return m_colorImage; }
+    [[nodiscard]] VkImage getColorImage() const { return m_colorImage; }
 
     /** @brief Get the color image view (for descriptor set binding). */
-    VkImageView getColorImageView() const { return m_colorImageView; }
+    [[nodiscard]] VkImageView getColorImageView() const { return m_colorImageView; }
 
     /** @brief Get the sampler for reading the color attachment. */
-    VkSampler getSampler() const { return m_sampler; }
+    [[nodiscard]] VkSampler getSampler() const { return m_sampler; }
 
     /** @brief Get the framebuffer (for vkCmdBeginRenderPass). */
-    VkFramebuffer getFramebuffer() const { return m_framebuffer; }
+    [[nodiscard]] VkFramebuffer getFramebuffer() const { return m_framebuffer; }
 
     /** @brief Width in pixels. */
-    uint32_t getWidth() const { return m_width; }
+    [[nodiscard]] uint32_t getWidth() const { return m_width; }
 
     /** @brief Height in pixels. */
-    uint32_t getHeight() const { return m_height; }
+    [[nodiscard]] uint32_t getHeight() const { return m_height; }
 
   private:
     void createColorResources(uint32_t width, uint32_t height);

@@ -103,9 +103,9 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Font Specimen Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Font Specimen Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "BitmapFont full ASCII glyph grid (small + large)",
             "TrueType rendering at six sizes (10-96 px)",
@@ -114,7 +114,7 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Left panel: two glyph grids (small 5x7, large 8x13)",
             "Right panel: pangram at increasing TTF sizes",
@@ -122,7 +122,9 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override { return {"TAB - Cycle TTF font size"}; }
+    [[nodiscard]] std::vector<std::string> getControls() const override {
+        return {"TAB - Cycle TTF font size"};
+    }
 
   private:
     static constexpr int kVariantCount = 3;
@@ -151,8 +153,9 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
             for (int col = 0; col < 16; ++col) {
                 int charIdx = row * 16 + col;
                 char c = static_cast<char>(0x20 + charIdx);
-                if (c > 0x7E)
+                if (c > 0x7E) {
                     break;
+                }
                 line += c;
             }
             vde::TextStyle style{.color = vde::Color::white(), .pixelScale = 2, .letterSpacing = 1};
@@ -186,8 +189,9 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
             for (int col = 0; col < 16; ++col) {
                 int charIdx = row * 16 + col;
                 char c = static_cast<char>(0x20 + charIdx);
-                if (c > 0x7E)
+                if (c > 0x7E) {
                     break;
+                }
                 line += c;
             }
             vde::TextStyle style{
@@ -249,8 +253,9 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
             style.letterSpacing = 0;
 
             auto tex = vde::TextRenderer::createTexture(m_ctx, text, *ttfFont, style);
-            if (!tex || tex->getWidth() == 0 || tex->getHeight() == 0)
+            if (!tex || tex->getWidth() == 0 || tex->getHeight() == 0) {
                 continue;
+            }
 
             auto sprite = addEntity<vde::SpriteEntity>();
             float aspect =
@@ -274,15 +279,17 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
     }
 
     void buildPosterVariant(int variantIdx) {
-        if (!m_ttfFonts[variantIdx] || !m_ttfFonts[variantIdx]->isLoaded())
+        if (!m_ttfFonts[variantIdx] || !m_ttfFonts[variantIdx]->isLoaded()) {
             return;
+        }
 
         vde::TextStyle style{
             .color = vde::Color::fromRGB8(255, 200, 100), .pixelScale = 1, .letterSpacing = 0};
         auto tex = vde::TextRenderer::createTexture(m_ctx, "VDE TEXT RENDERING",
                                                     *m_ttfFonts[variantIdx], style);
-        if (!tex || tex->getWidth() == 0 || tex->getHeight() == 0)
+        if (!tex || tex->getWidth() == 0 || tex->getHeight() == 0) {
             return;
+        }
 
         auto sprite = addEntity<vde::SpriteEntity>();
         float aspect = static_cast<float>(tex->getWidth()) / static_cast<float>(tex->getHeight());
@@ -300,8 +307,9 @@ class SpecimenScene : public vde::examples::BaseExampleScene {
 
     void setVariantVisible(int idx, bool visible) {
         for (auto& s : m_ttfVariants[idx]) {
-            if (s)
+            if (s) {
                 s->setVisible(visible);
+            }
         }
         if (m_posterVariants[idx]) {
             m_posterVariants[idx]->setVisible(visible);
@@ -326,6 +334,7 @@ class FontSpecimenDemo
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     FontSpecimenDemo demo;
     return vde::examples::runExample(demo, "VDE Font Specimen Demo", 1280, 720, argc, argv);

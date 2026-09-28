@@ -29,8 +29,8 @@ class WipeTransition : public Transition {
         m_direction = dir;
     }
 
-    const char* getName() const override { return "Wipe"; }
-    std::string getFragmentShaderPath() const override;
+    [[nodiscard]] const char* getName() const override { return "Wipe"; }
+    [[nodiscard]] std::string getFragmentShaderPath() const override;
 
     /**
      * @brief Encodes direction into uniforms so the shader can branch.

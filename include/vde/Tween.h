@@ -24,20 +24,20 @@ namespace vde {
 /**
  * @brief Linearly interpolate between @p from and @p to using @p t.
  *
- * @param from           Start value (t = 0).
- * @param to             End value (t = 1).
- * @param easedProgress  Pre-evaluated easing result in [0, 1].
+ * @param from  Start value (t = 0).
+ * @param to    End value (t = 1).
+ * @param t     Pre-evaluated easing result in [0, 1].
  * @return Interpolated value.
  */
 template <typename T>
-T tweenValue(const T& from, const T& to, float easedProgress) {
+T tweenValue(const T& from, const T& to, float t) {
     // If you hit this assertion, T is not a supported tween type.
     // Add an explicit specialization for T in Tween.h.
     static_assert(sizeof(T) == 0, "tweenValue<T>: unsupported type. "
                                   "Add an explicit specialization in include/vde/Tween.h.");
     (void)from;
     (void)to;
-    (void)easedProgress;
+    (void)t;
     return from;
 }
 

@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 #include "../ExampleBase.h"
 
@@ -41,49 +42,68 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_1)
+        if (key == KEY_1) {
             m_sceneSwitch = 1;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_sceneSwitch = 2;
-        if (key == KEY_3)
+        }
+        if (key == KEY_3) {
             m_sceneSwitch = 3;
-        if (key == KEY_4)
+        }
+        if (key == KEY_4) {
             m_sceneSwitch = 4;
-        if (key == KEY_P)
+        }
+        if (key == KEY_P) {
             m_pushPressed = true;
-        if (key == KEY_O)
+        }
+        if (key == KEY_O) {
             m_popPressed = true;
-        if (key == KEY_B)
+        }
+        if (key == KEY_B) {
             m_toggleBackground = true;
-        if (key == KEY_SPACE)
+        }
+        if (key == KEY_SPACE) {
             m_spacePressed = true;
-        if (key == KEY_TAB)
+        }
+        if (key == KEY_TAB) {
             m_tabPressed = true;
-        if (key == KEY_G)
+        }
+        if (key == KEY_G) {
             m_groupPressed = true;
-        if (key == KEY_V)
+        }
+        if (key == KEY_V) {
             m_viewportPressed = true;
+        }
 
         // Camera controls
-        if (key == KEY_W)
+        if (key == KEY_W) {
             m_up = true;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_down = true;
-        if (key == KEY_A)
+        }
+        if (key == KEY_A) {
             m_left = true;
-        if (key == KEY_D)
+        }
+        if (key == KEY_D) {
             m_right = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == KEY_W)
+        if (key == KEY_W) {
             m_up = false;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_down = false;
-        if (key == KEY_A)
+        }
+        if (key == KEY_A) {
             m_left = false;
-        if (key == KEY_D)
+        }
+        if (key == KEY_D) {
             m_right = false;
+        }
     }
 
     void onMouseScroll(double /*xOffset*/, double yOffset) override {
@@ -138,10 +158,10 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
     }
 
     // Continuous state
-    bool isUp() const { return m_up; }
-    bool isDown() const { return m_down; }
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
+    [[nodiscard]] bool isUp() const { return m_up; }
+    [[nodiscard]] bool isDown() const { return m_down; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
 
   private:
     int m_sceneSwitch = 0;
@@ -170,7 +190,7 @@ class MultiSceneInputHandler : public vde::examples::BaseExampleInputHandler {
  */
 class DemoScene : public vde::examples::BaseExampleScene {
   public:
-    explicit DemoScene(const std::string& label) : BaseExampleScene(), m_label(label) {}
+    explicit DemoScene(std::string label) : BaseExampleScene(), m_label(std::move(label)) {}
 
     // ------ Lifecycle overrides ------
 
@@ -178,12 +198,12 @@ class DemoScene : public vde::examples::BaseExampleScene {
         recordPauseTime();
         std::cout << "[" << m_label << "] paused"
                   << (getContinueInBackground() ? " (will continue simulation)" : " (suspended)")
-                  << std::endl;
+                  << '\n';
     }
 
     void onResume() override {
         applyBackgroundTime();
-        std::cout << "[" << m_label << "] resumed" << std::endl;
+        std::cout << "[" << m_label << "] resumed" << '\n';
     }
 
     void onEnter() override {
@@ -199,7 +219,7 @@ class DemoScene : public vde::examples::BaseExampleScene {
                   << (m_accumulatedBackgroundTime > 0.01f
                           ? " (catching up " + formatTime(m_accumulatedBackgroundTime) + "s)"
                           : "")
-                  << std::endl;
+                  << '\n';
     }
 
     void onExit() override {
@@ -207,7 +227,7 @@ class DemoScene : public vde::examples::BaseExampleScene {
         m_wasExited = true;
         std::cout << "[" << m_label << "] exited"
                   << (getContinueInBackground() ? " (simulation continues)" : " (suspended)")
-                  << std::endl;
+                  << '\n';
     }
 
     void update(float deltaTime) override {
@@ -228,7 +248,7 @@ class DemoScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
     }
 
-    const std::string& getLabel() const { return m_label; }
+    [[nodiscard]] const std::string& getLabel() const { return m_label; }
 
   protected:
     /**
@@ -237,9 +257,10 @@ class DemoScene : public vde::examples::BaseExampleScene {
      */
     virtual void updateScene(float effectiveDt) = 0;
 
-    double getCurrentGameTime() const {
-        if (getGame())
+    [[nodiscard]] double getCurrentGameTime() const {
+        if (getGame()) {
             return getGame()->getTotalTime();
+        }
         return 0.0;
     }
 
@@ -289,8 +310,9 @@ class Planet : public MeshEntity {
 
         auto rot = getRotation();
         rot.yaw += m_selfRotSpeed * deltaTime;
-        if (rot.yaw > 360.0f)
+        if (rot.yaw > 360.0f) {
             rot.yaw -= 360.0f;
+        }
         setRotation(rot);
     }
 
@@ -356,12 +378,14 @@ class SpaceScene : public DemoScene {
         (void)dt;
 
         auto* input = dynamic_cast<MultiSceneInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         auto* cam = dynamic_cast<OrbitCamera*>(getCamera());
-        if (!cam)
+        if (!cam) {
             return;
+        }
 
         float scroll = input->consumeScroll();
         if (scroll != 0.0f) {
@@ -372,19 +396,19 @@ class SpaceScene : public DemoScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Space Scene (3D)"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Space Scene (3D)"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"3D OrbitCamera", "Rotating planet entities", "Small 50m world bounds",
                 "Dark space background"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Yellow cube 'sun' at center", "Red, blue, and green cubes orbiting the sun",
                 "Very dark background (near-black)"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SCROLL - Zoom camera", "Camera auto-rotates"};
     }
 };
@@ -439,19 +463,24 @@ class ForestScene : public DemoScene {
 
     void updateScene(float dt) override {
         auto* input = dynamic_cast<MultiSceneInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Pan camera
         const float panSpeed = 15.0f;
-        if (input->isRight())
+        if (input->isRight()) {
             m_camX += panSpeed * dt;
-        if (input->isLeft())
+        }
+        if (input->isLeft()) {
             m_camX -= panSpeed * dt;
-        if (input->isUp())
+        }
+        if (input->isUp()) {
             m_camY += panSpeed * dt;
-        if (input->isDown())
+        }
+        if (input->isDown()) {
             m_camY -= panSpeed * dt;
+        }
 
         auto* cam = dynamic_cast<Camera2D*>(getCamera());
         if (cam) {
@@ -462,7 +491,7 @@ class ForestScene : public DemoScene {
         m_swayTime += dt;
         auto& entities = getEntities();
         for (auto& e : entities) {
-            if (e->getName().find("Tree_") == 0) {
+            if (e->getName().starts_with("Tree_")) {
                 auto pos = e->getPosition();
                 // Small horizontal sway
                 float sway = 0.15f * std::sin(m_swayTime * 1.5f + pos.x * 0.5f);
@@ -472,19 +501,21 @@ class ForestScene : public DemoScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Forest Scene (2D)"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Forest Scene (2D)"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"2D Camera", "Sprite entities as trees", "Medium 100m world bounds",
                 "Dark green background", "Tree sway animation"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Colored rectangles representing trees on dark green background",
                 "Yellow marker at origin", "Trees gently sway"};
     }
 
-    std::vector<std::string> getControls() const override { return {"WASD - Pan camera"}; }
+    [[nodiscard]] std::vector<std::string> getControls() const override {
+        return {"WASD - Pan camera"};
+    }
 
   private:
     float m_camX = 0.0f;
@@ -522,8 +553,9 @@ class CityScene : public DemoScene {
         int idx = 0;
         for (int x = -3; x <= 3; ++x) {
             for (int z = -3; z <= 3; ++z) {
-                if (x == 0 && z == 0)
+                if (x == 0 && z == 0) {
                     continue;  // Leave center open
+                }
                 float height = 1.0f + static_cast<float>((idx * 7 + 3) % 5);
                 auto building = addEntity<MeshEntity>();
                 building->setMesh(Mesh::createCube(1.0f));
@@ -548,12 +580,14 @@ class CityScene : public DemoScene {
 
     void updateScene(float dt) override {
         auto* input = dynamic_cast<MultiSceneInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         auto* cam = dynamic_cast<OrbitCamera*>(getCamera());
-        if (!cam)
+        if (!cam) {
             return;
+        }
 
         float scroll = input->consumeScroll();
         if (scroll != 0.0f) {
@@ -562,20 +596,24 @@ class CityScene : public DemoScene {
 
         // Orbit with WASD
         float rotSpeed = 40.0f;
-        if (input->isLeft())
+        if (input->isLeft()) {
             cam->rotate(0.0f, -rotSpeed * dt);
-        if (input->isRight())
+        }
+        if (input->isRight()) {
             cam->rotate(0.0f, rotSpeed * dt);
-        if (input->isUp())
+        }
+        if (input->isUp()) {
             cam->rotate(-rotSpeed * dt * 0.5f, 0.0f);
-        if (input->isDown())
+        }
+        if (input->isDown()) {
             cam->rotate(rotSpeed * dt * 0.5f, 0.0f);
+        }
 
         // Pulse building colors over time
         m_colorTime += dt;
         auto& entities = getEntities();
         for (auto& e : entities) {
-            if (e->getName().find("Building_") == 0) {
+            if (e->getName().starts_with("Building_")) {
                 auto* meshEnt = dynamic_cast<MeshEntity*>(e.get());
                 if (meshEnt) {
                     float pulse =
@@ -590,19 +628,19 @@ class CityScene : public DemoScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "City Scene (3D)"; }
+    [[nodiscard]] std::string getExampleName() const override { return "City Scene (3D)"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"3D OrbitCamera with manual control", "Grid of cube buildings",
                 "Large 500m world bounds", "Gray cityscape background", "Pulsing building colors"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Grid of differently-sized gray cubes as buildings", "Flat ground plane",
                 "Buildings subtly pulse", "Medium-gray background"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"WASD   - Orbit camera", "SCROLL - Zoom"};
     }
 
@@ -659,36 +697,42 @@ class OceanScene : public DemoScene {
         m_waveTime += dt;
 
         auto* input = dynamic_cast<MultiSceneInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Move boat
         auto* boat = getEntityByName("Boat");
         if (boat) {
             const float boatSpeed = 8.0f;
             auto pos = boat->getPosition();
-            if (input->isRight())
+            if (input->isRight()) {
                 pos.x += boatSpeed * dt;
-            if (input->isLeft())
+            }
+            if (input->isLeft()) {
                 pos.x -= boatSpeed * dt;
-            if (input->isUp())
+            }
+            if (input->isUp()) {
                 pos.y += boatSpeed * dt;
-            if (input->isDown())
+            }
+            if (input->isDown()) {
                 pos.y -= boatSpeed * dt;
+            }
             // Bob up and down
             pos.z = 0.2f + 0.1f * std::sin(m_waveTime * 3.0f);
             boat->setPosition(pos);
 
             // Camera follows boat
             auto* cam = dynamic_cast<Camera2D*>(getCamera());
-            if (cam)
+            if (cam) {
                 cam->setPosition(pos.x, pos.y);
+            }
         }
 
         // Animate waves
         auto& entities = getEntities();
         for (auto& e : entities) {
-            if (e->getName().find("Wave_") == 0) {
+            if (e->getName().starts_with("Wave_")) {
                 auto pos = e->getPosition();
                 float wave = 0.3f * std::sin(m_waveTime * 2.0f + pos.x * 0.5f + pos.y * 0.3f);
                 // Vertical oscillation
@@ -699,19 +743,19 @@ class OceanScene : public DemoScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Ocean Scene (2D)"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Ocean Scene (2D)"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"2D Camera following boat", "Animated wave sprites", "200m world bounds",
                 "Deep blue background", "Boat entity with controls"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Rows of blue rectangles as waves, oscillating",
                 "Brown rectangle 'boat' in the center", "Very dark blue background"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"WASD - Move boat (camera follows)"};
     }
 
@@ -746,8 +790,9 @@ class HUDScene : public vde::Scene {
         m_displayTime += deltaTime;
         // Auto-pop after 3 seconds
         if (m_displayTime >= 3.0f) {
-            if (getGame())
+            if (getGame()) {
                 getGame()->popScene();
+            }
         }
     }
 
@@ -794,8 +839,9 @@ class MultiSceneDemo : public vde::Game {
 
     void onUpdate(float /*deltaTime*/) override {
         auto* input = m_inputHandler.get();
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // --- Scene switching with number keys ---
         int sw = input->consumeSceneSwitch();
@@ -807,7 +853,7 @@ class MultiSceneDemo : public vde::Game {
                 std::cout << "\n>> Switched to: " << m_demoScenes[idx]->getLabel()
                           << " (background="
                           << (m_demoScenes[idx]->getContinueInBackground() ? "ON" : "OFF") << ")"
-                          << std::endl;
+                          << '\n';
             }
         }
 
@@ -815,19 +861,19 @@ class MultiSceneDemo : public vde::Game {
         if (input->consumeTab()) {
             m_activeIndex = (m_activeIndex + 1) % 4;
             setActiveScene(sceneNames[m_activeIndex]);
-            std::cout << "\n>> Cycled to: " << m_demoScenes[m_activeIndex]->getLabel() << std::endl;
+            std::cout << "\n>> Cycled to: " << m_demoScenes[m_activeIndex]->getLabel() << '\n';
         }
 
         // --- P: push HUD overlay onto current scene ---
         if (input->consumePush()) {
             std::cout << "\n>> Pushing HUD overlay onto " << m_demoScenes[m_activeIndex]->getLabel()
-                      << std::endl;
+                      << '\n';
             pushScene("hud");
         }
 
         // --- O: pop scene ---
         if (input->consumePop()) {
-            std::cout << "\n>> Popping scene stack" << std::endl;
+            std::cout << "\n>> Popping scene stack" << '\n';
             popScene();
         }
 
@@ -837,7 +883,7 @@ class MultiSceneDemo : public vde::Game {
             bool newVal = !scene->getContinueInBackground();
             scene->setContinueInBackground(newVal);
             std::cout << "\n>> " << scene->getLabel()
-                      << " background simulation: " << (newVal ? "ON" : "OFF") << std::endl;
+                      << " background simulation: " << (newVal ? "ON" : "OFF") << '\n';
         }
 
         // --- G: toggle scene group mode (Space + City rendered together) ---
@@ -847,15 +893,14 @@ class MultiSceneDemo : public vde::Game {
             if (m_groupMode) {
                 auto group = vde::SceneGroup::create("dual", {"space", "city"});
                 setActiveSceneGroup(group);
-                std::cout << "\n>> SCENE GROUP MODE: Space + City rendering simultaneously"
-                          << std::endl;
+                std::cout << "\n>> SCENE GROUP MODE: Space + City rendering simultaneously" << '\n';
                 std::cout << "   (Space is primary camera/background, City entities overlay)"
-                          << std::endl;
+                          << '\n';
             } else {
                 // Return to single-scene mode
                 m_activeIndex = 0;
                 setActiveScene("space");
-                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << std::endl;
+                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << '\n';
             }
         }
 
@@ -871,11 +916,11 @@ class MultiSceneDemo : public vde::Game {
                              });
                 setActiveSceneGroup(group);
                 std::cout << "\n>> VIEWPORT MODE: Space (left) + City (right) in split-screen"
-                          << std::endl;
+                          << '\n';
             } else {
                 m_activeIndex = 0;
                 setActiveScene("space");
-                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << std::endl;
+                std::cout << "\n>> SINGLE SCENE MODE: Switched back to Space only" << '\n';
             }
         }
 
@@ -887,82 +932,79 @@ class MultiSceneDemo : public vde::Game {
 
     void onShutdown() override {
         // Check if any scene reported failure
-        for (int i = 0; i < 4; ++i) {
-            if (m_demoScenes[i] && m_demoScenes[i]->didTestFail()) {
+        for (auto& m_demoScene : m_demoScenes) {
+            if (m_demoScene && m_demoScene->didTestFail()) {
                 m_exitCode = 1;
                 return;
             }
         }
     }
 
-    int getExitCode() const override { return m_exitCode; }
+    [[nodiscard]] int getExitCode() const override { return m_exitCode; }
 
   private:
     void printMasterHeader() {
-        std::cout << "\n================================================================"
-                  << std::endl;
-        std::cout << "  VDE Multi-Scene Demo" << std::endl;
-        std::cout << "================================================================\n"
-                  << std::endl;
-        std::cout << "This demo creates 4 scenes with different configurations:" << std::endl;
+        std::cout << "\n================================================================" << '\n';
+        std::cout << "  VDE Multi-Scene Demo" << '\n';
+        std::cout << "================================================================\n" << '\n';
+        std::cout << "This demo creates 4 scenes with different configurations:" << '\n';
         std::cout << "  1) Space  - 3D orbit camera, dark background, 50m world, orbiting planets"
-                  << std::endl;
-        std::cout << "  2) Forest - 2D camera, green background, 100m world, swaying trees"
-                  << std::endl;
+                  << '\n';
+        std::cout << "  2) Forest - 2D camera, green background, 100m world, swaying trees" << '\n';
         std::cout << "  3) City   - 3D orbit camera, gray background, 500m world, pulsing buildings"
-                  << std::endl;
-        std::cout << "  4) Ocean  - 2D camera, blue background, 200m world, animated waves"
-                  << std::endl;
+                  << '\n';
+        std::cout << "  4) Ocean  - 2D camera, blue background, 200m world, animated waves" << '\n';
 
-        std::cout << "\nBackground simulation (continues physics while scene is inactive):"
-                  << std::endl;
-        std::cout << "  City  = ON  (buildings keep pulsing while away)" << std::endl;
-        std::cout << "  Ocean = ON  (waves keep moving while away)" << std::endl;
-        std::cout << "  Space = OFF (planets pause when you leave)" << std::endl;
-        std::cout << "  Forest= OFF (trees pause when you leave)" << std::endl;
+        std::cout << "\nBackground simulation (continues physics while scene is inactive):" << '\n';
+        std::cout << "  City  = ON  (buildings keep pulsing while away)" << '\n';
+        std::cout << "  Ocean = ON  (waves keep moving while away)" << '\n';
+        std::cout << "  Space = OFF (planets pause when you leave)" << '\n';
+        std::cout << "  Forest= OFF (trees pause when you leave)" << '\n';
 
-        std::cout << "\nMulti-Scene Group (Phase 2):" << std::endl;
-        std::cout << "  G     - Toggle dual-scene group (Space + City rendered together)"
-                  << std::endl;
-        std::cout << "          Space is the primary scene (camera/background)" << std::endl;
-        std::cout << "          City entities are rendered as overlay" << std::endl;
+        std::cout << "\nMulti-Scene Group (Phase 2):" << '\n';
+        std::cout << "  G     - Toggle dual-scene group (Space + City rendered together)" << '\n';
+        std::cout << "          Space is the primary scene (camera/background)" << '\n';
+        std::cout << "          City entities are rendered as overlay" << '\n';
 
-        std::cout << "\nSplit-Screen Viewports (Phase 3):" << std::endl;
-        std::cout << "  V     - Toggle viewport mode (Space left, City right)" << std::endl;
-        std::cout << "          Each scene has its own camera and viewport" << std::endl;
+        std::cout << "\nSplit-Screen Viewports (Phase 3):" << '\n';
+        std::cout << "  V     - Toggle viewport mode (Space left, City right)" << '\n';
+        std::cout << "          Each scene has its own camera and viewport" << '\n';
 
-        std::cout << "\nControls:" << std::endl;
-        std::cout << "  1-4   - Switch to scene 1/2/3/4" << std::endl;
-        std::cout << "  TAB   - Cycle to next scene" << std::endl;
-        std::cout << "  G     - Toggle scene group mode (Space + City)" << std::endl;
-        std::cout << "  V     - Toggle split-screen viewport mode" << std::endl;
-        std::cout << "  P     - Push HUD overlay (tests pushScene)" << std::endl;
-        std::cout << "  O     - Pop overlay (tests popScene)" << std::endl;
-        std::cout << "  B     - Toggle background simulation for current scene" << std::endl;
-        std::cout << "  SPACE - Print status of all scenes" << std::endl;
-        std::cout << "  WASD  - Camera/movement controls (per scene)" << std::endl;
-        std::cout << "  SCROLL- Zoom (3D scenes)" << std::endl;
-        std::cout << "  F     - Report test failure" << std::endl;
-        std::cout << "  ESC   - Exit" << std::endl;
-        std::cout << "  (Auto-terminates after 120 seconds)\n" << std::endl;
+        std::cout << "\nControls:" << '\n';
+        std::cout << "  1-4   - Switch to scene 1/2/3/4" << '\n';
+        std::cout << "  TAB   - Cycle to next scene" << '\n';
+        std::cout << "  G     - Toggle scene group mode (Space + City)" << '\n';
+        std::cout << "  V     - Toggle split-screen viewport mode" << '\n';
+        std::cout << "  P     - Push HUD overlay (tests pushScene)" << '\n';
+        std::cout << "  O     - Pop overlay (tests popScene)" << '\n';
+        std::cout << "  B     - Toggle background simulation for current scene" << '\n';
+        std::cout << "  SPACE - Print status of all scenes" << '\n';
+        std::cout << "  WASD  - Camera/movement controls (per scene)" << '\n';
+        std::cout << "  SCROLL- Zoom (3D scenes)" << '\n';
+        std::cout << "  F     - Report test failure" << '\n';
+        std::cout << "  ESC   - Exit" << '\n';
+        std::cout << "  (Auto-terminates after 120 seconds)\n" << '\n';
     }
 
     void printStatus() {
-        std::cout << "\n--- Scene Status ---" << std::endl;
+        std::cout << "\n--- Scene Status ---" << '\n';
         std::string modeStr = "SINGLE";
-        if (m_groupMode)
+        if (m_groupMode) {
             modeStr = "GROUP (Space + City)";
-        if (m_viewportMode)
+        }
+        if (m_viewportMode) {
             modeStr = "VIEWPORT (Space | City)";
-        std::cout << "  Mode: " << modeStr << std::endl;
+        }
+        std::cout << "  Mode: " << modeStr << '\n';
         const auto& group = getActiveSceneGroup();
         std::cout << "  Active group: \"" << group.name << "\" [";
         for (size_t i = 0; i < group.sceneNames.size(); ++i) {
-            if (i > 0)
+            if (i > 0) {
                 std::cout << ", ";
+            }
             std::cout << group.sceneNames[i];
         }
-        std::cout << "]" << std::endl;
+        std::cout << "]" << '\n';
         for (int i = 0; i < 4; ++i) {
             const char* active = (sceneNames[i] == getActiveScene()->getName()) ? " [PRIMARY]" : "";
             // Check if scene is in the active group
@@ -976,9 +1018,9 @@ class MultiSceneDemo : public vde::Game {
             std::cout << "  " << (i + 1) << ") " << m_demoScenes[i]->getLabel() << " | background="
                       << (m_demoScenes[i]->getContinueInBackground() ? "ON " : "OFF")
                       << " | bounds=" << m_demoScenes[i]->getWorldBounds().width().value << "m wide"
-                      << (inGroup ? " [IN GROUP]" : "") << active << std::endl;
+                      << (inGroup ? " [IN GROUP]" : "") << active << '\n';
         }
-        std::cout << "--------------------\n" << std::endl;
+        std::cout << "--------------------\n" << '\n';
     }
 
     static constexpr const char* sceneNames[] = {"space", "forest", "city", "ocean"};
@@ -995,6 +1037,7 @@ class MultiSceneDemo : public vde::Game {
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     MultiSceneDemo demo;
     return vde::examples::runExample(demo, "VDE Multi-Scene Demo", 1280, 720, argc, argv);

@@ -31,8 +31,9 @@ T* AnimationBinding<T>::resolve(Scene& scene) const {
         return locked ? locked.get() : nullptr;
     }
     case AnimationBindingKind::Resolver:
-        if (m_resolver)
+        if (m_resolver) {
             return m_resolver();
+        }
         return nullptr;
     case AnimationBindingKind::None:
     default:
@@ -58,8 +59,9 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
     auto handleControl = m_handleControl;
 
     auto cancelOnMissingTarget = [idHolder, handleControl]() {
-        if (*idHolder == INVALID_ANIMATION_ID || !handleControl || !handleControl->animator)
+        if (*idHolder == INVALID_ANIMATION_ID || !handleControl || !handleControl->animator) {
             return;
+        }
         handleControl->animator->cancel(*idHolder);
     };
 
@@ -84,29 +86,32 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
     };
 
     if (callbacks.onStart) {
-        unbound.onStart = [&scene, binding, cb = std::move(callbacks.onStart),
+        unbound.onStart = [binding, cb = std::move(callbacks.onStart),
                            resolveBoundTarget](const AnimationContext& ctx) mutable {
             auto [lock, target] = resolveBoundTarget();
-            if (target)
+            if (target) {
                 cb(*target, ctx);
+            }
         };
     }
 
     if (callbacks.onUpdate) {
-        unbound.onUpdate = [&scene, binding, cb = std::move(callbacks.onUpdate),
+        unbound.onUpdate = [binding, cb = std::move(callbacks.onUpdate),
                             resolveBoundTarget](const AnimationContext& ctx) mutable {
             auto [lock, target] = resolveBoundTarget();
-            if (target)
+            if (target) {
                 cb(*target, ctx);
+            }
         };
     }
 
     if (callbacks.onComplete) {
-        unbound.onComplete = [&scene, binding, cb = std::move(callbacks.onComplete),
+        unbound.onComplete = [binding, cb = std::move(callbacks.onComplete),
                               resolveBoundTarget](const AnimationContext& ctx) mutable {
             auto [lock, target] = resolveBoundTarget();
-            if (target)
+            if (target) {
                 cb(*target, ctx);
+            }
         };
     }
 

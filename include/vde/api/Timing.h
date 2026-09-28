@@ -47,17 +47,19 @@ class Cooldown {
      * @brief Advance time. Non-positive deltaTime is ignored.
      */
     void advance(float deltaTime) {
-        if (deltaTime <= 0.0f)
+        if (deltaTime <= 0.0f) {
             return;
+        }
         m_elapsed += deltaTime;
-        if (m_elapsed > m_duration)
+        if (m_elapsed > m_duration) {
             m_elapsed = m_duration;
+        }
     }
 
     /**
      * @brief Check if the cooldown has elapsed.
      */
-    bool ready() const { return m_elapsed >= m_duration; }
+    [[nodiscard]] bool ready() const { return m_elapsed >= m_duration; }
 
     /**
      * @brief If ready, consume the cooldown (reset) and return true. Otherwise return false.
@@ -73,7 +75,7 @@ class Cooldown {
     /**
      * @brief Time remaining until ready.
      */
-    float remaining() const {
+    [[nodiscard]] float remaining() const {
         float r = m_duration - m_elapsed;
         return r > 0.0f ? r : 0.0f;
     }
@@ -81,9 +83,10 @@ class Cooldown {
     /**
      * @brief Progress from 0 (just started) to 1 (ready).
      */
-    float progress() const {
-        if (m_duration <= 0.0f)
+    [[nodiscard]] float progress() const {
+        if (m_duration <= 0.0f) {
             return 1.0f;
+        }
         float p = m_elapsed / m_duration;
         return p > 1.0f ? 1.0f : p;
     }
@@ -119,8 +122,9 @@ class RepeatingTimer {
      * ticks may fire in a single call. Non-positive deltaTime is ignored.
      */
     int advance(float deltaTime) {
-        if (m_interval <= 0.0f || deltaTime <= 0.0f)
+        if (m_interval <= 0.0f || deltaTime <= 0.0f) {
             return 0;
+        }
         m_accumulated += deltaTime;
         if (m_accumulated >= m_interval) {
             const int ticks = static_cast<int>(m_accumulated / m_interval);

@@ -138,12 +138,12 @@ class AnimationHandle {
     /**
      * @brief Returns true if this handle still refers to a live animation.
      */
-    bool isValid() const;
+    [[nodiscard]] bool isValid() const;
 
     /**
      * @brief Returns true if the animation is still running (not cancelled or complete).
      */
-    bool isActive() const;
+    [[nodiscard]] bool isActive() const;
 
     /**
      * @brief Cancel the animation.  onComplete will not be called.
@@ -168,9 +168,9 @@ class AnimationHandle {
     /**
      * @brief Get the current playback speed multiplier.
      */
-    float getSpeed() const;
+    [[nodiscard]] float getSpeed() const;
 
-    AnimationId getId() const { return m_id; }
+    [[nodiscard]] AnimationId getId() const { return m_id; }
 
   private:
     friend class Animator;
@@ -178,7 +178,7 @@ class AnimationHandle {
     AnimationHandle(AnimationId id, std::weak_ptr<AnimatorHandleControl> handleControl)
         : m_id(id), m_handleControl(std::move(handleControl)) {}
 
-    Animator* resolveAnimator() const;
+    [[nodiscard]] Animator* resolveAnimator() const;
 
     AnimationId m_id = INVALID_ANIMATION_ID;
     std::weak_ptr<AnimatorHandleControl> m_handleControl;
@@ -252,13 +252,14 @@ class AnimationBinding {
      *
      * Returns an empty shared_ptr for Entity, Resolver, and None bindings.
      */
-    std::shared_ptr<T> lockWeak() const {
-        if (m_kind != AnimationBindingKind::Weak)
+    [[nodiscard]] std::shared_ptr<T> lockWeak() const {
+        if (m_kind != AnimationBindingKind::Weak) {
             return {};
+        }
         return m_weak.lock();
     }
 
-    AnimationBindingKind kind() const { return m_kind; }
+    [[nodiscard]] AnimationBindingKind kind() const { return m_kind; }
 
   private:
     AnimationBindingKind m_kind = AnimationBindingKind::None;
@@ -404,23 +405,23 @@ class Animator {
     /**
      * @brief Get the global speed multiplier.
      */
-    float getGlobalSpeed() const { return m_globalSpeed; }
+    [[nodiscard]] float getGlobalSpeed() const { return m_globalSpeed; }
 
     /**
      * @brief Returns the number of currently active animations.
      */
-    size_t activeCount() const;
+    [[nodiscard]] size_t activeCount() const;
 
     // -----------------------------------------------------------------------
     // Per-handle controls (called by AnimationHandle)
     // -----------------------------------------------------------------------
 
-    bool isActive(AnimationId id) const;
+    [[nodiscard]] bool isActive(AnimationId id) const;
     void cancel(AnimationId id);
     void pause(AnimationId id);
     void resume(AnimationId id);
     void setSpeed(AnimationId id, float speed);
-    float getSpeed(AnimationId id) const;
+    [[nodiscard]] float getSpeed(AnimationId id) const;
 
     // -----------------------------------------------------------------------
     // Engine tick (called by Game::rebuildSchedulerGraph via scene.animations task)
@@ -478,7 +479,7 @@ class Animator {
 
     AnimationId allocateId();
     Job* findJob(AnimationId id);
-    const Job* findJob(AnimationId id) const;
+    [[nodiscard]] const Job* findJob(AnimationId id) const;
 
     void resetHandleControl();
 

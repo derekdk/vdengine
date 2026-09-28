@@ -135,11 +135,12 @@ TEST_F(ThreadPoolTest, TasksExecuteOnWorkerThreads) {
 
     constexpr int N = 20;
     std::vector<std::future<void>> futures;
+    futures.reserve(N);
     for (int i = 0; i < N; ++i) {
         futures.push_back(pool.submit([&]() {
             // Sleep briefly so tasks overlap across workers
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            std::lock_guard<std::mutex> lock(mtx);
+            std::scoped_lock lock(mtx);
             taskThreadIds.insert(std::this_thread::get_id());
         }));
     }
@@ -190,12 +191,14 @@ class SchedulerThreadPoolTest : public ::testing::Test {
 
     TaskDescriptor makeLoggingTask(const std::string& name, TaskPhase phase,
                                    const std::vector<TaskId>& deps = {}, bool mainThread = true) {
-        return {name, phase,
-                [this, name]() {
-                    std::lock_guard<std::mutex> lock(logMutex);
-                    executionLog.push_back(name);
-                },
-                deps, mainThread};
+        return {
+            name, phase,
+            // NOLINTNEXTLINE(bugprone-exception-escape) MSVC debug-STL string moves may allocate
+            [this, name]() {
+                std::scoped_lock lock(logMutex);
+                executionLog.push_back(name);
+            },
+            deps, mainThread};
     }
 };
 
@@ -253,7 +256,7 @@ TEST_F(SchedulerThreadPoolTest, IndependentNonMainThreadTasksRunInParallel) {
 
     auto work = [&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        std::lock_guard<std::mutex> lock(mtx);
+        std::scoped_lock lock(mtx);
         threadIds.insert(std::this_thread::get_id());
     };
 
@@ -302,8 +305,8 @@ TEST_F(SchedulerThreadPoolTest, MixedMainAndPoolTasksRespectDeps) {
     auto input = scheduler.addTask({"input",
                                     TaskPhase::Input,
                                     [this]() {
-                                        std::lock_guard<std::mutex> lock(logMutex);
-                                        executionLog.push_back("input");
+                                        std::scoped_lock lock(logMutex);
+                                        executionLog.emplace_back("input");
                                     },
                                     {},
                                     true});
@@ -317,7 +320,7 @@ TEST_F(SchedulerThreadPoolTest, MixedMainAndPoolTasksRespectDeps) {
     scheduler.addTask({"render",
                        TaskPhase::Render,
                        [this, &physicsCounter]() {
-                           std::lock_guard<std::mutex> lock(logMutex);
+                           std::scoped_lock lock(logMutex);
                            // By the time render runs, both physics tasks must be done
                            executionLog.push_back("render_" +
                                                   std::to_string(physicsCounter.load()));

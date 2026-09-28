@@ -52,8 +52,9 @@ __declspec(noinline)
 #endif
 inline float inverseLerp(float from, float to, float value) {
     float range = to - from;
-    if (std::abs(range) < 0.0001f)
+    if (std::abs(range) < 0.0001f) {
         return 0.0f;
+    }
     return (value - from) / range;
 }
 
@@ -95,8 +96,9 @@ inline float distanceSquared(const glm::vec2& a, const glm::vec2& b) {
  */
 inline glm::vec2 normalizeOrZero(const glm::vec2& value, float epsilon = 0.0001f) {
     float len2 = lengthSquared(value);
-    if (len2 < epsilon * epsilon)
+    if (len2 < epsilon * epsilon) {
         return glm::vec2(0.0f);
+    }
     return value / std::sqrt(len2);
 }
 
@@ -113,8 +115,9 @@ inline glm::vec2 lerp(const glm::vec2& from, const glm::vec2& to, float t) {
 inline glm::vec2 moveToward(const glm::vec2& current, const glm::vec2& target, float maxDelta) {
     glm::vec2 diff = target - current;
     float dist2 = lengthSquared(diff);
-    if (dist2 <= maxDelta * maxDelta || dist2 < 0.0001f * 0.0001f)
+    if (dist2 <= maxDelta * maxDelta || dist2 < 0.0001f * 0.0001f) {
         return target;
+    }
     return current + diff / std::sqrt(dist2) * maxDelta;
 }
 
@@ -122,14 +125,14 @@ inline glm::vec2 moveToward(const glm::vec2& current, const glm::vec2& target, f
  * @brief Perpendicular vector rotated 90 degrees left (counter-clockwise).
  */
 inline glm::vec2 perpendicularLeft(const glm::vec2& value) {
-    return glm::vec2(-value.y, value.x);
+    return {-value.y, value.x};
 }
 
 /**
  * @brief Perpendicular vector rotated 90 degrees right (clockwise).
  */
 inline glm::vec2 perpendicularRight(const glm::vec2& value) {
-    return glm::vec2(value.y, -value.x);
+    return {value.y, -value.x};
 }
 
 /**
@@ -139,7 +142,7 @@ inline glm::vec2 perpendicularRight(const glm::vec2& value) {
  */
 inline glm::vec2 directionFromAngleDegrees(float angleDegrees) {
     float rad = glm::radians(angleDegrees);
-    return glm::vec2(std::sin(rad), std::cos(rad));
+    return {std::sin(rad), std::cos(rad)};
 }
 
 /**
@@ -150,8 +153,9 @@ inline glm::vec2 directionFromAngleDegrees(float angleDegrees) {
 inline float angleDegreesFromUp(const glm::vec2& direction) {
     float rad = std::atan2(direction.x, direction.y);
     float deg = glm::degrees(rad);
-    if (deg < 0.0f)
+    if (deg < 0.0f) {
         deg += 360.0f;
+    }
     return deg;
 }
 
@@ -172,14 +176,14 @@ inline float angleDegreesFromRight(const glm::vec2& direction) {
  * @brief Convert a 2D vector to a 3D Position (XY plane, z = given value).
  */
 inline Position toPosition(const glm::vec2& value, float z = 0.0f) {
-    return Position(value.x, value.y, z);
+    return {value.x, value.y, z};
 }
 
 /**
  * @brief Extract the XY components of a Position as a vec2.
  */
 inline glm::vec2 toVec2(const Position& value) {
-    return glm::vec2(value.x, value.y);
+    return {value.x, value.y};
 }
 
 }  // namespace vde::math2d

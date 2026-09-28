@@ -179,6 +179,9 @@ void Game::shutdown() {
     m_scenes.clear();
     m_sceneStack.clear();
 
+    // Release persistent GPU resources while the Vulkan device is still alive
+    m_resourceManager.clear();
+
     // Clear sprite descriptor cache (static in Entity.cpp)
     clearSpriteDescriptorCache();
 
@@ -2188,7 +2191,7 @@ void Game::renderMultiViewport() {
         updateLightingUBO(scene);
 
         // Capture scene pointer for the lambda
-        info.renderCallback = [this, scene](VkCommandBuffer cmd) {
+        info.renderCallback = [scene](VkCommandBuffer cmd) {
             (void)cmd;
             scene->render();
         };

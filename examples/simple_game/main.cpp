@@ -30,25 +30,33 @@ class GameInputHandler : public vde::examples::BaseExampleInputHandler {
         if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
         }
-        if (key == vde::KEY_W)
+        if (key == vde::KEY_W) {
             m_moveForward = true;
-        if (key == vde::KEY_S)
+        }
+        if (key == vde::KEY_S) {
             m_moveBackward = true;
-        if (key == vde::KEY_A)
+        }
+        if (key == vde::KEY_A) {
             m_moveLeft = true;
-        if (key == vde::KEY_D)
+        }
+        if (key == vde::KEY_D) {
             m_moveRight = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_W)
+        if (key == vde::KEY_W) {
             m_moveForward = false;
-        if (key == vde::KEY_S)
+        }
+        if (key == vde::KEY_S) {
             m_moveBackward = false;
-        if (key == vde::KEY_A)
+        }
+        if (key == vde::KEY_A) {
             m_moveLeft = false;
-        if (key == vde::KEY_D)
+        }
+        if (key == vde::KEY_D) {
             m_moveRight = false;
+        }
     }
 
     void onMouseMove(double x, double y) override {
@@ -67,13 +75,13 @@ class GameInputHandler : public vde::examples::BaseExampleInputHandler {
         return val;
     }
 
-    bool isMovingForward() const { return m_moveForward; }
-    bool isMovingBackward() const { return m_moveBackward; }
-    bool isMovingLeft() const { return m_moveLeft; }
-    bool isMovingRight() const { return m_moveRight; }
+    [[nodiscard]] bool isMovingForward() const { return m_moveForward; }
+    [[nodiscard]] bool isMovingBackward() const { return m_moveBackward; }
+    [[nodiscard]] bool isMovingLeft() const { return m_moveLeft; }
+    [[nodiscard]] bool isMovingRight() const { return m_moveRight; }
 
-    double getMouseX() const { return m_mouseX; }
-    double getMouseY() const { return m_mouseY; }
+    [[nodiscard]] double getMouseX() const { return m_mouseX; }
+    [[nodiscard]] double getMouseY() const { return m_mouseY; }
 
     float getScrollDelta() {
         float val = m_scrollDelta;
@@ -105,8 +113,9 @@ class RotatingCube : public vde::MeshEntity {
         // Rotate the cube over time
         auto rot = getRotation();
         rot.yaw += m_rotationSpeed * deltaTime;
-        if (rot.yaw > 360.0f)
+        if (rot.yaw > 360.0f) {
             rot.yaw -= 360.0f;
+        }
         setRotation(rot);
     }
 
@@ -164,24 +173,24 @@ class MainScene : public vde::examples::BaseExampleScene {
                 m_speedMultiplier = (m_speedMultiplier == 1.0f) ? 3.0f : 1.0f;
                 m_cube->setRotationSpeed(30.0f * m_speedMultiplier);
                 std::cout << "Rotation speed: " << (m_speedMultiplier == 1.0f ? "normal" : "fast")
-                          << std::endl;
+                          << '\n';
             }
         }
     }
 
   protected:
-    std::string getExampleName() const override { return "Simple Game"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Simple Game"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Game class initialization", "Scene management", "MeshEntity with rotation",
                 "OrbitCamera controls"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Blue rotating cube at origin", "Dark blue background"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SCROLL - Zoom camera in/out", "SPACE  - Toggle rotation speed"};
     }
 
@@ -198,7 +207,7 @@ class MenuScene : public vde::Scene {
     MenuScene() = default;
 
     void onEnter() override {
-        std::cout << "MenuScene: Press SPACE to start the game" << std::endl;
+        std::cout << "MenuScene: Press SPACE to start the game" << '\n';
         setBackgroundColor(vde::Color::fromHex(0x0f0f23));
         m_elapsedTime = 0.0f;
     }
@@ -209,8 +218,9 @@ class MenuScene : public vde::Scene {
         auto* input = dynamic_cast<GameInputHandler*>(getInputHandler());
         if (input) {
             if (input->isEscapePressed()) {
-                if (getGame())
+                if (getGame()) {
                     getGame()->quit();
+                }
                 return;
             }
             if (input->isSpacePressed()) {
@@ -298,7 +308,7 @@ class SimpleGameDemo : public vde::Game {
         }
     }
 
-    int getExitCode() const override { return m_exitCode; }
+    [[nodiscard]] int getExitCode() const override { return m_exitCode; }
 
   private:
     std::unique_ptr<GameInputHandler> m_inputHandler;
@@ -331,8 +341,9 @@ class SimpleGameDemo : public vde::Game {
     void initImGui() {
         auto* ctx = getVulkanContext();
         auto* win = getWindow();
-        if (!ctx || !win)
+        if (!ctx || !win) {
             return;
+        }
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -368,8 +379,9 @@ class SimpleGameDemo : public vde::Game {
     }
 
     void cleanupImGui() {
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
 
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -391,6 +403,7 @@ class SimpleGameDemo : public vde::Game {
 /**
  * @brief Main entry point.
  */
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     SimpleGameDemo demo;
     return vde::examples::runExample(demo, "VDE Simple Game Example", 1280, 720, argc, argv);

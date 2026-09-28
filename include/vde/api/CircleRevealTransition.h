@@ -21,8 +21,8 @@ class CircleRevealTransition : public Transition {
   public:
     CircleRevealTransition() { m_direction = TransitionDirection::Center; }
 
-    const char* getName() const override { return "CircleReveal"; }
-    std::string getFragmentShaderPath() const override;
+    [[nodiscard]] const char* getName() const override { return "CircleReveal"; }
+    [[nodiscard]] std::string getFragmentShaderPath() const override;
 
     /**
      * @brief Maps linear progress to a radius and encodes it in uniforms.

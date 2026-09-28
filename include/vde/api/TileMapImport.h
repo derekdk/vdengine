@@ -31,6 +31,7 @@ using TileMapImportPropertyValue = std::variant<bool, int, float, std::string>;
  * Positions are converted into TileMap local/world units using a bottom-left
  * origin so they can be used directly alongside TileMap collision output.
  */
+// NOLINTNEXTLINE(bugprone-exception-escape) MSVC debug-STL container moves may allocate
 struct ImportedTileObject {
     int id = 0;
     std::string name;

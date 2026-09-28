@@ -52,8 +52,9 @@ struct TestImage {
     int height = 0;
 
     ~TestImage() {
-        if (data)
+        if (data) {
             stbi_image_free(data);
+        }
     }
 
     bool load(const std::string& filename) {

@@ -49,20 +49,20 @@ struct Pixels {
     constexpr Pixels(uint32_t v) : value(static_cast<float>(v)) {}
     constexpr operator float() const { return value; }
 
-    constexpr Pixels operator-() const { return Pixels(-value); }
-    constexpr Pixels operator+(Pixels other) const { return Pixels(value + other.value); }
-    constexpr Pixels operator-(Pixels other) const { return Pixels(value - other.value); }
-    constexpr Pixels operator*(float scalar) const { return Pixels(value * scalar); }
-    constexpr Pixels operator/(float scalar) const { return Pixels(value / scalar); }
+    constexpr Pixels operator-() const { return {-value}; }
+    constexpr Pixels operator+(Pixels other) const { return {value + other.value}; }
+    constexpr Pixels operator-(Pixels other) const { return {value - other.value}; }
+    constexpr Pixels operator*(float scalar) const { return {value * scalar}; }
+    constexpr Pixels operator/(float scalar) const { return {value / scalar}; }
 };
 
 /// User-defined literal for pixels (e.g., 1920_px)
 constexpr Pixels operator""_px(long double v) {
-    return Pixels(static_cast<float>(v));
+    return {static_cast<float>(v)};
 }
 /// User-defined literal for pixels from integer (e.g., 1920_px)
 constexpr Pixels operator""_px(unsigned long long v) {
-    return Pixels(static_cast<float>(v));
+    return {static_cast<float>(v)};
 }
 
 /**
@@ -78,7 +78,7 @@ struct ScreenSize {
         : width(static_cast<float>(w)), height(static_cast<float>(h)) {}
 
     /// @return Width divided by height
-    float aspectRatio() const { return width.value / height.value; }
+    [[nodiscard]] float aspectRatio() const { return width.value / height.value; }
 };
 
 /**
@@ -143,23 +143,23 @@ struct PixelToWorldMapping {
     // Conversion functions
 
     /// @brief Convert pixels to world meters
-    Meters toWorld(Pixels px) const { return Meters(px.value * metersPerPixel.value); }
+    [[nodiscard]] Meters toWorld(Pixels px) const { return {px.value * metersPerPixel.value}; }
 
     /// @brief Convert world meters to pixels
-    Pixels toPixels(Meters m) const { return Pixels(m.value / metersPerPixel.value); }
+    [[nodiscard]] Pixels toPixels(Meters m) const { return {m.value / metersPerPixel.value}; }
 
     /// @brief Convert screen position to world position
-    glm::vec2 toWorld(const glm::vec2& screenPos) const {
-        return glm::vec2(toWorld(Pixels(screenPos.x)), toWorld(Pixels(screenPos.y)));
+    [[nodiscard]] glm::vec2 toWorld(const glm::vec2& screenPos) const {
+        return {toWorld(Pixels(screenPos.x)), toWorld(Pixels(screenPos.y))};
     }
 
     /// @brief Convert world position to screen position
-    glm::vec2 toPixels(const glm::vec2& worldPos) const {
-        return glm::vec2(toPixels(Meters(worldPos.x)), toPixels(Meters(worldPos.y)));
+    [[nodiscard]] glm::vec2 toPixels(const glm::vec2& worldPos) const {
+        return {toPixels(Meters(worldPos.x)), toPixels(Meters(worldPos.y))};
     }
 
     /// @return Pixels per meter (inverse of metersPerPixel)
-    float getPixelsPerMeter() const { return 1.0f / metersPerPixel.value; }
+    [[nodiscard]] float getPixelsPerMeter() const { return 1.0f / metersPerPixel.value; }
 };
 
 /**
@@ -242,7 +242,7 @@ class CameraBounds2D {
     /**
      * @brief Get the current zoom level.
      */
-    float getZoom() const { return m_zoom; }
+    [[nodiscard]] float getZoom() const { return m_zoom; }
 
     /**
      * @brief Center the camera on a world point.
@@ -284,7 +284,7 @@ class CameraBounds2D {
     /**
      * @brief Check if constraint bounds are set.
      */
-    bool hasConstraintBounds() const { return m_hasConstraints; }
+    [[nodiscard]] bool hasConstraintBounds() const { return m_hasConstraints; }
 
     // Queries
 
@@ -293,32 +293,32 @@ class CameraBounds2D {
      *
      * @return The rectangular area of the world that is visible on screen
      */
-    WorldBounds2D getVisibleBounds() const;
+    [[nodiscard]] WorldBounds2D getVisibleBounds() const;
 
     /**
      * @brief Get the pixel-to-world mapping.
      */
-    PixelToWorldMapping getMapping() const { return m_mapping; }
+    [[nodiscard]] PixelToWorldMapping getMapping() const { return m_mapping; }
 
     /**
      * @brief Get the visible world width (after zoom).
      */
-    Meters getVisibleWidth() const;
+    [[nodiscard]] Meters getVisibleWidth() const;
 
     /**
      * @brief Get the visible world height (after zoom).
      */
-    Meters getVisibleHeight() const;
+    [[nodiscard]] Meters getVisibleHeight() const;
 
     /**
      * @brief Get the screen size.
      */
-    ScreenSize getScreenSize() const { return m_screenSize; }
+    [[nodiscard]] ScreenSize getScreenSize() const { return m_screenSize; }
 
     /**
      * @brief Get the camera center position in world space.
      */
-    glm::vec2 getCenter() const { return glm::vec2(m_centerX, m_centerY); }
+    [[nodiscard]] glm::vec2 getCenter() const { return {m_centerX, m_centerY}; }
 
     // Coordinate conversion
 
@@ -332,12 +332,12 @@ class CameraBounds2D {
      * @param screenY Screen Y in pixels (0 = top)
      * @return World position
      */
-    glm::vec2 screenToWorld(Pixels screenX, Pixels screenY) const;
+    [[nodiscard]] glm::vec2 screenToWorld(Pixels screenX, Pixels screenY) const;
 
     /**
      * @brief Convert screen coordinates to world coordinates.
      */
-    glm::vec2 screenToWorld(const glm::vec2& screenPos) const;
+    [[nodiscard]] glm::vec2 screenToWorld(const glm::vec2& screenPos) const;
 
     /**
      * @brief Convert world coordinates to screen coordinates.
@@ -346,12 +346,12 @@ class CameraBounds2D {
      * @param worldY World Y in meters
      * @return Screen position in pixels
      */
-    glm::vec2 worldToScreen(Meters worldX, Meters worldY) const;
+    [[nodiscard]] glm::vec2 worldToScreen(Meters worldX, Meters worldY) const;
 
     /**
      * @brief Convert world coordinates to screen coordinates.
      */
-    glm::vec2 worldToScreen(const glm::vec2& worldPos) const;
+    [[nodiscard]] glm::vec2 worldToScreen(const glm::vec2& worldPos) const;
 
     // Visibility testing
 
@@ -362,12 +362,12 @@ class CameraBounds2D {
      * @param worldY World Y coordinate
      * @return true if the point is within the visible bounds
      */
-    bool isVisible(Meters worldX, Meters worldY) const;
+    [[nodiscard]] bool isVisible(Meters worldX, Meters worldY) const;
 
     /**
      * @brief Check if a world point is visible on screen.
      */
-    bool isVisible(const glm::vec2& worldPos) const;
+    [[nodiscard]] bool isVisible(const glm::vec2& worldPos) const;
 
     /**
      * @brief Check if any part of a bounds rectangle is visible.
@@ -375,7 +375,7 @@ class CameraBounds2D {
      * @param bounds World bounds to test
      * @return true if any part of the bounds overlaps visible area
      */
-    bool isVisible(const WorldBounds2D& bounds) const;
+    [[nodiscard]] bool isVisible(const WorldBounds2D& bounds) const;
 
   private:
     ScreenSize m_screenSize{Pixels(defaults::DEFAULT_SCREEN_WIDTH),

@@ -39,12 +39,15 @@ class PhysicsAudioInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
-        if (key == vde::KEY_R)
+        }
+        if (key == vde::KEY_R) {
             m_resetPressed = true;
-        if (key == vde::KEY_Q)
+        }
+        if (key == vde::KEY_Q) {
             m_queryPressed = true;
+        }
     }
 
     bool isSpacePressed() {
@@ -117,9 +120,9 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
         });
 
         // Perform initial raycast status
-        std::cout << "[PhysicsAudioScene] Phase callbacks enabled (3-phase model)" << std::endl;
+        std::cout << "[PhysicsAudioScene] Phase callbacks enabled (3-phase model)" << '\n';
         std::cout << "[PhysicsAudioScene] Collision pipeline: Physics -> GameLogic -> Audio"
-                  << std::endl;
+                  << '\n';
     }
 
     // -----------------------------------------------------------------
@@ -142,7 +145,7 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
             if (input->isSpacePressed()) {
                 spawnSingleBox((static_cast<float>(rand()) / RAND_MAX - 0.5f) * 6.0f,
                                8.0f + static_cast<float>(rand()) / RAND_MAX * 4.0f);
-                std::cout << "[GameLogic] Spawned extra box" << std::endl;
+                std::cout << "[GameLogic] Spawned extra box" << '\n';
             }
             if (input->isResetPressed()) {
                 resetBoxes();
@@ -210,9 +213,9 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Physics + Audio Pipeline"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Physics + Audio Pipeline"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Phase callbacks (GameLogic -> Audio -> Visuals)",
                 "Collision begin/end callbacks",
                 "Per-body collision callbacks",
@@ -222,14 +225,14 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
                 "Audio event queue (collision -> game logic -> audio)"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Dark background with falling colored boxes",
                 "Boxes landing and stacking on a green ground platform",
                 "Console output showing collision events being processed",
                 "Console output showing raycast hits and AABB query results"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SPACE - Spawn an extra box", "R     - Reset all boxes",
                 "Q     - Manual AABB query"};
     }
@@ -271,7 +274,7 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
                 if (otherEntity) {
                     std::cout << "[PerBodyCB] Entity '" << otherEntity->getName()
                               << "' hit ground (depth=" << std::fixed << std::setprecision(3)
-                              << evt.depth << ")" << std::endl;
+                              << evt.depth << ")" << '\n';
                 }
             });
     }
@@ -281,8 +284,8 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
             {-2.0f, 5.0f}, {-0.5f, 6.5f}, {1.0f, 5.5f}, {-1.5f, 8.0f}, {0.5f, 7.0f}, {2.0f, 9.0f},
         };
 
-        for (int i = 0; i < 6; ++i) {
-            spawnSingleBox(positions[i][0], positions[i][1]);
+        for (auto& position : positions) {
+            spawnSingleBox(position[0], position[1]);
         }
     }
 
@@ -319,7 +322,7 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
         m_groundHitCount = 0;
         m_totalAudioEventsProcessed = 0;
         spawnBoxes();
-        std::cout << "[GameLogic] Reset all boxes" << std::endl;
+        std::cout << "[GameLogic] Reset all boxes" << '\n';
     }
 
     void processCollision(const vde::CollisionEvent& evt) {
@@ -348,13 +351,14 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
                 entityB ? entityB->getName() : ("body#" + std::to_string(evt.bodyB));
             std::cout << "[GameLogic] Collision #" << m_totalCollisions << ": " << nameA << " <-> "
                       << nameB << " (depth=" << std::fixed << std::setprecision(3) << evt.depth
-                      << ", audio queued)" << std::endl;
+                      << ", audio queued)" << '\n';
         }
     }
 
     void performRaycast() {
-        if (!getPhysicsScene())
+        if (!getPhysicsScene()) {
             return;
+        }
 
         // Cast a ray downward from above the scene
         glm::vec2 origin = {0.0f, 10.0f};
@@ -369,15 +373,16 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
                 hitEntity ? hitEntity->getName() : ("body#" + std::to_string(hit.bodyId));
             std::cout << "[Raycast] Hit '" << name << "' at y=" << std::fixed
                       << std::setprecision(2) << hit.point.y << " (dist=" << hit.distance << ")"
-                      << std::endl;
+                      << '\n';
         } else {
-            std::cout << "[Raycast] No hit (clear sky)" << std::endl;
+            std::cout << "[Raycast] No hit (clear sky)" << '\n';
         }
     }
 
     void performAABBQuery() {
-        if (!getPhysicsScene())
+        if (!getPhysicsScene()) {
             return;
+        }
 
         // Query a region in the center of the scene
         glm::vec2 queryMin = {-2.0f, -3.0f};
@@ -389,8 +394,9 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
         if (!bodies.empty()) {
             std::cout << " [";
             for (size_t i = 0; i < bodies.size() && i < 5; ++i) {
-                if (i > 0)
+                if (i > 0) {
                     std::cout << ", ";
+                }
                 vde::Entity* entity = getEntityByPhysicsBody(bodies[i]);
                 if (entity) {
                     std::cout << entity->getName();
@@ -398,22 +404,23 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
                     std::cout << "body#" << bodies[i];
                 }
             }
-            if (bodies.size() > 5)
+            if (bodies.size() > 5) {
                 std::cout << ", ...";
+            }
             std::cout << "]";
         }
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
     void printStatus() {
-        std::cout << "\n--- Status ---" << std::endl;
-        std::cout << "  Boxes: " << m_boxes.size() << std::endl;
-        std::cout << "  Total collisions (begin): " << m_totalCollisions << std::endl;
-        std::cout << "  Collision ends: " << m_collisionEndCount << std::endl;
-        std::cout << "  Ground hits (per-body CB): " << m_groundHitCount << std::endl;
-        std::cout << "  Audio events processed: " << m_totalAudioEventsProcessed << std::endl;
-        std::cout << "  Physics bodies: " << getPhysicsScene()->getActiveBodyCount() << std::endl;
-        std::cout << "--------------\n" << std::endl;
+        std::cout << "\n--- Status ---" << '\n';
+        std::cout << "  Boxes: " << m_boxes.size() << '\n';
+        std::cout << "  Total collisions (begin): " << m_totalCollisions << '\n';
+        std::cout << "  Collision ends: " << m_collisionEndCount << '\n';
+        std::cout << "  Ground hits (per-body CB): " << m_groundHitCount << '\n';
+        std::cout << "  Audio events processed: " << m_totalAudioEventsProcessed << '\n';
+        std::cout << "  Physics bodies: " << getPhysicsScene()->getActiveBodyCount() << '\n';
+        std::cout << "--------------\n" << '\n';
     }
 
     int m_groundHitCount = 0;
@@ -433,6 +440,7 @@ class PhysicsAudioGame
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     PhysicsAudioGame game;
     return vde::examples::runExample(game, "VDE Physics + Audio Pipeline Demo", 1280, 720, argc,

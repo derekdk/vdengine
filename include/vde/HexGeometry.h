@@ -9,6 +9,7 @@
 
 #include <glm/glm.hpp>
 
+#include <cstdint>
 #include <vector>
 
 namespace vde {
@@ -19,7 +20,7 @@ namespace vde {
  * Flat-top: Flat edge at top (common for strategy games)
  * Pointy-top: Point at top
  */
-enum class HexOrientation {
+enum class HexOrientation : uint8_t {
     FlatTop,   ///< Flat edge at top (standard for strategy games)
     PointyTop  ///< Point at top
 };
@@ -60,28 +61,29 @@ class HexGeometry {
      * @param center World position of the hex center
      * @return HexMesh containing vertices and indices
      */
-    HexMesh generateHex(const glm::vec3& center = glm::vec3(0.0f)) const;
+    [[nodiscard]] HexMesh generateHex(const glm::vec3& center = glm::vec3(0.0f)) const;
 
     /**
      * @brief Get the corner positions without generating a full mesh.
      * @param center World position of the hex center
      * @return Vector of 6 corner positions
      */
-    std::vector<glm::vec3> getCornerPositions(const glm::vec3& center = glm::vec3(0.0f)) const;
+    [[nodiscard]] std::vector<glm::vec3>
+    getCornerPositions(const glm::vec3& center = glm::vec3(0.0f)) const;
 
     // Dimension accessors
 
     /** @brief Get the size (outer radius) */
-    float getSize() const { return m_size; }
+    [[nodiscard]] float getSize() const { return m_size; }
 
     /** @brief Get the width (tip to tip for flat-top, flat to flat for pointy-top) */
-    float getWidth() const;
+    [[nodiscard]] float getWidth() const;
 
     /** @brief Get the height (flat to flat for flat-top, tip to tip for pointy-top) */
-    float getHeight() const;
+    [[nodiscard]] float getHeight() const;
 
     /** @brief Get the orientation */
-    HexOrientation getOrientation() const { return m_orientation; }
+    [[nodiscard]] HexOrientation getOrientation() const { return m_orientation; }
 
   private:
     float m_size;  ///< Outer radius (center to corner)
@@ -91,14 +93,14 @@ class HexGeometry {
      * @brief Get the starting angle for corner 0.
      * @return Angle in radians
      */
-    float getStartAngle() const;
+    [[nodiscard]] float getStartAngle() const;
 
     /**
      * @brief Calculate UV coordinates for a point relative to center.
      * @param localPos Position relative to hex center
      * @return UV coordinates in [0, 1] range
      */
-    glm::vec2 calculateUV(const glm::vec2& localPos) const;
+    [[nodiscard]] glm::vec2 calculateUV(const glm::vec2& localPos) const;
 };
 
 }  // namespace vde

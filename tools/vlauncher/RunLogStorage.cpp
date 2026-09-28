@@ -39,8 +39,8 @@ std::string normalizePathForKey(const std::filesystem::path& repositoryRoot,
         std::filesystem::relative(absolutePath, repositoryRoot, error);
     std::string keyPath = error ? absolutePath.generic_string() : relativePath.generic_string();
 
-    std::transform(keyPath.begin(), keyPath.end(), keyPath.begin(),
-                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::ranges::transform(keyPath, keyPath.begin(),
+                           [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     return keyPath;
 }
 
@@ -163,7 +163,7 @@ bool deserializeHistory(const std::vector<uint8_t>& bytes,
         return false;
     }
 
-    for (size_t slot = 0; slot < history.size(); ++slot) {
+    for (auto& slot : history) {
         uint8_t hasEntry = 0;
         if (!readUint8(bytes, offset, hasEntry)) {
             return false;
@@ -178,14 +178,10 @@ bool deserializeHistory(const std::vector<uint8_t>& bytes,
             return false;
         }
 
-        history[slot] = std::move(run);
+        slot = std::move(run);
     }
 
-    if (offset != bytes.size()) {
-        return false;
-    }
-
-    return true;
+    return offset == bytes.size();
 }
 
 }  // namespace

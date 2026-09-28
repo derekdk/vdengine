@@ -69,8 +69,7 @@ void CameraBounds2D::clearConstraintBounds() {
 WorldBounds2D CameraBounds2D::getVisibleBounds() const {
     Meters halfW = getVisibleWidth() * 0.5f;
     Meters halfH = getVisibleHeight() * 0.5f;
-    return WorldBounds2D(m_centerX - halfW, m_centerY - halfH, m_centerX + halfW,
-                         m_centerY + halfH);
+    return {m_centerX - halfW, m_centerY - halfH, m_centerX + halfW, m_centerY + halfH};
 }
 
 Meters CameraBounds2D::getVisibleWidth() const {
@@ -79,7 +78,7 @@ Meters CameraBounds2D::getVisibleWidth() const {
 
 Meters CameraBounds2D::getVisibleHeight() const {
     float aspect = m_screenSize.aspectRatio();
-    return Meters(m_baseWorldWidth.value / (m_zoom * aspect));
+    return {m_baseWorldWidth.value / (m_zoom * aspect)};
 }
 
 glm::vec2 CameraBounds2D::screenToWorld(Pixels screenX, Pixels screenY) const {
@@ -99,7 +98,7 @@ glm::vec2 CameraBounds2D::screenToWorld(Pixels screenX, Pixels screenY) const {
     float worldX = visible.minX.value + normalizedX * visible.width().value;
     float worldY = visible.maxY.value - normalizedY * visible.height().value;
 
-    return glm::vec2(worldX, worldY);
+    return {worldX, worldY};
 }
 
 glm::vec2 CameraBounds2D::screenToWorld(const glm::vec2& screenPos) const {
@@ -117,7 +116,7 @@ glm::vec2 CameraBounds2D::worldToScreen(Meters worldX, Meters worldY) const {
     float screenX = normalizedX * m_screenSize.width.value;
     float screenY = normalizedY * m_screenSize.height.value;
 
-    return glm::vec2(screenX, screenY);
+    return {screenX, screenY};
 }
 
 glm::vec2 CameraBounds2D::worldToScreen(const glm::vec2& worldPos) const {

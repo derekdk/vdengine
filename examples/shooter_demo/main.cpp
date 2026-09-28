@@ -46,40 +46,50 @@ class ShooterInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_LEFT || key == vde::KEY_A)
+        if (key == vde::KEY_LEFT || key == vde::KEY_A) {
             m_left = true;
-        if (key == vde::KEY_RIGHT || key == vde::KEY_D)
+        }
+        if (key == vde::KEY_RIGHT || key == vde::KEY_D) {
             m_right = true;
-        if (key == vde::KEY_UP || key == vde::KEY_W)
+        }
+        if (key == vde::KEY_UP || key == vde::KEY_W) {
             m_up = true;
-        if (key == vde::KEY_DOWN || key == vde::KEY_S)
+        }
+        if (key == vde::KEY_DOWN || key == vde::KEY_S) {
             m_down = true;
+        }
         if (key == vde::KEY_SPACE) {
             m_fireHeld = true;
             m_firePressed = true;
         }
-        if (key == vde::KEY_R)
+        if (key == vde::KEY_R) {
             m_restart = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT || key == vde::KEY_A)
+        if (key == vde::KEY_LEFT || key == vde::KEY_A) {
             m_left = false;
-        if (key == vde::KEY_RIGHT || key == vde::KEY_D)
+        }
+        if (key == vde::KEY_RIGHT || key == vde::KEY_D) {
             m_right = false;
-        if (key == vde::KEY_UP || key == vde::KEY_W)
+        }
+        if (key == vde::KEY_UP || key == vde::KEY_W) {
             m_up = false;
-        if (key == vde::KEY_DOWN || key == vde::KEY_S)
+        }
+        if (key == vde::KEY_DOWN || key == vde::KEY_S) {
             m_down = false;
-        if (key == vde::KEY_SPACE)
+        }
+        if (key == vde::KEY_SPACE) {
             m_fireHeld = false;
+        }
     }
 
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
-    bool isUp() const { return m_up; }
-    bool isDown() const { return m_down; }
-    bool isFireHeld() const { return m_fireHeld; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
+    [[nodiscard]] bool isUp() const { return m_up; }
+    [[nodiscard]] bool isDown() const { return m_down; }
+    [[nodiscard]] bool isFireHeld() const { return m_fireHeld; }
     bool consumeFire() {
         bool v = m_firePressed;
         m_firePressed = false;
@@ -120,8 +130,9 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<ShooterInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         switch (m_state) {
         case State::Title:
@@ -137,9 +148,9 @@ class ShooterScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Shooter Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Shooter Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Title screen -> Gameplay -> Game Over flow",
                 "Uses Math2D, Timing, Random, WorldBounds2D utilities",
                 "Deterministic enemy spawning with RandomStream",
@@ -147,12 +158,12 @@ class ShooterScene : public vde::examples::BaseExampleScene {
                 "AABB collision via WorldBounds2D::intersects()"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Cyan player ship at the bottom", "White bullets moving upward",
                 "Colored enemies scrolling downward", "Score printed in console"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"Arrow keys / WASD - Move", "SPACE - Fire (hold for auto-fire)",
                 "R - Restart when game over", "F - Report failure, ESC - Exit"};
     }
@@ -161,7 +172,7 @@ class ShooterScene : public vde::examples::BaseExampleScene {
     // -----------------------------------------------------------------
     // State machine
     // -----------------------------------------------------------------
-    enum class State { Title, Playing, GameOver };
+    enum class State : uint8_t { Title, Playing, GameOver };
     State m_state = State::Title;
 
     // -----------------------------------------------------------------
@@ -183,8 +194,8 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         m_promptSprite->setPosition(0.0f, -1.5f, 0.0f);
         m_promptSprite->setColor(Color::fromHex(0xffffff));
 
-        std::cout << "=== VERTICAL SHOOTER ===" << std::endl;
-        std::cout << "Press SPACE to start!" << std::endl;
+        std::cout << "=== VERTICAL SHOOTER ===" << '\n';
+        std::cout << "Press SPACE to start!" << '\n';
     }
 
     void updateTitle(ShooterInputHandler* input, float deltaTime) {
@@ -192,8 +203,9 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         int ticks = m_blinkTimer.advance(deltaTime);
         if (ticks > 0) {
             m_blinkVisible = !m_blinkVisible;
-            if (m_promptSprite)
+            if (m_promptSprite) {
                 m_promptSprite->setVisible(m_blinkVisible);
+            }
         }
 
         if (input->consumeFire() || input->consumeRestart()) {
@@ -220,7 +232,7 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         m_player->setPosition(0.0f, -HALF_H + 2.0f, 0.0f);
         m_player->setColor(Color::fromHex(0x00e5ff));
 
-        std::cout << "Score: 0" << std::endl;
+        std::cout << "Score: 0" << '\n';
     }
 
     void updatePlaying(ShooterInputHandler* input, float deltaTime) {
@@ -230,14 +242,18 @@ class ShooterScene : public vde::examples::BaseExampleScene {
 
         // Move player
         glm::vec2 moveDir(0.0f);
-        if (input->isLeft())
+        if (input->isLeft()) {
             moveDir.x -= 1.0f;
-        if (input->isRight())
+        }
+        if (input->isRight()) {
             moveDir.x += 1.0f;
-        if (input->isUp())
+        }
+        if (input->isUp()) {
             moveDir.y += 1.0f;
-        if (input->isDown())
+        }
+        if (input->isDown()) {
             moveDir.y -= 1.0f;
+        }
         moveDir = math2d::normalizeOrZero(moveDir);
 
         if (m_player) {
@@ -302,7 +318,7 @@ class ShooterScene : public vde::examples::BaseExampleScene {
                     m_enemies.erase(m_enemies.begin() + e);
                     bulletHit = true;
                     m_score += 10;
-                    std::cout << "Score: " << m_score << std::endl;
+                    std::cout << "Score: " << m_score << '\n';
                     break;
                 }
             }
@@ -330,8 +346,9 @@ class ShooterScene : public vde::examples::BaseExampleScene {
     }
 
     void fireBullet() {
-        if (!m_player)
+        if (!m_player) {
             return;
+        }
         auto pos = m_player->getPosition();
 
         auto bullet = addEntity<SpriteEntity>();
@@ -366,8 +383,8 @@ class ShooterScene : public vde::examples::BaseExampleScene {
         if (m_player) {
             m_player->setColor(Color::red());
         }
-        std::cout << "GAME OVER! Final Score: " << m_score << std::endl;
-        std::cout << "Press R to restart." << std::endl;
+        std::cout << "GAME OVER! Final Score: " << m_score << '\n';
+        std::cout << "Press R to restart." << '\n';
     }
 
     void updateGameOver(ShooterInputHandler* input, float /*deltaTime*/) {
@@ -384,11 +401,13 @@ class ShooterScene : public vde::examples::BaseExampleScene {
             removeEntity(m_player->getId());
             m_player.reset();
         }
-        for (auto& b : m_bullets)
+        for (auto& b : m_bullets) {
             removeEntity(b.entity->getId());
+        }
         m_bullets.clear();
-        for (auto& e : m_enemies)
+        for (auto& e : m_enemies) {
             removeEntity(e.entity->getId());
+        }
         m_enemies.clear();
         if (m_titleBanner) {
             removeEntity(m_titleBanner->getId());
@@ -440,6 +459,7 @@ class ShooterGame : public vde::examples::BaseExampleGame<ShooterInputHandler, S
 // Entry point
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ShooterGame game;
     return vde::examples::runExample(game, "VDE Shooter Demo", 600, 840, argc, argv);

@@ -16,12 +16,12 @@ namespace vde {
 /**
  * @brief Graphics quality presets.
  */
-enum class GraphicsQuality { Low, Medium, High, Ultra, Custom };
+enum class GraphicsQuality : uint8_t { Low, Medium, High, Ultra, Custom };
 
 /**
  * @brief VSync modes.
  */
-enum class VSyncMode {
+enum class VSyncMode : uint8_t {
     Off,      ///< No VSync, uncapped frame rate
     On,       ///< Standard VSync
     Adaptive  ///< Adaptive VSync (if supported)
@@ -30,7 +30,7 @@ enum class VSyncMode {
 /**
  * @brief Anti-aliasing modes.
  */
-enum class AntiAliasing { None, MSAA2x, MSAA4x, MSAA8x, FXAA, TAA };
+enum class AntiAliasing : uint8_t { None, MSAA2x, MSAA4x, MSAA8x, FXAA, TAA };
 
 /**
  * @brief Configuration for game window and display.

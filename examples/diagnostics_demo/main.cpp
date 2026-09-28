@@ -30,20 +30,27 @@ class DiagnosticsInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_1)
+        if (key == KEY_1) {
             m_addMesh = true;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_addSprite = true;
-        if (key == KEY_3)
+        }
+        if (key == KEY_3) {
             m_addText = true;
-        if (key == KEY_4)
+        }
+        if (key == KEY_4) {
             m_addPhysicsSprite = true;
-        if (key == KEY_R)
+        }
+        if (key == KEY_R) {
             m_removeLastPressed = true;
-        if (key == KEY_C)
+        }
+        if (key == KEY_C) {
             m_clearPressed = true;
-        if (key == KEY_TAB)
+        }
+        if (key == KEY_TAB) {
             m_switchScene = true;
+        }
     }
 
     bool consumeAddMesh() {
@@ -116,8 +123,9 @@ class PrimaryScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<DiagnosticsInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         if (input->consumeAddMesh()) {
             addEntity<MeshEntity>();
@@ -162,20 +170,20 @@ class PrimaryScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Diagnostics Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Diagnostics Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"SceneDiagnostics entity type classification",
                 "Lifecycle counters (enter/exit/pause/resume)",
                 "Dynamic entity add/remove tracking", "Multi-scene isFocused tracking"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Dark blue background with colored entities",
                 "Console shows real-time diagnostics counters"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"1 - Add MeshEntity",          "2 - Add SpriteEntity",   "3 - Add TextEntity",
                 "4 - Add PhysicsSpriteEntity", "R - Remove last entity", "C - Clear all entities",
                 "TAB - Switch scene"};
@@ -243,6 +251,7 @@ class DiagnosticsGame
 // Entry point
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     DiagnosticsGame demo;
     return vde::examples::runExample(demo, "VDE Diagnostics Demo", 1280, 720, argc, argv);

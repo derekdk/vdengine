@@ -147,8 +147,8 @@ void VLauncherScene::saveWindowPosition() const {
     int positionY = 0;
     glfwGetWindowPos(game->getWindow()->getHandle(), &positionX, &positionY);
 
-    const int32_t storedPositionX = static_cast<int32_t>(positionX);
-    const int32_t storedPositionY = static_cast<int32_t>(positionY);
+    const auto storedPositionX = static_cast<int32_t>(positionX);
+    const auto storedPositionY = static_cast<int32_t>(positionY);
     storage.setBinData(kWindowPositionXStorageKey, storedPositionX);
     storage.setBinData(kWindowPositionYStorageKey, storedPositionY);
 }
@@ -688,7 +688,7 @@ VLauncherScene::findMainSourceFile(const std::filesystem::path& sourceDirectory)
         }
     }
     if (!cppFiles.empty()) {
-        std::sort(cppFiles.begin(), cppFiles.end());
+        std::ranges::sort(cppFiles);
         return cppFiles.front();
     }
 
@@ -894,9 +894,10 @@ void VLauncherScene::drawRunLogViewer() {
             ImGui::Separator();
 
             if (!m_selectedTargetRuns[0].has_value() && !m_selectedTargetRuns[1].has_value()) {
-                const bool hasActiveRun = std::any_of(
-                    m_activeRuns.begin(), m_activeRuns.end(),
-                    [this](const ActiveRun& run) { return run.targetId == m_selectedTargetId; });
+                const bool hasActiveRun =
+                    std::ranges::any_of(m_activeRuns, [this](const ActiveRun& run) {
+                        return run.targetId == m_selectedTargetId;
+                    });
 
                 if (hasActiveRun) {
                     ImGui::TextDisabled(
@@ -1166,21 +1167,20 @@ std::vector<ExecutableEntry> VLauncherScene::getSortedEntries() const {
         return std::chrono::system_clock::time_point{};
     };
 
-    std::sort(filtered.begin(), filtered.end(),
-              [gitRecency](const ExecutableEntry& a, const ExecutableEntry& b) {
-                  auto aRecency = gitRecency(a);
-                  auto bRecency = gitRecency(b);
-                  if (aRecency != bRecency) {
-                      return aRecency > bRecency;
-                  }
-                  if (a.outOfDate != b.outOfDate) {
-                      return a.outOfDate > b.outOfDate;
-                  }
-                  if (a.kind != b.kind) {
-                      return a.kind < b.kind;
-                  }
-                  return a.targetName < b.targetName;
-              });
+    std::ranges::sort(filtered, [gitRecency](const ExecutableEntry& a, const ExecutableEntry& b) {
+        auto aRecency = gitRecency(a);
+        auto bRecency = gitRecency(b);
+        if (aRecency != bRecency) {
+            return aRecency > bRecency;
+        }
+        if (a.outOfDate != b.outOfDate) {
+            return a.outOfDate > b.outOfDate;
+        }
+        if (a.kind != b.kind) {
+            return a.kind < b.kind;
+        }
+        return a.targetName < b.targetName;
+    });
 
     return filtered;
 }

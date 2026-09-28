@@ -46,11 +46,11 @@ struct CoordinateSystem {
     glm::vec3 up{0.0f, 1.0f, 0.0f};     ///< Direction of Up (+Y default)
 
     /// @return Direction of South (opposite of North)
-    glm::vec3 south() const { return -north; }
+    [[nodiscard]] glm::vec3 south() const { return -north; }
     /// @return Direction of West (opposite of East)
-    glm::vec3 west() const { return -east; }
+    [[nodiscard]] glm::vec3 west() const { return -east; }
     /// @return Direction of Down (opposite of Up)
-    glm::vec3 down() const { return -up; }
+    [[nodiscard]] glm::vec3 down() const { return -up; }
 
     /**
      * @brief Y-up coordinate system (VDE default).
@@ -105,11 +105,11 @@ struct Meters {
     constexpr Meters(float v) : value(v) {}
     constexpr operator float() const { return value; }
 
-    constexpr Meters operator-() const { return Meters(-value); }
-    constexpr Meters operator+(Meters other) const { return Meters(value + other.value); }
-    constexpr Meters operator-(Meters other) const { return Meters(value - other.value); }
-    constexpr Meters operator*(float scalar) const { return Meters(value * scalar); }
-    constexpr Meters operator/(float scalar) const { return Meters(value / scalar); }
+    constexpr Meters operator-() const { return {-value}; }
+    constexpr Meters operator+(Meters other) const { return {value + other.value}; }
+    constexpr Meters operator-(Meters other) const { return {value - other.value}; }
+    constexpr Meters operator*(float scalar) const { return {value * scalar}; }
+    constexpr Meters operator/(float scalar) const { return {value / scalar}; }
 
     Meters& operator+=(Meters other) {
         value += other.value;
@@ -136,16 +136,16 @@ struct Meters {
     constexpr bool operator>=(Meters other) const { return value >= other.value; }
 
     /// @return Absolute value
-    constexpr Meters abs() const { return Meters(value < 0 ? -value : value); }
+    [[nodiscard]] constexpr Meters abs() const { return {value < 0 ? -value : value}; }
 };
 
 /// User-defined literal for meters (e.g., 100_m)
 constexpr Meters operator""_m(long double v) {
-    return Meters(static_cast<float>(v));
+    return {static_cast<float>(v)};
 }
 /// User-defined literal for meters from integer (e.g., 100_m)
 constexpr Meters operator""_m(unsigned long long v) {
-    return Meters(static_cast<float>(v));
+    return {static_cast<float>(v)};
 }
 
 /**
@@ -174,7 +174,7 @@ struct WorldPoint {
     explicit WorldPoint(const glm::vec3& v) : x(v.x), y(v.y), z(v.z) {}
 
     /// @return GLM vec3 for use with rendering APIs
-    glm::vec3 toVec3() const { return glm::vec3(x, y, z); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {x, y, z}; }
 
     /**
      * @brief Create point from cardinal directions (uses default Y-up system).
@@ -186,7 +186,7 @@ struct WorldPoint {
      */
     static WorldPoint fromDirections(Meters northSouth, Meters eastWest, Meters upDown) {
         // Default Y-up: X=east, Y=up, Z=north
-        return WorldPoint(eastWest, upDown, northSouth);
+        return {eastWest, upDown, northSouth};
     }
 
     /**
@@ -206,16 +206,14 @@ struct WorldPoint {
     }
 
     WorldPoint operator+(const WorldPoint& other) const {
-        return WorldPoint(x + other.x, y + other.y, z + other.z);
+        return {x + other.x, y + other.y, z + other.z};
     }
 
     WorldPoint operator-(const WorldPoint& other) const {
-        return WorldPoint(x - other.x, y - other.y, z - other.z);
+        return {x - other.x, y - other.y, z - other.z};
     }
 
-    WorldPoint operator*(float scalar) const {
-        return WorldPoint(x * scalar, y * scalar, z * scalar);
-    }
+    WorldPoint operator*(float scalar) const { return {x * scalar, y * scalar, z * scalar}; }
 };
 
 /**
@@ -239,21 +237,19 @@ struct WorldExtent {
      * @param depth North-south span
      * @return WorldExtent with height = 0
      */
-    static WorldExtent flat(Meters width, Meters depth) {
-        return WorldExtent(width, Meters(0.0f), depth);
-    }
+    static WorldExtent flat(Meters width, Meters depth) { return {width, Meters(0.0f), depth}; }
 
     /// @return GLM vec3 for use with rendering APIs
-    glm::vec3 toVec3() const { return glm::vec3(width, height, depth); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {width, height, depth}; }
 
     /// @return True if this is a 2D extent (height == 0)
-    bool is2D() const { return height.value == 0.0f; }
+    [[nodiscard]] bool is2D() const { return height.value == 0.0f; }
 
     /// @return Volume in cubic meters (0 for 2D extents)
-    float volume() const { return width.value * height.value * depth.value; }
+    [[nodiscard]] float volume() const { return width.value * height.value * depth.value; }
 
     /// @return Area of the base (width * depth) in square meters
-    float baseArea() const { return width.value * depth.value; }
+    [[nodiscard]] float baseArea() const { return width.value * depth.value; }
 };
 
 }  // namespace vde

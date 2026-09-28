@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <deque>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -41,8 +42,9 @@ class ShowcaseInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
+        }
     }
 
     bool consumeSpace() {
@@ -111,9 +113,9 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Text Rendering Showcase"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Text Rendering Showcase"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Automatic sizing with setWorldHeight()",
             "Max-width clamping with setMaxWidth()",
@@ -126,7 +128,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Title and subtitle centered at top",
             "Left/center/right aligned labels in ALIGNMENT section",
@@ -139,7 +141,7 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SPACE - Add a message to the scrolling log"};
     }
 
@@ -290,15 +292,15 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
         // ── Scrolling Log ───────────────────────────────────────
         addSectionHeader("SCROLLING LOG", COL, y);
 
-        for (int i = 0; i < LOG_LINES; ++i) {
-            m_logEntities[i] = addEntity<TextEntity>();
-            m_logEntities[i]->setText("---");
-            m_logEntities[i]->setFont(BitmapFont::small());
-            m_logEntities[i]->setStyle({.color = Color(0.8f, 0.8f, 0.8f, 1.0f), .pixelScale = 2});
-            m_logEntities[i]->setAnchor(0.0f, 0.5f);
-            m_logEntities[i]->setPosition(COL, y, 0.0f);
-            m_logEntities[i]->setWorldHeight(0.25f);
-            m_logEntities[i]->setMaxWidth(7.0f);
+        for (auto& m_logEntitie : m_logEntities) {
+            m_logEntitie = addEntity<TextEntity>();
+            m_logEntitie->setText("---");
+            m_logEntitie->setFont(BitmapFont::small());
+            m_logEntitie->setStyle({.color = Color(0.8f, 0.8f, 0.8f, 1.0f), .pixelScale = 2});
+            m_logEntitie->setAnchor(0.0f, 0.5f);
+            m_logEntitie->setPosition(COL, y, 0.0f);
+            m_logEntitie->setWorldHeight(0.25f);
+            m_logEntitie->setMaxWidth(7.0f);
             y -= 0.33f;
         }
 
@@ -395,8 +397,9 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
     }
 
     void updateResizeAnimation() {
-        if (!m_resizeLabel || !m_resizeInfo)
+        if (!m_resizeLabel || !m_resizeInfo) {
             return;
+        }
 
         // Oscillate maxWidth between 2.0 and 7.0
         float t = (std::sin(m_time * 1.5f) + 1.0f) * 0.5f;
@@ -410,8 +413,9 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
 
     void updateAutoLog(float deltaTime) {
         m_logAccum += deltaTime;
-        if (m_logAccum < 1.5f)
+        if (m_logAccum < 1.5f) {
             return;
+        }
         m_logAccum -= 1.5f;
         ++m_logCounter;
 
@@ -425,20 +429,23 @@ class ShowcaseScene : public vde::examples::BaseExampleScene {
 
     void addLogMessage(const std::string& msg) {
         m_logMessages.push_front(msg);
-        while (static_cast<int>(m_logMessages.size()) > LOG_LINES)
+        while (static_cast<int>(m_logMessages.size()) > LOG_LINES) {
             m_logMessages.pop_back();
+        }
 
         for (int i = 0; i < LOG_LINES; ++i) {
-            if (i < static_cast<int>(m_logMessages.size()))
+            if (std::cmp_less(i, m_logMessages.size())) {
                 m_logEntities[i]->setText(m_logMessages[i]);
-            else
+            } else {
                 m_logEntities[i]->setText("---");
+            }
         }
     }
 
     void updateStatusBar() {
-        if (!m_statusLabel || !getGame())
+        if (!m_statusLabel || !getGame()) {
             return;
+        }
         char buf[128];
         std::snprintf(buf, sizeof(buf), "Entities: %zu  |  FPS: %.0f  |  Elapsed: %.1fs",
                       getEntities().size(), getGame()->getFPS(), m_time);
@@ -485,6 +492,7 @@ class ShowcaseGame : public vde::examples::BaseExampleGame<ShowcaseInputHandler,
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ShowcaseGame game;
     return vde::examples::runExample(game, "VDE Text Rendering Showcase", 1280, 720, argc, argv);

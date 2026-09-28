@@ -87,30 +87,30 @@ class Camera {
 
     // Getters
 
-    const glm::vec3& getPosition() const { return m_position; }
-    const glm::vec3& getTarget() const { return m_target; }
-    const glm::vec3& getUp() const { return m_up; }
-    float getDistance() const { return m_distance; }
-    float getPitch() const { return m_pitch; }
-    float getYaw() const { return m_yaw; }
+    [[nodiscard]] const glm::vec3& getPosition() const { return m_position; }
+    [[nodiscard]] const glm::vec3& getTarget() const { return m_target; }
+    [[nodiscard]] const glm::vec3& getUp() const { return m_up; }
+    [[nodiscard]] float getDistance() const { return m_distance; }
+    [[nodiscard]] float getPitch() const { return m_pitch; }
+    [[nodiscard]] float getYaw() const { return m_yaw; }
 
     /**
      * @brief Get the view matrix for rendering.
      * @return View matrix transforming world to camera space
      */
-    glm::mat4 getViewMatrix() const;
+    [[nodiscard]] glm::mat4 getViewMatrix() const;
 
     /**
      * @brief Get the forward direction (toward target).
      * @return Normalized forward vector
      */
-    glm::vec3 getForward() const;
+    [[nodiscard]] glm::vec3 getForward() const;
 
     /**
      * @brief Get the right direction (perpendicular to forward and up).
      * @return Normalized right vector
      */
-    glm::vec3 getRight() const;
+    [[nodiscard]] glm::vec3 getRight() const;
 
     // Projection methods
 
@@ -139,7 +139,7 @@ class Camera {
      * @brief Check if using orthographic projection.
      * @return true if orthographic, false if perspective
      */
-    bool isOrthographic() const { return m_orthographic; }
+    [[nodiscard]] bool isOrthographic() const { return m_orthographic; }
 
     /**
      * @brief Update aspect ratio (e.g., on window resize).
@@ -157,19 +157,19 @@ class Camera {
      * @brief Get the projection matrix (Vulkan-corrected with Y-flip).
      * @return Projection matrix
      */
-    glm::mat4 getProjectionMatrix() const;
+    [[nodiscard]] glm::mat4 getProjectionMatrix() const;
 
     /**
      * @brief Get combined view-projection matrix.
      * @return VP matrix (projection * view)
      */
-    glm::mat4 getViewProjectionMatrix() const;
+    [[nodiscard]] glm::mat4 getViewProjectionMatrix() const;
 
     // Projection accessors
-    float getFOV() const { return m_fov; }
-    float getAspectRatio() const { return m_aspectRatio; }
-    float getNearPlane() const { return m_nearPlane; }
-    float getFarPlane() const { return m_farPlane; }
+    [[nodiscard]] float getFOV() const { return m_fov; }
+    [[nodiscard]] float getAspectRatio() const { return m_aspectRatio; }
+    [[nodiscard]] float getNearPlane() const { return m_nearPlane; }
+    [[nodiscard]] float getFarPlane() const { return m_farPlane; }
 
     // Configuration
 
@@ -199,9 +199,9 @@ class Camera {
     glm::vec3 m_up;
 
     // Orbital camera parameters
-    float m_distance;
-    float m_pitch;  ///< Degrees above horizontal
-    float m_yaw;    ///< Degrees around Y axis
+    float m_distance{20.0f};
+    float m_pitch{45.0f};  ///< Degrees above horizontal
+    float m_yaw{0.0f};     ///< Degrees around Y axis
 
     // Projection parameters
     float m_fov = 45.0f;

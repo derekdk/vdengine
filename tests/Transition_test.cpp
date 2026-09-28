@@ -21,8 +21,8 @@ namespace test {
 /// Minimal concrete subclass to test base class defaults.
 class StubTransition : public Transition {
   public:
-    const char* getName() const override { return "Stub"; }
-    std::string getFragmentShaderPath() const override { return "stub.frag"; }
+    [[nodiscard]] const char* getName() const override { return "Stub"; }
+    [[nodiscard]] std::string getFragmentShaderPath() const override { return "stub.frag"; }
 };
 
 class TransitionBaseTest : public ::testing::Test {

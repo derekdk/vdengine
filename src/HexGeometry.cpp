@@ -1,11 +1,12 @@
 #include <vde/HexGeometry.h>
 
 #include <cmath>
+#include <numbers>
 
 namespace vde {
 
 namespace {
-constexpr float PI = 3.14159265358979323846f;
+constexpr float PI = std::numbers::pi_v<float>;
 constexpr float DEG_TO_RAD = PI / 180.0f;
 }  // namespace
 
@@ -23,19 +24,17 @@ float HexGeometry::getWidth() const {
     // For pointy-top: width = sqrt(3) * size (flat to flat)
     if (m_orientation == HexOrientation::FlatTop) {
         return 2.0f * m_size;
-    } else {
-        return std::sqrt(3.0f) * m_size;
     }
+    return std::numbers::sqrt3_v<float> * m_size;
 }
 
 float HexGeometry::getHeight() const {
     // For flat-top: height = sqrt(3) * size (flat to flat)
     // For pointy-top: height = 2 * size (tip to tip)
     if (m_orientation == HexOrientation::FlatTop) {
-        return std::sqrt(3.0f) * m_size;
-    } else {
-        return 2.0f * m_size;
+        return std::numbers::sqrt3_v<float> * m_size;
     }
+    return 2.0f * m_size;
 }
 
 std::vector<glm::vec3> HexGeometry::getCornerPositions(const glm::vec3& center) const {
@@ -61,7 +60,7 @@ glm::vec2 HexGeometry::calculateUV(const glm::vec2& localPos) const {
     float u = (localPos.x / m_size + 1.0f) * 0.5f;
     float v = (localPos.y / m_size + 1.0f) * 0.5f;
 
-    return glm::vec2(u, v);
+    return {u, v};
 }
 
 HexMesh HexGeometry::generateHex(const glm::vec3& center) const {
@@ -91,8 +90,8 @@ HexMesh HexGeometry::generateHex(const glm::vec3& center) const {
     // Indices for 6 triangles (center + 2 adjacent corners each)
     // Wind counter-clockwise for front-facing (Vulkan default)
     for (int i = 0; i < 6; i++) {
-        uint32_t current = static_cast<uint32_t>(i + 1);
-        uint32_t next = static_cast<uint32_t>((i + 1) % 6 + 1);
+        auto current = static_cast<uint32_t>(i + 1);
+        auto next = static_cast<uint32_t>((i + 1) % 6 + 1);
 
         mesh.indices.push_back(0);        // Center
         mesh.indices.push_back(current);  // Current corner

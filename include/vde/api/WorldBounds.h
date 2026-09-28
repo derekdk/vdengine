@@ -60,48 +60,49 @@ struct WorldBounds {
     // Cardinal direction accessors (default Y-up coordinate system)
 
     /// @return Maximum Z value (north limit)
-    Meters northLimit() const { return max.z; }
+    [[nodiscard]] Meters northLimit() const { return max.z; }
     /// @return Minimum Z value (south limit)
-    Meters southLimit() const { return min.z; }
+    [[nodiscard]] Meters southLimit() const { return min.z; }
     /// @return Maximum X value (east limit)
-    Meters eastLimit() const { return max.x; }
+    [[nodiscard]] Meters eastLimit() const { return max.x; }
     /// @return Minimum X value (west limit)
-    Meters westLimit() const { return min.x; }
+    [[nodiscard]] Meters westLimit() const { return min.x; }
     /// @return Maximum Y value (up/ceiling limit)
-    Meters upLimit() const { return max.y; }
+    [[nodiscard]] Meters upLimit() const { return max.y; }
     /// @return Minimum Y value (down/floor limit)
-    Meters downLimit() const { return min.y; }
+    [[nodiscard]] Meters downLimit() const { return min.y; }
 
     // Dimensions
 
     /**
      * @brief Get the full 3D extent of the bounds.
      */
-    WorldExtent extent() const {
-        return WorldExtent(max.x - min.x,  // width (east-west)
-                           max.y - min.y,  // height (up-down)
-                           max.z - min.z   // depth (north-south)
-        );
+    [[nodiscard]] WorldExtent extent() const {
+        return {
+            max.x - min.x,  // width (east-west)
+            max.y - min.y,  // height (up-down)
+            max.z - min.z   // depth (north-south)
+        };
     }
 
     /// @return East-west span in meters
-    Meters width() const { return max.x - min.x; }
+    [[nodiscard]] Meters width() const { return max.x - min.x; }
     /// @return Up-down span in meters (0 for 2D bounds)
-    Meters height() const { return max.y - min.y; }
+    [[nodiscard]] Meters height() const { return max.y - min.y; }
     /// @return North-south span in meters
-    Meters depth() const { return max.z - min.z; }
+    [[nodiscard]] Meters depth() const { return max.z - min.z; }
 
     /**
      * @brief Get the center point of the bounds.
      */
-    WorldPoint center() const {
-        return WorldPoint((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f, (min.z + max.z) * 0.5f);
+    [[nodiscard]] WorldPoint center() const {
+        return {(min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f, (min.z + max.z) * 0.5f};
     }
 
     /**
      * @brief Check if a point is inside the bounds.
      */
-    bool contains(const WorldPoint& point) const {
+    [[nodiscard]] bool contains(const WorldPoint& point) const {
         return point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y &&
                point.z >= min.z && point.z <= max.z;
     }
@@ -109,7 +110,7 @@ struct WorldBounds {
     /**
      * @brief Check if this bounds intersects another.
      */
-    bool intersects(const WorldBounds& other) const {
+    [[nodiscard]] bool intersects(const WorldBounds& other) const {
         return min.x <= other.max.x && max.x >= other.min.x && min.y <= other.max.y &&
                max.y >= other.min.y && min.z <= other.max.z && max.z >= other.min.z;
     }
@@ -117,7 +118,7 @@ struct WorldBounds {
     /**
      * @brief Check if this is a 2D bounds (no height dimension).
      */
-    bool is2D() const { return height().value == 0.0f; }
+    [[nodiscard]] bool is2D() const { return height().value == 0.0f; }
 
     /**
      * @brief Create bounds from directional limits.
@@ -140,7 +141,7 @@ struct WorldBounds {
         WorldPoint maxPt(std::max(westLimit.value, eastLimit.value),
                          std::max(downLimit.value, upLimit.value),
                          std::max(southLimit.value, northLimit.value));
-        return WorldBounds(minPt, maxPt);
+        return {minPt, maxPt};
     }
 
     /**
@@ -154,8 +155,8 @@ struct WorldBounds {
         Meters halfW = extent.width * 0.5f;
         Meters halfH = extent.height * 0.5f;
         Meters halfD = extent.depth * 0.5f;
-        return WorldBounds(WorldPoint(center.x - halfW, center.y - halfH, center.z - halfD),
-                           WorldPoint(center.x + halfW, center.y + halfH, center.z + halfD));
+        return {WorldPoint(center.x - halfW, center.y - halfH, center.z - halfD),
+                WorldPoint(center.x + halfW, center.y + halfH, center.z + halfD)};
     }
 
     /**
@@ -202,29 +203,29 @@ struct WorldBounds2D {
         : minX(minX), minY(minY), maxX(maxX), maxY(maxY) {}
 
     /// @return Width (X span) in meters
-    Meters width() const { return maxX - minX; }
+    [[nodiscard]] Meters width() const { return maxX - minX; }
     /// @return Height (Y span) in meters
-    Meters height() const { return maxY - minY; }
+    [[nodiscard]] Meters height() const { return maxY - minY; }
 
     /// @return 2D extent
-    WorldExtent extent() const { return WorldExtent::flat(width(), height()); }
+    [[nodiscard]] WorldExtent extent() const { return WorldExtent::flat(width(), height()); }
 
     /**
      * @brief Get the center point.
      */
-    glm::vec2 center() const { return glm::vec2((minX + maxX) * 0.5f, (minY + maxY) * 0.5f); }
+    [[nodiscard]] glm::vec2 center() const { return {(minX + maxX) * 0.5f, (minY + maxY) * 0.5f}; }
 
     /**
      * @brief Check if a point is inside the bounds.
      */
-    bool contains(Meters x, Meters y) const {
+    [[nodiscard]] bool contains(Meters x, Meters y) const {
         return x >= minX && x <= maxX && y >= minY && y <= maxY;
     }
 
     /**
      * @brief Check if a point is inside the bounds.
      */
-    bool contains(const glm::vec2& point) const {
+    [[nodiscard]] bool contains(const glm::vec2& point) const {
         return contains(Meters(point.x), Meters(point.y));
     }
 
@@ -239,8 +240,8 @@ struct WorldBounds2D {
      * @param east Eastern limit (positive X)
      */
     static WorldBounds2D fromCardinal(Meters north, Meters south, Meters west, Meters east) {
-        return WorldBounds2D(std::min(west.value, east.value), std::min(south.value, north.value),
-                             std::max(west.value, east.value), std::max(south.value, north.value));
+        return {std::min(west.value, east.value), std::min(south.value, north.value),
+                std::max(west.value, east.value), std::max(south.value, north.value)};
     }
 
     /**
@@ -252,8 +253,8 @@ struct WorldBounds2D {
      * @param bottom Bottom edge (minimum Y)
      */
     static WorldBounds2D fromLRTB(Meters left, Meters right, Meters top, Meters bottom) {
-        return WorldBounds2D(std::min(left.value, right.value), std::min(bottom.value, top.value),
-                             std::max(left.value, right.value), std::max(bottom.value, top.value));
+        return {std::min(left.value, right.value), std::min(bottom.value, top.value),
+                std::max(left.value, right.value), std::max(bottom.value, top.value)};
     }
 
     /**
@@ -267,7 +268,7 @@ struct WorldBounds2D {
     static WorldBounds2D fromCenter(Meters centerX, Meters centerY, Meters width, Meters height) {
         Meters halfW = width * 0.5f;
         Meters halfH = height * 0.5f;
-        return WorldBounds2D(centerX - halfW, centerY - halfH, centerX + halfW, centerY + halfH);
+        return {centerX - halfW, centerY - halfH, centerX + halfW, centerY + halfH};
     }
 
     // ========================================================================
@@ -277,48 +278,48 @@ struct WorldBounds2D {
     /**
      * @brief Check if this bounds intersects another (inclusive; edge-touching returns true).
      */
-    bool intersects(const WorldBounds2D& other) const {
+    [[nodiscard]] bool intersects(const WorldBounds2D& other) const {
         return minX <= other.maxX && maxX >= other.minX && minY <= other.maxY && maxY >= other.minY;
     }
 
     /**
      * @brief Check if this bounds fully contains another.
      */
-    bool contains(const WorldBounds2D& other) const {
+    [[nodiscard]] bool contains(const WorldBounds2D& other) const {
         return other.minX >= minX && other.maxX <= maxX && other.minY >= minY && other.maxY <= maxY;
     }
 
     /**
      * @brief Get the size as a vec2 (width, height).
      */
-    glm::vec2 size() const { return glm::vec2(width().value, height().value); }
+    [[nodiscard]] glm::vec2 size() const { return {width().value, height().value}; }
 
     /**
      * @brief Get the half-extents (half-width, half-height).
      */
-    glm::vec2 halfExtents() const { return size() * 0.5f; }
+    [[nodiscard]] glm::vec2 halfExtents() const { return size() * 0.5f; }
 
     /**
      * @brief Clamp a point to lie within this bounds.
      */
-    glm::vec2 clampPoint(const glm::vec2& point) const {
-        return glm::vec2(std::max(minX.value, std::min(point.x, maxX.value)),
-                         std::max(minY.value, std::min(point.y, maxY.value)));
+    [[nodiscard]] glm::vec2 clampPoint(const glm::vec2& point) const {
+        return {std::max(minX.value, std::min(point.x, maxX.value)),
+                std::max(minY.value, std::min(point.y, maxY.value))};
     }
 
     /**
      * @brief Return a copy translated by a delta.
      */
-    WorldBounds2D translated(const glm::vec2& delta) const {
-        return WorldBounds2D(Meters(minX.value + delta.x), Meters(minY.value + delta.y),
-                             Meters(maxX.value + delta.x), Meters(maxY.value + delta.y));
+    [[nodiscard]] WorldBounds2D translated(const glm::vec2& delta) const {
+        return {Meters(minX.value + delta.x), Meters(minY.value + delta.y),
+                Meters(maxX.value + delta.x), Meters(maxY.value + delta.y)};
     }
 
     /**
      * @brief Return a copy expanded outward by the given amounts.
      */
-    WorldBounds2D expanded(Meters amountX, Meters amountY) const {
-        return WorldBounds2D(minX - amountX, minY - amountY, maxX + amountX, maxY + amountY);
+    [[nodiscard]] WorldBounds2D expanded(Meters amountX, Meters amountY) const {
+        return {minX - amountX, minY - amountY, maxX + amountX, maxY + amountY};
     }
 
     /**
@@ -327,8 +328,8 @@ struct WorldBounds2D {
     static WorldBounds2D fromCenterSize(const glm::vec2& center, const glm::vec2& size) {
         float halfW = size.x * 0.5f;
         float halfH = size.y * 0.5f;
-        return WorldBounds2D(Meters(center.x - halfW), Meters(center.y - halfH),
-                             Meters(center.x + halfW), Meters(center.y + halfH));
+        return {Meters(center.x - halfW), Meters(center.y - halfH), Meters(center.x + halfW),
+                Meters(center.y + halfH)};
     }
 
     /**
@@ -338,10 +339,10 @@ struct WorldBounds2D {
      * @param downLimit Lower Y limit in 3D space
      * @return WorldBounds with this 2D extent on the XZ plane
      */
-    WorldBounds toWorldBounds(Meters upLimit = Meters(0.0f),
-                              Meters downLimit = Meters(0.0f)) const {
+    [[nodiscard]] WorldBounds toWorldBounds(Meters upLimit = Meters(0.0f),
+                                            Meters downLimit = Meters(0.0f)) const {
         // Map 2D bounds to XZ plane, Y is vertical
-        return WorldBounds(WorldPoint(minX, downLimit, minY), WorldPoint(maxX, upLimit, maxY));
+        return {WorldPoint(minX, downLimit, minY), WorldPoint(maxX, upLimit, maxY)};
     }
 };
 

@@ -97,7 +97,7 @@ class Scene {
     /**
      * @brief Get the scene name.
      */
-    const std::string& getName() const { return m_name; }
+    [[nodiscard]] const std::string& getName() const { return m_name; }
 
     // Lifecycle methods (override in subclasses)
 
@@ -146,7 +146,7 @@ class Scene {
     /**
      * @brief Check whether phase callbacks are enabled.
      */
-    bool usesPhaseCallbacks() const { return m_usePhaseCallbacks; }
+    [[nodiscard]] bool usesPhaseCallbacks() const { return m_usePhaseCallbacks; }
 
     /**
      * @brief Game logic update (phase callback).
@@ -215,7 +215,7 @@ class Scene {
      * @endcode
      */
     TimedEvents& getTimedEvents() { return m_timedEvents; }
-    const TimedEvents& getTimedEvents() const { return m_timedEvents; }
+    [[nodiscard]] const TimedEvents& getTimedEvents() const { return m_timedEvents; }
 
     // Animation service
 
@@ -239,7 +239,7 @@ class Scene {
      * @endcode
      */
     Animator& animations() { return m_animator; }
-    const Animator& animations() const { return m_animator; }
+    [[nodiscard]] const Animator& animations() const { return m_animator; }
 
     // Audio event queue
 
@@ -275,7 +275,7 @@ class Scene {
     /**
      * @brief Get the number of pending audio events in the queue.
      */
-    size_t getAudioEventQueueSize() const { return m_audioEventQueue.size(); }
+    [[nodiscard]] size_t getAudioEventQueueSize() const { return m_audioEventQueue.size(); }
 
     // Deferred command queue
 
@@ -308,7 +308,7 @@ class Scene {
     /**
      * @brief Get the number of pending deferred commands.
      */
-    size_t getDeferredCommandCount() const { return m_deferredCommands.size(); }
+    [[nodiscard]] size_t getDeferredCommandCount() const { return m_deferredCommands.size(); }
 
     /**
      * @brief Keep a shared resource alive until in-flight GPU work completes.
@@ -351,7 +351,7 @@ class Scene {
      * @return Resource ID
      */
     template <typename T>
-    ResourceId addResource(ResourcePtr<T> resource);
+    ResourceId addResource(const ResourcePtr<T>& resource);
 
     /**
      * @brief Get a resource by ID.
@@ -447,12 +447,12 @@ class Scene {
     /**
      * @brief Get all entities.
      */
-    const std::vector<Entity::Ref>& getEntities() const { return m_entities; }
+    [[nodiscard]] const std::vector<Entity::Ref>& getEntities() const { return m_entities; }
 
     /**
      * @brief Get the scene's diagnostics counters.
      */
-    const SceneDiagnostics& getDiagnostics() const { return m_diagnostics; }
+    [[nodiscard]] const SceneDiagnostics& getDiagnostics() const { return m_diagnostics; }
 
     /**
      * @brief Game-defined numeric state for scripted-input assertions.
@@ -480,13 +480,13 @@ class Scene {
      * @return The LightBox, or nullptr if using default lighting.
      */
     LightBox* getLightBox() { return m_lightBox.get(); }
-    const LightBox* getLightBox() const { return m_lightBox.get(); }
+    [[nodiscard]] const LightBox* getLightBox() const { return m_lightBox.get(); }
 
     /**
      * @brief Get the effective lighting (returns default if none set).
      * @return The LightBox to use for rendering.
      */
-    const LightBox& getEffectiveLighting() const;
+    [[nodiscard]] const LightBox& getEffectiveLighting() const;
 
     // Camera
 
@@ -503,7 +503,7 @@ class Scene {
      * @return The camera, or nullptr if using default.
      */
     GameCamera* getCamera() { return m_camera.get(); }
-    const GameCamera* getCamera() const { return m_camera.get(); }
+    [[nodiscard]] const GameCamera* getCamera() const { return m_camera.get(); }
 
     // Background & Priority
 
@@ -522,7 +522,7 @@ class Scene {
     /**
      * @brief Check if background updates are enabled.
      */
-    bool getContinueInBackground() const { return m_continueInBackground; }
+    [[nodiscard]] bool getContinueInBackground() const { return m_continueInBackground; }
 
     /**
      * @brief Set the update priority (lower values run first).
@@ -537,7 +537,7 @@ class Scene {
     /**
      * @brief Get the update priority.
      */
-    int getUpdatePriority() const { return m_updatePriority; }
+    [[nodiscard]] int getUpdatePriority() const { return m_updatePriority; }
 
     // Viewport
 
@@ -556,7 +556,7 @@ class Scene {
      * @brief Get the viewport rectangle for this scene.
      * @return The viewport rectangle (default is fullWindow)
      */
-    const ViewportRect& getViewportRect() const { return m_viewportRect; }
+    [[nodiscard]] const ViewportRect& getViewportRect() const { return m_viewportRect; }
 
     // Physics
 
@@ -582,13 +582,13 @@ class Scene {
     /**
      * @brief Check if physics is enabled for this scene.
      */
-    bool hasPhysics() const { return m_physicsScene != nullptr; }
+    [[nodiscard]] bool hasPhysics() const { return m_physicsScene != nullptr; }
 
     /**
      * @brief Get the physics scene (nullptr if physics not enabled).
      */
     PhysicsScene* getPhysicsScene() { return m_physicsScene.get(); }
-    const PhysicsScene* getPhysicsScene() const { return m_physicsScene.get(); }
+    [[nodiscard]] const PhysicsScene* getPhysicsScene() const { return m_physicsScene.get(); }
 
     // Input
 
@@ -603,7 +603,7 @@ class Scene {
      * Returns the scene's input handler if set, otherwise falls back to the game's input handler.
      */
     InputHandler* getInputHandler();
-    const InputHandler* getInputHandler() const;
+    [[nodiscard]] const InputHandler* getInputHandler() const;
 
     // Game reference
 
@@ -611,7 +611,7 @@ class Scene {
      * @brief Get the game this scene belongs to.
      */
     Game* getGame() { return m_game; }
-    const Game* getGame() const { return m_game; }
+    [[nodiscard]] const Game* getGame() const { return m_game; }
 
     // Background color
 
@@ -623,7 +623,7 @@ class Scene {
     /**
      * @brief Get the background color.
      */
-    const Color& getBackgroundColor() const { return m_backgroundColor; }
+    [[nodiscard]] const Color& getBackgroundColor() const { return m_backgroundColor; }
 
     // 2D Convenience Methods
 
@@ -699,13 +699,13 @@ class Scene {
     /**
      * @brief Get the world bounds.
      */
-    const WorldBounds& getWorldBounds() const { return m_worldBounds; }
+    [[nodiscard]] const WorldBounds& getWorldBounds() const { return m_worldBounds; }
     WorldBounds& getWorldBounds() { return m_worldBounds; }
 
     /**
      * @brief Check if the scene is 2D (no height dimension).
      */
-    bool is2D() const { return m_worldBounds.is2D(); }
+    [[nodiscard]] bool is2D() const { return m_worldBounds.is2D(); }
 
     // 2D Camera Bounds
 
@@ -732,7 +732,7 @@ class Scene {
      * @brief Get the 2D camera bounds.
      */
     CameraBounds2D& getCameraBounds2D() { return m_cameraBounds2D; }
-    const CameraBounds2D& getCameraBounds2D() const { return m_cameraBounds2D; }
+    [[nodiscard]] const CameraBounds2D& getCameraBounds2D() const { return m_cameraBounds2D; }
 
   protected:
     std::string m_name;
@@ -817,16 +817,14 @@ class Scene {
 
 template <typename T>
 ResourceId Scene::addResource(const std::string& path) {
-    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+    static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     auto resource = std::make_shared<T>();
     resource->m_id = m_nextResourceId++;
     resource->m_path = path;
 
     // Load the resource (CPU-side only)
-    if constexpr (std::is_same_v<T, Mesh>) {
-        resource->loadFromFile(path);
-    } else if constexpr (std::is_same_v<T, Texture>) {
+    if constexpr (std::is_same_v<T, Mesh> || std::is_same_v<T, Texture>) {
         resource->loadFromFile(path);
     }
     // Add other resource type loading here
@@ -836,8 +834,8 @@ ResourceId Scene::addResource(const std::string& path) {
 }
 
 template <typename T>
-ResourceId Scene::addResource(ResourcePtr<T> resource) {
-    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+ResourceId Scene::addResource(const ResourcePtr<T>& resource) {
+    static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     if (resource->m_id == INVALID_RESOURCE_ID) {
         resource->m_id = m_nextResourceId++;
@@ -861,7 +859,7 @@ T* Scene::getResource(ResourceId id) {
 
 template <typename T, typename... Args>
 std::shared_ptr<T> Scene::addEntity(Args&&... args) {
-    static_assert(std::is_base_of<Entity, T>::value, "T must derive from Entity");
+    static_assert(std::is_base_of_v<Entity, T>, "T must derive from Entity");
 
     auto entity = std::make_shared<T>(std::forward<Args>(args)...);
     addEntity(std::static_pointer_cast<Entity>(entity));

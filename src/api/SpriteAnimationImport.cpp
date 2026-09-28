@@ -106,7 +106,7 @@ std::vector<ImportedFrameRecord> parseAsepriteFrames(const OrderedJson& root) {
 void appendFrameRange(SpriteAnimation& animation, const std::vector<ImportedFrameRecord>& frames,
                       int from, int to, const std::string& direction) {
     auto appendFrame = [&animation, &frames](int index) {
-        if (index < 0 || index >= static_cast<int>(frames.size())) {
+        if (index < 0 || std::cmp_greater_equal(index, frames.size())) {
             throw std::out_of_range("SpriteAnimationImport frame tag index out of range");
         }
         animation.addFrame(index, frames.at(static_cast<size_t>(index)).durationSec);
@@ -158,7 +158,7 @@ std::string readTextFile(const std::string& path) {
 }  // namespace
 
 ImportedSpriteAnimationSet
-SpriteAnimationImport::importAsepriteJson(std::shared_ptr<Texture> texture,
+SpriteAnimationImport::importAsepriteJson(const std::shared_ptr<Texture>& texture,
                                           const std::string& jsonText) {
     if (!texture) {
         throw std::invalid_argument("SpriteAnimationImport requires a non-null texture");
@@ -199,7 +199,7 @@ SpriteAnimationImport::importAsepriteJson(std::shared_ptr<Texture> texture,
                     ? tag.at("direction").get<std::string>()
                     : "forward";
 
-            if (from < 0 || to < from || to >= static_cast<int>(frames.size())) {
+            if (from < 0 || to < from || std::cmp_greater_equal(to, frames.size())) {
                 throw std::out_of_range("SpriteAnimationImport Aseprite frameTag range is invalid");
             }
 
@@ -219,13 +219,13 @@ SpriteAnimationImport::importAsepriteJson(std::shared_ptr<Texture> texture,
 }
 
 ImportedSpriteAnimationSet
-SpriteAnimationImport::importAsepriteJsonFile(std::shared_ptr<Texture> texture,
+SpriteAnimationImport::importAsepriteJsonFile(const std::shared_ptr<Texture>& texture,
                                               const std::string& jsonPath) {
     if (jsonPath.empty()) {
         throw std::invalid_argument("SpriteAnimationImport requires a non-empty JSON file path");
     }
 
-    return importAsepriteJson(std::move(texture), readTextFile(jsonPath));
+    return importAsepriteJson(texture, readTextFile(jsonPath));
 }
 
 }  // namespace vde

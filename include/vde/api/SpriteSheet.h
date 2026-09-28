@@ -105,7 +105,7 @@ class SpriteSheet : public Resource {
      * @return The UV rectangle for the requested sprite.
      * @throws std::out_of_range if index is out of bounds.
      */
-    UVRect getUVRect(int index) const;
+    [[nodiscard]] UVRect getUVRect(int index) const;
 
     /**
      * @brief Get a UV rect by name.
@@ -113,21 +113,21 @@ class SpriteSheet : public Resource {
      * @return The UV rectangle for the requested sprite.
      * @throws std::out_of_range if name is not found.
      */
-    UVRect getUVRect(const std::string& name) const;
+    [[nodiscard]] UVRect getUVRect(const std::string& name) const;
 
     /**
      * @brief Get the underlying texture.
      */
-    std::shared_ptr<Texture> getTexture() const { return m_texture; }
+    [[nodiscard]] std::shared_ptr<Texture> getTexture() const { return m_texture; }
 
     /**
      * @brief Get the total number of sprite regions.
      */
-    int getSpriteCount() const { return static_cast<int>(m_rects.size()); }
+    [[nodiscard]] int getSpriteCount() const { return static_cast<int>(m_rects.size()); }
 
     // -- Resource interface --------------------------------------------------
 
-    const char* getTypeName() const override { return "SpriteSheet"; }
+    [[nodiscard]] const char* getTypeName() const override { return "SpriteSheet"; }
 
   private:
     SpriteSheet() = default;

@@ -35,6 +35,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <numbers>
 #include <sstream>
 
 #include "../ExampleBase.h"
@@ -57,7 +58,7 @@ using namespace vde;
 static constexpr float kArenaHalf = 8.0f;
 
 /// Bright blue used for the focus border frame.
-static const Color kBorderColor = Color::fromHex(0x4488ff);
+static constexpr Color kBorderColor = Color::fromHex(0x4488ff);
 
 // ============================================================================
 // Input Handler
@@ -68,39 +69,53 @@ class FourScene3DInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_TAB)
+        if (key == KEY_TAB) {
             m_tabPressed = true;
-        if (key == KEY_1)
+        }
+        if (key == KEY_1) {
             m_directFocus = 1;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_directFocus = 2;
-        if (key == KEY_3)
+        }
+        if (key == KEY_3) {
             m_directFocus = 3;
-        if (key == KEY_4)
+        }
+        if (key == KEY_4) {
             m_directFocus = 4;
-        if (key == KEY_SPACE)
+        }
+        if (key == KEY_SPACE) {
             m_spacePressed = true;
+        }
 
         // Camera orbit (continuous)
-        if (key == KEY_W)
+        if (key == KEY_W) {
             m_up = true;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_down = true;
-        if (key == KEY_A)
+        }
+        if (key == KEY_A) {
             m_left = true;
-        if (key == KEY_D)
+        }
+        if (key == KEY_D) {
             m_right = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == KEY_W)
+        if (key == KEY_W) {
             m_up = false;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_down = false;
-        if (key == KEY_A)
+        }
+        if (key == KEY_A) {
             m_left = false;
-        if (key == KEY_D)
+        }
+        if (key == KEY_D) {
             m_right = false;
+        }
     }
 
     void onMouseScroll(double /*xOffset*/, double yOffset) override {
@@ -135,10 +150,10 @@ class FourScene3DInputHandler : public vde::examples::BaseExampleInputHandler {
 
     // --- Continuous state ---
 
-    bool isUp() const { return m_up; }
-    bool isDown() const { return m_down; }
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
+    [[nodiscard]] bool isUp() const { return m_up; }
+    [[nodiscard]] bool isDown() const { return m_down; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
 
   private:
     bool m_tabPressed = false;
@@ -165,7 +180,7 @@ class FourScene3DInputHandler : public vde::examples::BaseExampleInputHandler {
  */
 class Focusable3DScene : public Scene {
   public:
-    virtual ~Focusable3DScene() = default;
+    ~Focusable3DScene() override = default;
 
     void update(float deltaTime) override {
         Scene::update(deltaTime);
@@ -192,10 +207,10 @@ class Focusable3DScene : public Scene {
     // --- Subclass customisation points ---
 
     /// Background colour when this scene is NOT focused.
-    virtual Color getUnfocusedBg() const = 0;
+    [[nodiscard]] virtual Color getUnfocusedBg() const = 0;
 
     /// Background colour when this scene IS focused (a blue tint).
-    virtual Color getFocusedBg() const = 0;
+    [[nodiscard]] virtual Color getFocusedBg() const = 0;
 
     /// Override to animate scene-specific content each frame.
     virtual void animateContent(float deltaTime) { (void)deltaTime; }
@@ -257,30 +272,37 @@ class Focusable3DScene : public Scene {
         const char* names[] = {"Border_N", "Border_S", "Border_E", "Border_W"};
         for (auto& name : names) {
             auto* e = getEntityByName(name);
-            if (e)
+            if (e) {
                 e->setVisible(visible);
+            }
         }
     }
 
     void processOrbitalInput(float dt) {
         auto* input = dynamic_cast<FourScene3DInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         auto* cam = dynamic_cast<OrbitCamera*>(getCamera());
-        if (!cam)
+        if (!cam) {
             return;
+        }
 
         // Orbit with WASD
         const float rotSpeed = 50.0f;
-        if (input->isLeft())
+        if (input->isLeft()) {
             cam->rotate(0.0f, -rotSpeed * dt);
-        if (input->isRight())
+        }
+        if (input->isRight()) {
             cam->rotate(0.0f, rotSpeed * dt);
-        if (input->isUp())
+        }
+        if (input->isUp()) {
             cam->rotate(-rotSpeed * dt * 0.5f, 0.0f);
-        if (input->isDown())
+        }
+        if (input->isDown()) {
             cam->rotate(rotSpeed * dt * 0.5f, 0.0f);
+        }
 
         // Zoom with scroll
         float scroll = input->consumeScroll();
@@ -327,7 +349,7 @@ class CrystalScene : public Focusable3DScene {
         // Ring of rotating gemstones
         const uint32_t gemColors[] = {0xff4444, 0x44ff44, 0x4444ff, 0xff44ff, 0x44ffff, 0xffff44};
         for (int i = 0; i < 6; ++i) {
-            float angle = static_cast<float>(i) * 3.14159f * 2.0f / 6.0f;
+            float angle = static_cast<float>(i) * std::numbers::pi_v<float> * 2.0f / 6.0f;
             float r = 5.0f;
             float x = r * std::cos(angle);
             float z = r * std::sin(angle);
@@ -341,7 +363,7 @@ class CrystalScene : public Focusable3DScene {
 
         // Outer pillars (cylinders)
         for (int i = 0; i < 4; ++i) {
-            float angle = static_cast<float>(i) * 3.14159f * 0.5f + 0.4f;
+            float angle = static_cast<float>(i) * std::numbers::pi_v<float> * 0.5f + 0.4f;
             float r = 7.0f;
 
             auto pillar = addEntity<MeshEntity>();
@@ -362,8 +384,8 @@ class CrystalScene : public Focusable3DScene {
     }
 
   protected:
-    Color getUnfocusedBg() const override { return Color::fromHex(0x1a0a1a); }
-    Color getFocusedBg() const override { return Color::fromHex(0x0a1540); }
+    [[nodiscard]] Color getUnfocusedBg() const override { return Color::fromHex(0x1a0a1a); }
+    [[nodiscard]] Color getFocusedBg() const override { return Color::fromHex(0x0a1540); }
 
     void animateContent(float dt) override {
         m_time += dt;
@@ -371,10 +393,11 @@ class CrystalScene : public Focusable3DScene {
         // Rotate gemstones around center
         for (int i = 0; i < 6; ++i) {
             auto* gem = getEntityByName("Gem_" + std::to_string(i));
-            if (!gem)
+            if (!gem) {
                 continue;
+            }
 
-            float baseAngle = static_cast<float>(i) * 3.14159f * 2.0f / 6.0f;
+            float baseAngle = static_cast<float>(i) * std::numbers::pi_v<float> * 2.0f / 6.0f;
             float angle = baseAngle + m_time * 0.4f;
             float r = 5.0f;
             gem->setPosition(r * std::cos(angle), 1.0f + 0.3f * std::sin(m_time * 2.0f + i),
@@ -382,8 +405,9 @@ class CrystalScene : public Focusable3DScene {
 
             auto rot = gem->getRotation();
             rot.yaw += 60.0f * dt;
-            if (rot.yaw > 360.0f)
+            if (rot.yaw > 360.0f) {
                 rot.yaw -= 360.0f;
+            }
             gem->setRotation(rot);
         }
 
@@ -393,8 +417,9 @@ class CrystalScene : public Focusable3DScene {
             jewel->setPosition(0, 2.8f + 0.2f * std::sin(m_time * 1.5f), 0);
             auto rot = jewel->getRotation();
             rot.yaw += 30.0f * dt;
-            if (rot.yaw > 360.0f)
+            if (rot.yaw > 360.0f) {
                 rot.yaw -= 360.0f;
+            }
             jewel->setRotation(rot);
         }
 
@@ -437,8 +462,9 @@ class MetropolisScene : public Focusable3DScene {
         int idx = 0;
         for (int x = -3; x <= 3; ++x) {
             for (int z = -3; z <= 3; ++z) {
-                if (x == 0 && z == 0)
+                if (x == 0 && z == 0) {
                     continue;
+                }
 
                 float height = 1.0f + static_cast<float>((idx * 7 + 3) % 5);
                 auto building = addEntity<MeshEntity>();
@@ -470,8 +496,8 @@ class MetropolisScene : public Focusable3DScene {
     }
 
   protected:
-    Color getUnfocusedBg() const override { return Color::fromHex(0x151520); }
-    Color getFocusedBg() const override { return Color::fromHex(0x0a1535); }
+    [[nodiscard]] Color getUnfocusedBg() const override { return Color::fromHex(0x151520); }
+    [[nodiscard]] Color getFocusedBg() const override { return Color::fromHex(0x0a1535); }
 
     void animateContent(float dt) override {
         m_time += dt;
@@ -479,8 +505,9 @@ class MetropolisScene : public Focusable3DScene {
         // Pulse building colours
         for (int i = 0; i < m_buildingCount; ++i) {
             auto* b = dynamic_cast<MeshEntity*>(getEntityByName("Bldg_" + std::to_string(i)));
-            if (!b)
+            if (!b) {
                 continue;
+            }
 
             float pulse = 0.04f * std::sin(m_time * 2.0f + b->getPosition().x * 0.5f +
                                            b->getPosition().z * 0.3f);
@@ -569,8 +596,8 @@ class NatureScene : public Focusable3DScene {
     }
 
   protected:
-    Color getUnfocusedBg() const override { return Color::fromHex(0x0a1a0a); }
-    Color getFocusedBg() const override { return Color::fromHex(0x0a1530); }
+    [[nodiscard]] Color getUnfocusedBg() const override { return Color::fromHex(0x0a1a0a); }
+    [[nodiscard]] Color getFocusedBg() const override { return Color::fromHex(0x0a1530); }
 
     void animateContent(float dt) override {
         m_time += dt;
@@ -578,8 +605,9 @@ class NatureScene : public Focusable3DScene {
         // Gentle canopy sway
         for (int i = 0; i < 14; ++i) {
             auto* canopy = getEntityByName("Canopy_" + std::to_string(i));
-            if (!canopy)
+            if (!canopy) {
                 continue;
+            }
 
             float baseX = static_cast<float>((i * 41 + 5) % 130) / 10.0f - 6.5f;
             float baseZ = static_cast<float>((i * 29 + 11) % 130) / 10.0f - 6.5f;
@@ -591,8 +619,9 @@ class NatureScene : public Focusable3DScene {
         // Bush breathing
         for (int i = 0; i < 10; ++i) {
             auto* bush = getEntityByName("Bush_" + std::to_string(i));
-            if (!bush)
+            if (!bush) {
                 continue;
+            }
             float s = 1.0f + 0.05f * std::sin(m_time * 2.0f + i * 1.3f);
             bush->setScale(s, s, s);
         }
@@ -632,8 +661,9 @@ class PlanetEntity : public MeshEntity {
 
         auto rot = getRotation();
         rot.yaw += m_selfRotSpeed * deltaTime;
-        if (rot.yaw > 360.0f)
+        if (rot.yaw > 360.0f) {
             rot.yaw -= 360.0f;
+        }
         setRotation(rot);
     }
 
@@ -709,8 +739,8 @@ class CosmosScene : public Focusable3DScene {
     }
 
   protected:
-    Color getUnfocusedBg() const override { return Color::fromHex(0x050510); }
-    Color getFocusedBg() const override { return Color::fromHex(0x050530); }
+    [[nodiscard]] Color getUnfocusedBg() const override { return Color::fromHex(0x050510); }
+    [[nodiscard]] Color getFocusedBg() const override { return Color::fromHex(0x050530); }
 
     void animateContent(float dt) override {
         m_time += dt;
@@ -782,8 +812,9 @@ class FourScene3DDemo : public vde::Game {
 
     void onRender() override {
 #ifdef VDE_EXAMPLE_USE_IMGUI
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -820,17 +851,19 @@ class FourScene3DDemo : public vde::Game {
         }
         cleanupImGui();
 #endif
-        if (m_failed)
+        if (m_failed) {
             m_exitCode = 1;
+        }
     }
 
     void onUpdate(float /*deltaTime*/) override {
-        if (!m_input)
+        if (!m_input) {
             return;
+        }
 
         // Fail / quit keys
         if (m_input->isFailPressed()) {
-            std::cerr << "\nTEST FAILED: User reported issue\n" << std::endl;
+            std::cerr << "\nTEST FAILED: User reported issue\n" << '\n';
             m_failed = true;
             quit();
             return;
@@ -857,8 +890,9 @@ class FourScene3DDemo : public vde::Game {
         }
 
         // Status
-        if (m_input->consumeSpace())
+        if (m_input->consumeSpace()) {
             printStatus();
+        }
 
         // Auto-terminate (only when --timeout is active)
         m_elapsed += getDeltaTime();
@@ -868,7 +902,7 @@ class FourScene3DDemo : public vde::Game {
         }
     }
 
-    int getExitCode() const override { return m_exitCode; }
+    [[nodiscard]] int getExitCode() const override { return m_exitCode; }
 
     void setAutoTerminateSeconds(float s) { m_autoTerminateSeconds = s; }
 
@@ -904,8 +938,9 @@ class FourScene3DDemo : public vde::Game {
     void initImGui() {
         auto* ctx = getVulkanContext();
         auto* win = getWindow();
-        if (!ctx || !win)
+        if (!ctx || !win) {
             return;
+        }
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -914,8 +949,9 @@ class FourScene3DDemo : public vde::Game {
         ImGui::StyleColorsDark();
 
         float dpiScale = getDPIScale();
-        if (dpiScale > 0.0f)
+        if (dpiScale > 0.0f) {
             io.FontGlobalScale = dpiScale;
+        }
 
         ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
         m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
@@ -939,8 +975,9 @@ class FourScene3DDemo : public vde::Game {
     }
 
     void cleanupImGui() {
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -998,6 +1035,7 @@ class FourScene3DDemo : public vde::Game {
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     FourScene3DDemo demo;
 
@@ -1022,13 +1060,13 @@ int main(int argc, char** argv) {
 
     try {
         if (!demo.initialize(settings)) {
-            std::cerr << "Failed to initialize demo!" << std::endl;
+            std::cerr << "Failed to initialize demo!" << '\n';
             return 1;
         }
         demo.run();
         return demo.getExitCode();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << '\n';
         return 1;
     }
 }

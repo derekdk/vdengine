@@ -316,7 +316,7 @@ TEST(MaterialTest, MaxRoughnessMetallic) {
 
 TEST(MaterialTest, CopyConstruction) {
     Material original(Color::green(), 0.3f, 0.7f);
-    Material copy(original);
+    const Material& copy(original);
 
     EXPECT_FLOAT_EQ(copy.getAlbedo().r, original.getAlbedo().r);
     EXPECT_FLOAT_EQ(copy.getAlbedo().g, original.getAlbedo().g);

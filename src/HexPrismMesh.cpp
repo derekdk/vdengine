@@ -1,12 +1,13 @@
 #include <vde/HexPrismMesh.h>
 
 #include <cmath>
+#include <numbers>
 
 namespace vde {
 
 namespace {
 // Helper constants for flat-top hexagon
-constexpr float PI = 3.14159265358979323846f;
+constexpr float PI = std::numbers::pi_v<float>;
 constexpr float DEG_60 = PI / 3.0f;  // 60 degrees in radians
 }  // namespace
 
@@ -23,11 +24,11 @@ void HexPrismMeshGenerator::generate(float hexRadius, std::vector<HexPrismVertex
     generateTopFace(hexRadius, outVertices, outIndices, 0);
 
     // Generate bottom face (y = 0.0)
-    uint32_t bottomBaseIndex = static_cast<uint32_t>(outVertices.size());
+    auto bottomBaseIndex = static_cast<uint32_t>(outVertices.size());
     generateBottomFace(hexRadius, outVertices, outIndices, bottomBaseIndex);
 
     // Generate side faces connecting top and bottom
-    uint32_t sideBaseIndex = static_cast<uint32_t>(outVertices.size());
+    auto sideBaseIndex = static_cast<uint32_t>(outVertices.size());
     generateSideFaces(hexRadius, outVertices, outIndices, sideBaseIndex);
 }
 
@@ -114,8 +115,9 @@ void HexPrismMeshGenerator::generateSideFaces(float radius, std::vector<HexPrism
         // UV coordinates for side face (tiled horizontally)
         float uLeft = static_cast<float>(i) / 6.0f;
         float uRight = static_cast<float>(nextCorner) / 6.0f;
-        if (uRight == 0.0f)
+        if (uRight == 0.0f) {
             uRight = 1.0f;  // Wrap around for last face
+        }
 
         // Add 4 vertices for this quad
         uint32_t quadBase = baseIndex + i * 4;
@@ -144,14 +146,14 @@ glm::vec3 HexPrismMeshGenerator::getCornerPosition(float radius, int cornerIndex
     float angle = static_cast<float>(cornerIndex) * DEG_60;
     float x = radius * std::cos(angle);
     float z = radius * std::sin(angle);
-    return glm::vec3(x, y, z);
+    return {x, y, z};
 }
 
 glm::vec2 HexPrismMeshGenerator::calculateUV(const glm::vec2& localPos, float radius) {
     // Map from [-radius, radius] to [0, 1]
     float u = (localPos.x / radius + 1.0f) * 0.5f;
     float v = (localPos.y / radius + 1.0f) * 0.5f;
-    return glm::vec2(u, v);
+    return {u, v};
 }
 
 }  // namespace vde

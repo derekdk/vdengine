@@ -73,7 +73,7 @@ class VulkanContext;
 class Game : private ScriptEnvironment {
   public:
     Game();
-    virtual ~Game();
+    ~Game() override;
 
     // Non-copyable, non-movable
     Game(const Game&) = delete;
@@ -98,7 +98,7 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Check if the game is initialized.
      */
-    bool isInitialized() const { return m_initialized; }
+    [[nodiscard]] bool isInitialized() const { return m_initialized; }
 
     // Game loop
 
@@ -129,12 +129,12 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Get the configured input script file path.
      */
-    const std::string& getInputScriptFile() const;
+    [[nodiscard]] const std::string& getInputScriptFile() const;
 
     /**
      * @brief Check if the game is running.
      */
-    bool isRunning() const { return m_running; }
+    [[nodiscard]] bool isRunning() const { return m_running; }
 
     // Scene management
 
@@ -184,13 +184,15 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Get the currently active scene group.
      */
-    const SceneGroup& getActiveSceneGroup() const override { return m_activeSceneGroup; }
+    [[nodiscard]] const SceneGroup& getActiveSceneGroup() const override {
+        return m_activeSceneGroup;
+    }
 
     /**
      * @brief Get the currently active scene.
      */
     Scene* getActiveScene() { return m_activeScene; }
-    const Scene* getActiveScene() const { return m_activeScene; }
+    [[nodiscard]] const Scene* getActiveScene() const { return m_activeScene; }
 
     // Input focus (for split-screen)
 
@@ -209,7 +211,7 @@ class Game : private ScriptEnvironment {
      * @return Pointer to the focused scene, or the primary scene if none set
      */
     Scene* getFocusedScene();
-    const Scene* getFocusedScene() const;
+    [[nodiscard]] const Scene* getFocusedScene() const;
 
     /**
      * @brief Get the scene whose viewport contains the given screen position.
@@ -268,7 +270,7 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Returns true while a scene transition is in progress.
      */
-    bool isTransitioning() const;
+    [[nodiscard]] bool isTransitioning() const;
 
     /**
      * @brief Cancel the current transition immediately.
@@ -282,7 +284,7 @@ class Game : private ScriptEnvironment {
      * @brief Get the progress [0, 1] of the current transition.
      * @return 0 if no transition is active.
      */
-    float getTransitionProgress() const;
+    [[nodiscard]] float getTransitionProgress() const;
 
     /**
      * @brief Pause or unpause the active transition.
@@ -296,7 +298,7 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Returns true if the transition is currently paused.
      */
-    bool isTransitionPaused() const;
+    [[nodiscard]] bool isTransitionPaused() const;
 
     /**
      * @brief Advance a paused transition by exactly one frame.
@@ -317,7 +319,7 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Get the current transition playback speed multiplier.
      */
-    float getTransitionSpeed() const;
+    [[nodiscard]] float getTransitionSpeed() const;
 
     // Input handling
 
@@ -330,7 +332,7 @@ class Game : private ScriptEnvironment {
      * automatically when scenes change.
      */
     Scheduler& getScheduler() { return m_scheduler; }
-    const Scheduler& getScheduler() const { return m_scheduler; }
+    [[nodiscard]] const Scheduler& getScheduler() const { return m_scheduler; }
 
     /**
      * @brief Set the global input handler.
@@ -342,29 +344,29 @@ class Game : private ScriptEnvironment {
      * @brief Get the global input handler.
      */
     InputHandler* getInputHandler() { return m_inputHandler; }
-    const InputHandler* getInputHandler() const { return m_inputHandler; }
+    [[nodiscard]] const InputHandler* getInputHandler() const { return m_inputHandler; }
 
     // Timing
 
     /**
      * @brief Get the time since the last frame in seconds.
      */
-    float getDeltaTime() const { return m_deltaTime; }
+    [[nodiscard]] float getDeltaTime() const { return m_deltaTime; }
 
     /**
      * @brief Get the total time since game start in seconds.
      */
-    double getTotalTime() const { return m_totalTime; }
+    [[nodiscard]] double getTotalTime() const { return m_totalTime; }
 
     /**
      * @brief Get the current frames per second.
      */
-    float getFPS() const { return m_fps; }
+    [[nodiscard]] float getFPS() const { return m_fps; }
 
     /**
      * @brief Get the current frame number.
      */
-    uint64_t getFrameCount() const { return m_frameCount; }
+    [[nodiscard]] uint64_t getFrameCount() const { return m_frameCount; }
 
     // Window access
 
@@ -372,7 +374,7 @@ class Game : private ScriptEnvironment {
      * @brief Get the game window.
      */
     Window* getWindow() { return m_window.get(); }
-    const Window* getWindow() const { return m_window.get(); }
+    [[nodiscard]] const Window* getWindow() const { return m_window.get(); }
 
     /**
      * @brief Queue a window/OS operation to run at a scheduler-safe point.
@@ -417,20 +419,20 @@ class Game : private ScriptEnvironment {
      * Returns the content scale factor for the window's monitor,
      * which is useful for scaling UI elements on high-DPI displays.
      */
-    float getDPIScale() const;
+    [[nodiscard]] float getDPIScale() const;
 
     // Settings
 
     /**
      * @brief Get the current game settings.
      */
-    const GameSettings& getSettings() const { return m_settings; }
+    [[nodiscard]] const GameSettings& getSettings() const { return m_settings; }
 
     /**
      * @brief Get the Vulkan context (for advanced rendering).
      */
     VulkanContext* getVulkanContext() { return m_vulkanContext.get(); }
-    const VulkanContext* getVulkanContext() const { return m_vulkanContext.get(); }
+    [[nodiscard]] const VulkanContext* getVulkanContext() const { return m_vulkanContext.get(); }
 
     /**
      * @brief Get the global resource manager.
@@ -443,7 +445,7 @@ class Game : private ScriptEnvironment {
      * @endcode
      */
     ResourceManager& getResourceManager() { return m_resourceManager; }
-    const ResourceManager& getResourceManager() const { return m_resourceManager; }
+    [[nodiscard]] const ResourceManager& getResourceManager() const { return m_resourceManager; }
 
     /**
      * @brief Apply new display settings.
@@ -472,12 +474,12 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Get the mesh rendering pipeline.
      */
-    VkPipeline getMeshPipeline() const { return m_meshPipeline; }
+    [[nodiscard]] VkPipeline getMeshPipeline() const { return m_meshPipeline; }
 
     /**
      * @brief Get the mesh pipeline layout.
      */
-    VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
+    [[nodiscard]] VkPipelineLayout getMeshPipelineLayout() const { return m_meshPipelineLayout; }
 
     /**
      * @brief Allocate a mesh texture descriptor set (set 2).
@@ -496,27 +498,29 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Get the sprite rendering pipeline.
      */
-    VkPipeline getSpritePipeline() const { return m_spritePipeline; }
+    [[nodiscard]] VkPipeline getSpritePipeline() const { return m_spritePipeline; }
 
     /**
      * @brief Get the sprite pipeline layout.
      */
-    VkPipelineLayout getSpritePipelineLayout() const { return m_spritePipelineLayout; }
+    [[nodiscard]] VkPipelineLayout getSpritePipelineLayout() const {
+        return m_spritePipelineLayout;
+    }
 
     /**
      * @brief Get the sprite sampler.
      */
-    VkSampler getSpriteSampler() const { return m_spriteSampler; }
+    [[nodiscard]] VkSampler getSpriteSampler() const { return m_spriteSampler; }
 
     /**
      * @brief Get the default white texture for sprites without textures.
      */
-    Texture* getDefaultWhiteTexture() const { return m_defaultWhiteTexture.get(); }
+    [[nodiscard]] Texture* getDefaultWhiteTexture() const { return m_defaultWhiteTexture.get(); }
 
     /**
      * @brief Get the sprite descriptor set layout.
      */
-    VkDescriptorSetLayout getSpriteDescriptorSetLayout() const {
+    [[nodiscard]] VkDescriptorSetLayout getSpriteDescriptorSetLayout() const {
         return m_spriteDescriptorSetLayout;
     }
 
@@ -543,14 +547,14 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Get the lighting descriptor set layout (Set 1 for mesh pipeline).
      */
-    VkDescriptorSetLayout getLightingDescriptorSetLayout() const {
+    [[nodiscard]] VkDescriptorSetLayout getLightingDescriptorSetLayout() const {
         return m_lightingDescriptorSetLayout;
     }
 
     /**
      * @brief Get the current frame's lighting descriptor set.
      */
-    VkDescriptorSet getCurrentLightingDescriptorSet() const;
+    [[nodiscard]] VkDescriptorSet getCurrentLightingDescriptorSet() const;
 
     /**
      * @brief Update the lighting UBO with scene lighting data.
@@ -576,7 +580,7 @@ class Game : private ScriptEnvironment {
      * @brief Get the current exit code.
      * @return 0 for success, 1 for failure
      */
-    virtual int getExitCode() const { return m_exitCode; }
+    [[nodiscard]] virtual int getExitCode() const { return m_exitCode; }
 
     /// Get the script executor (for test inspection).
     InputScriptExecutor* getScriptExecutor() { return m_scriptExecutor.get(); }
@@ -680,7 +684,7 @@ class Game : private ScriptEnvironment {
     // Scheduler
     Scheduler m_scheduler;
 
-    enum class WindowOperationKind {
+    enum class WindowOperationKind : uint8_t {
         Generic,
         Resize,
     };
@@ -720,9 +724,9 @@ class Game : private ScriptEnvironment {
 
     // ScriptEnvironment overrides (private, no public declaration)
     InputHandler* resolveInputHandler() override;
-    std::pair<uint32_t, uint32_t> getSwapChainExtent() const override;
-    size_t getScenesCreated() const override { return m_scenesCreated; }
-    size_t getScenesRemoved() const override { return m_scenesRemoved; }
+    [[nodiscard]] std::pair<uint32_t, uint32_t> getSwapChainExtent() const override;
+    [[nodiscard]] size_t getScenesCreated() const override { return m_scenesCreated; }
+    [[nodiscard]] size_t getScenesRemoved() const override { return m_scenesRemoved; }
 
     // Internal methods
     void processInput();

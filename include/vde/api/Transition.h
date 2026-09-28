@@ -70,7 +70,7 @@ class Transition {
     /**
      * @brief Human-readable name (for debug UI / logging).
      */
-    virtual const char* getName() const = 0;
+    [[nodiscard]] virtual const char* getName() const = 0;
 
     // ---- Shader paths ----
 
@@ -82,13 +82,13 @@ class Transition {
      *   layout(binding = 1) uniform sampler2D destTexture;
      *   layout(push_constant) TransitionUniforms uniforms;
      */
-    virtual std::string getFragmentShaderPath() const = 0;
+    [[nodiscard]] virtual std::string getFragmentShaderPath() const = 0;
 
     /**
      * @brief Vertex shader — the default fullscreen triangle is usually sufficient.
      * Override only for custom geometry.
      */
-    virtual std::string getVertexShaderPath() const;
+    [[nodiscard]] virtual std::string getVertexShaderPath() const;
 
     // ---- Per-frame callback ----
 
@@ -115,7 +115,7 @@ class Transition {
      * source scene continue animating (appropriate for cross-fades, wipes,
      * etc.).
      */
-    virtual bool freezesSourceScene() const { return false; }
+    [[nodiscard]] virtual bool freezesSourceScene() const { return false; }
 
     // ---- Lifecycle hooks ----
 
@@ -131,7 +131,7 @@ class Transition {
      * @brief Return true if this transition renders its own geometry
      * instead of using the default fullscreen quad.
      */
-    virtual bool usesCustomGeometry() const { return false; }
+    [[nodiscard]] virtual bool usesCustomGeometry() const { return false; }
 
     /**
      * @brief Record custom draw commands.
@@ -149,7 +149,7 @@ class Transition {
     // ---- Configuration helpers ----
 
     void setDirection(TransitionDirection dir) { m_direction = dir; }
-    TransitionDirection getDirection() const { return m_direction; }
+    [[nodiscard]] TransitionDirection getDirection() const { return m_direction; }
 
   protected:
     TransitionDirection m_direction = TransitionDirection::Center;

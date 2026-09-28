@@ -19,8 +19,9 @@ namespace vde::tools {
 // =============================================================================
 
 static bool strictStoi(const std::string& s, int& out) {
-    if (s.empty())
+    if (s.empty()) {
         return false;
+    }
     try {
         size_t pos = 0;
         out = std::stoi(s, &pos);
@@ -31,8 +32,9 @@ static bool strictStoi(const std::string& s, int& out) {
 }
 
 static bool strictStof(const std::string& s, float& out) {
-    if (s.empty())
+    if (s.empty()) {
         return false;
+    }
     try {
         size_t pos = 0;
         out = std::stof(s, &pos);
@@ -52,22 +54,19 @@ std::vector<std::string> CommandArgParser::tokenize(const std::string& input) {
     int parenDepth = 0;
     bool inQuote = false;
 
-    for (size_t i = 0; i < input.size(); ++i) {
-        char ch = input[i];
-
+    for (char ch : input) {
         // Quoted string handling
         if (ch == '"' && parenDepth == 0) {
             if (!inQuote) {
                 inQuote = true;
                 current += ch;
                 continue;
-            } else {
-                inQuote = false;
-                current += ch;
-                tokens.push_back(current);
-                current.clear();
-                continue;
             }
+            inQuote = false;
+            current += ch;
+            tokens.push_back(current);
+            current.clear();
+            continue;
         }
 
         if (inQuote) {
@@ -156,7 +155,7 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
     }
 
     // Check for nested-pair rect: "(a,b),(c,d)"
-    if (expected == ParamType::Rect && inner.find("(") != std::string::npos) {
+    if (expected == ParamType::Rect && inner.find('(') != std::string::npos) {
         // Strip whitespace for uniform separator matching
         std::string compact;
         compact.reserve(inner.size());
@@ -180,8 +179,9 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
             // Parse "a,b" and "c,d"
             auto comma1 = first.find(',');
             auto comma2 = second.find(',');
-            if (comma1 == std::string::npos || comma2 == std::string::npos)
+            if (comma1 == std::string::npos || comma2 == std::string::npos) {
                 return false;
+            }
             if (!strictStoi(first.substr(0, comma1), out.m_rect.x) ||
                 !strictStoi(first.substr(comma1 + 1), out.m_rect.y) ||
                 !strictStoi(second.substr(0, comma2), out.m_rect.w) ||
@@ -201,12 +201,14 @@ bool CommandArgParser::parseTuple(const std::string& token, ParsedArg& out, Para
         // Trim whitespace
         auto start = part.find_first_not_of(" \t");
         auto end = part.find_last_not_of(" \t");
-        if (start == std::string::npos)
+        if (start == std::string::npos) {
             return false;
+        }
         part = part.substr(start, end - start + 1);
         int val = 0;
-        if (!strictStoi(part, val))
+        if (!strictStoi(part, val)) {
             return false;
+        }
         values.push_back(val);
     }
 
@@ -259,8 +261,8 @@ bool CommandArgParser::parseToken(const std::string& token, ParamType type, Pars
 
     case ParamType::Bool: {
         std::string lower = token;
-        std::transform(lower.begin(), lower.end(), lower.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+        std::ranges::transform(lower, lower.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
         if (lower == "true" || lower == "false" || lower == "1" || lower == "0" ||
             lower == "filled" || lower == "outline" || lower == "show" || lower == "hide" ||
             lower == "yes" || lower == "no") {
@@ -287,8 +289,6 @@ bool CommandArgParser::parseToken(const std::string& token, ParamType type, Pars
 
     case ParamType::Point:
     case ParamType::Size:
-        return parseTuple(token, out, type);
-
     case ParamType::Rect:
         return parseTuple(token, out, type);
     }
@@ -313,10 +313,10 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
                 // Case-insensitive keyword match
                 std::string tok = tokens[tokenIdx];
                 std::string expected = param.name;
-                std::transform(tok.begin(), tok.end(), tok.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
-                std::transform(expected.begin(), expected.end(), expected.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
+                std::ranges::transform(tok, tok.begin(),
+                                       [](unsigned char c) { return std::tolower(c); });
+                std::ranges::transform(expected, expected.begin(),
+                                       [](unsigned char c) { return std::tolower(c); });
                 if (tok == expected) {
                     ParsedArg arg;
                     arg.raw = tokens[tokenIdx];
@@ -465,8 +465,9 @@ CommandArgParser::ParseResult CommandArgParser::parse(const std::string& argsStr
     if (tokenIdx < tokens.size()) {
         std::ostringstream rem;
         for (size_t i = tokenIdx; i < tokens.size(); ++i) {
-            if (i > tokenIdx)
+            if (i > tokenIdx) {
                 rem << " ";
+            }
             rem << tokens[i];
         }
         // Normal commands (non-empty param list) should not have leftover tokens

@@ -115,8 +115,9 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
         // Auto-rotate cube
         if (m_autoRotate) {
             m_cubeRotY += m_rotationSpeed * deltaTime;
-            if (m_cubeRotY > 360.0f)
+            if (m_cubeRotY > 360.0f) {
                 m_cubeRotY -= 360.0f;
+            }
         }
 
         // Apply current values to entities
@@ -220,21 +221,21 @@ class ImGuiDemoScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Dear ImGui Integration"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Dear ImGui Integration"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"ImGui overlay on VDE scene", "Entity property editors (position, color, scale)",
                 "Lighting controls", "FPS / engine stats", "ImGui Demo Window toggle"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"3D scene with cube, sphere, and ground plane",
                 "Multiple ImGui windows overlaid on top",
                 "Cube rotating when auto-rotate is enabled",
                 "Real-time property changes reflected in the scene"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"Mouse - Interact with ImGui panels"};
     }
 
@@ -280,6 +281,7 @@ class ImGuiDemoGame : public vde::examples::BaseExampleGame<ImGuiDemoInputHandle
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ImGuiDemoGame demo;
 
@@ -287,8 +289,8 @@ int main(int argc, char** argv) {
     float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
 
     // Scale the resolution for high DPI displays
-    uint32_t width = static_cast<uint32_t>(1280 * dpiScale);
-    uint32_t height = static_cast<uint32_t>(720 * dpiScale);
+    auto width = static_cast<uint32_t>(1280 * dpiScale);
+    auto height = static_cast<uint32_t>(720 * dpiScale);
 
     return vde::examples::runExample(demo, "VDE ImGui Demo", width, height, argc, argv);
 }

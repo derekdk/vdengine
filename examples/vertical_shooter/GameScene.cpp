@@ -123,13 +123,14 @@ void GameScene::enterTitle() {
     }
 
     // Camera at starting position
-    if (auto* cam = dynamic_cast<Camera2D*>(getCamera()))
+    if (auto* cam = dynamic_cast<Camera2D*>(getCamera())) {
         cam->setPosition(0.0f, VIEW_HEIGHT * 0.5f);
+    }
 
     initStars();
 
-    std::cout << "=== VERTICAL SHOOTER ===" << std::endl;
-    std::cout << "Press ENTER / START to begin!" << std::endl;
+    std::cout << "=== VERTICAL SHOOTER ===" << '\n';
+    std::cout << "Press ENTER / START to begin!" << '\n';
 }
 
 void GameScene::enterPlaying() {
@@ -145,8 +146,9 @@ void GameScene::enterPlaying() {
     m_nextSpawnIdx = 0;
 
     // Camera at bottom of map
-    if (auto* cam = dynamic_cast<Camera2D*>(getCamera()))
+    if (auto* cam = dynamic_cast<Camera2D*>(getCamera())) {
         cam->setPosition(0.0f, VIEW_HEIGHT * 0.5f);
+    }
 
     // Create player
     m_player = addEntity<SpriteEntity>();
@@ -156,21 +158,22 @@ void GameScene::enterPlaying() {
 
     initStars();
 
-    std::cout << "Lives: " << m_health << "  Weapon: Basic  Score: 0" << std::endl;
+    std::cout << "Lives: " << m_health << "  Weapon: Basic  Score: 0" << '\n';
 }
 
 void GameScene::enterGameOver() {
     m_state = State::GameOver;
-    if (m_player)
+    if (m_player) {
         m_player->setColor(Color::red());
-    std::cout << "GAME OVER!  Final Score: " << m_score << std::endl;
-    std::cout << "Press R / BACK to restart." << std::endl;
+    }
+    std::cout << "GAME OVER!  Final Score: " << m_score << '\n';
+    std::cout << "Press R / BACK to restart." << '\n';
 }
 
 void GameScene::enterVictory() {
     m_state = State::Victory;
-    std::cout << "VICTORY!  Final Score: " << m_score << std::endl;
-    std::cout << "Press R / BACK to restart." << std::endl;
+    std::cout << "VICTORY!  Final Score: " << m_score << '\n';
+    std::cout << "Press R / BACK to restart." << '\n';
 }
 
 // ============================================================================
@@ -181,8 +184,9 @@ void GameScene::updateTitle(float dt) {
     int ticks = m_blinkTimer.advance(dt);
     if (ticks > 0) {
         m_blinkOn = !m_blinkOn;
-        if (m_promptSprite)
+        if (m_promptSprite) {
             m_promptSprite->setVisible(m_blinkOn);
+        }
     }
 
     auto* in = input();
@@ -197,14 +201,16 @@ void GameScene::updateTitle(float dt) {
 
 void GameScene::updatePlaying(float dt) {
     auto* in = input();
-    if (!in)
+    if (!in) {
         return;
+    }
 
     // Scroll
     m_scrollY += SCROLL_SPEED * dt;
     float camY = VIEW_HEIGHT * 0.5f + m_scrollY;
-    if (auto* cam = dynamic_cast<Camera2D*>(getCamera()))
+    if (auto* cam = dynamic_cast<Camera2D*>(getCamera())) {
         cam->setPosition(0.0f, camY);
+    }
 
     // Check for map completion
     if (m_scrollY >= MAP_HEIGHT - VIEW_HEIGHT) {
@@ -213,10 +219,12 @@ void GameScene::updatePlaying(float dt) {
     }
 
     // Weapon switching
-    if (in->consumeNextWeapon())
+    if (in->consumeNextWeapon()) {
         cycleWeapon(1);
-    if (in->consumePrevWeapon())
+    }
+    if (in->consumePrevWeapon()) {
         cycleWeapon(-1);
+    }
 
     // Fire
     m_fireCooldown.advance(dt);
@@ -265,8 +273,9 @@ void GameScene::updateGameOver(float /*dt*/) {
 
 void GameScene::movePlayer(float dt) {
     auto* in = input();
-    if (!m_player || !in)
+    if (!m_player || !in) {
         return;
+    }
 
     glm::vec2 dir = in->getMoveDirection();
     auto pos = m_player->getPosition();
@@ -284,16 +293,18 @@ void GameScene::movePlayer(float dt) {
 }
 
 void GameScene::fireWeapon() {
-    if (!m_player)
+    if (!m_player) {
         return;
+    }
     auto pos = m_player->getPosition();
     glm::vec2 origin(pos.x, pos.y + 0.5f);
 
     switch (m_weapon) {
     case WeaponType::Basic:
         spawnPlayerBullet(origin, {0.0f, BULLET_SPEED});
-        if (m_sounds.shoot)
+        if (m_sounds.shoot) {
             AudioManager::getInstance().playSFX(m_sounds.shoot, 0.3f);
+        }
         break;
 
     case WeaponType::Spread:
@@ -302,14 +313,16 @@ void GameScene::fireWeapon() {
             origin, {SPREAD_SPEED * std::sin(SPREAD_ANGLE), SPREAD_SPEED * std::cos(SPREAD_ANGLE)});
         spawnPlayerBullet(origin, {SPREAD_SPEED * std::sin(-SPREAD_ANGLE),
                                    SPREAD_SPEED * std::cos(-SPREAD_ANGLE)});
-        if (m_sounds.spreadShoot)
+        if (m_sounds.spreadShoot) {
             AudioManager::getInstance().playSFX(m_sounds.spreadShoot, 0.25f);
+        }
         break;
 
     case WeaponType::Rapid:
         spawnPlayerBullet(origin, {0.0f, RAPID_SPEED});
-        if (m_sounds.rapidShoot)
+        if (m_sounds.rapidShoot) {
             AudioManager::getInstance().playSFX(m_sounds.rapidShoot, 0.2f);
+        }
         break;
 
     default:
@@ -340,10 +353,11 @@ void GameScene::cycleWeapon(int dir) {
     m_fireCooldown.finish();
 
     const char* names[] = {"Basic", "Spread", "Rapid"};
-    std::cout << "Weapon: " << names[static_cast<int>(m_weapon)] << std::endl;
+    std::cout << "Weapon: " << names[static_cast<int>(m_weapon)] << '\n';
 
-    if (m_sounds.weaponSwitch)
+    if (m_sounds.weaponSwitch) {
         AudioManager::getInstance().playSFX(m_sounds.weaponSwitch, 0.25f);
+    }
 }
 
 // ============================================================================
@@ -355,10 +369,11 @@ void GameScene::spawnPlayerBullet(glm::vec2 pos, glm::vec2 vel) {
     sprite->setScale(0.15f, 0.35f, 1.0f);
     sprite->setPosition(pos.x, pos.y, -0.1f);
     int idx = static_cast<int>(m_weapon);
-    if (m_bulletTex[idx])
+    if (m_bulletTex[idx]) {
         sprite->setTexture(m_bulletTex[idx]);
-    else
+    } else {
         sprite->setColor(Color::white());
+    }
 
     m_projectiles.push_back({sprite, {vel, true}, false});
 }
@@ -367,10 +382,11 @@ void GameScene::spawnEnemyBullet(glm::vec2 pos, glm::vec2 vel) {
     auto sprite = addEntity<SpriteEntity>();
     sprite->setScale(0.2f, 0.2f, 1.0f);
     sprite->setPosition(pos.x, pos.y, -0.1f);
-    if (m_enemyBulletTex)
+    if (m_enemyBulletTex) {
         sprite->setTexture(m_enemyBulletTex);
-    else
+    } else {
         sprite->setColor(Color::red());
+    }
 
     m_projectiles.push_back({sprite, {vel, true}, true});
 }
@@ -409,8 +425,9 @@ void GameScene::spawnVisibleEnemies() {
 
     while (m_nextSpawnIdx < m_map.enemies.size()) {
         const auto& spawn = m_map.enemies[m_nextSpawnIdx];
-        if (spawn.y > spawnLine)
+        if (spawn.y > spawnLine) {
             break;
+        }
 
         auto sprite = addEntity<SpriteEntity>();
         glm::vec2 halfExt = enemyHalfExtents(spawn.type);
@@ -418,8 +435,9 @@ void GameScene::spawnVisibleEnemies() {
         sprite->setPosition(spawn.x, spawn.y, 0.0f);
 
         int texIdx = static_cast<int>(spawn.type);
-        if (m_enemyTex[texIdx])
+        if (m_enemyTex[texIdx]) {
             sprite->setTexture(m_enemyTex[texIdx]);
+        }
 
         EnemyData edata;
         edata.type = spawn.type;
@@ -466,8 +484,9 @@ void GameScene::updateEnemies(float dt) {
 
         FireRequest fire;
         bool wantsFire = updateEnemy(e.data, e.sprite.get(), dt, playerPos, m_scrollY, fire);
-        if (wantsFire)
+        if (wantsFire) {
             spawnEnemyBullet(fire.origin, fire.velocity);
+        }
 
         // Remove if scrolled well past the bottom of the view
         auto pos = e.sprite->getPosition();
@@ -496,8 +515,9 @@ void GameScene::initStars() {
         float x = rng.range(-HALF_VIEW_W, HALF_VIEW_W);
         float y = rng.range(camY - HALF_VIEW_H - 2.0f, camY + HALF_VIEW_H + 2.0f);
         sprite->setPosition(x, y, 0.5f);  // behind everything
-        if (m_starTex)
+        if (m_starTex) {
             sprite->setTexture(m_starTex);
+        }
         float bright = rng.range(0.3f, 1.0f);
         sprite->setColor(Color(bright, bright, bright * 1.1f, 0.8f));
         m_stars.push_back({sprite});
@@ -525,8 +545,9 @@ void GameScene::recycleStars() {
 // ============================================================================
 
 void GameScene::checkCollisions() {
-    if (!m_player)
+    if (!m_player) {
         return;
+    }
 
     auto pp = m_player->getPosition();
     glm::vec2 playerPos(pp.x, pp.y);
@@ -535,15 +556,17 @@ void GameScene::checkCollisions() {
     // Player bullets vs enemies
     for (int p = static_cast<int>(m_projectiles.size()) - 1; p >= 0; --p) {
         auto& proj = m_projectiles[p];
-        if (proj.isEnemy || !proj.data.alive)
+        if (proj.isEnemy || !proj.data.alive) {
             continue;
+        }
         auto bp = proj.sprite->getPosition();
         glm::vec2 bPos(bp.x, bp.y);
         glm::vec2 bHalf(0.1f, 0.2f);
 
         for (auto& e : m_enemies) {
-            if (!e.data.alive)
+            if (!e.data.alive) {
                 continue;
+            }
             auto ep = e.sprite->getPosition();
             glm::vec2 ePos(ep.x, ep.y);
             glm::vec2 eHalf = enemyHalfExtents(e.data.type);
@@ -554,12 +577,14 @@ void GameScene::checkCollisions() {
                 if (e.data.health <= 0) {
                     e.data.alive = false;
                     m_score += enemyScore(e.data.type);
-                    std::cout << "Score: " << m_score << std::endl;
-                    if (m_sounds.explosion)
+                    std::cout << "Score: " << m_score << '\n';
+                    if (m_sounds.explosion) {
                         AudioManager::getInstance().playSFX(m_sounds.explosion, 0.35f);
+                    }
                 } else {
-                    if (m_sounds.hit)
+                    if (m_sounds.hit) {
                         AudioManager::getInstance().playSFX(m_sounds.hit, 0.25f);
+                    }
                     // Flash enemy white briefly
                     e.sprite->setColor(Color::white());
                 }
@@ -571,8 +596,9 @@ void GameScene::checkCollisions() {
     // Enemy bullets vs player
     if (m_invulnTimer <= 0.0f) {
         for (auto& proj : m_projectiles) {
-            if (!proj.isEnemy || !proj.data.alive)
+            if (!proj.isEnemy || !proj.data.alive) {
                 continue;
+            }
             auto bp = proj.sprite->getPosition();
             glm::vec2 bPos(bp.x, bp.y);
             glm::vec2 bHalf(0.1f, 0.1f);
@@ -581,9 +607,10 @@ void GameScene::checkCollisions() {
                 proj.data.alive = false;
                 m_health--;
                 m_invulnTimer = INVULN_TIME;
-                std::cout << "Hit! Lives: " << m_health << std::endl;
-                if (m_sounds.hit)
+                std::cout << "Hit! Lives: " << m_health << '\n';
+                if (m_sounds.hit) {
                     AudioManager::getInstance().playSFX(m_sounds.hit, 0.4f);
+                }
                 if (m_health <= 0) {
                     enterGameOver();
                     return;
@@ -596,8 +623,9 @@ void GameScene::checkCollisions() {
     // Enemies vs player (body collision)
     if (m_invulnTimer <= 0.0f) {
         for (auto& e : m_enemies) {
-            if (!e.data.alive)
+            if (!e.data.alive) {
                 continue;
+            }
             auto ep = e.sprite->getPosition();
             glm::vec2 ePos(ep.x, ep.y);
             glm::vec2 eHalf = enemyHalfExtents(e.data.type);
@@ -607,10 +635,10 @@ void GameScene::checkCollisions() {
                 m_invulnTimer = INVULN_TIME;
                 e.data.alive = false;
                 m_score += enemyScore(e.data.type);
-                std::cout << "Collision! Lives: " << m_health << "  Score: " << m_score
-                          << std::endl;
-                if (m_sounds.explosion)
+                std::cout << "Collision! Lives: " << m_health << "  Score: " << m_score << '\n';
+                if (m_sounds.explosion) {
                     AudioManager::getInstance().playSFX(m_sounds.explosion, 0.4f);
+                }
                 if (m_health <= 0) {
                     enterGameOver();
                     return;
@@ -630,14 +658,17 @@ void GameScene::clearAll() {
         removeEntity(m_player->getId());
         m_player.reset();
     }
-    for (auto& p : m_projectiles)
+    for (auto& p : m_projectiles) {
         removeEntity(p.sprite->getId());
+    }
     m_projectiles.clear();
-    for (auto& e : m_enemies)
+    for (auto& e : m_enemies) {
         removeEntity(e.sprite->getId());
+    }
     m_enemies.clear();
-    for (auto& s : m_stars)
+    for (auto& s : m_stars) {
         removeEntity(s.sprite->getId());
+    }
     m_stars.clear();
     if (m_titleBanner) {
         removeEntity(m_titleBanner->getId());

@@ -11,6 +11,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "CommandSystem.h"
@@ -41,23 +42,26 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
     // Skip @canvas prefix if present.
     if (!text.empty() && text[0] == '@') {
         auto sp = text.find(' ');
-        if (sp == std::string::npos)
+        if (sp == std::string::npos) {
             return;
+        }
         cmdOffset += sp + 1;
         text = text.substr(sp + 1);
         auto ns = text.find_first_not_of(" \t");
-        if (ns == std::string::npos)
+        if (ns == std::string::npos) {
             return;
+        }
         cmdOffset += ns;
         text = text.substr(ns);
     }
 
-    if (text.empty())
+    if (text.empty()) {
         return;
+    }
 
     std::string textLower = text;
-    std::transform(textLower.begin(), textLower.end(), textLower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(textLower, textLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     auto& registry = CommandRegistry::instance();
     auto allMeta = registry.getAllMetadata();
@@ -69,17 +73,19 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
     for (const auto* meta : allMeta) {
         auto tryMatch = [&](const std::string& name) {
             std::string lower = name;
-            std::transform(lower.begin(), lower.end(), lower.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::ranges::transform(lower, lower.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
             if (textLower.size() >= lower.size() + 1 && textLower[lower.size()] == ' ' &&
-                textLower.substr(0, lower.size()) == lower && lower.size() > matchLen) {
+                textLower.starts_with(lower) && lower.size() > matchLen) {
                 matchedCmd = meta;
                 matchLen = lower.size();
             }
         };
         tryMatch(meta->name);
-        for (const auto& alias : meta->aliases)
+        for (const auto& alias : meta->aliases) {
             tryMatch(alias);
+        }
     }
 
     if (matchedCmd) {
@@ -91,8 +97,9 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
         {
             std::istringstream iss(argsText);
             std::string tok;
-            while (iss >> tok)
+            while (iss >> tok) {
                 tokens.push_back(tok);
+            }
         }
 
         bool endsWithSpace = !argsText.empty() && argsText.back() == ' ';
@@ -102,8 +109,9 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
         if (paramIdx < matchedCmd->params.size()) {
             const auto& param = matchedCmd->params[paramIdx];
             std::string currentLower = currentToken;
-            std::transform(currentLower.begin(), currentLower.end(), currentLower.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::ranges::transform(currentLower, currentLower.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
 
             m_completionReplaceStart = currentToken.empty()
                                            ? static_cast<int>(input.size())
@@ -112,9 +120,9 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
             if (param.type == ParamType::Enum) {
                 for (const auto& ev : param.enumValues) {
                     std::string evLower = ev;
-                    std::transform(
-                        evLower.begin(), evLower.end(), evLower.begin(),
-                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    std::ranges::transform(evLower, evLower.begin(), [](unsigned char c) {
+                        return static_cast<char>(std::tolower(c));
+                    });
                     if (currentToken.empty() ||
                         (evLower.starts_with(currentLower) && evLower != currentLower)) {
                         m_completions.push_back(ev);
@@ -125,9 +133,9 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
                 if (ctx) {
                     for (const auto& [name, color] : ctx->namedColors) {
                         std::string nameLower = name;
-                        std::transform(
-                            nameLower.begin(), nameLower.end(), nameLower.begin(),
-                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                        std::ranges::transform(nameLower, nameLower.begin(), [](unsigned char c) {
+                            return static_cast<char>(std::tolower(c));
+                        });
                         if (currentToken.empty() ||
                             (nameLower.starts_with(currentLower) && nameLower != currentLower)) {
                             m_completions.push_back(name);
@@ -153,20 +161,22 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
     for (const auto* meta : allMeta) {
         auto tryPrefix = [&](const std::string& name) {
             std::string lower = name;
-            std::transform(lower.begin(), lower.end(), lower.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::ranges::transform(lower, lower.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
             if (lower.starts_with(textLower) && lower != textLower) {
                 m_completions.push_back(name);
             }
         };
         tryPrefix(meta->name);
-        for (const auto& alias : meta->aliases)
+        for (const auto& alias : meta->aliases) {
             tryPrefix(alias);
+        }
     }
 
-    std::sort(m_completions.begin(), m_completions.end());
-    m_completions.erase(std::unique(m_completions.begin(), m_completions.end()),
-                        m_completions.end());
+    std::ranges::sort(m_completions);
+    const auto duplicates = std::ranges::unique(m_completions);
+    m_completions.erase(duplicates.begin(), duplicates.end());
 
     m_showCompletions = !m_completions.empty();
     if (!m_completions.empty()) {
@@ -180,28 +190,32 @@ void EditorPanels::updateCompletions(const std::string& input, const CommandSyst
 std::string EditorPanels::getParameterHint(const std::string& input) const {
     std::string text = input;
     auto start = text.find_first_not_of(" \t");
-    if (start == std::string::npos)
+    if (start == std::string::npos) {
         return {};
+    }
     text = text.substr(start);
 
     // Skip @canvas prefix.
     if (!text.empty() && text[0] == '@') {
         auto sp = text.find(' ');
-        if (sp == std::string::npos)
+        if (sp == std::string::npos) {
             return {};
+        }
         text = text.substr(sp + 1);
         auto ns = text.find_first_not_of(" \t");
-        if (ns == std::string::npos)
+        if (ns == std::string::npos) {
             return {};
+        }
         text = text.substr(ns);
     }
 
-    if (text.empty())
+    if (text.empty()) {
         return {};
+    }
 
     std::string textLower = text;
-    std::transform(textLower.begin(), textLower.end(), textLower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(textLower, textLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     auto& registry = CommandRegistry::instance();
     auto allMeta = registry.getAllMetadata();
@@ -212,21 +226,24 @@ std::string EditorPanels::getParameterHint(const std::string& input) const {
     for (const auto* meta : allMeta) {
         auto tryMatch = [&](const std::string& name) {
             std::string lower = name;
-            std::transform(lower.begin(), lower.end(), lower.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::ranges::transform(lower, lower.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
             if (textLower.size() >= lower.size() + 1 && textLower[lower.size()] == ' ' &&
-                textLower.substr(0, lower.size()) == lower && lower.size() > matchLen) {
+                textLower.starts_with(lower) && lower.size() > matchLen) {
                 matched = meta;
                 matchLen = lower.size();
             }
         };
         tryMatch(meta->name);
-        for (const auto& alias : meta->aliases)
+        for (const auto& alias : meta->aliases) {
             tryMatch(alias);
+        }
     }
 
-    if (!matched || matched->params.empty())
+    if (!matched || matched->params.empty()) {
         return {};
+    }
 
     // Count how many tokens have been fully typed after the command name.
     std::string argsText = text.substr(matchLen + 1);
@@ -234,16 +251,18 @@ std::string EditorPanels::getParameterHint(const std::string& input) const {
     {
         std::istringstream iss(argsText);
         std::string tok;
-        while (iss >> tok)
+        while (iss >> tok) {
             tokens.push_back(tok);
+        }
     }
 
     bool endsWithSpace = !argsText.empty() && argsText.back() == ' ';
     size_t completedParams =
         endsWithSpace ? tokens.size() : (tokens.empty() ? 0 : tokens.size() - 1);
 
-    if (completedParams >= matched->params.size())
+    if (completedParams >= matched->params.size()) {
         return {};
+    }
 
     std::ostringstream os;
     for (size_t i = completedParams; i < matched->params.size(); ++i) {
@@ -330,17 +349,21 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
                 while (std::getline(stream, line)) {
                     // Trim whitespace
                     auto s = line.find_first_not_of(" \t\r\n");
-                    if (s == std::string::npos)
+                    if (s == std::string::npos) {
                         continue;
+                    }
                     line = line.substr(s);
                     auto e = line.find_last_not_of(" \t\r\n");
-                    if (e != std::string::npos)
+                    if (e != std::string::npos) {
                         line.resize(e + 1);
+                    }
                     // Skip blank lines and comments
-                    if (line.empty() || line[0] == '#')
+                    if (line.empty() || line[0] == '#') {
                         continue;
-                    if (line.size() >= 2 && line[0] == '/' && line[1] == '/')
+                    }
+                    if (line.size() >= 2 && line[0] == '/' && line[1] == '/') {
                         continue;
+                    }
                     cmds.push_back(line);
                 }
                 if (!cmds.empty()) {
@@ -377,7 +400,7 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
             if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
                 // Tab — accept the currently selected completion.
                 if (panels.m_showCompletions && panels.m_selectedCompletion >= 0 &&
-                    panels.m_selectedCompletion < static_cast<int>(panels.m_completions.size())) {
+                    std::cmp_less(panels.m_selectedCompletion, panels.m_completions.size())) {
                     const std::string& completion =
                         panels.m_completions[panels.m_selectedCompletion];
                     int start = panels.m_completionReplaceStart;
@@ -470,7 +493,7 @@ void EditorPanels::drawCommandConsole(CommandSystem& cmd, float dpiScale) {
                         ImGui::PopStyleColor();
                     }
                 }
-                if (static_cast<int>(m_completions.size()) > maxVisible) {
+                if (std::cmp_greater(m_completions.size(), maxVisible)) {
                     ImGui::TextDisabled("... and %d more",
                                         static_cast<int>(m_completions.size()) - maxVisible);
                 }
@@ -578,8 +601,9 @@ void EditorPanels::drawCanvasTabs(CanvasRegistry& canvases, CommandSystem& cmd, 
             auto ids = canvases.getIds();
             for (uint32_t id : ids) {
                 Canvas* canvas = canvases.getById(id);
-                if (!canvas)
+                if (!canvas) {
                     continue;
+                }
 
                 std::string label = "[" + std::to_string(canvas->id) + "] " + canvas->name;
                 if (canvas->document && canvas->document->isDirty()) {
@@ -637,7 +661,7 @@ void EditorPanels::drawCanvasViewport(Canvas& canvas, ToolPalette& palette, Comm
             // Get cursor position for mouse coordinate calculation
             ImVec2 cursorPos = ImGui::GetCursorScreenPos();
 
-            ImGui::Image((ImTextureID)canvas.imguiTextureId, ImVec2(texW, texH));
+            ImGui::Image(reinterpret_cast<ImTextureID>(canvas.imguiTextureId), ImVec2(texW, texH));
 
             // Mouse interaction
             if (ImGui::IsItemHovered()) {
@@ -703,8 +727,9 @@ void EditorPanels::drawAllCanvasViewports(CanvasRegistry& canvases, ToolPalette&
     auto ids = canvases.getIds();
     for (uint32_t id : ids) {
         Canvas* canvas = canvases.getById(id);
-        if (!canvas || !canvas->document)
+        if (!canvas || !canvas->document) {
             continue;
+        }
 
         bool isActive = (id == cmd.getActiveCanvasId());
         drawCanvasViewport(*canvas, palette, cmd, isActive, dpiScale);

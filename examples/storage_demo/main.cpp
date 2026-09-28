@@ -419,9 +419,9 @@ class StorageDemoScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Persistent Storage"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Persistent Storage"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "StorageManager API demonstration",
             "SQLite-backed persistent key/value store",
@@ -430,7 +430,7 @@ class StorageDemoScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Dark background with six ImGui panels",
             "Each panel has a key field, value editor, Save and Load buttons",
@@ -439,7 +439,7 @@ class StorageDemoScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "Mouse / keyboard – interact with panels",
             "Type a key, edit a value, press Save",
@@ -490,12 +490,13 @@ class StorageDemoGame
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     StorageDemoGame demo;
 
     float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
-    uint32_t width = static_cast<uint32_t>(870 * dpiScale);
-    uint32_t height = static_cast<uint32_t>(720 * dpiScale);
+    auto width = static_cast<uint32_t>(870 * dpiScale);
+    auto height = static_cast<uint32_t>(720 * dpiScale);
 
     return vde::examples::runExample(demo, "VDE Storage Demo", width, height, argc, argv);
 }

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <utility>
 
 namespace vde {
 namespace tools {
@@ -37,7 +38,7 @@ void ReplConsole::draw() {
                           ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
         for (const auto& msg : m_log) {
             // Color error lines red
-            if (msg.size() > 5 && msg.substr(0, 5) == "ERROR") {
+            if (msg.size() > 5 && msg.starts_with("ERROR")) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
                 ImGui::TextWrapped("%s", msg.c_str());
                 ImGui::PopStyleColor();
@@ -46,7 +47,7 @@ void ReplConsole::draw() {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.85f, 0.95f, 1.0f));
                 ImGui::TextWrapped("%s", msg.c_str());
                 ImGui::PopStyleColor();
-            } else if (msg.size() > 3 && msg.substr(0, 4) == "====") {
+            } else if (msg.size() > 3 && msg.starts_with("====")) {
                 // Header lines in yellow
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.9f, 0.5f, 1.0f));
                 ImGui::TextWrapped("%s", msg.c_str());
@@ -70,9 +71,10 @@ void ReplConsole::draw() {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
             std::string hint;
             for (size_t i = 0; i < m_completions.size() && i < 10; ++i) {
-                if (i > 0)
+                if (i > 0) {
                     hint += "  ";
-                if (static_cast<int>(i) == m_completionIndex) {
+                }
+                if (std::cmp_equal(i, m_completionIndex)) {
                     hint += "[" + m_completions[i] + "]";
                 } else {
                     hint += m_completions[i];
@@ -226,7 +228,7 @@ void ReplConsole::handleHistory(ImGuiInputTextCallbackData* data, bool up) {
     } else {
         if (m_historyPos != -1) {
             m_historyPos++;
-            if (m_historyPos >= static_cast<int>(m_history.size())) {
+            if (std::cmp_greater_equal(m_historyPos, m_history.size())) {
                 m_historyPos = -1;
             }
         }

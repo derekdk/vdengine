@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <numbers>
 #include <vector>
 
 #ifndef M_PI
@@ -29,7 +30,7 @@ namespace shooter {
 
 static bool writeWav(const std::string& path, const std::vector<float>& samples,
                      uint32_t sampleRate = 44100) {
-    uint32_t numSamples = static_cast<uint32_t>(samples.size());
+    auto numSamples = static_cast<uint32_t>(samples.size());
     uint16_t channels = 1;
     uint16_t bitsPerSample = 16;
     uint32_t byteRate = sampleRate * channels * bitsPerSample / 8;
@@ -38,8 +39,9 @@ static bool writeWav(const std::string& path, const std::vector<float>& samples,
     uint32_t fileSize = 36 + dataSize;
 
     std::ofstream f(path, std::ios::binary);
-    if (!f)
+    if (!f) {
         return false;
+    }
 
     // RIFF header
     f.write("RIFF", 4);
@@ -64,7 +66,7 @@ static bool writeWav(const std::string& path, const std::vector<float>& samples,
 
     for (float s : samples) {
         float clamped = std::max(-1.0f, std::min(1.0f, s));
-        int16_t pcm = static_cast<int16_t>(clamped * 32767.0f);
+        auto pcm = static_cast<int16_t>(clamped * 32767.0f);
         f.write(reinterpret_cast<const char*>(&pcm), 2);
     }
 
@@ -86,7 +88,7 @@ static std::vector<float> synthLaser(float duration, float startFreq, float endF
         float freq = startFreq + (endFreq - startFreq) * t;
         float env = (1.0f - t);
         phase += freq / RATE;
-        out[i] = std::sin(2.0f * static_cast<float>(M_PI) * phase) * env * volume;
+        out[i] = std::sin(2.0f * std::numbers::pi_v<float> * phase) * env * volume;
     }
     return out;
 }
@@ -114,7 +116,8 @@ static std::vector<float> synthClick(float duration, float freq, float volume = 
     for (uint32_t i = 0; i < count; ++i) {
         float t = static_cast<float>(i) / count;
         float env = (1.0f - t);
-        float wave = std::sin(2.0f * static_cast<float>(M_PI) * freq * t * duration) * env * volume;
+        float wave =
+            std::sin(2.0f * std::numbers::pi_v<float> * freq * t * duration) * env * volume;
         out[i] = wave;
     }
     return out;
@@ -127,12 +130,12 @@ static std::vector<float> synthClick(float duration, float freq, float volume = 
 static std::shared_ptr<vde::AudioClip> loadGenerated(const std::string& path,
                                                      const std::vector<float>& samples) {
     if (!writeWav(path, samples)) {
-        std::cerr << "Audio: failed to write " << path << std::endl;
+        std::cerr << "Audio: failed to write " << path << '\n';
         return nullptr;
     }
     auto clip = std::make_shared<vde::AudioClip>();
     if (!clip->loadFromFile(path)) {
-        std::cerr << "Audio: failed to load " << path << std::endl;
+        std::cerr << "Audio: failed to load " << path << '\n';
         return nullptr;
     }
     return clip;
@@ -142,8 +145,7 @@ SoundBank generateSoundBank(const std::string& tempDir) {
     std::error_code ec;
     std::filesystem::create_directories(tempDir, ec);
     if (ec) {
-        std::cerr << "Audio: failed to create temp dir " << tempDir << ": " << ec.message()
-                  << std::endl;
+        std::cerr << "Audio: failed to create temp dir " << tempDir << ": " << ec.message() << '\n';
         return {};
     }
     SoundBank bank;

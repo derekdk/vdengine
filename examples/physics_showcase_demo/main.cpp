@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <numbers>
 #include <random>
 #include <sstream>
 #include <string>
@@ -52,14 +53,18 @@ class ShowcaseInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
-        if (key == vde::KEY_R)
+        }
+        if (key == vde::KEY_R) {
             m_resetPressed = true;
-        if (key == vde::KEY_LEFT)
+        }
+        if (key == vde::KEY_LEFT) {
             m_prevPressed = true;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_nextPressed = true;
+        }
     }
 
     bool consumeSpace() { return consume(m_spacePressed); }
@@ -84,23 +89,21 @@ class ShowcaseInputHandler : public vde::examples::BaseExampleInputHandler {
 // Test descriptions (parallel arrays indexed by test number)
 // ============================================================================
 
-enum TestId {
-    TEST_GRAVITY_RAIN = 0,
-    TEST_BOUNCY_CHAMBER,
-    TEST_DOMINO_CHAIN,
-    TEST_WRECKING_BALL,
-    TEST_ZERO_GRAVITY,
-    TEST_GRAVITY_FLIP,
-    TEST_EXPLOSION_BURST,
-    TEST_COUNT
-};
+constexpr int TEST_GRAVITY_RAIN = 0;
+constexpr int TEST_BOUNCY_CHAMBER = 1;
+constexpr int TEST_DOMINO_CHAIN = 2;
+constexpr int TEST_WRECKING_BALL = 3;
+constexpr int TEST_ZERO_GRAVITY = 4;
+constexpr int TEST_GRAVITY_FLIP = 5;
+constexpr int TEST_EXPLOSION_BURST = 6;
+constexpr int TEST_COUNT = 7;
 
-static const char* TEST_NAMES[TEST_COUNT] = {
+static const char* const TEST_NAMES[TEST_COUNT] = {
     "Gravity Rain", "Bouncy Chamber", "Domino Chain",    "Wrecking Ball",
     "Zero Gravity", "Gravity Flip",   "Explosion Burst",
 };
 
-static const char* TEST_DESCRIPTIONS[TEST_COUNT] = {
+static const char* const TEST_DESCRIPTIONS[TEST_COUNT] = {
     "Boxes rain from above and pile up under gravity",
     "High-restitution circles bounce around the arena",
     "SPACE: tip the first domino and watch the chain reaction",
@@ -150,14 +153,18 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
 
         auto* input = dynamic_cast<ShowcaseInputHandler*>(getInputHandler());
         if (input) {
-            if (input->consumeNext())
+            if (input->consumeNext()) {
                 cycleTest(+1);
-            if (input->consumePrev())
+            }
+            if (input->consumePrev()) {
                 cycleTest(-1);
-            if (input->consumeReset())
+            }
+            if (input->consumeReset()) {
                 loadTest(m_currentTest);
-            if (input->consumeSpace())
+            }
+            if (input->consumeSpace()) {
                 handleSpaceAction();
+            }
         }
 
         // Per-test per-frame logic
@@ -177,9 +184,9 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Physics Showcase"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Physics Showcase"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "7 distinct physics tests",  "Gravity: falling bodies and stacking",
             "High-restitution bouncing", "Domino chain reaction",
@@ -188,7 +195,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Boxed arena with colored walls",
             "Test-specific physics behaviors",
@@ -196,7 +203,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "LEFT/RIGHT  - Previous/Next test", "SPACE       - Test-specific action",
             "R           - Reset current test", "ESC         - Exit",
@@ -231,8 +238,8 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     // First domino entity (test 3) - stored to apply initial impulse
     std::shared_ptr<vde::PhysicsSpriteEntity> m_firstDomino;
 
-    // RNG
-    std::mt19937 m_rng{42};
+    // Fixed seed keeps smoke/render-verify runs deterministic.
+    std::mt19937 m_rng{42};  // NOLINT(bugprone-random-generator-seed)
 
     // -----------------------------------------------------------------------
     // Helpers
@@ -329,8 +336,9 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         }
         m_firstDomino.reset();
         for (auto& e : m_testEntities) {
-            if (e)
+            if (e) {
                 removeEntity(e->getId());
+            }
         }
         m_testEntities.clear();
     }
@@ -351,8 +359,8 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         }
 
         std::cout << "\n=== Test " << (id + 1) << "/" << TEST_COUNT << ": " << TEST_NAMES[id]
-                  << " ===" << std::endl;
-        std::cout << "    " << TEST_DESCRIPTIONS[id] << std::endl;
+                  << " ===" << '\n';
+        std::cout << "    " << TEST_DESCRIPTIONS[id] << '\n';
 
         switch (id) {
         case TEST_GRAVITY_RAIN:
@@ -375,6 +383,8 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
             break;
         case TEST_EXPLOSION_BURST:
             setupExplosionBurst();
+            break;
+        default:
             break;
         }
     }
@@ -438,7 +448,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     // -----------------------------------------------------------------------
 
     void setupGravityRain() {
-        std::cout << "  Boxes will rain from above. SPACE to spawn extras." << std::endl;
+        std::cout << "  Boxes will rain from above. SPACE to spawn extras." << '\n';
         // Spawn a few starter boxes immediately
         for (int i = 0; i < 5; ++i) {
             spawnRainBox();
@@ -446,8 +456,9 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     }
 
     void spawnRainBox() {
-        if (m_rainCount >= RAIN_MAX)
+        if (m_rainCount >= RAIN_MAX) {
             return;
+        }
         float x = randRange(-ARENA_HALF_W + 0.5f, ARENA_HALF_W - 0.5f);
         float y = ARENA_CEIL_Y - 0.5f;
         float h = 0.3f + randRange(0.0f, 0.2f);
@@ -473,8 +484,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     // -----------------------------------------------------------------------
 
     void setupBouncyChamber() {
-        std::cout << "  High-restitution circles bouncing off walls. SPACE to add more."
-                  << std::endl;
+        std::cout << "  High-restitution circles bouncing off walls. SPACE to add more." << '\n';
         for (int i = 0; i < 12; ++i) {
             spawnBouncyBall();
         }
@@ -502,7 +512,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     static constexpr float DOMINO_SPACING = 0.55f;
 
     void setupDominoChain() {
-        std::cout << "  Row of standing boxes. SPACE to tip the first domino." << std::endl;
+        std::cout << "  Row of standing boxes. SPACE to tip the first domino." << '\n';
 
         float startX = -(DOMINO_COUNT - 1) * DOMINO_SPACING * 0.5f;
         float groundY = ARENA_FLOOR_Y + DOMINO_HALF_H;
@@ -512,15 +522,16 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
             float hue = static_cast<float>(i) / DOMINO_COUNT;
             vde::Color col = hsv(hue, 0.75f, 0.95f);
             auto e = addDynamicBox(x, groundY, DOMINO_HALF_W, DOMINO_HALF_H, col, 0.1f, 0.6f, 0.0f);
-            if (i == 0)
+            if (i == 0) {
                 m_firstDomino = e;
+            }
         }
     }
 
     void tipFirstDomino() {
         if (m_firstDomino) {
             m_firstDomino->applyImpulse({1.8f, 0.2f});
-            std::cout << "  [Domino] First domino tipped!" << std::endl;
+            std::cout << "  [Domino] First domino tipped!" << '\n';
         }
     }
 
@@ -529,7 +540,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     // -----------------------------------------------------------------------
 
     void setupWreckingBall() {
-        std::cout << "  A kinematic wrecking ball sweeps across demolishing towers." << std::endl;
+        std::cout << "  A kinematic wrecking ball sweeps across demolishing towers." << '\n';
 
         float groundY = ARENA_FLOOR_Y;
 
@@ -563,13 +574,15 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     }
 
     void updateWreckingBall(float dt) {
-        if (!m_wreckingBall)
+        if (!m_wreckingBall) {
             return;
+        }
         m_wreckingBallTime += dt;
 
         // Sweep speed: 6 seconds for full left-right-left cycle
         const float amplitude = ARENA_HALF_W - 1.2f;
-        const float omega = 2.0f * 3.14159f / 6.0f;  // one full oscillation every 6s
+        const float omega =
+            2.0f * std::numbers::pi_v<float> / 6.0f;  // one full oscillation every 6s
         float vx = amplitude * omega * std::cos(omega * m_wreckingBallTime);
         m_wreckingBall->setLinearVelocity({vx, 0.0f});
     }
@@ -579,10 +592,11 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     // -----------------------------------------------------------------------
 
     void setupZeroGravity() {
-        std::cout << "  No gravity. Circles drift and collide freely." << std::endl;
+        std::cout << "  No gravity. Circles drift and collide freely." << '\n';
 
-        if (hasPhysics())
+        if (hasPhysics()) {
             getPhysicsScene()->setGravity({0.0f, 0.0f});
+        }
 
         for (int i = 0; i < 16; ++i) {
             float x = randRange(-ARENA_HALF_W + 0.5f, ARENA_HALF_W - 0.5f);
@@ -602,7 +616,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     // -----------------------------------------------------------------------
 
     void setupGravityFlip() {
-        std::cout << "  Gravity reverses every " << FLIP_INTERVAL << " seconds." << std::endl;
+        std::cout << "  Gravity reverses every " << FLIP_INTERVAL << " seconds." << '\n';
 
         // Scatter boxes throughout the arena
         for (int i = 0; i < 20; ++i) {
@@ -621,10 +635,10 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
             m_flipTimer = 0.0f;
             m_gravityDown = !m_gravityDown;
             float gy = m_gravityDown ? -9.81f : 9.81f;
-            if (hasPhysics())
+            if (hasPhysics()) {
                 getPhysicsScene()->setGravity({0.0f, gy});
-            std::cout << "  [Gravity Flip] Gravity now " << (m_gravityDown ? "DOWN" : "UP")
-                      << std::endl;
+            }
+            std::cout << "  [Gravity Flip] Gravity now " << (m_gravityDown ? "DOWN" : "UP") << '\n';
         }
     }
 
@@ -636,7 +650,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     static constexpr int GRID_ROWS = 7;
 
     void setupExplosionBurst() {
-        std::cout << "  Boxes packed in a grid. SPACE to explode them outward." << std::endl;
+        std::cout << "  Boxes packed in a grid. SPACE to explode them outward." << '\n';
 
         const float spacing = 0.62f;
         const float startX = -(GRID_COLS - 1) * spacing * 0.5f;
@@ -654,7 +668,7 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
     }
 
     void triggerExplosion() {
-        std::cout << "  [Explosion] Triggering burst!" << std::endl;
+        std::cout << "  [Explosion] Triggering burst!" << '\n';
 
         // Find the center of the grid
         const float cx = 0.0f;
@@ -662,8 +676,9 @@ class PhysicsShowcaseScene : public vde::examples::BaseExampleScene {
         const float impulseStrength = 14.0f;
 
         for (auto& e : m_testEntities) {
-            if (!e)
+            if (!e) {
                 continue;
+            }
             auto state = e->getPhysicsState();
             glm::vec2 dir = state.position - glm::vec2(cx, cy);
             float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
@@ -692,6 +707,7 @@ class PhysicsShowcaseGame
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     PhysicsShowcaseGame game;
     return vde::examples::runExample(game, "VDE Physics Showcase", 1280, 720, argc, argv);

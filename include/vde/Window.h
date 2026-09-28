@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <utility>
 
 namespace vde {
 
@@ -56,7 +57,7 @@ class Window {
      * @brief Check if the window should close
      * @return true if close was requested
      */
-    virtual bool shouldClose() const;
+    [[nodiscard]] virtual bool shouldClose() const;
 
     /**
      * @brief Poll for window events
@@ -67,19 +68,19 @@ class Window {
      * @brief Get the underlying GLFW window handle
      * @return GLFWwindow pointer
      */
-    GLFWwindow* getHandle() const { return m_window; }
+    [[nodiscard]] GLFWwindow* getHandle() const { return m_window; }
 
     /**
      * @brief Get current window width
      * @return Width in pixels
      */
-    uint32_t getWidth() const { return m_width; }
+    [[nodiscard]] uint32_t getWidth() const { return m_width; }
 
     /**
      * @brief Get current window height
      * @return Height in pixels
      */
-    uint32_t getHeight() const { return m_height; }
+    [[nodiscard]] uint32_t getHeight() const { return m_height; }
 
     /**
      * @brief Get DPI scale factor for the window
@@ -89,7 +90,7 @@ class Window {
      * which is useful for scaling UI elements on high-DPI displays.
      * On Windows with 150% scaling, this returns 1.5.
      */
-    float getDPIScale() const;
+    [[nodiscard]] float getDPIScale() const;
 
     /**
      * @brief Set window resolution
@@ -119,13 +120,13 @@ class Window {
      * @brief Check if window is in fullscreen mode
      * @return true if fullscreen
      */
-    bool isFullscreen() const { return m_isFullscreen; }
+    [[nodiscard]] bool isFullscreen() const { return m_isFullscreen; }
 
     /**
      * @brief Set callback for window resize events
      * @param callback Function to call on resize
      */
-    void setResizeCallback(ResizeCallback callback) { m_resizeCallback = callback; }
+    void setResizeCallback(ResizeCallback callback) { m_resizeCallback = std::move(callback); }
 
     /**
      * @brief Get a predefined resolution by index

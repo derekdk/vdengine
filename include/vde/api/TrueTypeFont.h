@@ -79,46 +79,46 @@ class TrueTypeFont {
      * @brief Check whether the font was loaded successfully.
      * @return true if loadFromFile() succeeded
      */
-    bool isLoaded() const { return m_loaded; }
+    [[nodiscard]] bool isLoaded() const { return m_loaded; }
 
     /**
      * @brief Get the last load failure message.
      * @return Empty string when the last load succeeded or no load was attempted
      */
-    const std::string& getLastError() const { return m_lastError; }
+    [[nodiscard]] const std::string& getLastError() const { return m_lastError; }
 
     /**
      * @brief Get the glyph atlas texture.
      * @return Shared pointer to the atlas texture (nullptr if not loaded)
      */
-    std::shared_ptr<Texture> getAtlasTexture() const { return m_atlas; }
+    [[nodiscard]] std::shared_ptr<Texture> getAtlasTexture() const { return m_atlas; }
 
     /**
      * @brief Get the atlas width in pixels.
      */
-    int atlasWidth() const { return m_atlasWidth; }
+    [[nodiscard]] int atlasWidth() const { return m_atlasWidth; }
 
     /**
      * @brief Get the atlas height in pixels.
      */
-    int atlasHeight() const { return m_atlasHeight; }
+    [[nodiscard]] int atlasHeight() const { return m_atlasHeight; }
 
     /**
      * @brief Get glyph info for an ASCII character.
      * @param c Character to look up (ASCII 0x20–0x7E)
      * @return Pointer to GlyphInfo, or nullptr for unsupported characters
      */
-    const GlyphInfo* getGlyph(char c) const;
+    [[nodiscard]] const GlyphInfo* getGlyph(char c) const;
 
     /**
      * @brief Get the font size in pixels that was used to build the atlas.
      */
-    float fontSize() const { return m_fontSize; }
+    [[nodiscard]] float fontSize() const { return m_fontSize; }
 
     /**
      * @brief Get the line height (ascent - descent) in pixels.
      */
-    float lineHeight() const { return m_lineHeight; }
+    [[nodiscard]] float lineHeight() const { return m_lineHeight; }
 
     /**
      * @brief Convenience fallback font to use when TTF loading fails.

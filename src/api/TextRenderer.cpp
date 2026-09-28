@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <utility>
 #include <vector>
 
 namespace vde {
@@ -48,13 +49,14 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
 
     std::vector<uint8_t> pixels(static_cast<size_t>(texW) * texH * 4, 0);
 
-    for (int ci = 0; ci < static_cast<int>(text.size()); ++ci) {
+    for (int ci = 0; std::cmp_less(ci, text.size()); ++ci) {
         const int x0 = ci * cellW;
         for (int row = 0; row < glyphH; ++row) {
             const uint8_t bits = font.glyphRow(text[ci], row);
             for (int col = 0; col < glyphW; ++col) {
-                if (!((bits >> (7 - col)) & 1))
+                if (!((bits >> (7 - col)) & 1)) {
                     continue;
+                }
                 // Stamp a scale x scale block
                 for (int py = 0; py < scale; ++py) {
                     for (int px = 0; px < scale; ++px) {
@@ -106,10 +108,11 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
     int minY = 0;
     int maxY = 0;
 
-    for (size_t i = 0; i < text.size(); ++i) {
-        const GlyphInfo* g = font.getGlyph(text[i]);
-        if (!g)
+    for (char i : text) {
+        const GlyphInfo* g = font.getGlyph(i);
+        if (!g) {
             continue;
+        }
 
         int top = g->yOffset;
         int bottom = g->yOffset + g->height;
@@ -167,8 +170,8 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
     float cx = 0.0f;
     const int baselineOffset = -minY;
 
-    for (size_t i = 0; i < text.size(); ++i) {
-        const GlyphInfo* gl = font.getGlyph(text[i]);
+    for (char i : text) {
+        const GlyphInfo* gl = font.getGlyph(i);
         if (!gl) {
             cx += fontSize * 0.5f + spacing;  // Approximate advance for unknown chars
             continue;
@@ -187,13 +190,15 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
                 // Read alpha from atlas (RGBA, 4 bytes per pixel)
                 const int sx = srcX0 + gx;
                 const int sy = srcY0 + gy;
-                if (sx < 0 || sx >= atlasW || sy < 0 || sy >= atlasH)
+                if (sx < 0 || sx >= atlasW || sy < 0 || sy >= atlasH) {
                     continue;
+                }
                 const uint8_t atlasAlpha =
                     atlasPixels[(static_cast<size_t>(sy) * atlasW + sx) * 4 + 3];
-                if (atlasAlpha == 0)
+                if (atlasAlpha == 0) {
                     continue;
-                const uint8_t alpha =
+                }
+                const auto alpha =
                     static_cast<uint8_t>(static_cast<float>(atlasAlpha) * styleAlpha);
 
                 // Stamp a scale × scale block
@@ -201,8 +206,9 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx, const s
                     for (int px = 0; px < scale; ++px) {
                         const int tx = dstX0 + gx * scale + px;
                         const int ty = dstY0 + gy * scale + py;
-                        if (tx < 0 || tx >= texW || ty < 0 || ty >= texH)
+                        if (tx < 0 || tx >= texW || ty < 0 || ty >= texH) {
                             continue;
+                        }
                         const size_t idx = (static_cast<size_t>(ty) * texW + tx) * 4;
                         pixels[idx + 0] = r;
                         pixels[idx + 1] = g;
@@ -357,16 +363,18 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx,
                     uint8_t eG = emojiAtlasPixels[srcIdx + 1];
                     uint8_t eB = emojiAtlasPixels[srcIdx + 2];
                     uint8_t eA = emojiAtlasPixels[srcIdx + 3];
-                    if (eA == 0)
+                    if (eA == 0) {
                         continue;
+                    }
 
                     // Stamp scaled block
                     for (int py = 0; py < scale; ++py) {
                         for (int px = 0; px < scale; ++px) {
                             int tx = dstX0 + ex * scale + px;
                             int ty = dstY0 + ey * scale + py;
-                            if (tx < 0 || tx >= texW || ty < 0 || ty >= texH)
+                            if (tx < 0 || tx >= texW || ty < 0 || ty >= texH) {
                                 continue;
+                            }
                             size_t idx = (static_cast<size_t>(ty) * texW + tx) * 4;
                             pixels[idx + 0] = eR;
                             pixels[idx + 1] = eG;
@@ -398,21 +406,24 @@ std::shared_ptr<Texture> TextRenderer::createTexture(VulkanContext* ctx,
                 for (int gx = 0; gx < gl->width; ++gx) {
                     const int sx = srcX0 + gx;
                     const int sy = srcY0 + gy;
-                    if (sx < 0 || sx >= ttfAtlasW || sy < 0 || sy >= ttfAtlasH)
+                    if (sx < 0 || sx >= ttfAtlasW || sy < 0 || sy >= ttfAtlasH) {
                         continue;
+                    }
                     const uint8_t atlasAlpha =
                         ttfAtlasPixels[(static_cast<size_t>(sy) * ttfAtlasW + sx) * 4 + 3];
-                    if (atlasAlpha == 0)
+                    if (atlasAlpha == 0) {
                         continue;
-                    const uint8_t alpha =
+                    }
+                    const auto alpha =
                         static_cast<uint8_t>(static_cast<float>(atlasAlpha) * styleAlpha);
 
                     for (int py = 0; py < scale; ++py) {
                         for (int px = 0; px < scale; ++px) {
                             int tx = dstX0 + gx * scale + px;
                             int ty = dstY0 + gy * scale + py;
-                            if (tx < 0 || tx >= texW || ty < 0 || ty >= texH)
+                            if (tx < 0 || tx >= texW || ty < 0 || ty >= texH) {
                                 continue;
+                            }
                             size_t idx = (static_cast<size_t>(ty) * texW + tx) * 4;
                             pixels[idx + 0] = r;
                             pixels[idx + 1] = g;

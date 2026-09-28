@@ -13,6 +13,7 @@
 #include <vde/api/GameAPI.h>
 
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 
 #include "../ExampleBase.h"
@@ -25,21 +26,25 @@ class SheetInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_LEFT)
+        if (key == vde::KEY_LEFT) {
             m_left = true;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_right = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT)
+        if (key == vde::KEY_LEFT) {
             m_left = false;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_right = false;
+        }
     }
 
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
 
   private:
     bool m_left = false;
@@ -66,9 +71,11 @@ static void putPixel(std::vector<uint8_t>& buf, uint32_t stride, uint32_t x, uin
 /// Fill a rectangular region in an RGBA buffer.
 static void fillRect(std::vector<uint8_t>& buf, uint32_t stride, uint32_t x0, uint32_t y0,
                      uint32_t w, uint32_t h, RGBA c) {
-    for (uint32_t y = y0; y < y0 + h; ++y)
-        for (uint32_t x = x0; x < x0 + w; ++x)
+    for (uint32_t y = y0; y < y0 + h; ++y) {
+        for (uint32_t x = x0; x < x0 + w; ++x) {
             putPixel(buf, stride, x, y, c);
+        }
+    }
 }
 
 /// Draw a right-pointing arrow character (16×16) into a cell of an atlas.
@@ -85,9 +92,10 @@ static void drawCharacterRight(std::vector<uint8_t>& buf, uint32_t stride, uint3
     //   row 5-10: extend rightward progressively
     for (int r = 0; r < 6; ++r) {
         int extra = (r < 3) ? r + 1 : (5 - r) + 1;  // diamond taper
-        for (int e = 0; e < extra; ++e)
+        for (int e = 0; e < extra; ++e) {
             putPixel(buf, stride, ox + 11 + static_cast<uint32_t>(e),
                      oy + 5 + static_cast<uint32_t>(r), body);
+        }
     }
 
     // Eye: 2×2 on the left side of the body
@@ -126,13 +134,15 @@ static void drawHeart(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, u
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     };
     // clang-format on
-    for (int r = 0; r < 16; ++r)
+    for (int r = 0; r < 16; ++r) {
         for (int c = 0; c < 16; ++c) {
-            if (heart[r][c] == 1)
+            if (heart[r][c] == 1) {
                 putPixel(buf, stride, ox + c, oy + r, fg);
-            else if (heart[r][c] == 2)
+            } else if (heart[r][c] == 2) {
                 putPixel(buf, stride, ox + c, oy + r, highlight);
+            }
         }
+    }
 }
 
 /// Draw a lightning bolt icon (16×16) — inherently asymmetric.
@@ -159,13 +169,15 @@ static void drawLightning(std::vector<uint8_t>& buf, uint32_t stride, uint32_t o
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     };
     // clang-format on
-    for (int r = 0; r < 16; ++r)
+    for (int r = 0; r < 16; ++r) {
         for (int c = 0; c < 16; ++c) {
-            if (bolt[r][c] == 1)
+            if (bolt[r][c] == 1) {
                 putPixel(buf, stride, ox + c, oy + r, fg);
-            else if (bolt[r][c] == 2)
+            } else if (bolt[r][c] == 2) {
                 putPixel(buf, stride, ox + c, oy + r, glow);
+            }
         }
+    }
 }
 
 /// Draw a shield icon (16×16) — asymmetric emblem on front.
@@ -193,16 +205,18 @@ static void drawShield(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, 
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     };
     // clang-format on
-    for (int r = 0; r < 16; ++r)
+    for (int r = 0; r < 16; ++r) {
         for (int c = 0; c < 16; ++c) {
             uint8_t v = shield[r][c];
-            if (v == 1)
+            if (v == 1) {
                 putPixel(buf, stride, ox + c, oy + r, outline);
-            else if (v == 2)
+            } else if (v == 2) {
                 putPixel(buf, stride, ox + c, oy + r, fill);
-            else if (v == 3)
+            } else if (v == 3) {
                 putPixel(buf, stride, ox + c, oy + r, emblem);
+            }
         }
+    }
 }
 
 /// Draw a 1px outline around a rectangular region in an RGBA buffer.
@@ -230,9 +244,10 @@ static void drawBigCreature(std::vector<uint8_t>& buf, uint32_t stride, uint32_t
     // Nose: triangle extending right from body
     for (int r = 0; r < 10; ++r) {
         int extra = (r < 5) ? r + 1 : (9 - r) + 1;
-        for (int e = 0; e < extra; ++e)
+        for (int e = 0; e < extra; ++e) {
             putPixel(buf, stride, ox + 22 + static_cast<uint32_t>(e),
                      oy + 11 + static_cast<uint32_t>(r), body);
+        }
     }
     // Eye: 4×3 on left side
     fillRect(buf, stride, ox + 5, oy + 9, 4, 3, eye);
@@ -264,8 +279,9 @@ static void drawSword(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, u
     fillRect(buf, stride, ox + 29, oy + 5, 2, 2, blade);
     putPixel(buf, stride, ox + 31, oy + 5, blade);
     // Highlight along blade top edge
-    for (uint32_t x = 9; x < 29; ++x)
+    for (uint32_t x = 9; x < 29; ++x) {
         putPixel(buf, stride, ox + x, oy + 4, highlight);
+    }
 }
 
 /// Draw a 48×16 banner — pole on left, cloth body with wavy right edge and emblem.
@@ -291,9 +307,10 @@ static void drawBanner(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, 
     // Diamond emblem in center
     for (int r = -3; r <= 3; ++r) {
         int hw = 3 - std::abs(r);
-        for (int c = -hw; c <= hw; ++c)
+        for (int c = -hw; c <= hw; ++c) {
             putPixel(buf, stride, ox + 22 + static_cast<uint32_t>(c),
                      oy + 8 + static_cast<uint32_t>(r), emblem);
+        }
     }
 }
 
@@ -313,13 +330,15 @@ static void drawCoin(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, ui
         {0,0,1,1,1,1,0,0},
     };
     // clang-format on
-    for (int r = 0; r < 8; ++r)
+    for (int r = 0; r < 8; ++r) {
         for (int c = 0; c < 8; ++c) {
-            if (coin[r][c] == 1)
+            if (coin[r][c] == 1) {
                 putPixel(buf, stride, ox + c, oy + r, outer);
-            else if (coin[r][c] == 2)
+            } else if (coin[r][c] == 2) {
                 putPixel(buf, stride, ox + c, oy + r, inner);
+            }
         }
+    }
 }
 
 /// Draw an 8×8 gem — diamond shape with facets.
@@ -338,13 +357,15 @@ static void drawGem(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, uin
         {0,0,0,1,1,0,0,0},
     };
     // clang-format on
-    for (int r = 0; r < 8; ++r)
+    for (int r = 0; r < 8; ++r) {
         for (int c = 0; c < 8; ++c) {
-            if (gem[r][c] == 1)
+            if (gem[r][c] == 1) {
                 putPixel(buf, stride, ox + c, oy + r, outer);
-            else if (gem[r][c] == 2)
+            } else if (gem[r][c] == 2) {
                 putPixel(buf, stride, ox + c, oy + r, inner);
+            }
         }
+    }
 }
 
 /// Draw a 16×32 tall tower — pointed roof, stone body, windows, door.
@@ -353,10 +374,12 @@ static void drawTower(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, u
     fillRect(buf, stride, ox, oy, 16, 32, bg);
     // Pointed roof
     for (int r = 0; r < 8; ++r) {
-        for (int c = 7 - r; c <= 8 + r && c < 16; ++c)
-            if (c >= 0)
+        for (int c = 7 - r; c <= 8 + r && c < 16; ++c) {
+            if (c >= 0) {
                 putPixel(buf, stride, ox + static_cast<uint32_t>(c), oy + static_cast<uint32_t>(r),
                          roof);
+            }
+        }
     }
     // Stone body
     fillRect(buf, stride, ox + 2, oy + 8, 12, 22, stone);
@@ -378,11 +401,12 @@ static std::shared_ptr<vde::Texture> createCheckerTexture(vde::VulkanContext* co
                                                           uint32_t cellSize, RGBA light,
                                                           RGBA dark) {
     std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4);
-    for (uint32_t y = 0; y < height; ++y)
+    for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
             bool useLight = ((x / cellSize) + (y / cellSize)) % 2 == 0;
             putPixel(pixels, width, x, y, useLight ? light : dark);
         }
+    }
 
     auto texture = std::make_shared<vde::Texture>();
     texture->loadFromData(pixels.data(), width, height);
@@ -429,7 +453,7 @@ class SheetScene : public vde::examples::BaseExampleScene {
         constexpr RGBA kBg{0, 0, 0, 0};  // Transparent — checkerboard shows through
         constexpr RGBA kEye{255, 255, 255, 255};
 
-        std::vector<uint8_t> atlasPixels(kTexW * kTexH * 4, 0);
+        std::vector<uint8_t> atlasPixels(static_cast<size_t>(kTexW) * kTexH * 4, 0);
         fillRect(atlasPixels, kTexW, 0, 0, kTexW, kTexH, kBg);
 
         // --- Draw each sprite into the atlas ---
@@ -640,8 +664,9 @@ class SheetScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<SheetInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         float speed = 3.0f;
         auto pos = m_character->getPosition();
@@ -665,9 +690,9 @@ class SheetScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "SpriteSheet & Flip"; }
+    [[nodiscard]] std::string getExampleName() const override { return "SpriteSheet & Flip"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Single atlas with mixed-size sprites: 32x32, 16x16, 32x12, 48x16, 16x32, 8x8",
             "Transparent atlas background — checkerboard proves alpha mask is correct",
@@ -678,7 +703,7 @@ class SheetScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Left: full atlas image with transparent backgrounds on dark scene",
             "Right: sprites on gray checkerboard — opaque shapes, transparent bg",
@@ -689,7 +714,7 @@ class SheetScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "LEFT/RIGHT - Move character (auto-flips sprite)",
         };
@@ -707,6 +732,7 @@ class SheetScene : public vde::examples::BaseExampleScene {
 
 class SpritesheetDemo : public vde::examples::BaseExampleGame<SheetInputHandler, SheetScene> {};
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     SpritesheetDemo demo;
     return vde::examples::runExample(demo, "VDE SpriteSheet Demo", 1024, 768, argc, argv);

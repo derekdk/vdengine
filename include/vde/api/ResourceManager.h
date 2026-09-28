@@ -12,6 +12,7 @@
 #include <string>
 #include <typeindex>
 #include <unordered_map>
+#include <utility>
 
 #include "Resource.h"
 
@@ -121,7 +122,7 @@ class ResourceManager {
      * @param path Path to the resource
      * @return true if the resource is in the cache and still alive
      */
-    bool has(const std::string& path) const;
+    [[nodiscard]] bool has(const std::string& path) const;
 
     /**
      * @brief Remove a resource from the cache.
@@ -148,7 +149,7 @@ class ResourceManager {
      *
      * @return Number of alive cached resources
      */
-    size_t getCachedCount() const;
+    [[nodiscard]] size_t getCachedCount() const;
 
     /**
      * @brief Estimate memory usage of cached resources (CPU-side only).
@@ -158,7 +159,7 @@ class ResourceManager {
      *
      * @return Estimated bytes used by cached resources
      */
-    size_t getMemoryUsage() const;
+    [[nodiscard]] size_t getMemoryUsage() const;
 
     /**
      * @brief Remove expired weak pointers from the cache.
@@ -172,16 +173,16 @@ class ResourceManager {
     struct CacheEntry {
         std::weak_ptr<Resource> resource;
         std::shared_ptr<Resource> strongRef;  ///< Non-null for persistent entries
-        std::type_index type;
-        size_t lastAccessTime;
-        size_t estimatedSize;  // Approximate memory usage in bytes
+        std::type_index type = typeid(void);
+        size_t lastAccessTime = 0;
+        size_t estimatedSize = 0;  // Approximate memory usage in bytes
 
         // Default constructor for std::unordered_map
-        CacheEntry() : type(typeid(void)), lastAccessTime(0), estimatedSize(0) {}
+        CacheEntry() = default;
 
         CacheEntry(std::weak_ptr<Resource> res, std::type_index t, size_t time = 0, size_t size = 0,
                    std::shared_ptr<Resource> strong = nullptr)
-            : resource(res), strongRef(std::move(strong)), type(t), lastAccessTime(time),
+            : resource(std::move(res)), strongRef(std::move(strong)), type(t), lastAccessTime(time),
               estimatedSize(size) {}
     };
 
@@ -199,7 +200,7 @@ class ResourceManager {
 
 template <typename T>
 ResourcePtr<T> ResourceManager::load(const std::string& path) {
-    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+    static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     // Check if already cached
     auto existing = get<T>(path);
@@ -225,7 +226,7 @@ ResourcePtr<T> ResourceManager::load(const std::string& path) {
 
 template <typename T>
 ResourcePtr<T> ResourceManager::add(const std::string& key, ResourcePtr<T> resource) {
-    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+    static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     if (!resource) {
         return nullptr;
@@ -239,7 +240,7 @@ ResourcePtr<T> ResourceManager::add(const std::string& key, ResourcePtr<T> resou
 
 template <typename T>
 ResourcePtr<T> ResourceManager::addPersistent(const std::string& key, ResourcePtr<T> resource) {
-    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+    static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     if (!resource) {
         return nullptr;
@@ -253,7 +254,7 @@ ResourcePtr<T> ResourceManager::addPersistent(const std::string& key, ResourcePt
 
 template <typename T>
 ResourcePtr<T> ResourceManager::get(const std::string& path) {
-    static_assert(std::is_base_of<Resource, T>::value, "T must derive from Resource");
+    static_assert(std::is_base_of_v<Resource, T>, "T must derive from Resource");
 
     auto it = m_cache.find(path);
     if (it != m_cache.end()) {
@@ -268,10 +269,9 @@ ResourcePtr<T> ResourceManager::get(const std::string& path) {
             // Update access time
             it->second.lastAccessTime = m_accessCounter++;
             return std::static_pointer_cast<T>(resource);
-        } else {
-            // Resource expired, remove from cache
-            m_cache.erase(it);
         }
+        // Resource expired, remove from cache
+        m_cache.erase(it);
     }
 
     return nullptr;

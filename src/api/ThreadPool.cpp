@@ -16,7 +16,7 @@ ThreadPool::ThreadPool(size_t threadCount) : m_threadCount(threadCount) {
 
 ThreadPool::~ThreadPool() {
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::scoped_lock lock(m_mutex);
         m_shutdown = true;
     }
     m_condition.notify_all();
@@ -41,7 +41,7 @@ std::future<void> ThreadPool::submit(std::function<void()> func) {
     auto future = task.get_future();
 
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::scoped_lock lock(m_mutex);
         m_taskQueue.push(std::move(task));
     }
     m_condition.notify_one();
@@ -93,7 +93,7 @@ void ThreadPool::workerLoop() {
         task();
 
         {
-            std::lock_guard<std::mutex> lock(m_mutex);
+            std::scoped_lock lock(m_mutex);
             --m_busyCount;
         }
         m_doneCondition.notify_all();

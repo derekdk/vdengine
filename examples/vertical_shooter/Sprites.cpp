@@ -18,8 +18,9 @@ namespace shooter {
 
 static void setPixel(std::vector<uint8_t>& px, int size, int x, int y, uint8_t r, uint8_t g,
                      uint8_t b, uint8_t a = 255) {
-    if (x < 0 || x >= size || y < 0 || y >= size)
+    if (x < 0 || x >= size || y < 0 || y >= size) {
         return;
+    }
     int idx = (y * size + x) * 4;
     px[idx + 0] = r;
     px[idx + 1] = g;
@@ -38,8 +39,9 @@ static void fillCircle(std::vector<uint8_t>& px, int size, float cx, float cy, f
         for (int x = minX; x <= maxX; ++x) {
             float dx = x + 0.5f - cx;
             float dy = y + 0.5f - cy;
-            if (dx * dx + dy * dy <= r2)
+            if (dx * dx + dy * dy <= r2) {
                 setPixel(px, size, x, y, r, g, b, a);
+            }
         }
     }
 }
@@ -77,9 +79,9 @@ std::shared_ptr<vde::Texture> createPlayerTexture(vde::VulkanContext* ctx) {
             if (pointInTriangle(fx, fy, 16.0f, 2.0f, 4.0f, 28.0f, 28.0f, 28.0f)) {
                 // Gradient: brighter toward nose
                 float t = 1.0f - (fy - 2.0f) / 26.0f;
-                uint8_t r = static_cast<uint8_t>(30 + 60 * t);
-                uint8_t g = static_cast<uint8_t>(180 + 75 * t);
-                uint8_t b = static_cast<uint8_t>(220 + 35 * t);
+                auto r = static_cast<uint8_t>(30 + 60 * t);
+                auto g = static_cast<uint8_t>(180 + 75 * t);
+                auto b = static_cast<uint8_t>(220 + 35 * t);
                 setPixel(px, S, x, y, r, g, b);
             }
         }
@@ -106,9 +108,11 @@ std::shared_ptr<vde::Texture> createBulletTexture(vde::VulkanContext* ctx, Weapo
     switch (weapon) {
     case WeaponType::Basic:
         // Elongated white bolt
-        for (int y = 1; y < 7; ++y)
-            for (int x = 3; x < 5; ++x)
+        for (int y = 1; y < 7; ++y) {
+            for (int x = 3; x < 5; ++x) {
                 setPixel(px, S, x, y, 220, 240, 255);
+            }
+        }
         // Bright core
         setPixel(px, S, 3, 2, 255, 255, 255);
         setPixel(px, S, 4, 2, 255, 255, 255);
@@ -122,8 +126,9 @@ std::shared_ptr<vde::Texture> createBulletTexture(vde::VulkanContext* ctx, Weapo
 
     case WeaponType::Rapid:
         // Thin bright line
-        for (int y = 0; y < 8; ++y)
+        for (int y = 0; y < 8; ++y) {
             setPixel(px, S, 4, y, 255, 200, 100);
+        }
         setPixel(px, S, 3, 3, 255, 220, 150);
         setPixel(px, S, 5, 3, 255, 220, 150);
         break;
@@ -146,9 +151,11 @@ std::shared_ptr<vde::Texture> createEnemyTexture(vde::VulkanContext* ctx, EnemyT
     case EnemyType::Turret:
         // Circular body with a barrel pointing down
         fillCircle(px, S, 12.0f, 10.0f, 8.0f, 200, 50, 50);
-        for (int y = 10; y < 22; ++y)
-            for (int x = 10; x < 14; ++x)
+        for (int y = 10; y < 22; ++y) {
+            for (int x = 10; x < 14; ++x) {
                 setPixel(px, S, x, y, 160, 40, 40);
+            }
+        }
         fillCircle(px, S, 12.0f, 10.0f, 3.0f, 255, 100, 100);
         break;
 
@@ -159,7 +166,7 @@ std::shared_ptr<vde::Texture> createEnemyTexture(vde::VulkanContext* ctx, EnemyT
                 float dx = std::abs(x + 0.5f - 12.0f);
                 float dy = std::abs(y + 0.5f - 12.0f);
                 if (dx / 10.0f + dy / 10.0f <= 1.0f) {
-                    uint8_t g = static_cast<uint8_t>(150 + 80 * (1.0f - dy / 10.0f));
+                    auto g = static_cast<uint8_t>(150 + 80 * (1.0f - dy / 10.0f));
                     setPixel(px, S, x, y, 30, g, 60);
                 }
             }
@@ -184,7 +191,7 @@ std::shared_ptr<vde::Texture> createEnemyTexture(vde::VulkanContext* ctx, EnemyT
         // Large rectangle with armor plating
         for (int y = 3; y < 21; ++y) {
             for (int x = 2; x < 22; ++x) {
-                uint8_t shade = static_cast<uint8_t>(160 + ((x + y) % 4) * 15);
+                auto shade = static_cast<uint8_t>(160 + ((x + y) % 4) * 15);
                 setPixel(px, S, x, y, shade, static_cast<uint8_t>(shade / 2), 30);
             }
         }
@@ -246,9 +253,9 @@ std::shared_ptr<vde::Texture> createExplosionTexture(vde::VulkanContext* ctx) {
             if (d < 7.5f) {
                 float t = 1.0f - d / 7.5f;
                 uint8_t r = static_cast<uint8_t>(255 * std::min(1.0f, t * 2.0f));
-                uint8_t g = static_cast<uint8_t>(200 * t * t);
-                uint8_t b = static_cast<uint8_t>(50 * t * t * t);
-                uint8_t a = static_cast<uint8_t>(255 * t);
+                auto g = static_cast<uint8_t>(200 * t * t);
+                auto b = static_cast<uint8_t>(50 * t * t * t);
+                auto a = static_cast<uint8_t>(255 * t);
                 setPixel(px, S, x, y, r, g, b, a);
             }
         }

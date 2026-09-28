@@ -80,7 +80,7 @@ bool GitUtils::hasUncommittedChanges(const std::filesystem::path& pathInRepo) co
                 return true;
             }
             // dirtyDir is under normalizedStr (queried path contains dirty content).
-            if (dirtyDir.size() > normalizedStr.size() && dirtyDir.find(normalizedStr) == 0 &&
+            if (dirtyDir.size() > normalizedStr.size() && dirtyDir.starts_with(normalizedStr) &&
                 (dirtyDir[normalizedStr.size()] == '/' || dirtyDir[normalizedStr.size()] == '\\')) {
                 return true;
             }
@@ -138,7 +138,7 @@ void GitUtils::refreshCommitTimeCache(const std::vector<std::filesystem::path>& 
         }
 
         try {
-            std::time_t commitEpoch = static_cast<std::time_t>(std::stoll(trimmed));
+            auto commitEpoch = static_cast<std::time_t>(std::stoll(trimmed));
             m_commitTimeCache[key] = std::chrono::system_clock::from_time_t(commitEpoch);
         } catch (...) {
             m_commitTimeCache[key] = std::nullopt;
@@ -180,7 +180,7 @@ GitUtils::getLastCommitTime(const std::filesystem::path& pathInRepo) const {
     }
 
     try {
-        std::time_t commitEpoch = static_cast<std::time_t>(std::stoll(trimmed));
+        auto commitEpoch = static_cast<std::time_t>(std::stoll(trimmed));
         return std::chrono::system_clock::from_time_t(commitEpoch);
     } catch (...) {
         return std::nullopt;
@@ -199,6 +199,8 @@ GitUtils::CommandResult GitUtils::runGitCommand(const std::string& args) const {
     command << " 2>/dev/null";
 #endif
 
+    // Arguments are fixed git subcommands plus quoted repo-relative paths from the local scan.
+    // NOLINTNEXTLINE(bugprone-command-processor)
     FILE* pipe = popen(command.str().c_str(), "r");
     if (!pipe) {
         result.exitCode = -1;

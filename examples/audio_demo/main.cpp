@@ -45,32 +45,45 @@ class AudioInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_M)
+        if (key == KEY_M) {
             m_musicToggle = true;
-        if (key == KEY_SPACE)
+        }
+        if (key == KEY_SPACE) {
             m_playSFX = true;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_playSpatial = true;
-        if (key == KEY_U)
+        }
+        if (key == KEY_U) {
             m_muteToggle = true;
-        if (key == KEY_1)
+        }
+        if (key == KEY_1) {
             m_masterVol = 0.5f;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_masterVol = 0.75f;
-        if (key == KEY_3)
+        }
+        if (key == KEY_3) {
             m_masterVol = 1.0f;
-        if (key == KEY_4)
+        }
+        if (key == KEY_4) {
             m_musicVol = 0.5f;
-        if (key == KEY_5)
+        }
+        if (key == KEY_5) {
             m_musicVol = 0.75f;
-        if (key == KEY_6)
+        }
+        if (key == KEY_6) {
             m_musicVol = 1.0f;
-        if (key == KEY_7)
+        }
+        if (key == KEY_7) {
             m_sfxVol = 0.5f;
-        if (key == KEY_8)
+        }
+        if (key == KEY_8) {
             m_sfxVol = 0.75f;
-        if (key == KEY_9)
+        }
+        if (key == KEY_9) {
             m_sfxVol = 1.0f;
+        }
     }
 
     bool isMusicTogglePressed() {
@@ -262,20 +275,20 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Audio System Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Audio System Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Background music playback", "Sound effects", "3D spatial audio",
                 "Volume controls (master, music, SFX)", "Mute/unmute functionality"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Blue rotating cube that pulses with music",
                 "Yellow glowing sphere moving in a circle (spatial sound source)",
                 "Dark blue/purple background"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"M     - Play/stop background music",
                 "SPACE - Play sound effect",
                 "S     - Play spatial sound (follows yellow sphere)",
@@ -326,9 +339,8 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
                 if (m_musicClip->loadFromFile(path)) {
                     std::cout << "Loaded music: " << path << "\n";
                     break;
-                } else {
-                    m_musicClip.reset();
                 }
+                m_musicClip.reset();
             }
         }
 
@@ -343,9 +355,8 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
                 if (m_sfxClip->loadFromFile(path)) {
                     std::cout << "Loaded SFX: " << path << "\n";
                     break;
-                } else {
-                    m_sfxClip.reset();
                 }
+                m_sfxClip.reset();
             }
         }
 
@@ -412,9 +423,9 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
 
     void printAudioStatus() {
         auto& audio = AudioManager::getInstance();
-        std::cout << "Volume - Master: " << int(audio.getMasterVolume() * 100) << "%"
-                  << " | Music: " << int(audio.getMusicVolume() * 100) << "%"
-                  << " | SFX: " << int(audio.getSFXVolume() * 100) << "%\n";
+        std::cout << "Volume - Master: " << static_cast<int>(audio.getMasterVolume() * 100) << "%"
+                  << " | Music: " << static_cast<int>(audio.getMusicVolume() * 100) << "%"
+                  << " | SFX: " << static_cast<int>(audio.getSFXVolume() * 100) << "%\n";
     }
 
     MeshEntity* m_audioCube = nullptr;
@@ -439,6 +450,7 @@ using AudioGame = vde::examples::BaseExampleGame<AudioInputHandler, AudioDemoSce
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     AudioGame game;
 

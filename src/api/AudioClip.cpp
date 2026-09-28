@@ -15,14 +15,14 @@ AudioClip::~AudioClip() {
 bool AudioClip::loadFromFile(const std::string& path) {
     m_path = path;
 
-    std::cout << "AudioClip: Loading file: " << path << std::endl;
+    std::cout << "AudioClip: Loading file: " << path << '\n';
 
     // Decode the audio file using miniaudio
     ma_decoder decoder;
     ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 0, 0);
 
     if (ma_decoder_init_file(path.c_str(), &config, &decoder) != MA_SUCCESS) {
-        std::cout << "AudioClip: Failed to initialize decoder for: " << path << std::endl;
+        std::cout << "AudioClip: Failed to initialize decoder for: " << path << '\n';
         return false;
     }
 
@@ -43,7 +43,7 @@ bool AudioClip::loadFromFile(const std::string& path) {
 
     std::cout << "AudioClip: Format - " << m_format.channels << " channels, " << m_format.sampleRate
               << " Hz, " << frameCount << " frames, "
-              << "streaming: " << (m_streaming ? "yes" : "no") << std::endl;
+              << "streaming: " << (m_streaming ? "yes" : "no") << '\n';
 
     // If streaming, we don't load data into memory - miniaudio will stream from file
     if (!m_streaming) {

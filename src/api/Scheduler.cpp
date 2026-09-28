@@ -61,7 +61,7 @@ void Scheduler::removeTask(TaskId id) {
     // Remove this task from all other tasks' dependency lists
     for (auto& [otherId, entry] : m_tasks) {
         auto& deps = entry.descriptor.dependsOn;
-        deps.erase(std::remove(deps.begin(), deps.end(), id), deps.end());
+        std::erase(deps, id);
     }
 
     m_tasks.erase(it);
@@ -126,8 +126,8 @@ void Scheduler::execute() {
         auto cmp = [this](TaskId a, TaskId b) {
             auto itA = m_tasks.find(a);
             auto itB = m_tasks.find(b);
-            uint8_t phaseA = static_cast<uint8_t>(itA->second.descriptor.phase);
-            uint8_t phaseB = static_cast<uint8_t>(itB->second.descriptor.phase);
+            auto phaseA = static_cast<uint8_t>(itA->second.descriptor.phase);
+            auto phaseB = static_cast<uint8_t>(itB->second.descriptor.phase);
             if (phaseA != phaseB) {
                 return phaseA > phaseB;
             }
@@ -297,8 +297,8 @@ std::vector<TaskId> Scheduler::topologicalSort() const {
     auto cmp = [this](TaskId a, TaskId b) {
         auto itA = m_tasks.find(a);
         auto itB = m_tasks.find(b);
-        uint8_t phaseA = static_cast<uint8_t>(itA->second.descriptor.phase);
-        uint8_t phaseB = static_cast<uint8_t>(itB->second.descriptor.phase);
+        auto phaseA = static_cast<uint8_t>(itA->second.descriptor.phase);
+        auto phaseB = static_cast<uint8_t>(itB->second.descriptor.phase);
         if (phaseA != phaseB) {
             return phaseA > phaseB;  // min-heap: smaller phase = higher priority
         }

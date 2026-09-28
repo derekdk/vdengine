@@ -431,11 +431,13 @@ const BitmapFont& BitmapFont::large() {
 }
 
 uint8_t BitmapFont::glyphRow(char c, int row) const {
-    if (row < 0 || row >= m_glyphHeight)
+    if (row < 0 || row >= m_glyphHeight) {
         return 0;
+    }
     int index = static_cast<unsigned char>(c) - static_cast<unsigned char>(m_firstChar);
-    if (index < 0 || index >= m_glyphCount)
+    if (index < 0 || index >= m_glyphCount) {
         return 0;
+    }
     return m_data[index * m_glyphHeight + row];
 }
 

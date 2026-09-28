@@ -64,18 +64,24 @@ class QuadViewportInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_SPACE)
+        if (key == KEY_SPACE) {
             m_spacePressed = true;
-        if (key == KEY_1)
+        }
+        if (key == KEY_1) {
             m_toggleQuadrant = 1;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_toggleQuadrant = 2;
-        if (key == KEY_3)
+        }
+        if (key == KEY_3) {
             m_toggleQuadrant = 3;
-        if (key == KEY_4)
+        }
+        if (key == KEY_4) {
             m_toggleQuadrant = 4;
-        if (key == KEY_R)
+        }
+        if (key == KEY_R) {
             m_resetPressed = true;
+        }
     }
 
     bool consumeSpace() {
@@ -456,8 +462,9 @@ class OceanScene : public Scene {
             float bob = 0.08f * std::sin(m_time * 2.5f);
             float drift = 1.5f * std::sin(m_time * 0.15f);
             hull->setPosition(drift, bob, 0.3f);
-            if (mast)
+            if (mast) {
                 mast->setPosition(drift, 0.4f + bob, 0.35f);
+            }
             if (sail) {
                 float flutter = 0.03f * std::sin(m_time * 4.0f);
                 sail->setPosition(0.2f + drift + flutter, 0.5f + bob, 0.32f);
@@ -528,8 +535,9 @@ class QuadViewportDemo : public vde::Game {
 
     void onRender() override {
 #ifdef VDE_EXAMPLE_USE_IMGUI
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -565,17 +573,19 @@ class QuadViewportDemo : public vde::Game {
         }
         cleanupImGui();
 #endif
-        if (m_failed)
+        if (m_failed) {
             m_exitCode = 1;
+        }
     }
 
     void onUpdate(float /*deltaTime*/) override {
-        if (!m_input)
+        if (!m_input) {
             return;
+        }
 
         // Fail / quit keys
         if (m_input->isFailPressed()) {
-            std::cerr << "\nTEST FAILED: User reported issue\n" << std::endl;
+            std::cerr << "\nTEST FAILED: User reported issue\n" << '\n';
             m_failed = true;
             quit();
             return;
@@ -598,15 +608,17 @@ class QuadViewportDemo : public vde::Game {
 
         // Reset
         if (m_input->consumeReset()) {
-            for (auto& a : m_quadActive)
+            for (auto& a : m_quadActive) {
                 a = true;
+            }
             rebuildGroup();
             std::cout << "Reset — all quadrants active\n";
         }
 
         // Status
-        if (m_input->consumeSpace())
+        if (m_input->consumeSpace()) {
             printStatus();
+        }
 
         // Auto-terminate (only when --timeout is active)
         m_elapsed += getDeltaTime();
@@ -616,7 +628,7 @@ class QuadViewportDemo : public vde::Game {
         }
     }
 
-    int getExitCode() const override { return m_exitCode; }
+    [[nodiscard]] int getExitCode() const override { return m_exitCode; }
 
     void setAutoTerminateSeconds(float s) { m_autoTerminateSeconds = s; }
 
@@ -648,8 +660,9 @@ class QuadViewportDemo : public vde::Game {
     void initImGui() {
         auto* ctx = getVulkanContext();
         auto* win = getWindow();
-        if (!ctx || !win)
+        if (!ctx || !win) {
             return;
+        }
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -658,8 +671,9 @@ class QuadViewportDemo : public vde::Game {
         ImGui::StyleColorsDark();
 
         float dpiScale = getDPIScale();
-        if (dpiScale > 0.0f)
+        if (dpiScale > 0.0f) {
             io.FontGlobalScale = dpiScale;
+        }
 
         ImGui_ImplGlfw_InitForVulkan(win->getHandle(), true);
         m_imguiPool = createImGuiDescriptorPool(ctx->getDevice());
@@ -683,8 +697,9 @@ class QuadViewportDemo : public vde::Game {
     }
 
     void cleanupImGui() {
-        if (!m_imguiInitialized)
+        if (!m_imguiInitialized) {
             return;
+        }
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -710,8 +725,9 @@ class QuadViewportDemo : public vde::Game {
 
         std::vector<SceneGroupEntry> entries;
         for (int i = 0; i < 4; ++i) {
-            if (m_quadActive[i])
+            if (m_quadActive[i]) {
                 entries.push_back({names[i], vps[i]});
+            }
         }
 
         if (entries.empty()) {
@@ -769,6 +785,7 @@ class QuadViewportDemo : public vde::Game {
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     QuadViewportDemo demo;
 
@@ -789,13 +806,13 @@ int main(int argc, char** argv) {
 
     try {
         if (!demo.initialize(settings)) {
-            std::cerr << "Failed to initialize demo!" << std::endl;
+            std::cerr << "Failed to initialize demo!" << '\n';
             return 1;
         }
         demo.run();
         return demo.getExitCode();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << '\n';
         return 1;
     }
 }

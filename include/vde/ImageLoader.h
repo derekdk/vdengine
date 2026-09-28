@@ -24,13 +24,15 @@ struct ImageData {
      * @brief Calculate the size of the image data in bytes.
      * @return Size in bytes (width * height * channels)
      */
-    size_t size() const { return static_cast<size_t>(width) * height * channels; }
+    [[nodiscard]] size_t size() const { return static_cast<size_t>(width) * height * channels; }
 
     /**
      * @brief Check if the image data is valid.
      * @return true if pixels is not null and dimensions are positive
      */
-    bool isValid() const { return pixels != nullptr && width > 0 && height > 0 && channels > 0; }
+    [[nodiscard]] bool isValid() const {
+        return pixels != nullptr && width > 0 && height > 0 && channels > 0;
+    }
 };
 
 /**

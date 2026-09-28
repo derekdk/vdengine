@@ -24,7 +24,7 @@ constexpr float kBackdropHeight = kViewHeight * 2.0f;
 constexpr float kBackdropHalfHeight = kBackdropHeight * 0.5f;
 constexpr float kBackdropPivotY = -kViewHeight * 0.5f;
 
-enum class LayerId : size_t {
+enum class LayerId : uint8_t {
     Sky = 0,
     Clouds,
     Mountains,
@@ -56,7 +56,7 @@ struct LayerState {
     float offset = 0.0f;
 };
 
-enum class PieceMode {
+enum class PieceMode : uint8_t {
     Wrapped,
     RotatingBackdrop,
 };
@@ -84,15 +84,15 @@ size_t toIndex(LayerId layer) {
 // Blend between two colors for pulses, highlights, and day/night tinting.
 vde::Color blendColor(const vde::Color& a, const vde::Color& b, float t) {
     const float clamped = std::clamp(t, 0.0f, 1.0f);
-    return vde::Color(a.r + (b.r - a.r) * clamped, a.g + (b.g - a.g) * clamped,
-                      a.b + (b.b - a.b) * clamped, a.a + (b.a - a.a) * clamped);
+    return {a.r + (b.r - a.r) * clamped, a.g + (b.g - a.g) * clamped, a.b + (b.b - a.b) * clamped,
+            a.a + (b.a - a.a) * clamped};
 }
 
 // Scale a color's brightness and opacity while keeping channels in range.
 vde::Color scaleColor(const vde::Color& color, float rgbScale, float alphaScale = 1.0f) {
-    return vde::Color(
-        std::clamp(color.r * rgbScale, 0.0f, 1.0f), std::clamp(color.g * rgbScale, 0.0f, 1.0f),
-        std::clamp(color.b * rgbScale, 0.0f, 1.0f), std::clamp(color.a * alphaScale, 0.0f, 1.0f));
+    return {std::clamp(color.r * rgbScale, 0.0f, 1.0f), std::clamp(color.g * rgbScale, 0.0f, 1.0f),
+            std::clamp(color.b * rgbScale, 0.0f, 1.0f),
+            std::clamp(color.a * alphaScale, 0.0f, 1.0f)};
 }
 
 // Define the default speed and repeat width for each parallax layer.
@@ -275,10 +275,10 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
 
   protected:
     // Name shown in the shared example header.
-    std::string getExampleName() const override { return "Parallax Scrolling"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Parallax Scrolling"; }
 
     // Summarize the main techniques this example demonstrates.
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"An oversized rotating day/night backdrop behind the scrolling world",
                 "The sun, moon, and stars are locked to the rotating sky composition",
                 "Independent per-layer scroll tuning in the debug menu",
@@ -287,7 +287,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
     // Describe the important visual beats a user should verify on screen.
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"A large background slowly rotating from blue daytime sky into starry night",
                 "A warm sun on the daytime half and a moon with stars on the nighttime half",
                 "A separate cloud layer drifting in front of the changing backdrop",
@@ -298,7 +298,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
     // Document the controls added by this demo beyond the base example shortcuts.
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SPACE / P           - Pause or resume the scrolling",
                 "UP / ] / =          - Speed up the playback",
                 "DOWN / [ / -        - Slow down the playback",
@@ -357,7 +357,7 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
     // Decide how many repeated segment copies a layer needs to avoid visible gaps.
-    int getSegmentRadius(LayerId layer) const {
+    [[nodiscard]] int getSegmentRadius(LayerId layer) const {
         const float segmentWidth = m_layers[toIndex(layer)].segmentWidth;
 
         // A single copy is enough when the segment is at least as wide as the
@@ -372,13 +372,13 @@ class ParallaxScene : public vde::examples::BaseExampleScene {
     }
 
     // Convert playback time into the current rotation angle for the sky backdrop.
-    float getBackdropRotationDegrees() const {
+    [[nodiscard]] float getBackdropRotationDegrees() const {
         return (m_playbackTime * m_layers[toIndex(LayerId::Sky)].speed * 360.0f) /
                kBackdropCycleDuration;
     }
 
     // Map the backdrop rotation into a daylight factor used to tint the whole scene.
-    float getBackdropDaylight() const {
+    [[nodiscard]] float getBackdropDaylight() const {
         const float rotationRadians =
             getBackdropRotationDegrees() * (std::numbers::pi_v<float> / 180.0f);
         return 0.5f + 0.5f * std::cos(rotationRadians);
@@ -889,6 +889,7 @@ class ParallaxDemoGame
 }  // namespace
 
 // Enter the shared example runner, which creates the window and starts the game loop.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ParallaxDemoGame game;
     return vde::examples::runExample(game, "VDE Parallax Demo", 1280, 720, argc, argv);

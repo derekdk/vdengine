@@ -127,7 +127,7 @@ class TimedEvents {
     /**
      * @brief Returns true while event timers are paused.
      */
-    bool isPaused() const { return m_paused; }
+    [[nodiscard]] bool isPaused() const { return m_paused; }
 
     /**
      * @brief Set a speed multiplier that scales how fast all timers advance.
@@ -139,7 +139,7 @@ class TimedEvents {
     /**
      * @brief Get the current speed multiplier.
      */
-    float getSpeed() const { return m_speed; }
+    [[nodiscard]] float getSpeed() const { return m_speed; }
 
     /**
      * @brief Advance all timers by deltaTime seconds.

@@ -78,8 +78,8 @@ MapLayout generateMap(uint32_t seed) {
     }
 
     // Sort enemies by Y so we can spawn them in order as the camera scrolls
-    std::sort(layout.enemies.begin(), layout.enemies.end(),
-              [](const EnemySpawn& a, const EnemySpawn& b) { return a.y < b.y; });
+    std::ranges::sort(layout.enemies,
+                      [](const EnemySpawn& a, const EnemySpawn& b) { return a.y < b.y; });
 
     return layout;
 }

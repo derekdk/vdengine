@@ -5,6 +5,7 @@
  * @brief Named input-action mapping with keyboard and gamepad support.
  */
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,7 +17,7 @@ namespace vde {
 /**
  * @brief Physical binding kind for an input action.
  */
-enum class InputActionBindingType {
+enum class InputActionBindingType : uint8_t {
     Key,
     GamepadButton,
     GamepadAxisPositive,
@@ -63,19 +64,19 @@ class InputActionMap {
   public:
     void addAction(const std::string& name);
     void removeAction(const std::string& name);
-    bool hasAction(const std::string& name) const;
+    [[nodiscard]] bool hasAction(const std::string& name) const;
     void clear();
 
     void clearBindings(const std::string& name);
     void setBindings(const std::string& name, const std::vector<InputActionBinding>& bindings);
     void addBinding(const std::string& name, const InputActionBinding& binding);
 
-    const std::vector<InputActionBinding>& getBindings(const std::string& name) const;
-    std::vector<InputAction> getActions() const;
+    [[nodiscard]] const std::vector<InputActionBinding>& getBindings(const std::string& name) const;
+    [[nodiscard]] std::vector<InputAction> getActions() const;
 
-    bool isPressed(const std::string& name) const;
-    bool isHeld(const std::string& name) const;
-    bool isReleased(const std::string& name) const;
+    [[nodiscard]] bool isPressed(const std::string& name) const;
+    [[nodiscard]] bool isHeld(const std::string& name) const;
+    [[nodiscard]] bool isReleased(const std::string& name) const;
 
     bool consumePressed(const std::string& name);
     bool consumeReleased(const std::string& name);
@@ -89,7 +90,7 @@ class InputActionMap {
     void handleGamepadButtonRelease(int gamepadId, int button);
     void handleGamepadAxis(int gamepadId, int axis, float value);
 
-    bool saveBindings(const std::string& storageKey) const;
+    [[nodiscard]] bool saveBindings(const std::string& storageKey) const;
     bool loadBindings(const std::string& storageKey);
 
   private:

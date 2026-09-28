@@ -43,12 +43,14 @@ class MockScriptEnv : public ScriptEnvironment {
     InputHandler* resolveInputHandler() override { return &handler; }
     bool captureScreenshot(const std::string&) override { return true; }
     Scene* getScene(const std::string&) override { return scene; }
-    const SceneGroup& getActiveSceneGroup() const override { return activeGroup; }
-    std::pair<uint32_t, uint32_t> getSwapChainExtent() const override { return {1280, 720}; }
+    [[nodiscard]] const SceneGroup& getActiveSceneGroup() const override { return activeGroup; }
+    [[nodiscard]] std::pair<uint32_t, uint32_t> getSwapChainExtent() const override {
+        return {1280, 720};
+    }
     void setExitCode(int code) override { exitCode = code; }
     void quit() override { quitCalled = true; }
-    size_t getScenesCreated() const override { return scenesCreated; }
-    size_t getScenesRemoved() const override { return scenesRemoved; }
+    [[nodiscard]] size_t getScenesCreated() const override { return scenesCreated; }
+    [[nodiscard]] size_t getScenesRemoved() const override { return scenesRemoved; }
 
     int exitCode = 0;
     bool quitCalled = false;

@@ -53,8 +53,9 @@ TEST_F(BitmapFontTest, LetterAHasNonZeroRows) {
     const auto& font = BitmapFont::small();
     bool anyNonZero = false;
     for (int row = 0; row < font.glyphHeight(); ++row) {
-        if (font.glyphRow('A', row) != 0)
+        if (font.glyphRow('A', row) != 0) {
             anyNonZero = true;
+        }
     }
     EXPECT_TRUE(anyNonZero);
 }
@@ -78,8 +79,9 @@ TEST_F(BitmapFontTest, DigitsHaveNonZeroRows) {
     for (char c = '0'; c <= '9'; ++c) {
         bool anyNonZero = false;
         for (int row = 0; row < font.glyphHeight(); ++row) {
-            if (font.glyphRow(c, row) != 0)
+            if (font.glyphRow(c, row) != 0) {
                 anyNonZero = true;
+            }
         }
         EXPECT_TRUE(anyNonZero) << "digit '" << c << "' should have non-zero rows";
     }
@@ -89,8 +91,9 @@ TEST_F(BitmapFontTest, LargeFontLetterAHasNonZeroRows) {
     const auto& font = BitmapFont::large();
     bool anyNonZero = false;
     for (int row = 0; row < font.glyphHeight(); ++row) {
-        if (font.glyphRow('A', row) != 0)
+        if (font.glyphRow('A', row) != 0) {
             anyNonZero = true;
+        }
     }
     EXPECT_TRUE(anyNonZero);
 }

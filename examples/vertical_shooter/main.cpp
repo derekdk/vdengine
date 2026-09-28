@@ -20,6 +20,7 @@ class VerticalShooterGame
     VerticalShooterGame() = default;
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     VerticalShooterGame game;
     return vde::examples::runExample(game, "VDE Vertical Shooter", 600, 840, argc, argv);

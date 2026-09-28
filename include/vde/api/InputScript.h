@@ -13,6 +13,7 @@
  * Priority order: API call > CLI arg (--input-script) > env var (VDE_INPUT_SCRIPT)
  */
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -29,7 +30,7 @@ class Game;  // forward
 /**
  * @brief Types of commands that can appear in an input script.
  */
-enum class InputCommandType {
+enum class InputCommandType : uint8_t {
     WaitStartup,  ///< wait startup — wait for first frame render
     WaitMs,       ///< wait 500 — wait N milliseconds
     Press,        ///< press A — keydown + keyup (with optional modifiers)
@@ -71,13 +72,13 @@ constexpr int INPUT_SCRIPT_MOD_ALT = 0x0004;
 /**
  * @brief Comparison operators for assert commands.
  */
-enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge };
+enum class CompareOp : uint8_t { Eq, Ne, Lt, Le, Gt, Ge };
 
 /**
  * @brief A single parsed command from an input script.
  */
 struct ScriptCommand {
-    InputCommandType type;
+    InputCommandType type = InputCommandType::WaitStartup;
     int keyCode = 0;           ///< For Press/KeyDown/KeyUp
     int modifiers = 0;         ///< Bitmask: MOD_CTRL | MOD_SHIFT | MOD_ALT
     double waitMs = 0.0;       ///< For WaitMs
@@ -231,7 +232,7 @@ const char* compareOpToString(CompareOp op);
  * @param argv Argument values
  * @return The script path, or empty string if not found
  */
-std::string getInputScriptArg(int argc, char** argv);
+std::string getInputScriptArg(int argc, const char* const* argv);
 
 /**
  * @brief Configure game with input script from CLI args.

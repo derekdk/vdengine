@@ -66,7 +66,7 @@ struct ShaderCacheEntry {
      * @brief Check if entry has valid data
      * @return true if entry is usable
      */
-    bool isValid() const { return sourceHash != 0 && !spvFileName.empty(); }
+    [[nodiscard]] bool isValid() const { return sourceHash != 0 && !spvFileName.empty(); }
 };
 
 /**

@@ -16,9 +16,11 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -57,9 +59,11 @@ static void putPixel(std::vector<uint8_t>& buf, uint32_t stride, uint32_t x, uin
 
 static void fillRect(std::vector<uint8_t>& buf, uint32_t stride, uint32_t x0, uint32_t y0,
                      uint32_t w, uint32_t h, RGBA c) {
-    for (uint32_t y = y0; y < y0 + h; ++y)
-        for (uint32_t x = x0; x < x0 + w; ++x)
+    for (uint32_t y = y0; y < y0 + h; ++y) {
+        for (uint32_t x = x0; x < x0 + w; ++x) {
             putPixel(buf, stride, x, y, c);
+        }
+    }
 }
 
 /// Draw a 16x16 character facing right — asymmetric body with eye, nose, feet, tail.
@@ -71,9 +75,10 @@ static void drawCharacter(std::vector<uint8_t>& buf, uint32_t stride, uint32_t o
     // Pointed nose
     for (int r = 0; r < 6; ++r) {
         int extra = (r < 3) ? r + 1 : (5 - r) + 1;
-        for (int e = 0; e < extra; ++e)
+        for (int e = 0; e < extra; ++e) {
             putPixel(buf, stride, ox + 11 + static_cast<uint32_t>(e),
                      oy + 5 + static_cast<uint32_t>(r), body);
+        }
     }
     // Eye
     fillRect(buf, stride, ox + 3, oy + 5, 2, 2, eye);
@@ -108,11 +113,14 @@ static void drawStar(std::vector<uint8_t>& buf, uint32_t stride, uint32_t ox, ui
         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     };
     // clang-format on
-    for (int r = 0; r < 16; ++r)
-        for (int c = 0; c < 16; ++c)
-            if (star[r][c] == 1)
+    for (int r = 0; r < 16; ++r) {
+        for (int c = 0; c < 16; ++c) {
+            if (star[r][c] == 1) {
                 putPixel(buf, stride, ox + static_cast<uint32_t>(c), oy + static_cast<uint32_t>(r),
                          fg);
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -123,14 +131,18 @@ class MultiSheetInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == KEY_1)
+        if (key == KEY_1) {
             m_sceneSwitch = 1;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_sceneSwitch = 2;
-        if (key == KEY_LEFT)
+        }
+        if (key == KEY_LEFT) {
             m_leftPressed = true;
-        if (key == KEY_RIGHT)
+        }
+        if (key == KEY_RIGHT) {
             m_rightPressed = true;
+        }
     }
 
     int consumeSceneSwitch() {
@@ -247,11 +259,11 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
         }
 
         // Create name labels above characters
-        for (size_t i = 0; i < roster.size(); ++i) {
+        for (const auto& i : roster) {
             auto label = addEntity<TextEntity>();
-            label->setText(roster[i].name);
+            label->setText(i.name);
             label->setFont(BitmapFont::small());
-            label->setStyle({.color = roster[i].tint, .pixelScale = 1});
+            label->setStyle({.color = i.tint, .pixelScale = 1});
             label->setAnchor(0.5f, 0.0f);
             label->setWorldHeight(0.30f);
             m_nameLabels.push_back(label);
@@ -320,9 +332,9 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "SpriteSheet Multi-Scene"; }
+    [[nodiscard]] std::string getExampleName() const override { return "SpriteSheet Multi-Scene"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Shared SpriteSheet resource across two scenes via ResourceManager",
             "CPU-controlled characters bouncing around a playfield",
@@ -331,7 +343,7 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Dark playfield with bordered arena",
             "Five colored characters moving and bouncing off walls",
@@ -339,7 +351,7 @@ class PlayfieldScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "1     - Switch to playfield scene (this scene)",
             "2     - Switch to character detail scene",
@@ -472,8 +484,9 @@ class DetailScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(dt);
 
         auto* input = dynamic_cast<MultiSheetInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         const auto& roster = getCharacterRoster();
 
@@ -499,9 +512,9 @@ class DetailScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Character Details"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Character Details"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Same SpriteSheet shared from Scene 1 via ResourceManager",
             "Large character sprite display with stats panel",
@@ -510,7 +523,7 @@ class DetailScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Left: large character sprite on dark panel",
             "Right: stat labels (HP, ATK, DEF, SPD) with values",
@@ -519,7 +532,7 @@ class DetailScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "LEFT  - Previous character",
             "RIGHT - Next character",
@@ -531,8 +544,9 @@ class DetailScene : public vde::examples::BaseExampleScene {
   private:
     void showCharacter(int index) {
         const auto& roster = getCharacterRoster();
-        if (index < 0 || index >= static_cast<int>(roster.size()))
+        if (index < 0 || std::cmp_greater_equal(index, roster.size())) {
             return;
+        }
 
         m_currentIndex = index;
         const auto& info = roster[static_cast<size_t>(index)];
@@ -591,24 +605,29 @@ class SpriteSheetMultiSceneDemo : public vde::Game {
 
     void onUpdate(float /*deltaTime*/) override {
         auto* input = m_inputHandler.get();
-        if (!input)
+        if (!input) {
             return;
+        }
 
         int sw = input->consumeSceneSwitch();
-        if (sw == 1)
+        if (sw == 1) {
             setActiveScene("main");
-        if (sw == 2)
+        }
+        if (sw == 2) {
             setActiveScene("detail");
+        }
     }
 
     void onShutdown() override {
-        if ((m_playfield && m_playfield->didTestFail()) || (m_detail && m_detail->didTestFail()))
+        if ((m_playfield && m_playfield->didTestFail()) || (m_detail && m_detail->didTestFail())) {
             m_exitCode = 1;
+        }
     }
 
-    int getExitCode() const override {
-        if (m_exitCode != 0)
+    [[nodiscard]] int getExitCode() const override {
+        if (m_exitCode != 0) {
             return m_exitCode;
+        }
         return Game::getExitCode();
     }
 
@@ -623,7 +642,7 @@ class SpriteSheetMultiSceneDemo : public vde::Game {
         constexpr RGBA kBg{0, 0, 0, 0};
         constexpr RGBA kEye{255, 255, 255, 255};
 
-        std::vector<uint8_t> pixels(kTexW * kTexH * 4, 0);
+        std::vector<uint8_t> pixels(static_cast<size_t>(kTexW) * kTexH * 4, 0);
         fillRect(pixels, kTexW, 0, 0, kTexW, kTexH, kBg);
 
         // Character colors matching the roster
@@ -677,6 +696,7 @@ class SpriteSheetMultiSceneDemo : public vde::Game {
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     SpriteSheetMultiSceneDemo demo;
     return vde::examples::runExample(demo, "VDE SpriteSheet Multi-Scene Demo", 1024, 768, argc,
