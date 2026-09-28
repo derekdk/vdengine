@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <typeindex>
 #include <unordered_map>
@@ -452,6 +453,17 @@ class Scene {
      * @brief Get the scene's diagnostics counters.
      */
     const SceneDiagnostics& getDiagnostics() const { return m_diagnostics; }
+
+    /**
+     * @brief Game-defined numeric state for scripted-input assertions.
+     *
+     * Resolves `assert scene "name" state.<key> <op> <value>` script commands.
+     * @param key Lowercase key following the `state.` prefix.
+     * @return The value, or std::nullopt when the scene does not expose @p key.
+     */
+    virtual std::optional<double> getScriptStateValue(const std::string& /*key*/) const {
+        return std::nullopt;
+    }
 
     // Lighting
 

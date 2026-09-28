@@ -455,17 +455,6 @@ That order matters most in Phases 1 through 4, where structure and runtime behav
 
 ## Summary
 
-The correct first move was to stop extending `examples/tilemap_demo/main.cpp` directly and instead create a new multi-file game target that treats the tilemap demo as imported gameplay logic. That foundation now exists, and the unified input layer plus Development mode toggle are already in place.
+The correct first move was to stop extending `examples/tilemap_demo/main.cpp` directly and instead create a new multi-file game target that treats the tilemap demo as imported gameplay logic.
 
-The first two phases are now complete:
-
-1. port the demo into a real game structure,
-2. unify input and add Start-button mode toggling.
-
-The remaining milestone sequence is:
-
-1. add Development submodes with default no-collision `MoveMode`,
-2. add `SelectTileMode` with a white outline on the nearest tile,
-3. add next/previous/copy/paste tile actions plus visible joypad-action and clipboard state,
-4. add persistence,
-5. verify, document, and polish the workflow.
+All six phases of this plan are complete, along with the undo/redo and palette-driven brush follow-up slices. Multi-layer authoring was delivered separately by [TILEMAP_LEVEL_BUILDER_MULTI_LAYER_PLAN.md](TILEMAP_LEVEL_BUILDER_MULTI_LAYER_PLAN.md). Remaining work is tracked in [TILEMAP_LEVEL_BUILDER_REMAINING_WORK_PLAN.md](TILEMAP_LEVEL_BUILDER_REMAINING_WORK_PLAN.md).

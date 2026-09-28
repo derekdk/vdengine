@@ -1016,6 +1016,25 @@ TEST(InputScriptParseLine, AssertSceneUnknownFieldIsError) {
     EXPECT_NE(error.find("unknown assert field"), std::string::npos);
 }
 
+TEST(InputScriptParseLine, ParsesAssertSceneStateField) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert scene \"main\" state.Layer_Count >= 3", 1, cmd, error))
+        << error;
+    EXPECT_EQ(cmd.type, InputCommandType::AssertScene);
+    EXPECT_EQ(cmd.assertSceneName, "main");
+    EXPECT_EQ(cmd.assertField, "state.layer_count");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Ge);
+    EXPECT_DOUBLE_EQ(cmd.assertValue, 3.0);
+}
+
+TEST(InputScriptParseLine, AssertSceneEmptyStateKeyIsError) {
+    ScriptCommand cmd;
+    std::string error;
+    EXPECT_FALSE(parseScriptLine("assert scene \"main\" state. == 0", 1, cmd, error));
+    EXPECT_NE(error.find("unknown assert field"), std::string::npos);
+}
+
 TEST(InputScriptParseLine, AssertSceneMissingFieldIsError) {
     ScriptCommand cmd;
     std::string error;

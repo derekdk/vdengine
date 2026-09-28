@@ -8,8 +8,17 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <system_error>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 
 namespace {
 
@@ -24,7 +33,7 @@ constexpr const char* kOverlayFormatId = "vde.level_builder.ground_overlay";
 constexpr int kOverlayFormatVersionLegacy = 1;
 constexpr int kOverlayFormatVersion = 2;
 constexpr size_t kMaxOverlayFileBytes = 64u * 1024u * 1024u;
-constexpr size_t kMaxOverlayLayers = 64;
+constexpr size_t kMaxOverlayLayers = levelbuilder::TileMapSession::kMaxLayerCount;
 constexpr size_t kMaxOverlayTotalTiles = 4u * 1024u * 1024u;
 
 std::string readTextFile(const std::filesystem::path& path) {
@@ -55,14 +64,40 @@ void writeTextFile(const std::filesystem::path& path, const std::string& text) {
         }
     }
 
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
-    if (!output) {
-        throw std::runtime_error("Failed to open overlay for writing: " + path.string());
+    std::filesystem::path tempPath = path;
+    tempPath += ".tmp";
+    {
+        std::ofstream output(tempPath, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            throw std::runtime_error("Failed to open overlay for writing: " + tempPath.string());
+        }
+
+        output << text;
+        output.flush();
+        if (!output.good()) {
+            output.close();
+            std::error_code removeError;
+            std::filesystem::remove(tempPath, removeError);
+            throw std::runtime_error("Failed to write overlay file: " + tempPath.string());
+        }
     }
 
-    output << text;
-    if (!output.good()) {
-        throw std::runtime_error("Failed to write overlay file: " + path.string());
+    std::error_code replaceError;
+#ifdef _WIN32
+    const std::wstring tempPathWide = tempPath.wstring();
+    const std::wstring pathWide = path.wstring();
+    if (!::MoveFileExW(tempPathWide.c_str(), pathWide.c_str(),
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        replaceError = std::error_code(static_cast<int>(::GetLastError()), std::system_category());
+    }
+#else
+    // Rename replaces the previous overlay only after the new contents are fully written.
+    std::filesystem::rename(tempPath, path, replaceError);
+#endif
+    if (replaceError) {
+        std::error_code removeError;
+        std::filesystem::remove(tempPath, removeError);
+        throw std::runtime_error("Failed to replace overlay file: " + path.string());
     }
 }
 
@@ -294,12 +329,18 @@ std::vector<LayerAndTiles> parseOverlayLayers(const OrderedJson& root, const vde
 
         std::vector<LayerAndTiles> result;
         result.reserve(layersJson.size());
+        std::unordered_set<std::string> layerIds;
         for (size_t i = 0; i < layersJson.size(); ++i) {
             if (!layersJson.at(i).is_object()) {
                 throw std::invalid_argument("LevelBuilder overlay layer " + std::to_string(i) +
                                             " must be an object");
             }
             result.push_back(parseLayerJsonV2(layersJson.at(i), tileMap, i));
+            if (!layerIds.insert(result.back().first.id).second) {
+                throw std::invalid_argument("LevelBuilder overlay layer " + std::to_string(i) +
+                                            " reuses duplicate layer id '" +
+                                            result.back().first.id + "'");
+            }
         }
         return result;
     }
@@ -349,6 +390,10 @@ void applyLayerStackToTileMap(vde::TileMap& tileMap,
     const std::vector<int> emptyTiles(static_cast<size_t>(tileMap.getColumnCount()) *
                                           static_cast<size_t>(tileMap.getRowCount()),
                                       vde::TileMap::kEmptyTile);
+    // The session map backs collision extraction, so it needs a real layer per authorable layer.
+    while (static_cast<size_t>(tileMap.getLayerCount()) < layers.size()) {
+        (void)tileMap.addLayer();
+    }
     for (int layerIndex = 0; layerIndex < tileMap.getLayerCount(); ++layerIndex) {
         if (static_cast<size_t>(layerIndex) < tileData.size()) {
             const auto& layer = layers.at(static_cast<size_t>(layerIndex));
@@ -388,11 +433,27 @@ glm::vec2 findSpawnPoint(const std::vector<vde::ImportedTileObject>& objects) {
     return kDefaultSpawnPoint;
 }
 
+std::optional<size_t> parseLayerIdSuffix(const std::string& id) {
+    constexpr std::string_view kPrefix = "layer_";
+    if (id.size() <= kPrefix.size() || !id.starts_with(kPrefix)) {
+        return std::nullopt;
+    }
+
+    size_t value = 0;
+    for (const char digit : std::string_view(id).substr(kPrefix.size())) {
+        if (digit < '0' || digit > '9' || value > kMaxOverlayLayers * 1024u) {
+            return std::nullopt;
+        }
+        value = (value * 10u) + static_cast<size_t>(digit - '0');
+    }
+    return value;
+}
+
 }  // namespace
 
 namespace levelbuilder {
 
-void TileMapSession::load(vde::VulkanContext* context) {
+bool TileMapSession::load(vde::VulkanContext* context) {
     if (context == nullptr) {
         throw std::invalid_argument("LevelBuilder requires a valid VulkanContext to load maps");
     }
@@ -409,7 +470,7 @@ void TileMapSession::load(vde::VulkanContext* context) {
 
     adoptTileMap(imported.tileMap, findSpawnPoint(imported.objects), imported.objects.size(),
                  kImportedMapPath);
-    (void)reloadEditableLayerOverlay();
+    return reloadEditableLayerOverlay();
 }
 
 void TileMapSession::adoptTileMap(const std::shared_ptr<const vde::TileMap>& tileMap,
@@ -441,12 +502,13 @@ void TileMapSession::adoptTileMap(const std::shared_ptr<const vde::TileMap>& til
         m_savedLayerTiles.push_back(layer.tiles);
     }
     m_activeLayerIndex = 0;
+    resetNextLayerId();
     clearEditHistory();
     m_hasUnsavedChanges = false;
     if (m_overlayPath.empty()) {
         m_overlayPath = kOverlayFileName;
     }
-    m_lastPersistenceStatus = "Using imported ground layer.";
+    m_lastPersistenceStatus = "Using imported map layers.";
 
     m_runtimeLayerSyncRevisions.assign(m_layers.size(), 0);
     rebuildCollisionCache();
@@ -732,15 +794,37 @@ size_t TileMapSession::addLayer(const std::string& name) {
     const size_t newIndex = m_layers.size();
     const size_t tileCount = static_cast<size_t>(m_tileMap->getColumnCount()) *
                              static_cast<size_t>(m_tileMap->getRowCount());
+    if (newIndex >= kMaxOverlayLayers) {
+        m_lastPersistenceStatus = "Cannot add layer: overlays support a maximum of " +
+                                  std::to_string(kMaxOverlayLayers) + " layers.";
+        return m_layers.size();
+    }
+    if (tileCount != 0 && newIndex + 1 > kMaxOverlayTotalTiles / tileCount) {
+        m_lastPersistenceStatus = "Cannot add layer: overlays support a maximum of " +
+                                  std::to_string(kMaxOverlayTotalTiles) + " total tiles.";
+        return m_layers.size();
+    }
 
     LayerDefinition layer;
-    layer.id = "layer_" + std::to_string(newIndex);
+    layer.id = "layer_" + std::to_string(m_nextLayerId);
     layer.name = name.empty() ? ("Layer " + std::to_string(newIndex)) : name;
     layer.tiles.assign(tileCount, vde::TileMap::kEmptyTile);
     layer.collisionEnabled = false;
     layer.depthZ = static_cast<float>(newIndex) * kDefaultLayerDepthStep;
 
+    const int mapLayerIndex = static_cast<int>(newIndex);
+    if (m_tileMap->getLayerCount() <= mapLayerIndex) {
+        (void)m_tileMap->addLayer(layer.name);
+    } else {
+        m_tileMap->loadLayerFromArray(mapLayerIndex, layer.tiles);
+        m_tileMap->setLayerName(mapLayerIndex, layer.name);
+    }
+    m_tileMap->setLayerVisible(mapLayerIndex, layer.visible);
+    m_tileMap->setLayerDepth(mapLayerIndex, layer.depthZ);
+
+    m_lastPersistenceStatus = "Added layer '" + layer.name + "'.";
     m_layers.push_back(std::move(layer));
+    ++m_nextLayerId;
     m_hasUnsavedChanges = true;
     markRuntimeLayoutChanged();
 
@@ -1039,8 +1123,9 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         clearEditHistory();
         m_hasUnsavedChanges = false;
         m_activeLayerIndex = 0;
+        resetNextLayerId();
         markRuntimeLayoutChanged();
-        m_lastPersistenceStatus = "No saved overlay found; using imported ground layer.";
+        m_lastPersistenceStatus = "No saved overlay found; using imported map layers.";
         std::cout << m_lastPersistenceStatus << '\n';
         return true;
     }
@@ -1079,6 +1164,7 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         if (m_activeLayerIndex >= m_layers.size()) {
             m_activeLayerIndex = 0;
         }
+        resetNextLayerId();
         clearEditHistory();
         m_hasUnsavedChanges = false;
         markRuntimeLayoutChanged();
@@ -1111,6 +1197,15 @@ void TileMapSession::clearEditHistory() {
     m_editHistory.clear();
     m_appliedEditCount = 0;
     m_lastEditedLayerIndex.reset();
+}
+
+void TileMapSession::resetNextLayerId() {
+    m_nextLayerId = m_layers.size();
+    for (const auto& layer : m_layers) {
+        if (const auto suffix = parseLayerIdSuffix(layer.id); suffix.has_value()) {
+            m_nextLayerId = std::max(m_nextLayerId, suffix.value() + 1);
+        }
+    }
 }
 
 void TileMapSession::refreshDirtyStateForTileEdit(size_t layerIndex,

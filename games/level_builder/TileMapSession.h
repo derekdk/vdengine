@@ -41,7 +41,10 @@ enum class LayerScrollPreset {
 
 class TileMapSession {
   public:
-    void load(vde::VulkanContext* context);
+    static constexpr size_t kMaxLayerCount = 64;
+
+    /// Returns false when a saved overlay exists but could not be applied.
+    bool load(vde::VulkanContext* context);
     void adoptTileMap(const std::shared_ptr<const vde::TileMap>& tileMap, glm::vec2 spawnPoint,
                       size_t importedObjectCount = 0, const std::string& sourceMapId = {});
     void setOverlayPath(std::filesystem::path overlayPath);
@@ -98,6 +101,7 @@ class TileMapSession {
     bool adjustLayerDepthZ(size_t index, float deltaZ);
     bool setLayerScrollPreset(size_t index, LayerScrollPreset preset);
     bool cycleLayerScrollPreset(size_t index, int direction);
+    /// Returns layerCount() when the layer could not be added.
     size_t addLayer(const std::string& name = "");
     bool setEditableTileId(const glm::ivec2& tileCoordinate, int tileId);
     bool cycleEditableTile(const glm::ivec2& tileCoordinate, int direction);
@@ -123,6 +127,7 @@ class TileMapSession {
                                       int oldTileId, int newTileId);
     void refreshDirtyState();
     void rebuildCollisionCache();
+    void resetNextLayerId();
     void markRuntimeChanged(std::optional<size_t> layerIndex = std::nullopt);
     void markRuntimeLayoutChanged();
     [[nodiscard]] int readLayerTile(size_t layerIndex, const glm::ivec2& tileCoord) const;
@@ -144,6 +149,7 @@ class TileMapSession {
     std::string m_lastPersistenceStatus;
     std::vector<LayerDefinition> m_layers;
     size_t m_activeLayerIndex = 0;
+    size_t m_nextLayerId = 0;
     std::optional<size_t> m_lastEditedLayerIndex;
     size_t m_runtimeRevision = 0;
     size_t m_runtimeLayoutRevision = 0;

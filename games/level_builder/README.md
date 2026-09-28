@@ -40,15 +40,24 @@ The current build keeps the tilemap runtime baseline while adding multi-layer au
 | `Z` / `X` or Gamepad `B` / `A` | Previous / next palette tile in Select Tile Mode |
 | `C` / `V` or Gamepad `X` / `Y` | Copy the selected tile into the palette or paint with the palette |
 | `U` / `I` or Gamepad LT / RT | Undo / redo the last tile edit |
-| `F5` / `F9` or Gamepad `L3` / `R3` | Save / reload the layer-stack overlay |
+| `F5` / `F9` or Gamepad `L3` / `R3` | Save / reload the layer-stack overlay (reload asks for a second press when there are unsaved changes) |
 | `F1` | Toggle debug UI |
 | `F11` | Toggle fullscreen |
-| `Esc` | Quit |
+| `Esc` | Quit (asks for a second press when there are unsaved changes) |
+
+Save, reload, layer-creation, undo/redo, and scroll-preset results appear briefly as a status line in
+the bottom-left corner of the view. A failed overlay load at startup is shown there too.
 
 ## Persistence
 
 - The persistence strategy is a VDE-native overlay snapshot for the complete authorable layer stack.
 - The overlay is written beside the executable as `level_builder_ground.overlay.json`.
+- Saves are written to `level_builder_ground.overlay.json.tmp` first and then renamed over the
+  previous overlay, so a failed save keeps the last good file.
+- Layer creation stops at the same 64-layer limit that loading enforces, so any saved stack can be
+  reloaded. Layer IDs are never reused within a stack, and overlays with duplicate IDs are rejected.
+- The unsaved-changes guard covers `F9` / `R3` reload and `Esc` quit; closing the window directly
+  does not prompt.
 - Loading restores the checked-in imported map first, then reapplies the saved overlay if the file exists.
 - Undo and redo operate across in-memory edits on all authorable layers; loading an overlay resets that history.
 - The palette is the same visible value used for copy and paint, so controller users only need to learn one brush concept.
