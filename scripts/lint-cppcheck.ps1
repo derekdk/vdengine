@@ -59,6 +59,8 @@ try {
 $cppcheckArgs = @(
     '--enable=warning,performance,portability',
     '--std=c++20',
+    # Standalone .h files are otherwise parsed as C and fail on namespaces.
+    '--language=c++',
     '--error-exitcode=1',
     '--library=googletest',
     '--suppress=missingIncludeSystem',
