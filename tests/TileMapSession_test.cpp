@@ -784,4 +784,128 @@ TEST(TileMapSessionTest, ReloadRejectsScrolledCollisionLayersAndOversizedLayerSt
     std::filesystem::remove(overlayPath, error);
 }
 
+// --- Remaining-work Phase 0: hardening tests ---
+
+namespace {
+
+nlohmann::ordered_json readOverlayJson(const std::filesystem::path& overlayPath) {
+    std::ifstream input(overlayPath, std::ios::binary);
+    return nlohmann::ordered_json::parse(input);
+}
+
+void writeOverlayJson(const std::filesystem::path& overlayPath,
+                      const nlohmann::ordered_json& root) {
+    std::ofstream output(overlayPath, std::ios::binary | std::ios::trunc);
+    output << root.dump(2);
+}
+
+}  // namespace
+
+TEST(TileMapSessionTest, AddLayerStopsAtOverlayLayerLimitAndSavedStackReloads) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeEditableMap(), {0.0f, 0.0f}, 0u, "test-map");
+
+    while (session.layerCount() < TileMapSession::kMaxLayerCount) {
+        const size_t previousCount = session.layerCount();
+        ASSERT_EQ(session.addLayer(), previousCount);
+    }
+
+    EXPECT_EQ(session.addLayer(), session.layerCount());
+    EXPECT_EQ(session.layerCount(), TileMapSession::kMaxLayerCount);
+    EXPECT_NE(session.lastPersistenceStatus().find("maximum"), std::string::npos);
+
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+    ASSERT_TRUE(session.reloadEditableLayerOverlay());
+    EXPECT_EQ(session.layerCount(), TileMapSession::kMaxLayerCount);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
+TEST(TileMapSessionTest, FailedSaveKeepsPreviousOverlayIntact) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeEditableMap(), {0.0f, 0.0f}, 0u, "test-map");
+    ASSERT_TRUE(session.setEditableTileId({0, 0}, 7));
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+
+    // A directory at the temp path makes the staged write fail before the rename.
+    std::filesystem::path blockedTempPath = overlayPath;
+    blockedTempPath += ".tmp";
+    std::error_code error;
+    ASSERT_TRUE(std::filesystem::create_directory(blockedTempPath, error)) << error.message();
+
+    ASSERT_TRUE(session.setEditableTileId({0, 0}, 8));
+    EXPECT_FALSE(session.saveEditableLayerOverlay());
+    EXPECT_TRUE(session.hasUnsavedChanges());
+    EXPECT_EQ(readOverlayJson(overlayPath).at("layers").at(0).at("tiles").at(0).get<int>(), 7);
+
+    std::filesystem::remove(blockedTempPath, error);
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+    EXPECT_EQ(readOverlayJson(overlayPath).at("layers").at(0).at("tiles").at(0).get<int>(), 8);
+    EXPECT_FALSE(std::filesystem::exists(blockedTempPath));
+
+    std::filesystem::remove(overlayPath, error);
+}
+
+TEST(TileMapSessionTest, LayerIdsContinuePastReloadedIdsAndDuplicatesAreRejected) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeEditableMap(), {0.0f, 0.0f}, 0u, "test-map");
+    ASSERT_EQ(session.addLayer("detail"), 1u);
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+
+    nlohmann::ordered_json root = readOverlayJson(overlayPath);
+    root.at("layers").at(1).at("id") = "layer_7";
+    writeOverlayJson(overlayPath, root);
+    ASSERT_TRUE(session.reloadEditableLayerOverlay());
+
+    const size_t addedIndex = session.addLayer("sky");
+    ASSERT_EQ(addedIndex, 2u);
+    ASSERT_NE(session.layerDefinition(addedIndex), nullptr);
+    EXPECT_EQ(session.layerDefinition(addedIndex)->id, "layer_8");
+
+    root.at("layers").at(1).at("id") = "layer_0";
+    writeOverlayJson(overlayPath, root);
+    EXPECT_FALSE(session.reloadEditableLayerOverlay());
+    EXPECT_NE(session.lastPersistenceStatus().find("duplicate"), std::string::npos);
+    EXPECT_EQ(session.layerCount(), 3u);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
+TEST(TileMapSessionTest, AddedLayersContributeCollisionWhenEnabled) {
+    TileMapSession session;
+    const std::filesystem::path overlayPath = makeTempOverlayPath();
+    session.setOverlayPath(overlayPath);
+    session.adoptTileMap(makeCollisionMultiLayerMap(), {0.0f, 0.0f}, 0u, "test-map");
+    ASSERT_EQ(session.solidRects().size(), 2u);
+
+    const size_t wallsLayer = session.addLayer("walls");
+    ASSERT_TRUE(session.setActiveLayerIndex(wallsLayer));
+    ASSERT_TRUE(session.setEditableTileId({0, 1}, 1));
+    EXPECT_EQ(session.solidRects().size(), 2u);
+    ASSERT_TRUE(session.saveEditableLayerOverlay());
+
+    nlohmann::ordered_json root = readOverlayJson(overlayPath);
+    root.at("layers").at(wallsLayer).at("collision_enabled") = true;
+    writeOverlayJson(overlayPath, root);
+    ASSERT_TRUE(session.reloadEditableLayerOverlay());
+    EXPECT_EQ(session.solidRects().size(), 3u);
+
+    ASSERT_TRUE(session.setActiveLayerIndex(wallsLayer));
+    ASSERT_TRUE(session.setEditableTileId({2, 0}, 1));
+    EXPECT_EQ(session.solidRects().size(), 4u);
+    ASSERT_TRUE(session.undoLastEditableEdit());
+    EXPECT_EQ(session.solidRects().size(), 3u);
+
+    std::error_code error;
+    std::filesystem::remove(overlayPath, error);
+}
+
 }  // namespace levelbuilder::test

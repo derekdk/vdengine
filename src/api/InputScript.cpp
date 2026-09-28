@@ -16,6 +16,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -599,6 +600,11 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
                     validField = true;
                     break;
                 }
+            }
+            constexpr std::string_view kStatePrefix = "state.";
+            if (cmd.assertField.size() > kStatePrefix.size() &&
+                cmd.assertField.starts_with(kStatePrefix)) {
+                validField = true;
             }
             if (!validField) {
                 errorMsg = "at line " + std::to_string(lineNumber) + ": unknown assert field '" +

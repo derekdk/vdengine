@@ -2005,6 +2005,7 @@ VDE's scripted input system drives automation, smoke testing, and render verific
 | `assert rendered_scene_count == N` | Verify number of active scenes |
 | `assert scene "name" was_rendered == true` | Verify a named scene rendered |
 | `assert scene "name" not_blank` | Verify scene is not a blank frame |
+| `assert scene "name" state.<key> <op> <value>` | Compare game-defined state from `Scene::getScriptStateValue(key)`; unknown keys fail the script |
 
 #### Screenshot and Image Comparison
 

@@ -6,10 +6,12 @@
 #include <vde/api/InputHandler.h>
 #include <vde/api/InputScriptExecutor.h>
 #include <vde/api/KeyCodes.h>
+#include <vde/api/Scene.h>
 #include <vde/api/SceneGroup.h>
 #include <vde/api/ScriptEnvironment.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -40,7 +42,7 @@ class MockScriptEnv : public ScriptEnvironment {
 
     InputHandler* resolveInputHandler() override { return &handler; }
     bool captureScreenshot(const std::string&) override { return true; }
-    Scene* getScene(const std::string&) override { return nullptr; }
+    Scene* getScene(const std::string&) override { return scene; }
     [[nodiscard]] const SceneGroup& getActiveSceneGroup() const override { return activeGroup; }
     [[nodiscard]] std::pair<uint32_t, uint32_t> getSwapChainExtent() const override {
         return {1280, 720};
@@ -54,6 +56,17 @@ class MockScriptEnv : public ScriptEnvironment {
     bool quitCalled = false;
     size_t scenesCreated = 0;
     size_t scenesRemoved = 0;
+    Scene* scene = nullptr;
+};
+
+class ScriptStateScene : public Scene {
+  public:
+    [[nodiscard]] std::optional<double> getScriptStateValue(const std::string& key) const override {
+        if (key == "layer_count") {
+            return 3.0;
+        }
+        return std::nullopt;
+    }
 };
 
 ScriptCommand makeCommand(InputCommandType type) {
@@ -162,6 +175,78 @@ TEST(InputScriptExecutor, AssertSceneCountFailureSetsExitCode) {
     ASSERT_NE(s, nullptr);
     EXPECT_TRUE(s->finished);
     EXPECT_TRUE(s->assertionFailed);
+    EXPECT_EQ(env.exitCode, 1);
+}
+
+// ============================================================================
+// Scene state assert fields: state.<key>
+// ============================================================================
+
+ScriptCommand makeStateAssert(const std::string& field, CompareOp op, double value) {
+    ScriptCommand cmd = makeCommand(InputCommandType::AssertScene);
+    cmd.assertSceneName = "main";
+    cmd.assertField = field;
+    cmd.assertOp = op;
+    cmd.assertValue = value;
+    return cmd;
+}
+
+TEST(InputScriptExecutor, AssertSceneStateResolvesFromSceneHook) {
+    MockScriptEnv env;
+    ScriptStateScene scene;
+    env.scene = &scene;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    state->commands = {makeStateAssert("state.layer_count", CompareOp::Eq, 3.0)};
+    executor.setState(std::move(state));
+    executor.processFrame(0.016f);
+
+    EXPECT_TRUE(executor.getState()->finished);
+    EXPECT_FALSE(executor.getState()->assertionFailed);
+    EXPECT_EQ(env.exitCode, 0);
+}
+
+TEST(InputScriptExecutor, AssertSceneStateMismatchFails) {
+    MockScriptEnv env;
+    ScriptStateScene scene;
+    env.scene = &scene;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    state->commands = {makeStateAssert("state.layer_count", CompareOp::Eq, 4.0)};
+    executor.setState(std::move(state));
+    executor.processFrame(0.016f);
+
+    EXPECT_TRUE(executor.getState()->assertionFailed);
+    EXPECT_EQ(env.exitCode, 1);
+}
+
+TEST(InputScriptExecutor, AssertSceneStateUnknownKeyFails) {
+    MockScriptEnv env;
+    ScriptStateScene scene;
+    env.scene = &scene;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    state->commands = {makeStateAssert("state.missing", CompareOp::Eq, 0.0)};
+    executor.setState(std::move(state));
+    executor.processFrame(0.016f);
+
+    EXPECT_TRUE(executor.getState()->assertionFailed);
+    EXPECT_EQ(env.exitCode, 1);
+}
+
+TEST(InputScriptExecutor, AssertSceneStateMissingSceneFails) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    state->commands = {makeStateAssert("state.layer_count", CompareOp::Eq, 0.0)};
+    executor.setState(std::move(state));
+    executor.processFrame(0.016f);
+
+    EXPECT_TRUE(executor.getState()->assertionFailed);
     EXPECT_EQ(env.exitCode, 1);
 }
 
