@@ -80,6 +80,7 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 | Filter changed-only selection by name | `.\scripts\smoke-test.ps1 -Filter "*physics*"` |
 | Filter the full suite by name | `.\scripts\smoke-test.ps1 -Full -Filter "*physics*"` |
 | Changed source/header owners only | `.\scripts\smoke-test.ps1 -ChangedOnly` |
+| Compare changed-only selection with an explicit Git base | `.\scripts\smoke-test.ps1 -ChangedOnly -Since origin/main` |
 | Build first | `.\scripts\smoke-test.ps1 -Build` |
 | Verbose output | `.\scripts\smoke-test.ps1 -Verbose` |
 | Build + smoke test | `.\scripts\smoke-test.ps1 -Build -Verbose` |
@@ -91,6 +92,7 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 |-----------|--------|---------|-------------|
 | `-Category` | `All`, `Examples`, `Games`, `Tools` | `All` | Which category of executables to test |
 | `-Filter` | Wildcard pattern | (none) | Filter executable names (e.g. `"*physics*"`, `"vde_vlauncher*"`) |
+| `-Since` | Git revision or range | (auto) | Base for changed-only selection; automatically resolves a GitHub PR base, mainline ref, or different upstream branch, then falls back to the repository root commit |
 | `-Extended` | switch | `$false` | Legacy full-suite mode including priority 2 examples and games |
 | `-Generator` | `MSBuild`, `Ninja` | `Ninja` | Which build system output to test |
 | `-Config` | `Debug`, `Release` | `Debug` | Build configuration |
@@ -98,6 +100,10 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 | `-ChangedOnly` | switch | `$false` | Explicitly run only executables whose `vde.toml` `source_paths` own changed source/header or shader files; this is the default |
 | `-Full` | switch | `$false` | Run every discovered executable and all priorities |
 | `-Verbose` | switch | `$false` | Show detailed error output for failures |
+
+### Changed-only Git base resolution
+
+When `-ChangedOnly` is active without `-Since`, the script resolves a comparison base in this order: `GITHUB_BASE_REF`, `origin/HEAD` and common mainline refs, a different upstream branch, and finally the repository root commit. This keeps clean committed checkouts covered without treating a feature branch's own upstream as its base. If Git cannot provide a committed base, the existing working-tree, index, and untracked-file detection remains the fallback.
 
 ## Smoke Priority Model
 

@@ -228,17 +228,18 @@ Run smoke tests against examples, games, and tools, with changed-source selectio
 
 **Syntax:**
 ```powershell
-.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-ChangedOnly] [-Full] [-Verbose] [-ProblemsOnly]
+.\scripts\smoke-test.ps1 [-Category All|Examples|Games|Tools] [-Filter <pattern>] [-Since <revision>] [-Generator MSBuild|Ninja] [-Config Debug|Release] [-Build] [-Extended] [-ChangedOnly] [-Full] [-Verbose] [-ProblemsOnly]
 ```
 
 **Parameters:**
 - `-Category` - `All` (default), `Examples`, `Games`, or `Tools`
 - `-Filter <pattern>` - Wildcard pattern for executable names (for example `"*physics*"`)
+- `-Since <revision>` - Explicit Git revision or range for changed-only selection; when omitted, the script resolves a merge base from the GitHub PR base, mainline refs, or a different upstream branch, then falls back to the repository root commit
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests
 - `-Extended` - Legacy full-suite mode that includes priority 1 and 2 examples/games; use `-Full` for the explicit full-suite option
-- `-ChangedOnly` - Explicitly select every-priority executable whose declared `source_paths` contain changed source/header files; this is the default when neither `-Full` nor `-Extended` is supplied
+- `-ChangedOnly` - Explicitly select every-priority executable whose declared `source_paths` contain changed source/header or shader files; this is the default when neither `-Full` nor `-Extended` is supplied
 - `-Full` - Run every discovered executable and all priorities, bypassing changed-only selection
 - `-Verbose` - Verbose output with detailed error messages
 - `-ProblemsOnly` - Emit only `WARNING:` / `FAILURE:` lines plus a final `PASS:` or `FAILURE:` summary
@@ -268,6 +269,9 @@ Run smoke tests against examples, games, and tools, with changed-source selectio
 
 # Explicitly select smoke tests affected by the current source/header changes
 .\scripts\smoke-test.ps1 -ChangedOnly
+
+# Select smoke tests for committed changes relative to an explicit base
+.\scripts\smoke-test.ps1 -ChangedOnly -Since origin/main
 
 # AI-friendly failure summary output
 .\scripts\smoke-test.ps1 -ProblemsOnly

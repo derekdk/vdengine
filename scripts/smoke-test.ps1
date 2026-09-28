@@ -12,6 +12,7 @@
 #   .\scripts\smoke-test.ps1 -Full -Filter "*physics*"    # Filter the full suite by name
 #   .\scripts\smoke-test.ps1 -Build -Verbose              # Build first, verbose output
 #   .\scripts\smoke-test.ps1 -ChangedOnly                 # Explicitly select changed source/header owners
+#   .\scripts\smoke-test.ps1 -ChangedOnly -Since origin/main # Compare changes with an explicit base
 #   .\scripts\smoke-test.ps1 -ProblemsOnly                # Emit only warnings/failures plus final PASS/FAIL
 
 param(
@@ -19,6 +20,8 @@ param(
     [string]$Category = "All",
 
     [string]$Filter = "",  # Wildcard filter for executable names (e.g. "*physics*", "vde_vlauncher*")
+
+    [string]$Since = "",  # Git revision used as the base for changed-only selection
 
     [ValidateSet("MSBuild", "Ninja")]
     [string]$Generator = "Ninja",
@@ -599,8 +602,78 @@ $discoveredCount = $allExes.Count
 
 if ($ChangedOnly) {
     $sourceExtensions = @('.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx', '.inl', '.ipp', '.tpp', '.vert', '.frag', '.comp', '.geom', '.tesc', '.tese')
+
+    function Resolve-SmokeChangeBase {
+        param(
+            [string]$RepoRoot,
+            [string]$RequestedSince
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($RequestedSince)) {
+            return $RequestedSince
+        }
+
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            return ""
+        }
+
+        $candidateRefs = @()
+        if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_BASE_REF)) {
+            $candidateRefs += "origin/$($env:GITHUB_BASE_REF)"
+            $candidateRefs += $env:GITHUB_BASE_REF
+        }
+
+        $candidateRefs += @('origin/HEAD', 'origin/main', 'main', 'origin/master', 'master')
+
+        $currentBranch = & git -C $RepoRoot symbolic-ref --quiet --short HEAD 2>$null
+        $currentBranchName = if ($LASTEXITCODE -eq 0) { ([string]$currentBranch).Trim() } else { "" }
+        $upstreamRef = & git -C $RepoRoot rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace([string]$upstreamRef)) {
+            $upstreamRefName = ([string]$upstreamRef).Trim()
+            $upstreamBranchName = $upstreamRefName -replace '^refs/remotes/[^/]+/', ''
+            $upstreamSeparator = $upstreamBranchName.IndexOf('/')
+            if ($upstreamSeparator -ge 0) {
+                $upstreamBranchName = $upstreamBranchName.Substring($upstreamSeparator + 1)
+            }
+
+            if ($upstreamBranchName -ne $currentBranchName) {
+                $candidateRefs += $upstreamRefName
+            }
+        }
+
+        foreach ($candidateRef in $candidateRefs) {
+            if ([string]::IsNullOrWhiteSpace($candidateRef)) {
+                continue
+            }
+
+            $mergeBase = & git -C $RepoRoot merge-base HEAD $candidateRef 2>$null
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace([string]$mergeBase)) {
+                return ([string]$mergeBase).Trim()
+            }
+        }
+
+        $rootCommits = @(& git -C $RepoRoot rev-list --max-parents=0 HEAD 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $rootCommits.Count -gt 0) {
+            return ([string]$rootCommits[0]).Trim()
+        }
+
+        return ""
+    }
+
+    $effectiveSince = Resolve-SmokeChangeBase -RepoRoot $vdeRoot -RequestedSince $Since
+    $changedFileArguments = @{
+        RepoRoot = $vdeRoot
+        IncludeDeleted = $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($effectiveSince)) {
+        $changedFileArguments.Since = $effectiveSince
+        Write-Info "Changed-file base: $effectiveSince"
+    } else {
+        Write-Info "Changed-file base: working tree and index"
+    }
+
     try {
-        $changedFiles = @(Get-VdeChangedFiles -RepoRoot $vdeRoot -IncludeDeleted)
+        $changedFiles = @(Get-VdeChangedFiles @changedFileArguments)
     }
     catch {
         Write-Err "Unable to determine changed files: $($_.Exception.Message)"
@@ -694,12 +767,6 @@ if ($ChangedOnly) {
     Write-Info "Changed-only selection: $($allExes.Count) applicable executable(s); $notApplicableCount skipped"
 }
 
-$filteredPriority2Count = 0
-if (-not $Extended -and -not $ChangedOnly -and -not $Full) {
-    $filteredPriority2Count = @($allExes | Where-Object { ($_.Category -eq 'Example' -or $_.Category -eq 'Game') -and $_.SmokePriority -eq 2 }).Count
-    $allExes = @($allExes | Where-Object { (($_.Category -ne 'Example') -and ($_.Category -ne 'Game')) -or $_.SmokePriority -eq 1 })
-}
-
 if ($allExes.Count -eq 0) {
     if ($ChangedOnly -and $discoveredCount -gt 0) {
         Write-Pass "No applicable smoke tests found for the changed source/header files; smoke tests skipped."
@@ -709,9 +776,6 @@ if ($allExes.Count -eq 0) {
     Write-Warn "No executables found to test."
     if ($Filter) {
         Write-Warn "Filter '$Filter' matched nothing. Try a different pattern."
-    }
-    if (-not $Extended -and $filteredPriority2Count -gt 0) {
-        Write-Warn "Only priority 2 examples/games matched. Re-run with -Extended to include them."
     }
     Write-Warn "Run with -Build flag to build first, or run .\scripts\build.ps1"
     exit 1
@@ -733,10 +797,6 @@ $toolCount = @($allExes | Where-Object { $_.Category -eq "Tool" }).Count
 if ($exampleCount -gt 0) { Write-Info "  Examples: $exampleCount" }
 if ($gameCount -gt 0) { Write-Info "  Games:    $gameCount" }
 if ($toolCount -gt 0) { Write-Info "  Tools:    $toolCount" }
-if (-not $Extended -and $filteredPriority2Count -gt 0) {
-    Write-Info "  Priority 2 examples/games excluded: $filteredPriority2Count"
-}
-
 # --- Run Smoke Tests ---
 
 $results = @()
