@@ -179,6 +179,9 @@ void Game::shutdown() {
     m_scenes.clear();
     m_sceneStack.clear();
 
+    // Release persistent GPU resources while the Vulkan device is still alive
+    m_resourceManager.clear();
+
     // Clear sprite descriptor cache (static in Entity.cpp)
     clearSpriteDescriptorCache();
 
