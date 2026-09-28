@@ -8,9 +8,14 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <system_error>
 #include <unordered_set>
 
 #include <nlohmann/json.hpp>
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 namespace {
 
@@ -74,10 +79,17 @@ void writeTextFile(const std::filesystem::path& path, const std::string& text) {
         }
     }
 
+    std::error_code replaceError;
+#ifdef _WIN32
+    if (!::MoveFileExW(tempPath.c_str(), path.c_str(),
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        replaceError = std::error_code(static_cast<int>(::GetLastError()), std::system_category());
+    }
+#else
     // Rename replaces the previous overlay only after the new contents are fully written.
-    std::error_code renameError;
-    std::filesystem::rename(tempPath, path, renameError);
-    if (renameError) {
+    std::filesystem::rename(tempPath, path, replaceError);
+#endif
+    if (replaceError) {
         std::error_code removeError;
         std::filesystem::remove(tempPath, removeError);
         throw std::runtime_error("Failed to replace overlay file: " + path.string());

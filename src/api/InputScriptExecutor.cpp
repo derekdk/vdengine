@@ -207,7 +207,7 @@ bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, S
     constexpr std::string_view kStatePrefix = "state.";
     if (cmd.assertField.starts_with(kStatePrefix)) {
         if (!targetScene) {
-            return true;
+            return false;
         }
         const auto value =
             targetScene->getScriptStateValue(cmd.assertField.substr(kStatePrefix.size()));

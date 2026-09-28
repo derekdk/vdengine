@@ -144,6 +144,7 @@ void LevelBuilderScene::onEnter() {
               << m_tileMapSession.importedObjectCount() << " imported objects, extracted "
               << m_tileMapSession.solidRects().size() << " solid regions and "
               << m_tileMapSession.oneWayRects().size() << " one-way regions\n";
+    m_lastKnownUnsavedChanges = m_tileMapSession.hasUnsavedChanges();
 }
 
 void LevelBuilderScene::update(float deltaTime) {
@@ -950,7 +951,18 @@ void LevelBuilderScene::showSessionStatus() {
     showStatus(m_tileMapSession.lastPersistenceStatus());
 }
 
+void LevelBuilderScene::clearPendingDiscardConfirmation() {
+    m_pendingDiscard = PendingDiscard::None;
+    m_pendingDiscardTimeRemaining = 0.0f;
+}
+
 void LevelBuilderScene::tickTransientState(float deltaTime) {
+    const bool hasUnsavedChanges = m_tileMapSession.hasUnsavedChanges();
+    if (hasUnsavedChanges != m_lastKnownUnsavedChanges) {
+        clearPendingDiscardConfirmation();
+        m_lastKnownUnsavedChanges = hasUnsavedChanges;
+    }
+
     if (m_statusTimeRemaining > 0.0f) {
         m_statusTimeRemaining -= deltaTime;
         if (m_statusTimeRemaining <= 0.0f && m_statusText != nullptr) {
@@ -961,15 +973,14 @@ void LevelBuilderScene::tickTransientState(float deltaTime) {
     if (m_pendingDiscardTimeRemaining > 0.0f) {
         m_pendingDiscardTimeRemaining -= deltaTime;
         if (m_pendingDiscardTimeRemaining <= 0.0f) {
-            m_pendingDiscard = PendingDiscard::None;
+            clearPendingDiscardConfirmation();
         }
     }
 }
 
 bool LevelBuilderScene::confirmDiscard(PendingDiscard action, const std::string& prompt) {
     if (m_pendingDiscard == action) {
-        m_pendingDiscard = PendingDiscard::None;
-        m_pendingDiscardTimeRemaining = 0.0f;
+        clearPendingDiscardConfirmation();
         return true;
     }
 

@@ -235,6 +235,19 @@ TEST(InputScriptExecutor, AssertSceneStateUnknownKeyFails) {
     EXPECT_EQ(env.exitCode, 1);
 }
 
+TEST(InputScriptExecutor, AssertSceneStateMissingSceneFails) {
+    MockScriptEnv env;
+    InputScriptExecutor executor(env);
+
+    auto state = std::make_unique<InputScriptState>();
+    state->commands = {makeStateAssert("state.layer_count", CompareOp::Eq, 0.0)};
+    executor.setState(std::move(state));
+    executor.processFrame(0.016f);
+
+    EXPECT_TRUE(executor.getState()->assertionFailed);
+    EXPECT_EQ(env.exitCode, 1);
+}
+
 // ============================================================================
 // Global assert fields: scenes_created, scenes_removed
 // ============================================================================

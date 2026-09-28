@@ -69,6 +69,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     void setDevelopmentMode(bool enabled);
     void showStatus(const std::string& message);
     void showSessionStatus();
+    void clearPendingDiscardConfirmation();
     void tickTransientState(float deltaTime);
     [[nodiscard]] bool confirmDiscard(PendingDiscard action, const std::string& prompt);
     void requestQuit();
@@ -88,6 +89,7 @@ class LevelBuilderScene : public vde::games::BaseGameScene {
     float m_statusTimeRemaining = 0.0f;
     PendingDiscard m_pendingDiscard = PendingDiscard::None;
     float m_pendingDiscardTimeRemaining = 0.0f;
+    bool m_lastKnownUnsavedChanges = false;
     std::vector<std::shared_ptr<vde::TextEntity>> m_actionLegendLines;
     std::vector<LayerRuntime> m_layerRuntimes;
     size_t m_appliedRuntimeLayoutRevision = 0;
