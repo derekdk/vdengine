@@ -1,9 +1,9 @@
 #pragma once
 
+#include <vde/api/GameAPI.h>
+
 #include <memory>
 #include <vector>
-
-#include <vde/api/GameAPI.h>
 
 namespace rungame {
 
@@ -17,12 +17,12 @@ class ParallaxLayer {
     explicit ParallaxLayer(vde::Scene& scene, float speedFactor);
 
     void advanceSprites(float deltaTime, float runSpeed);
-    std::shared_ptr<vde::SpriteEntity> addSprite(
-        float x, float y, float width, float height, const vde::Color& color,
-        float z, float roll = 0.0f, float bobAmplitude = 0.0f,
-        float bobFrequency = 0.0f, float phase = 0.0f);
-    std::shared_ptr<vde::SpriteEntity> addStaticSprite(
-        float x, float y, float width, float height, const vde::Color& color, float z);
+    std::shared_ptr<vde::SpriteEntity> addSprite(float x, float y, float width, float height,
+                                                 const vde::Color& color, float z,
+                                                 float roll = 0.0f, float bobAmplitude = 0.0f,
+                                                 float bobFrequency = 0.0f, float phase = 0.0f);
+    std::shared_ptr<vde::SpriteEntity> addStaticSprite(float x, float y, float width, float height,
+                                                       const vde::Color& color, float z);
 
     static constexpr float kSegmentWidth = 24.0f;
 

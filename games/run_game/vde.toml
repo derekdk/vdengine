@@ -2,4 +2,4 @@
 scripts = ["smoke_run_game.vdescript"]
 source_paths = ["."]
 priority = 2
-sections = ["entity,input,text"]
+sections = ["entity", "input", "text"]

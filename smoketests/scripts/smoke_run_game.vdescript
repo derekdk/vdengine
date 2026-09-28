@@ -2,7 +2,7 @@
 # Jump, then exercise the restart control.
 wait startup
 press SPACE
-wait 1800
+wait 1900
 press SPACE
 wait 500
 press R

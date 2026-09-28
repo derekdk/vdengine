@@ -1,9 +1,9 @@
 #pragma once
 
+#include <vde/api/GameAPI.h>
+
 #include <array>
 #include <memory>
-
-#include <vde/api/GameAPI.h>
 
 namespace rungame {
 

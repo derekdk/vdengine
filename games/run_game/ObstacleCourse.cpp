@@ -47,9 +47,8 @@ bool ObstacleCourse::collides(const RunnerCharacter& runner) const {
         const float halfWidth = obstacle.width * 0.5f;
         const float bottom = kGroundY;
         const float top = bottom + obstacle.height;
-        if (runner.right() >= obstacle.x - halfWidth &&
-            runner.left() <= obstacle.x + halfWidth && runner.top() >= bottom &&
-            runner.bottom() <= top) {
+        if (runner.right() >= obstacle.x - halfWidth && runner.left() <= obstacle.x + halfWidth &&
+            runner.top() >= bottom && runner.bottom() <= top) {
             return true;
         }
     }

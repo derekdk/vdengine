@@ -9,3 +9,4 @@ Games differ from `examples/` by prioritizing a fuller gameplay loop and a multi
 - `fishing_game/` - 2D pond-fishing game showing the recommended `games/` layout
 - `level_builder/` - Phase 1 tilemap baseline for the controller-driven level-builder workflow
 - `pong/` - Classic one-player Pong showing the lightweight end of the `games/` structure
+- `run_game/` - Endless runner with independently updated parallax layers

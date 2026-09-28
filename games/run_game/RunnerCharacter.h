@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
-
 #include <vde/api/GameAPI.h>
+
+#include <memory>
 
 namespace rungame {
 
