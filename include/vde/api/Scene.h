@@ -187,6 +187,14 @@ class Scene {
      */
     virtual void updateVisuals(float deltaTime);
 
+    /**
+     * @brief Update visuals that depend on the camera's final position for this frame.
+     *
+     * Called after Camera::update() in both legacy and phase-callback scene modes.
+     * The default implementation is a no-op.
+     */
+    virtual void updateCameraDependentVisuals(float deltaTime);
+
     // Timed events
 
     /**
@@ -382,6 +390,22 @@ class Scene {
      * @return Pointer to entity, or nullptr if not found
      */
     Entity* getEntity(EntityId id);
+
+    /**
+     * @brief Move an entity to the beginning of the scene update and render order.
+     * @param id Entity ID
+     * @return true if the entity exists, otherwise false
+     */
+    bool moveEntityToBack(EntityId id);
+
+    /**
+     * @brief Move an entity to the end of the scene update and render order.
+     *
+     * The relative order of all other entities is preserved.
+     * @param id Entity ID
+     * @return true if the entity exists, otherwise false
+     */
+    bool moveEntityToFront(EntityId id);
 
     /**
      * @brief Get an entity by name.

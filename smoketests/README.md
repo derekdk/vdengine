@@ -31,17 +31,23 @@ See the **smoke-testing** skill in `.github/skills/smoke-testing/SKILL.md` for d
 
 Quick reference:
 ```powershell
-# Run all smoke tests
+# Run smoke tests for changed source/header owners (default)
 .\scripts\smoke-test.ps1
 
-# Run examples only
+# Compare changed-only selection with an explicit Git base
+.\scripts\smoke-test.ps1 -ChangedOnly -Since origin/main
+
+# Run all discovered smoke tests
+.\scripts\smoke-test.ps1 -Full
+
+# Run changed examples only
 .\scripts\smoke-test.ps1 -Category Examples
 
-# Run games only
+# Run changed games only
 .\scripts\smoke-test.ps1 -Category Games
 
-# Run specific test
-.\scripts\smoke-test.ps1 -Filter "*physics*"
+# Run a specific test regardless of the current Git delta
+.\scripts\smoke-test.ps1 -Full -Filter "*physics*"
 ```
 
 ## Verification Images
@@ -61,6 +67,8 @@ When creating a new example, game, or tool:
    }
    ```
 
-Examples and games should prefer `vde.toml` smoke metadata next to the source. Tools still use an explicit mapping.
+Every example, game, and tool project declares `source_paths = ["."]` in its `[smoke]` metadata. Paths are relative to the project directory and may be narrowed or expanded when a smoke test owns only part of a project. Tools also retain the explicit executable-to-script fallback mapping in `scripts/smoke-test.ps1`.
+
+When `smoke-test.ps1 -ChangedOnly` is used, source/header and shader changes inside those paths are considered and all applicable priorities are included. When `-Since` is omitted, changes are compared with the GitHub PR base, a mainline ref, or a different upstream branch merge-base so a clean checkout still selects its changed owners; local staged, unstaged, and untracked changes are included as well. If no branch base is available, the repository root commit is used as a conservative fallback. Changes under `src`, `include`, `third_party`, or `shaders` are treated as shared engine changes and select all discovered executables. Deleted source/header files are included. No smoke process is launched when no applicable source/header changes exist.
 
 See the **writing-examples**, **writing-games**, or **writing-tools** skills for detailed guidance.

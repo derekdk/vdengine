@@ -323,10 +323,11 @@ ParsedTileSet parseTileSet(const OrderedJson& root, const std::shared_ptr<Textur
         throw std::invalid_argument("TileMapImport tileset image dimensions must be positive");
     }
 
-    const int expectedImageWidth =
-        parsed.columns * tileWidthPx + parsed.spacingPx * (parsed.columns - 1);
-    const int expectedImageHeight =
-        parsed.rows * tileHeightPx + parsed.spacingPx * (parsed.rows - 1);
+    const int64_t expectedImageWidth =
+        static_cast<int64_t>(parsed.columns) * tileWidthPx +
+        static_cast<int64_t>(parsed.spacingPx) * (parsed.columns - 1);
+    const int64_t expectedImageHeight = static_cast<int64_t>(parsed.rows) * tileHeightPx +
+                                        static_cast<int64_t>(parsed.spacingPx) * (parsed.rows - 1);
     if (imageWidth != expectedImageWidth || imageHeight != expectedImageHeight) {
         throw std::invalid_argument("TileMapImport tileset image dimensions do not match the "
                                     "tileset columns/rows, tile size, and spacing");
@@ -517,9 +518,8 @@ ImportedTileObject parseObject(const OrderedJson& object, const std::string& lay
     const float yPixels = getRequiredFloat(object, "y", "object");
     const float widthPixels = getOptionalFloat(object, "width", 0.0f, "object");
     const float heightPixels = getOptionalFloat(object, "height", 0.0f, "object");
-    if (!imported.point && (widthPixels <= 0.0f || heightPixels <= 0.0f)) {
-        throw std::invalid_argument(
-            "TileMapImport rectangle objects require positive width and height");
+    if (widthPixels < 0.0f || heightPixels < 0.0f) {
+        throw std::invalid_argument("TileMapImport object width and height must be non-negative");
     }
 
     if (imported.point) {
@@ -619,6 +619,10 @@ ImportedTileMap importTiledJsonImpl(const std::shared_ptr<Texture>& texture,
     if (columns <= 0 || rows <= 0 || tilePixelWidth <= 0 || tilePixelHeight <= 0) {
         throw std::invalid_argument("TileMapImport map dimensions must be positive");
     }
+    if (columns > std::numeric_limits<int>::max() / tilePixelWidth ||
+        rows > std::numeric_limits<int>::max() / tilePixelHeight) {
+        throw std::invalid_argument("TileMapImport map pixel dimensions would overflow");
+    }
 
     if (!root.contains("layers") || !root.at("layers").is_array()) {
         throw std::invalid_argument("TileMapImport map is missing a layers array");
@@ -635,10 +639,6 @@ ImportedTileMap importTiledJsonImpl(const std::shared_ptr<Texture>& texture,
         imported.tileMap->setCollisionKind(tileId, collisionKind);
     }
 
-    if (columns > std::numeric_limits<int>::max() / tilePixelWidth ||
-        rows > std::numeric_limits<int>::max() / tilePixelHeight) {
-        throw std::invalid_argument("TileMapImport map pixel dimensions would overflow");
-    }
     const int mapPixelWidth = columns * tilePixelWidth;
     const int mapPixelHeight = rows * tilePixelHeight;
     const float unitScaleX = options.tileWidth / static_cast<float>(tilePixelWidth);

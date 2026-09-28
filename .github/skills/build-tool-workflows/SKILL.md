@@ -29,7 +29,7 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 | `scripts: rebuild` | Clean and rebuild (Ninja, Debug) |
 | `scripts: build-and-test` | Build the project and run all unit tests |
 | `scripts: test` | Run all unit tests (project must already be built) |
-| `scripts: smoke-test` | Run priority 1 smoke tests |
+| `scripts: smoke-test` | Run changed-only smoke tests by default |
 | `scripts: render-verify` | Run render verification (golden image comparison) |
 | `scripts: verify` | Full end-to-end verification: Build → Unit Tests → Smoke Tests → Render Verify → targeted lint |
 | `scripts: clean` | Clean Ninja build artifacts |
@@ -113,7 +113,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 
 **Smoke tests with filter or category:**
 ```powershell
-.\scripts\smoke-test.ps1 -Filter "*physics*"
+.\scripts\smoke-test.ps1 -Full -Filter "*physics*"
 .\scripts\smoke-test.ps1 -Category Examples
 .\scripts\smoke-test.ps1 -Category Tools
 .\scripts\smoke-test.ps1 -Extended
@@ -171,7 +171,9 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 **smoke-test.ps1**
 - `-Category` - All (default), Examples, or Tools
 - `-Filter` - Wildcard pattern for executable names (e.g. `"*physics*"`)
-- `-Extended` - Include priority 2 examples (default runs only priority 1)
+- `-Extended` - Legacy full-suite mode including priority 2 examples and games
+- `-ChangedOnly` - Explicitly select smoke tests affected by changed source/header or shader files; this is the default
+- `-Full` - Run every discovered smoke executable and all priorities
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 - `-Build` - Build before running smoke tests
@@ -186,7 +188,9 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-FullLint` - Run full-repo lint instead of targeted changed-file lint
 - `-Filter` - GoogleTest filter pattern passed to test.ps1
 - `-SmokeFilter` - Wildcard pattern for smoke test executables
-- `-SmokeExtended` - Include priority 2 examples in the smoke run
+- `-SmokeExtended` - Legacy full-suite mode including priority 1 and 2 examples/games
+- `-SmokeChangedOnly` - Explicitly run only smoke tests affected by changed source/header or shader files; this is the default
+- `-SmokeFull` - Run every discovered smoke executable and all priorities
 - `-Generator` - Ninja (default) or MSBuild
 - `-Config` - Debug (default) or Release
 

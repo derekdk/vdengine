@@ -13,6 +13,7 @@ constexpr float kPlayerHalfWidth = kPlayerWidth * 0.5f;
 constexpr float kPlayerHalfHeight = kPlayerHeight * 0.5f;
 constexpr float kMoveSpeed = 7.5f;
 constexpr float kJumpVelocity = 11.5f;
+constexpr float kJumpBufferTime = 0.12f;
 constexpr float kGravity = -28.0f;
 constexpr float kMaxFallVelocity = -22.0f;
 constexpr float kCollisionEpsilon = 0.001f;
@@ -69,6 +70,7 @@ void PlayerController::createEntities(vde::Scene& scene) {
 void PlayerController::reset(const TileMapSession& session, vde::Camera2D* camera) {
     m_playerPosition = session.spawnPoint();
     m_playerVelocity = glm::vec2(0.0f);
+    m_jumpBufferRemaining = 0.0f;
     m_onGround = false;
 
     if (camera != nullptr) {
@@ -84,10 +86,13 @@ void PlayerController::update(float deltaTime, float moveAxis, bool jumpRequeste
         return;
     }
 
-    if (jumpRequested && m_onGround) {
-        m_playerVelocity.y = kJumpVelocity;
-        m_onGround = false;
+    if (jumpRequested) {
+        m_jumpBufferRemaining = kJumpBufferTime;
+    } else {
+        m_jumpBufferRemaining = std::max(0.0f, m_jumpBufferRemaining - deltaTime);
     }
+
+    consumeBufferedJump();
 
     m_playerVelocity.x = moveAxis * kMoveSpeed;
     m_playerVelocity.y = std::max(m_playerVelocity.y + (kGravity * deltaTime), kMaxFallVelocity);
@@ -99,6 +104,7 @@ void PlayerController::update(float deltaTime, float moveAxis, bool jumpRequeste
     m_playerPosition.y += m_playerVelocity.y * deltaTime;
     m_onGround = false;
     resolveVerticalCollisions(session, previousBottom);
+    consumeBufferedJump();
 
     const float maxX = static_cast<float>(session.tileMap()->getColumnCount()) - kPlayerHalfWidth;
     m_playerPosition.x = std::clamp(m_playerPosition.x, kPlayerHalfWidth, maxX);
@@ -110,6 +116,16 @@ void PlayerController::update(float deltaTime, float moveAxis, bool jumpRequeste
     }
 
     syncVisuals();
+}
+
+void PlayerController::consumeBufferedJump() {
+    if (m_jumpBufferRemaining <= 0.0f || !m_onGround) {
+        return;
+    }
+
+    m_playerVelocity.y = kJumpVelocity;
+    m_jumpBufferRemaining = 0.0f;
+    m_onGround = false;
 }
 
 void PlayerController::stopMotion() {

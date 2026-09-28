@@ -300,6 +300,7 @@ Write-Ok "tools/$Name/CMakeLists.txt"
 $TomlContent = @"
 [smoke]
 scripts = ["smoke_${Name}.vdescript"]
+source_paths = ["."]
 sections = $SectionsToml
 "@
 

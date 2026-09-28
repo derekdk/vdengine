@@ -53,6 +53,20 @@ TileMap::TileMap(float tileWidth, float tileHeight, int columns, int rows)
     addLayer("base");
 }
 
+std::shared_ptr<TileMap> TileMap::clone() const {
+    auto copy = std::make_shared<TileMap>(m_tileWidth, m_tileHeight, m_columns, m_rows);
+    copy->m_cullingEnabled = m_cullingEnabled;
+    copy->m_tileSet = m_tileSet;
+    copy->m_layers = m_layers;
+    copy->m_collisionKinds = m_collisionKinds;
+    copy->m_lastVisibleBounds = TileVisibilityBounds{};
+    copy->m_meshDirty = true;
+    copy->setTransform(getTransform());
+    copy->setVisible(isVisible());
+    copy->setTexture(m_tileSet ? m_tileSet->getTexture() : std::shared_ptr<Texture>{});
+    return copy;
+}
+
 int TileMap::addLayer(const std::string& name) {
     LayerData layer;
     layer.info.name = name;

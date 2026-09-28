@@ -289,7 +289,7 @@ Use the smoke test runner:
 .\scripts\smoke-test.ps1
 ```
 
-This script runs all discovered examples, games, and tools with their smoke scripts and reports results. See the **smoke-testing** skill for the full reference.
+By default, this script runs only discovered examples, games, and tools affected by changed source/header or shader files. Use `-Full` to run every discovered executable. See the **smoke-testing** skill for the full reference.
 
 ## Best Practices
 

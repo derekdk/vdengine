@@ -1,2 +1,3 @@
 [smoke]
+source_paths = ["."]
 scripts = ["smoke_vlauncher.vdescript"]

@@ -16,12 +16,12 @@ This skill encodes hard-won lessons about running commands and writing PowerShel
 
 ## Required: Handling Long-Running Commands
 
-Smoke tests, full test suites, and rebuild commands can take 1–4 minutes. Getting this wrong means acting on incomplete output.
+Full smoke tests, full test suites, and rebuild commands can take 1–4 minutes. The default changed-only smoke run is usually shorter; getting this wrong means acting on incomplete output.
 
 ### Use generous timeouts or no timeout
 
 For any command that might run longer than 30 seconds, use `timeout: 0` (no timeout). Never guess a short timeout for:
-- `smoke-test.ps1` (runs ~29 executables, 2–4 minutes)
+- `smoke-test.ps1 -Full` (runs every discovered executable, typically 2–4 minutes)
 - `rebuild.ps1` (full clean + build, 30–90 seconds)
 - `test.ps1` without `-Filter` (full suite, 10–30 seconds)
 

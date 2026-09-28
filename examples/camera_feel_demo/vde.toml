@@ -1,4 +1,5 @@
 [smoke]
+source_paths = ["."]
 scripts = ["smoke_camera_feel_demo.vdescript"]
 sections = ["entity", "input"]
 

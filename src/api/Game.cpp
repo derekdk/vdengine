@@ -2675,6 +2675,7 @@ void Game::rebuildSchedulerGraph() {
                                              if (auto* camera = scene->getCamera()) {
                                                  camera->update(m_deltaTime);
                                              }
+                                             scene->updateCameraDependentVisuals(m_deltaTime);
                                          },
                                      .dependsOn = {timedTask},
                                      .mainThreadOnly = true});
@@ -2700,6 +2701,7 @@ void Game::rebuildSchedulerGraph() {
                                              if (auto* camera = scene->getCamera()) {
                                                  camera->update(m_deltaTime);
                                              }
+                                             scene->updateCameraDependentVisuals(m_deltaTime);
                                          },
                                      .dependsOn = {gameUpdateTask},
                                      .mainThreadOnly = true});

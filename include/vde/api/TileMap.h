@@ -159,6 +159,11 @@ class TileMap : public MeshEntity {
     std::shared_ptr<SpriteSheet> getTileSet() const { return m_tileSet; }
 
     /**
+     * @brief Create a CPU-side copy of this tilemap without attached scene or GPU mesh state.
+     */
+    std::shared_ptr<TileMap> clone() const;
+
+    /**
      * @brief Get the tile width in world units.
      */
     float getTileWidth() const { return m_tileWidth; }

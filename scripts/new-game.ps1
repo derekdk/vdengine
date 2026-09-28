@@ -259,6 +259,7 @@ Write-Ok "games/$Name/CMakeLists.txt"
 $TomlContent = @"
 [smoke]
 scripts = ["smoke_${Name}.vdescript"]
+source_paths = ["."]
 priority = 2
 sections = $SectionsToml
 "@

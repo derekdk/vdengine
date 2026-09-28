@@ -24,6 +24,7 @@ set(VDE_TEST_SOURCES
     # Phase 1 tests
     Entity_test.cpp
     Scene_test.cpp
+    SceneOrdering_test.cpp
     GameCamera_test.cpp
     LightBox_test.cpp
     # Phase 2.5 tests
@@ -53,6 +54,7 @@ set(VDE_TEST_SOURCES
     Joystick_test.cpp
     # Input / KeyStateTracker tests
     InputActionMap_test.cpp
+    LevelBuilderInput_test.cpp
     KeyStateTracker_test.cpp
     # Input script tests
     InputScript_test.cpp
@@ -71,6 +73,7 @@ set(VDE_TEST_SOURCES
     Timing_test.cpp
     Random_test.cpp
     DevModeController_test.cpp
+    PlayerController_test.cpp
     # Phase 2 animation engine tests
     PlaybackClock_test.cpp
     TimedEvents_test.cpp
@@ -96,6 +99,7 @@ set(VDE_TEST_SOURCES
     TileMapSession_test.cpp
 
     ${CMAKE_SOURCE_DIR}/games/level_builder/DevModeController.cpp
+    ${CMAKE_SOURCE_DIR}/games/level_builder/PlayerController.cpp
     ${CMAKE_SOURCE_DIR}/games/level_builder/TileMapSession.cpp
 
     # VLauncher storage utilities

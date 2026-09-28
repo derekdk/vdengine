@@ -78,6 +78,7 @@ void VLauncherScene::onEnter() {
     if (storageOk) {
         addConsoleMessage("Run-log storage initialized (app='vde_vlauncher').");
         loadViewPreferences();
+        loadWindowPosition();
         if (m_compactView) {
             m_compactResizePending = true;
         }
@@ -89,6 +90,8 @@ void VLauncherScene::onEnter() {
 }
 
 void VLauncherScene::onExit() {
+    saveWindowPosition();
+
     if (m_scanner) {
         m_scanner->stop();
     }
@@ -106,6 +109,48 @@ void VLauncherScene::loadViewPreferences() {
     if (compactValue.has_value()) {
         m_compactView = (*compactValue != 0);
     }
+}
+
+void VLauncherScene::loadWindowPosition() {
+    auto& storage = vde::StorageManager::getInstance();
+    if (!storage.isInitialized()) {
+        return;
+    }
+
+    const auto positionX = storage.getBinData<int32_t>(kWindowPositionXStorageKey);
+    const auto positionY = storage.getBinData<int32_t>(kWindowPositionYStorageKey);
+    if (!positionX.has_value() || !positionY.has_value()) {
+        return;
+    }
+
+    auto* game = getGame();
+    if (!game || !game->getWindow() || !game->getWindow()->getHandle()) {
+        return;
+    }
+
+    glfwSetWindowPos(game->getWindow()->getHandle(), static_cast<int>(*positionX),
+                     static_cast<int>(*positionY));
+}
+
+void VLauncherScene::saveWindowPosition() const {
+    auto& storage = vde::StorageManager::getInstance();
+    if (!storage.isInitialized()) {
+        return;
+    }
+
+    auto* game = getGame();
+    if (!game || !game->getWindow() || !game->getWindow()->getHandle()) {
+        return;
+    }
+
+    int positionX = 0;
+    int positionY = 0;
+    glfwGetWindowPos(game->getWindow()->getHandle(), &positionX, &positionY);
+
+    const int32_t storedPositionX = static_cast<int32_t>(positionX);
+    const int32_t storedPositionY = static_cast<int32_t>(positionY);
+    storage.setBinData(kWindowPositionXStorageKey, storedPositionX);
+    storage.setBinData(kWindowPositionYStorageKey, storedPositionY);
 }
 
 void VLauncherScene::saveCompactViewPreference() const {

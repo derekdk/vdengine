@@ -22,6 +22,7 @@ class PlayerController {
     [[nodiscard]] glm::vec2 getPosition() const { return m_playerPosition; }
 
   private:
+    void consumeBufferedJump();
     void resolveHorizontalCollisions(const TileMapSession& session);
     void resolveVerticalCollisions(const TileMapSession& session, float previousBottom);
     void syncVisuals();
@@ -30,6 +31,7 @@ class PlayerController {
     std::shared_ptr<vde::SpriteEntity> m_playerShadow;
     glm::vec2 m_playerPosition{0.0f};
     glm::vec2 m_playerVelocity{0.0f};
+    float m_jumpBufferRemaining = 0.0f;
     bool m_onGround = false;
 };
 

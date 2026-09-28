@@ -407,20 +407,24 @@ class PhaseCallbackTestScene : public Scene {
   public:
     int gameLogicCallCount = 0;
     int visualsCallCount = 0;
+    int cameraDependentVisualsCallCount = 0;
 
     PhaseCallbackTestScene() { enablePhaseCallbacks(); }
 
     void updateGameLogic(float) override { gameLogicCallCount++; }
     void updateAudio(float) override {}
     void updateVisuals(float) override { visualsCallCount++; }
+    void updateCameraDependentVisuals(float) override { cameraDependentVisualsCallCount++; }
 };
 
 /// Minimal legacy scene (single update()).
 class LegacyTestScene : public Scene {
   public:
     int updateCallCount = 0;
+    int cameraDependentVisualsCallCount = 0;
 
     void update(float) override { updateCallCount++; }
+    void updateCameraDependentVisuals(float) override { cameraDependentVisualsCallCount++; }
 };
 
 /// Minimal scene with both phase callbacks and physics enabled.
@@ -544,6 +548,21 @@ TEST_F(GameSchedulerTest, LegacyScene_UpdateCallbackFires) {
     EXPECT_EQ(scenePtr->updateCallCount, 0);
     game.getScheduler().execute();
     EXPECT_EQ(scenePtr->updateCallCount, 1);
+    EXPECT_EQ(scenePtr->cameraDependentVisualsCallCount, 1);
+}
+
+TEST_F(GameSchedulerTest, PhaseCallbackScene_CameraDependentVisualsCallbackFires) {
+    auto rawScene = std::make_unique<PhaseCallbackTestScene>();
+    PhaseCallbackTestScene* scenePtr = rawScene.get();
+    game.addScene("phased", std::move(rawScene));
+
+    SceneGroup group;
+    group.sceneNames = {"phased"};
+    game.setActiveSceneGroup(group);
+
+    game.getScheduler().execute();
+    EXPECT_EQ(scenePtr->visualsCallCount, 1);
+    EXPECT_EQ(scenePtr->cameraDependentVisualsCallCount, 1);
 }
 
 TEST_F(GameSchedulerTest, VisualPhase_AfterPostPhysics) {

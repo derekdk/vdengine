@@ -16,6 +16,9 @@ wait_frames 3
 press D
 wait_frames 3
 
+press X
+wait_frames 3
+
 screenshot render_verify_output/level_builder_select_tile.png
 wait 100
 

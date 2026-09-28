@@ -1,4 +1,5 @@
 [smoke]
+source_paths = ["."]
 scripts = ["smoke_spritesheet_multiscene_demo.vdescript"]
 priority = 2
 sections = ["resource", "multi_scene"]
