@@ -36,6 +36,10 @@ void RunnerCharacter::reset() {
     m_sprite->setPosition(kX, m_y, 0.55f);
 }
 
+bool RunnerCharacter::isJumping() const {
+    return m_y > kGroundY + kHeight * 0.5f;
+}
+
 float RunnerCharacter::left() const {
     return kX - kWidth * 0.5f;
 }

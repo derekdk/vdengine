@@ -14,6 +14,7 @@ class RunnerCharacter {
     void jump();
     void reset();
 
+    [[nodiscard]] bool isJumping() const;
     [[nodiscard]] float left() const;
     [[nodiscard]] float right() const;
     [[nodiscard]] float bottom() const;

@@ -85,6 +85,19 @@ std::vector<std::string> RunGameScene::getControls() const {
     };
 }
 
+std::optional<double> RunGameScene::getScriptStateValue(const std::string& key) const {
+    if (key == "game_over") {
+        return m_gameOver ? 1.0 : 0.0;
+    }
+    if (key == "jumping") {
+        return m_runner && m_runner->isJumping() ? 1.0 : 0.0;
+    }
+    if (key == "score") {
+        return std::floor(m_distance);
+    }
+    return std::nullopt;
+}
+
 void RunGameScene::createHud() {
     m_titleText = addEntity<vde::TextEntity>();
     m_titleText->setText("RUN GAME");

@@ -1,10 +1,13 @@
 # Smoke test: RunGame
-# Jump, then exercise the restart control.
+# Jump, reach game over, then restart with jump.
 wait startup
 press SPACE
-wait 1900
+wait_frames 2
+assert scene "main" state.jumping == 1
+wait 2800
+assert scene "main" state.game_over == 1
 press SPACE
-wait 500
-press R
-wait 1000
+wait_frames 2
+assert scene "main" state.game_over == 0
+assert scene "main" state.score == 0
 exit

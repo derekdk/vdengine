@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,7 @@ class RunGameScene : public vde::games::BaseGameScene {
     std::vector<std::string> getGameplaySummary() const override;
     std::vector<std::string> getGoals() const override;
     std::vector<std::string> getControls() const override;
+    std::optional<double> getScriptStateValue(const std::string& key) const override;
 
   private:
     void createHud();
