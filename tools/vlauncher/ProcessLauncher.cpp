@@ -192,6 +192,8 @@ bool ProcessLauncher::pollCompletion(const LaunchedProcess& launchedProcess, boo
         return false;
     }
 
+    // HANDLE is stored as uintptr_t so the header stays free of windows.h.
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     auto processHandle = reinterpret_cast<HANDLE>(launchedProcess.processHandle);
     DWORD waitResult = WaitForSingleObject(processHandle, 0);
     if (waitResult == WAIT_TIMEOUT) {
@@ -224,6 +226,7 @@ bool ProcessLauncher::pollCompletion(const LaunchedProcess& launchedProcess, boo
 void ProcessLauncher::release(LaunchedProcess& launchedProcess) {
 #ifdef _WIN32
     if (launchedProcess.processHandle != 0) {
+        // NOLINTNEXTLINE(performance-no-int-to-ptr)
         auto processHandle = reinterpret_cast<HANDLE>(launchedProcess.processHandle);
         CloseHandle(processHandle);
         launchedProcess.processHandle = 0;

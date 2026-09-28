@@ -68,7 +68,7 @@ std::filesystem::path findExecutableOnPath(const char* executableName) {
         return {};
     }
 
-    return std::filesystem::path(buffer);
+    return {buffer};
 }
 #endif
 

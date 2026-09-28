@@ -86,7 +86,7 @@ std::optional<std::string> sanitizeSmokeScriptName(const std::string& rawScript)
         }
     }
 
-    const std::string fileName = scriptPath.filename().string();
+    std::string fileName = scriptPath.filename().string();
     if (fileName.empty() || fileName == "." || fileName == "..") {
         return std::nullopt;
     }
@@ -655,7 +655,8 @@ ExecutableScanner::loadSmokeMetadata(const std::filesystem::path& sourceDir,
             }
         }
     } catch (const toml::parse_error&) {
-        // Malformed TOML — silently skip.
+        // Malformed TOML — skip smoke metadata for this target.
+        return result;
     }
 
     return result;

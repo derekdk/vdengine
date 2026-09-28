@@ -149,7 +149,11 @@ static std::vector<std::string> wordWrap(const vde::TrueTypeFont& font, const st
     std::string currentLine;
 
     while (stream >> word) {
-        std::string testLine = currentLine.empty() ? word : currentLine + " " + word;
+        std::string testLine = currentLine;
+        if (!testLine.empty()) {
+            testLine += ' ';
+        }
+        testLine += word;
         if (measureTextWidthPx(font, testLine) > maxWidthPx && !currentLine.empty()) {
             lines.push_back(currentLine);
             currentLine = word;

@@ -199,6 +199,8 @@ GitUtils::CommandResult GitUtils::runGitCommand(const std::string& args) const {
     command << " 2>/dev/null";
 #endif
 
+    // Arguments are fixed git subcommands plus quoted repo-relative paths from the local scan.
+    // NOLINTNEXTLINE(bugprone-command-processor)
     FILE* pipe = popen(command.str().c_str(), "r");
     if (!pipe) {
         result.exitCode = -1;

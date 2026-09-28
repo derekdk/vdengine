@@ -570,7 +570,11 @@ void GeometryReplScene::drawDebugUI() {
                     if (ImGui::Button(("Export##" + name).c_str())) {
                         std::string filename = name + ".obj";
                         if (geo.exportToOBJ(filename)) {
-                            addConsoleMessage("Exported '" + name + "' to " + filename);
+                            std::string message = "Exported '";
+                            message += name;
+                            message += "' to ";
+                            message += filename;
+                            addConsoleMessage(message);
                         } else {
                             addConsoleMessage("ERROR: Failed to export '" + name + "'");
                         }
@@ -996,11 +1000,20 @@ void GeometryReplScene::cmdList(const std::string& /*args*/) {
     addConsoleMessage("====================================================");
     addConsoleMessage("GEOMETRY OBJECTS:");
     for (const auto& [name, geo] : m_geometryObjects) {
-        std::string typeStr = (geo.type == GeometryType::POLYGON) ? "polygon" : "line";
-        std::string visStr = geo.visible ? "[VISIBLE]" : "[hidden]";
-        std::string texStr = geo.textureName.empty() ? "" : (", tex=" + geo.textureName);
-        addConsoleMessage("  " + name + " (" + typeStr + ", " + std::to_string(geo.points.size()) +
-                          " points" + texStr + ") " + visStr);
+        std::string line = "  ";
+        line += name;
+        line += " (";
+        line += (geo.type == GeometryType::POLYGON) ? "polygon" : "line";
+        line += ", ";
+        line += std::to_string(geo.points.size());
+        line += " points";
+        if (!geo.textureName.empty()) {
+            line += ", tex=";
+            line += geo.textureName;
+        }
+        line += ") ";
+        line += geo.visible ? "[VISIBLE]" : "[hidden]";
+        addConsoleMessage(line);
     }
     addConsoleMessage("====================================================");
 }
@@ -1313,7 +1326,7 @@ GeometryReplScene::getOrCreateTexturePreview(const std::string& textureName,
 
     auto existing = m_textureInspectorDescriptors.find(textureName);
     if (existing != m_textureInspectorDescriptors.end() && existing->second != VK_NULL_HANDLE) {
-        return (ImTextureID)existing->second;
+        return reinterpret_cast<ImTextureID>(existing->second);
     }
 
     VkDescriptorSet descriptor = ImGui_ImplVulkan_AddTexture(
@@ -1323,7 +1336,7 @@ GeometryReplScene::getOrCreateTexturePreview(const std::string& textureName,
     }
 
     m_textureInspectorDescriptors[textureName] = descriptor;
-    return (ImTextureID)descriptor;
+    return reinterpret_cast<ImTextureID>(descriptor);
 }
 
 void GeometryReplScene::clearTexturePreview(const std::string& textureName) {

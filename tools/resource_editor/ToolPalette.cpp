@@ -6,6 +6,7 @@
 #include "ToolPalette.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <sstream>
@@ -117,7 +118,7 @@ void ToolPalette::setTool(EditorTool tool) {
 std::string ToolPalette::colorToHex(RGBAColor color) {
     char buf[12];
     std::snprintf(buf, sizeof(buf), "#%02X%02X%02X%02X", color.r, color.g, color.b, color.a);
-    return std::string(buf);
+    return {buf};
 }
 
 bool ToolPalette::hexToColor(const std::string& hex, RGBAColor& outColor) {
@@ -126,25 +127,28 @@ bool ToolPalette::hexToColor(const std::string& hex, RGBAColor& outColor) {
         h = h.substr(1);
     }
 
-    if (h.size() == 6) {
-        // #RRGGBB — alpha defaults to 255
-        unsigned int r, g, b;
-        if (std::sscanf(h.c_str(), "%02x%02x%02x", &r, &g, &b) == 3) {
-            outColor = {static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b),
-                        255};
-            return true;
-        }
-    } else if (h.size() == 8) {
-        // #RRGGBBAA
-        unsigned int r, g, b, a;
-        if (std::sscanf(h.c_str(), "%02x%02x%02x%02x", &r, &g, &b, &a) == 4) {
-            outColor = {static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b),
-                        static_cast<uint8_t>(a)};
-            return true;
-        }
+    if (h.size() != 6 && h.size() != 8) {
+        return false;
     }
 
-    return false;
+    uint32_t value = 0;
+    const char* begin = h.data();
+    const char* end = begin + h.size();
+    const auto [ptr, ec] = std::from_chars(begin, end, value, 16);
+    if (ec != std::errc{} || ptr != end) {
+        return false;
+    }
+
+    if (h.size() == 6) {
+        // #RRGGBB — alpha defaults to 255
+        outColor = {static_cast<uint8_t>(value >> 16), static_cast<uint8_t>(value >> 8),
+                    static_cast<uint8_t>(value), 255};
+    } else {
+        // #RRGGBBAA
+        outColor = {static_cast<uint8_t>(value >> 24), static_cast<uint8_t>(value >> 16),
+                    static_cast<uint8_t>(value >> 8), static_cast<uint8_t>(value)};
+    }
+    return true;
 }
 
 std::string ToolPalette::toolToString(EditorTool tool) {

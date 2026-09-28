@@ -24,7 +24,7 @@ namespace vde {
 VulkanContext::VulkanContext() = default;
 
 VulkanContext::~VulkanContext() {
-    cleanup();
+    VulkanContext::cleanup();
 }
 
 void VulkanContext::initialize(Window* window) {

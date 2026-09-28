@@ -661,7 +661,7 @@ void EditorPanels::drawCanvasViewport(Canvas& canvas, ToolPalette& palette, Comm
             // Get cursor position for mouse coordinate calculation
             ImVec2 cursorPos = ImGui::GetCursorScreenPos();
 
-            ImGui::Image((ImTextureID)canvas.imguiTextureId, ImVec2(texW, texH));
+            ImGui::Image(reinterpret_cast<ImTextureID>(canvas.imguiTextureId), ImVec2(texW, texH));
 
             // Mouse interaction
             if (ImGui::IsItemHovered()) {

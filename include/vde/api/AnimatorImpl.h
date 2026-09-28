@@ -86,7 +86,7 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
     };
 
     if (callbacks.onStart) {
-        unbound.onStart = [&scene, binding, cb = std::move(callbacks.onStart),
+        unbound.onStart = [binding, cb = std::move(callbacks.onStart),
                            resolveBoundTarget](const AnimationContext& ctx) mutable {
             auto [lock, target] = resolveBoundTarget();
             if (target) {
@@ -96,7 +96,7 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
     }
 
     if (callbacks.onUpdate) {
-        unbound.onUpdate = [&scene, binding, cb = std::move(callbacks.onUpdate),
+        unbound.onUpdate = [binding, cb = std::move(callbacks.onUpdate),
                             resolveBoundTarget](const AnimationContext& ctx) mutable {
             auto [lock, target] = resolveBoundTarget();
             if (target) {
@@ -106,7 +106,7 @@ AnimationHandle Animator::schedule(Scene& scene, const AnimationBinding<T>& bind
     }
 
     if (callbacks.onComplete) {
-        unbound.onComplete = [&scene, binding, cb = std::move(callbacks.onComplete),
+        unbound.onComplete = [binding, cb = std::move(callbacks.onComplete),
                               resolveBoundTarget](const AnimationContext& ctx) mutable {
             auto [lock, target] = resolveBoundTarget();
             if (target) {

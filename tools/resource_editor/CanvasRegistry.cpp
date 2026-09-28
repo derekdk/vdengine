@@ -6,6 +6,7 @@
 #include "CanvasRegistry.h"
 
 #include <algorithm>
+#include <charconv>
 #include <sstream>
 
 namespace vde {
@@ -80,14 +81,12 @@ Canvas* CanvasRegistry::resolve(const std::string& nameOrId) {
     }
 
     // Try to parse as integer ID
-    try {
-        size_t pos = 0;
-        unsigned long val = std::stoul(nameOrId, &pos);
-        if (pos == nameOrId.size()) {
-            return getById(static_cast<uint32_t>(val));
-        }
-    } catch (...) {
-        // Not a number — fall through
+    uint32_t id = 0;
+    const char* begin = nameOrId.data();
+    const char* end = begin + nameOrId.size();
+    const auto [ptr, ec] = std::from_chars(begin, end, id);
+    if (ec == std::errc{} && ptr == end) {
+        return getById(id);
     }
 
     return nullptr;
