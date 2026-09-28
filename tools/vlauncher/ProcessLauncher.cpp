@@ -192,7 +192,7 @@ bool ProcessLauncher::pollCompletion(const LaunchedProcess& launchedProcess, boo
         return false;
     }
 
-    HANDLE processHandle = reinterpret_cast<HANDLE>(launchedProcess.processHandle);
+    auto processHandle = reinterpret_cast<HANDLE>(launchedProcess.processHandle);
     DWORD waitResult = WaitForSingleObject(processHandle, 0);
     if (waitResult == WAIT_TIMEOUT) {
         return true;
@@ -224,7 +224,7 @@ bool ProcessLauncher::pollCompletion(const LaunchedProcess& launchedProcess, boo
 void ProcessLauncher::release(LaunchedProcess& launchedProcess) {
 #ifdef _WIN32
     if (launchedProcess.processHandle != 0) {
-        HANDLE processHandle = reinterpret_cast<HANDLE>(launchedProcess.processHandle);
+        auto processHandle = reinterpret_cast<HANDLE>(launchedProcess.processHandle);
         CloseHandle(processHandle);
         launchedProcess.processHandle = 0;
     }
@@ -254,7 +254,7 @@ bool ProcessLauncher::readOutputFile(const std::filesystem::path& outputPath, st
             break;
         }
 
-        const size_t bytesRead = static_cast<size_t>(readCount);
+        const auto bytesRead = static_cast<size_t>(readCount);
         const size_t remaining =
             (kMaxOutputReadBytes > totalRead) ? (kMaxOutputReadBytes - totalRead) : 0;
         const size_t toAppend = (bytesRead < remaining) ? bytesRead : remaining;

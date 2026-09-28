@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -123,10 +124,10 @@ struct GameWorld {
         rooms[5].eventKey = "dungeon_escape";
     }
 
-    const Room& current() const { return rooms[currentRoom]; }
+    [[nodiscard]] const Room& current() const { return rooms[currentRoom]; }
 
-    bool hasItem(const std::string& item) const {
-        return std::find(inventory.begin(), inventory.end(), item) != inventory.end();
+    [[nodiscard]] bool hasItem(const std::string& item) const {
+        return std::ranges::find(inventory, item) != inventory.end();
     }
 };
 
@@ -154,27 +155,32 @@ static std::string buildMiniMap(const GameWorld& world) {
 
     // Build 3-row, 3-col grid
     char grid[3][3];
-    for (auto& row : grid)
-        for (auto& c : row)
+    for (auto& row : grid) {
+        for (auto& c : row) {
             c = '.';
+        }
+    }
 
     for (int i = 0; i < 6; ++i) {
         auto& p = positions[i];
-        if (i == world.currentRoom)
+        if (i == world.currentRoom) {
             grid[p.row][p.col] = '@';
-        else
+        } else {
             grid[p.row][p.col] = '#';
+        }
     }
 
     std::string result;
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 3; ++c) {
             result += grid[r][c];
-            if (c < 2)
+            if (c < 2) {
                 result += ' ';
+            }
         }
-        if (r < 2)
+        if (r < 2) {
             result += '/';
+        }
     }
     return result;
 }
@@ -186,7 +192,7 @@ static std::string buildMiniMap(const GameWorld& world) {
 static std::vector<std::string> wordWrap(const std::string& text, size_t maxChars) {
     std::vector<std::string> lines;
     if (text.empty()) {
-        lines.push_back("");
+        lines.emplace_back("");
         return lines;
     }
 
@@ -204,8 +210,9 @@ static std::vector<std::string> wordWrap(const std::string& text, size_t maxChar
             currentLine = word;
         }
     }
-    if (!currentLine.empty())
+    if (!currentLine.empty()) {
         lines.push_back(currentLine);
+    }
 
     return lines;
 }
@@ -382,8 +389,9 @@ class AdventureScene : public vde::examples::BaseExampleScene {
 
         // Handle character input
         auto* input = dynamic_cast<AdventureInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Append typed characters
         std::string chars = input->drainChars();
@@ -402,8 +410,9 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         if (input->consumeEnter() && !m_commandBuffer.empty()) {
             // Convert to uppercase for matching
             std::string cmd = m_commandBuffer;
-            for (auto& c : cmd)
+            for (auto& c : cmd) {
                 c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
             m_commandBuffer.clear();
             m_promptDirty = true;
             processCommand(cmd);
@@ -421,18 +430,20 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         if (m_promptDirty) {
             m_promptDirty = false;
             std::string display = m_commandBuffer;
-            if (m_cursorVisible)
+            if (m_cursorVisible) {
                 display += "_";
-            if (display.empty())
+            }
+            if (display.empty()) {
                 display = " ";
+            }
             m_promptText->setText(display);
         }
     }
 
   protected:
-    std::string getExampleName() const override { return "Text Adventure"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Text Adventure"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"TTF room title at top with TrueTypeFont + TextEntity",
                 "Pixel-font ASCII mini-map in top-right corner",
                 "Scrolling narrative with word-wrap (8 lines)",
@@ -442,7 +453,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
                 "All text rendering features composed together"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Yellow room title at top center",
                 "Green ASCII mini-map in top-right (@ = current room)",
                 "White narrative text lines filling center area",
@@ -450,7 +461,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
                 "Yellow inventory and green HP in status bar"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"Type letters to build a command", "ENTER   - Execute command",
                 "BACKSPACE - Delete last character",
                 "Commands: GO <dir>, TAKE <item>, LOOK, INVENTORY, USE <item>"};
@@ -498,22 +509,25 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         // Show room description with word-wrap
         addNarrative("");
         auto wrapped = wordWrap(room.description, WRAP_WIDTH);
-        for (const auto& line : wrapped)
+        for (const auto& line : wrapped) {
             addNarrative(line);
+        }
 
         // List visible items
         if (!room.items.empty()) {
             std::string itemLine = "You see:";
-            for (const auto& item : room.items)
+            for (const auto& item : room.items) {
                 itemLine += " " + item + ",";
+            }
             itemLine.pop_back();  // remove trailing comma
             addNarrative(itemLine);
         }
 
         // List exits
         std::string exitLine = "Exits:";
-        for (const auto& [dir, _] : room.exits)
+        for (const auto& [dir, _] : room.exits) {
             exitLine += " " + dir;
+        }
         addNarrative(exitLine);
 
         // Trigger room event
@@ -529,11 +543,12 @@ class AdventureScene : public vde::examples::BaseExampleScene {
     // ---- Narrative management ----
     void addNarrative(const std::string& line) {
         m_narrativeLines.push_front(line.empty() ? " " : line);
-        while (static_cast<int>(m_narrativeLines.size()) > NARRATIVE_LINES)
+        while (static_cast<int>(m_narrativeLines.size()) > NARRATIVE_LINES) {
             m_narrativeLines.pop_back();
+        }
 
         for (int i = 0; i < NARRATIVE_LINES; ++i) {
-            if (i < static_cast<int>(m_narrativeLines.size())) {
+            if (std::cmp_less(i, m_narrativeLines.size())) {
                 m_narrativeEntities[i]->setText(m_narrativeLines[i]);
             }
         }
@@ -546,8 +561,9 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         if (m_world.inventory.empty()) {
             inv += " (empty)";
         } else {
-            for (const auto& item : m_world.inventory)
+            for (const auto& item : m_world.inventory) {
                 inv += " " + item + ",";
+            }
             inv.pop_back();
         }
         m_statusInventory->setText(inv);
@@ -556,10 +572,11 @@ class AdventureScene : public vde::examples::BaseExampleScene {
         std::string hpStr =
             "HP: " + std::to_string(m_world.hp) + "/" + std::to_string(m_world.maxHp);
         Color hpColor = Color::green();
-        if (m_world.hp <= m_world.maxHp / 4)
+        if (m_world.hp <= m_world.maxHp / 4) {
             hpColor = Color::red();
-        else if (m_world.hp <= m_world.maxHp / 2)
+        } else if (m_world.hp <= m_world.maxHp / 2) {
             hpColor = Color::yellow();
+        }
         m_statusHp->setText(hpStr);
         m_statusHp->setStyle({.color = hpColor, .pixelScale = 1, .letterSpacing = 1});
     }
@@ -572,11 +589,11 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             cmdLook();
         } else if (cmd == "INVENTORY" || cmd == "INV" || cmd == "I") {
             cmdInventory();
-        } else if (cmd.substr(0, 3) == "GO ") {
+        } else if (cmd.starts_with("GO ")) {
             cmdGo(cmd.substr(3));
-        } else if (cmd.substr(0, 5) == "TAKE ") {
+        } else if (cmd.starts_with("TAKE ")) {
             cmdTake(cmd.substr(5));
-        } else if (cmd.substr(0, 4) == "USE ") {
+        } else if (cmd.starts_with("USE ")) {
             cmdUse(cmd.substr(4));
         } else if (cmd == "HELP") {
             addNarrative("Commands: GO <dir>, TAKE <item>,");
@@ -590,13 +607,15 @@ class AdventureScene : public vde::examples::BaseExampleScene {
     void cmdLook() {
         const auto& room = m_world.current();
         auto wrapped = wordWrap(room.description, 52);
-        for (const auto& line : wrapped)
+        for (const auto& line : wrapped) {
             addNarrative(line);
+        }
 
         if (!room.items.empty()) {
             std::string itemLine = "You see:";
-            for (const auto& item : room.items)
+            for (const auto& item : room.items) {
                 itemLine += " " + item + ",";
+            }
             itemLine.pop_back();
             addNarrative(itemLine);
         }
@@ -607,8 +626,9 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             addNarrative("You are carrying nothing.");
         } else {
             addNarrative("You are carrying:");
-            for (const auto& item : m_world.inventory)
+            for (const auto& item : m_world.inventory) {
                 addNarrative("  " + item);
+            }
         }
     }
 
@@ -625,7 +645,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
 
     void cmdTake(const std::string& itemName) {
         auto& room = m_world.rooms[m_world.currentRoom];
-        auto it = std::find(room.items.begin(), room.items.end(), itemName);
+        auto it = std::ranges::find(room.items, itemName);
         if (it == room.items.end()) {
             addNarrative("There is no " + itemName + " here.");
             return;
@@ -652,7 +672,7 @@ class AdventureScene : public vde::examples::BaseExampleScene {
             addNarrative("You unlock the chest with the RUSTY KEY!");
             addNarrative("Inside you find a SILVER RING.");
             removeItem(itemName);
-            m_world.inventory.push_back("SILVER RING");
+            m_world.inventory.emplace_back("SILVER RING");
             refreshStatusBar();
         } else if (itemName == "TORCH" && m_world.currentRoom == 5) {
             addNarrative("The torch illuminates hidden runes on the wall.");
@@ -666,9 +686,10 @@ class AdventureScene : public vde::examples::BaseExampleScene {
     }
 
     void removeItem(const std::string& itemName) {
-        auto it = std::find(m_world.inventory.begin(), m_world.inventory.end(), itemName);
-        if (it != m_world.inventory.end())
+        auto it = std::ranges::find(m_world.inventory, itemName);
+        if (it != m_world.inventory.end()) {
             m_world.inventory.erase(it);
+        }
     }
 
     // ---- Events ----
@@ -723,6 +744,7 @@ class AdventureGame : public vde::examples::BaseExampleGame<AdventureInputHandle
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     AdventureGame game;
     return vde::examples::runExample(game, "VDE Text Adventure Demo", 1280, 720, argc, argv);

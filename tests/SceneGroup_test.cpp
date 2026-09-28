@@ -91,7 +91,7 @@ TEST(SceneGroupTest, CopySemantics) {
     EXPECT_EQ(group2.size(), 2);
 
     // Modifying copy doesn't affect original
-    group2.sceneNames.push_back("c");
+    group2.sceneNames.emplace_back("c");
     EXPECT_EQ(group1.size(), 2);
     EXPECT_EQ(group2.size(), 3);
 }

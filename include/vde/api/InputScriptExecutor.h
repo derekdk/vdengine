@@ -36,14 +36,14 @@ class InputScriptExecutor {
     bool processFrame(float deltaTime);
 
     /// True when the script has been loaded and has not yet finished.
-    bool isRunning() const;
+    [[nodiscard]] bool isRunning() const;
 
     /// True if any assertion in the script failed.
-    bool hasAssertionFailure() const;
+    [[nodiscard]] bool hasAssertionFailure() const;
 
     /// Direct access for test inspection.
     InputScriptState* getState() { return m_state.get(); }
-    const InputScriptState* getState() const { return m_state.get(); }
+    [[nodiscard]] const InputScriptState* getState() const { return m_state.get(); }
 
     /// Replace the internal state (for testing).
     void setState(std::unique_ptr<InputScriptState> state) { m_state = std::move(state); }
@@ -80,7 +80,8 @@ class InputScriptExecutor {
     bool handleSet(InputScriptState& state, const ScriptCommand& cmd);
     bool handleHoldKey(InputScriptState& state, const ScriptCommand& cmd);
 
-    ScriptEnvironment& m_env;
+    // Executor is bound to one environment for its lifetime.
+    ScriptEnvironment& m_env;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     float m_deltaTime = 0.0f;
     std::unique_ptr<InputScriptState> m_state;
 };

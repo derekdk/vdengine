@@ -108,7 +108,7 @@ std::vector<uint32_t> CanvasRegistry::getIds() const {
         ids.push_back(id);
     }
     // std::map already iterates in sorted order, but be explicit
-    std::sort(ids.begin(), ids.end());
+    std::ranges::sort(ids);
     return ids;
 }
 

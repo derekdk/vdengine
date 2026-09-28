@@ -77,13 +77,13 @@ class PhysicsEntity {
     /**
      * @brief Get the physics body ID (INVALID_PHYSICS_BODY_ID if none).
      */
-    PhysicsBodyId getPhysicsBodyId() const { return m_physicsBodyId; }
+    [[nodiscard]] PhysicsBodyId getPhysicsBodyId() const { return m_physicsBodyId; }
 
     /**
      * @brief Get the current physics body state.
      * @throws std::runtime_error if no valid body exists
      */
-    PhysicsBodyState getPhysicsState() const;
+    [[nodiscard]] PhysicsBodyState getPhysicsState() const;
 
     // -----------------------------------------------------------------
     // Force / impulse helpers  (delegate to PhysicsScene)
@@ -117,7 +117,7 @@ class PhysicsEntity {
     /**
      * @brief Check whether automatic sync is enabled.
      */
-    bool getAutoSync() const { return m_autoSync; }
+    [[nodiscard]] bool getAutoSync() const { return m_autoSync; }
 
     // -----------------------------------------------------------------
     // Internal — called by derived classes

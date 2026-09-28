@@ -115,22 +115,22 @@ class PlaybackClock {
      * For PingPong mode this reflects the visual direction:
      * 0→1 on the forward pass, 1→0 on the reverse pass.
      */
-    float getProgress() const { return m_progress; }
+    [[nodiscard]] float getProgress() const { return m_progress; }
 
     /**
      * @brief Returns true if the delay window has elapsed and playback has begun.
      */
-    bool hasStarted() const { return (m_active || m_complete) && m_delayConsumed; }
+    [[nodiscard]] bool hasStarted() const { return (m_active || m_complete) && m_delayConsumed; }
 
     /**
      * @brief Returns true if the clock has completed (Once mode after reaching 1.0).
      */
-    bool isComplete() const { return m_complete; }
+    [[nodiscard]] bool isComplete() const { return m_complete; }
 
     /**
      * @brief Returns true while the clock is paused.
      */
-    bool isPaused() const { return m_paused; }
+    [[nodiscard]] bool isPaused() const { return m_paused; }
 
     /**
      * @brief Number of passes completed.
@@ -138,12 +138,12 @@ class PlaybackClock {
      * In Loop mode this increments each full cycle.
      * In PingPong mode this increments each pass (both forward and reverse).
      */
-    uint32_t getCycleIndex() const { return m_cycleIndex; }
+    [[nodiscard]] uint32_t getCycleIndex() const { return m_cycleIndex; }
 
     /**
      * @brief Returns true during the reverse pass of a PingPong clock.
      */
-    bool isReversePass() const { return !m_forward; }
+    [[nodiscard]] bool isReversePass() const { return !m_forward; }
 
   private:
     LoopMode m_loopMode = LoopMode::Once;

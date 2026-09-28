@@ -2191,7 +2191,7 @@ void Game::renderMultiViewport() {
         updateLightingUBO(scene);
 
         // Capture scene pointer for the lambda
-        info.renderCallback = [this, scene](VkCommandBuffer cmd) {
+        info.renderCallback = [scene](VkCommandBuffer cmd) {
             (void)cmd;
             scene->render();
         };

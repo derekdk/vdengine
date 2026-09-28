@@ -407,12 +407,12 @@ CompletionCallback GeometryReplScene::objectNameCompleter() const {
             [[maybe_unused]] const std::vector<std::string>& tokens) -> std::vector<std::string> {
             std::vector<std::string> results;
             std::string prefix = partial;
-            std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+            std::ranges::transform(prefix, prefix.begin(), ::tolower);
 
             for (const auto& [name, _] : m_geometryObjects) {
                 std::string lower = name;
-                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                if (prefix.empty() || lower.substr(0, prefix.size()) == prefix) {
+                std::ranges::transform(lower, lower.begin(), ::tolower);
+                if (prefix.empty() || lower.starts_with(prefix)) {
                     results.push_back(name);
                 }
             }
@@ -428,11 +428,11 @@ CompletionCallback GeometryReplScene::createCompleter() const {
             // Complete type names
             std::vector<std::string> types = {"polygon", "line"};
             std::string prefix = partial;
-            std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+            std::ranges::transform(prefix, prefix.begin(), ::tolower);
 
             std::vector<std::string> results;
             for (const auto& t : types) {
-                if (prefix.empty() || t.substr(0, prefix.size()) == prefix) {
+                if (prefix.empty() || t.starts_with(prefix)) {
                     results.push_back(t);
                 }
             }
@@ -449,12 +449,12 @@ CompletionCallback GeometryReplScene::textureNameCompleter() const {
             [[maybe_unused]] const std::vector<std::string>& tokens) -> std::vector<std::string> {
             std::vector<std::string> results;
             std::string prefix = partial;
-            std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+            std::ranges::transform(prefix, prefix.begin(), ::tolower);
 
             for (const auto& [name, _] : m_textures) {
                 std::string lower = name;
-                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                if (prefix.empty() || lower.substr(0, prefix.size()) == prefix) {
+                std::ranges::transform(lower, lower.begin(), ::tolower);
+                if (prefix.empty() || lower.starts_with(prefix)) {
                     results.push_back(name);
                 }
             }
@@ -648,8 +648,8 @@ void GeometryReplScene::drawDebugUI() {
                     float availableWidth = ImGui::GetContentRegionAvail().x;
                     float maxPreviewHeight = 220.0f * scale;
 
-                    float texWidth = static_cast<float>(texture->getWidth());
-                    float texHeight = static_cast<float>(texture->getHeight());
+                    auto texWidth = static_cast<float>(texture->getWidth());
+                    auto texHeight = static_cast<float>(texture->getHeight());
 
                     float previewWidth = availableWidth;
                     float previewHeight = previewWidth * (texHeight / texWidth);
@@ -783,7 +783,7 @@ void GeometryReplScene::cmdCreate(const std::string& args) {
         return;
     }
 
-    std::transform(typeStr.begin(), typeStr.end(), typeStr.begin(), ::tolower);
+    std::ranges::transform(typeStr, typeStr.begin(), ::tolower);
 
     GeometryType type;
     if (typeStr == "polygon") {
@@ -825,7 +825,7 @@ void GeometryReplScene::cmdAddPoint(const std::string& args) {
         return;
     }
 
-    it->second.points.push_back(glm::vec3(x, y, z));
+    it->second.points.emplace_back(x, y, z);
     addConsoleMessage("Added point (" + std::to_string(x) + ", " + std::to_string(y) + ", " +
                       std::to_string(z) + ") to '" + name + "'");
 
@@ -1166,6 +1166,7 @@ void GeometryReplScene::setGeometryVisible(const std::string& name, bool visible
     // Defer the actual entity add/remove to the next update phase via
     // Scene::deferCommand(), so we never mutate entities while the Vulkan
     // command buffer is being recorded.
+    // NOLINTNEXTLINE(bugprone-exception-escape) MSVC debug-STL string moves may allocate
     deferCommand([this, name, visible]() {
         auto it = m_geometryObjects.find(name);
         if (it == m_geometryObjects.end()) {
@@ -1231,6 +1232,7 @@ void GeometryReplScene::updateGeometryMesh(const std::string& name) {
 
     // Defer the mesh swap to the update phase so we don't free GPU buffers
     // while the command buffer is being recorded.
+    // NOLINTNEXTLINE(bugprone-exception-escape) MSVC debug-STL string moves may allocate
     deferCommand([this, name]() {
         auto it = m_geometryObjects.find(name);
         if (it == m_geometryObjects.end() || !it->second.visible || !it->second.entity) {
@@ -1306,7 +1308,7 @@ ImTextureID
 GeometryReplScene::getOrCreateTexturePreview(const std::string& textureName,
                                              const std::shared_ptr<vde::Texture>& texture) {
     if (!texture || !texture->isValid() || !isImGuiVulkanBackendAvailable()) {
-        return (ImTextureID)0;
+        return static_cast<ImTextureID>(0);
     }
 
     auto existing = m_textureInspectorDescriptors.find(textureName);
@@ -1317,7 +1319,7 @@ GeometryReplScene::getOrCreateTexturePreview(const std::string& textureName,
     VkDescriptorSet descriptor = ImGui_ImplVulkan_AddTexture(
         texture->getSampler(), texture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     if (descriptor == VK_NULL_HANDLE) {
-        return (ImTextureID)0;
+        return static_cast<ImTextureID>(0);
     }
 
     m_textureInspectorDescriptors[textureName] = descriptor;

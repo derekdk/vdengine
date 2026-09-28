@@ -23,10 +23,10 @@ constexpr std::array<std::string_view, 6> kSourceExtensions = {".cpp", ".cxx", "
 
 bool hasKnownSourceExtension(const std::filesystem::path& path) {
     std::string ext = path.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
-    return std::find(kSourceExtensions.begin(), kSourceExtensions.end(), std::string_view(ext)) !=
-           kSourceExtensions.end();
+    std::ranges::transform(ext, ext.begin(), [](unsigned char value) {
+        return static_cast<char>(std::tolower(value));
+    });
+    return std::ranges::find(kSourceExtensions, std::string_view(ext)) != kSourceExtensions.end();
 }
 
 std::string stripCmakeComments(const std::string& content) {
@@ -127,7 +127,7 @@ ExecutableScanner::~ExecutableScanner() {
 }
 
 void ExecutableScanner::start() {
-    std::lock_guard<std::mutex> lock(m_controlMutex);
+    std::scoped_lock lock(m_controlMutex);
     if (m_running) {
         return;
     }
@@ -139,7 +139,7 @@ void ExecutableScanner::start() {
 
 void ExecutableScanner::stop() {
     {
-        std::lock_guard<std::mutex> lock(m_controlMutex);
+        std::scoped_lock lock(m_controlMutex);
         if (!m_running) {
             return;
         }
@@ -155,21 +155,21 @@ void ExecutableScanner::stop() {
 
 void ExecutableScanner::requestRefresh() {
     {
-        std::lock_guard<std::mutex> lock(m_controlMutex);
+        std::scoped_lock lock(m_controlMutex);
         m_forceRefresh = true;
     }
     m_controlCv.notify_all();
 }
 
 std::shared_ptr<const ScanSnapshot> ExecutableScanner::getSnapshot() const {
-    std::lock_guard<std::mutex> lock(m_snapshotMutex);
+    std::scoped_lock lock(m_snapshotMutex);
     return m_snapshot;
 }
 
 void ExecutableScanner::workerLoop() {
     while (true) {
         {
-            std::lock_guard<std::mutex> lock(m_controlMutex);
+            std::scoped_lock lock(m_controlMutex);
             if (!m_running) {
                 break;
             }
@@ -180,7 +180,7 @@ void ExecutableScanner::workerLoop() {
         // Detect whether the scan produced different results from the previous snapshot.
         bool changed = true;
         {
-            std::lock_guard<std::mutex> lock(m_snapshotMutex);
+            std::scoped_lock lock(m_snapshotMutex);
             if (m_snapshot) {
                 changed = (fresh.entries.size() != m_snapshot->entries.size());
                 if (!changed) {
@@ -282,7 +282,7 @@ ScanSnapshot ExecutableScanner::buildSnapshot() {
             pre.sourceFound = std::filesystem::exists(pre.sourceDir);
         } else {
             std::string baseName = pre.targetName;
-            if (baseName.rfind("vde_", 0) == 0) {
+            if (baseName.starts_with("vde_")) {
                 baseName = baseName.substr(4);
             }
 
@@ -471,7 +471,7 @@ ExecutableScanner::findExecutablePaths(const std::filesystem::path& repoRoot) {
             }
 
             std::string stem = path.stem().string();
-            if (stem.rfind("vde_", 0) != 0) {
+            if (!stem.starts_with("vde_")) {
                 continue;
             }
 

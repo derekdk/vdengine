@@ -227,7 +227,7 @@ TEST(TileMapSessionTest, AddLayerCreatesNewLayerWithCorrectDefaults) {
     EXPECT_EQ(def->scrollVelocityY, 0.0f);
 
     // New layer tiles are all empty.
-    EXPECT_TRUE(def->tiles.size() == 3u * 2u);
+    EXPECT_EQ(def->tiles.size(), size_t{3} * 2u);
     for (int t : def->tiles) {
         EXPECT_EQ(t, vde::TileMap::kEmptyTile);
     }
@@ -594,9 +594,9 @@ TEST(TileMapSessionTest, RuntimeLayerPositionCombinesCameraFollowSavedBaseAndRun
     const auto position = session.runtimeLayerPosition(1, {10.0f, 4.0f}, {1.0f, -2.0f});
 
     ASSERT_TRUE(position.has_value());
-    EXPECT_FLOAT_EQ(position->x, 9.0f);
-    EXPECT_FLOAT_EQ(position->y, 2.4f);
-    EXPECT_FLOAT_EQ(position->z, -0.05f);
+    EXPECT_FLOAT_EQ(position.value().x, 9.0f);
+    EXPECT_FLOAT_EQ(position.value().y, 2.4f);
+    EXPECT_FLOAT_EQ(position.value().z, -0.05f);
 }
 
 TEST(TileMapSessionTest, OldV1OverlayLoadsWithPreservedImportedLayers) {

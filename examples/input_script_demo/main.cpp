@@ -73,7 +73,7 @@ static float panelCY(int row) {
 }
 
 // Inactive colour (dark navy-grey) and per-panel active colours
-static const Color INACTIVE_COLOR = Color::fromHex(0x2d2d3d);
+static constexpr Color INACTIVE_COLOR = Color::fromHex(0x2d2d3d);
 
 // clang-format off
 static const std::array<uint32_t, 8> PANEL_HEX = {
@@ -94,8 +94,8 @@ static const std::array<uint32_t, 3> PIP_HEX = {
 };
 // clang-format on
 
-static const Color CURSOR_ACTIVE_COLOR = Color::fromHex(0xffffff);
-static const Color CURSOR_IDLE_COLOR = Color::fromHex(0x636e72);
+static constexpr Color CURSOR_ACTIVE_COLOR = Color::fromHex(0xffffff);
+static constexpr Color CURSOR_IDLE_COLOR = Color::fromHex(0x636e72);
 
 // ============================================================================
 // Input handler
@@ -131,30 +131,40 @@ class InputScriptDemoHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_LEFT_SHIFT || key == KEY_RIGHT_SHIFT)
+        if (key == KEY_LEFT_SHIFT || key == KEY_RIGHT_SHIFT) {
             shiftHeld = true;
-        if (key == KEY_LEFT_CONTROL || key == KEY_RIGHT_CONTROL)
+        }
+        if (key == KEY_LEFT_CONTROL || key == KEY_RIGHT_CONTROL) {
             ctrlHeld = true;
+        }
 
-        if (key == KEY_A)
+        if (key == KEY_A) {
             pressA = true;
-        if (key == KEY_W)
+        }
+        if (key == KEY_W) {
             wHeld = true;
-        if (key == KEY_RIGHT)
+        }
+        if (key == KEY_RIGHT) {
             rightHeld = true;
-        if (key == KEY_B && shiftHeld)
+        }
+        if (key == KEY_B && shiftHeld) {
             shiftBPressed = true;
-        if (key == KEY_D && ctrlHeld)
+        }
+        if (key == KEY_D && ctrlHeld) {
             ctrlDPressed = true;
-        if (key == KEY_SPACE)
+        }
+        if (key == KEY_SPACE) {
             spacePressed = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == KEY_LEFT_SHIFT || key == KEY_RIGHT_SHIFT)
+        if (key == KEY_LEFT_SHIFT || key == KEY_RIGHT_SHIFT) {
             shiftHeld = false;
-        if (key == KEY_LEFT_CONTROL || key == KEY_RIGHT_CONTROL)
+        }
+        if (key == KEY_LEFT_CONTROL || key == KEY_RIGHT_CONTROL) {
             ctrlHeld = false;
+        }
         if (key == KEY_W && wHeld) {
             wHeld = false;
             releasedW = true;
@@ -166,8 +176,9 @@ class InputScriptDemoHandler : public vde::examples::BaseExampleInputHandler {
     }
 
     void onMouseButtonPress(int button, double x, double y) override {
-        if (button != MOUSE_BUTTON_LEFT)
+        if (button != MOUSE_BUTTON_LEFT) {
             return;
+        }
 
         float wx = pixelToWorldX(x);
         float wy = pixelToWorldY(y);
@@ -199,8 +210,9 @@ class InputScriptDemoHandler : public vde::examples::BaseExampleInputHandler {
     }
 
     void onMouseScroll(double /*x*/, double dy) override {
-        if (dy != 0.0)
+        if (dy != 0.0) {
             scrolled = true;
+        }
     }
 
     void onMouseMove(double x, double y) override {
@@ -260,47 +272,56 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<InputScriptDemoHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Panel 0 — bare press A
-        if (input->pressA && !m_panelActive[0])
+        if (input->pressA && !m_panelActive[0]) {
             activatePanel(0);
+        }
         input->pressA = false;
 
         // Panel 1 — keydown W then keyup W
-        if (input->releasedW && !m_panelActive[1])
+        if (input->releasedW && !m_panelActive[1]) {
             activatePanel(1);
+        }
         input->releasedW = false;
 
         // Panel 2 — hold RIGHT (detected on key release)
-        if (input->releasedRight && !m_panelActive[2])
+        if (input->releasedRight && !m_panelActive[2]) {
             activatePanel(2);
+        }
         input->releasedRight = false;
 
         // Panel 3 — press shift+B
-        if (input->shiftBPressed && !m_panelActive[3])
+        if (input->shiftBPressed && !m_panelActive[3]) {
             activatePanel(3);
+        }
         input->shiftBPressed = false;
 
         // Panel 4 — press ctrl+D (no char emitted)
-        if (input->ctrlDPressed && !m_panelActive[4])
+        if (input->ctrlDPressed && !m_panelActive[4]) {
             activatePanel(4);
+        }
         input->ctrlDPressed = false;
 
         // Panel 5 — mouse click in the panel-5 zone
-        if (input->leftClicked && !m_panelActive[5])
+        if (input->leftClicked && !m_panelActive[5]) {
             activatePanel(5);
+        }
         input->leftClicked = false;
 
         // Panel 6 — scroll event
-        if (input->scrolled && !m_panelActive[6])
+        if (input->scrolled && !m_panelActive[6]) {
             activatePanel(6);
+        }
         input->scrolled = false;
 
         // Panel 7 — mousedown + mouseup (drag gesture in panel-7 zone)
-        if (input->dragComplete && !m_panelActive[7])
+        if (input->dragComplete && !m_panelActive[7]) {
             activatePanel(7);
+        }
         input->dragComplete = false;
 
         // Pips — each SPACE press from the loop
@@ -312,7 +333,7 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
 
         // Cursor — follows mouse position
         if (input->mouseMoved) {
-            auto* cursor = static_cast<SpriteEntity*>(getEntity(m_cursor));
+            auto* cursor = dynamic_cast<SpriteEntity*>(getEntity(m_cursor));
             if (cursor) {
                 float wx = pixelToWorldX(input->mouseMoveX);
                 float wy = pixelToWorldY(input->mouseMoveY);
@@ -324,9 +345,9 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Input Script Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Input Script Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "press (bare key)",
             "keydown / keyup",
@@ -340,7 +361,7 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "8 coloured panels in a 4×2 grid — dark until the matching input fires",
             "3 small pip indicators at bottom centre — lit by SPACE presses via a loop",
@@ -357,7 +378,7 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
     int m_spaceCount = 0;
 
     void activatePanel(int idx) {
-        auto* panel = static_cast<SpriteEntity*>(getEntity(m_panels[idx]));
+        auto* panel = dynamic_cast<SpriteEntity*>(getEntity(m_panels[idx]));
         if (panel) {
             panel->setColor(Color::fromHex(PANEL_HEX[idx]));
             m_panelActive[idx] = true;
@@ -365,9 +386,10 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
     }
 
     void activatePip(int idx) {
-        auto* pip = static_cast<SpriteEntity*>(getEntity(m_pips[idx]));
-        if (pip)
+        auto* pip = dynamic_cast<SpriteEntity*>(getEntity(m_pips[idx]));
+        if (pip) {
             pip->setColor(Color::fromHex(PIP_HEX[idx]));
+        }
     }
 };
 
@@ -378,6 +400,7 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
 class InputScriptDemoGame
     : public vde::examples::BaseExampleGame<InputScriptDemoHandler, InputScriptDemoScene> {};
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     InputScriptDemoGame demo;
     return vde::examples::runExample(demo, "VDE Input Script Demo", WIN_W, WIN_H, argc, argv);

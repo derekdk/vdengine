@@ -96,7 +96,7 @@ TEST_F(PhysicsEntityTest, GetPhysicsStateReturnsBodyState) {
 
 TEST_F(PhysicsEntityTest, GetPhysicsStateThrowsWithoutBody) {
     auto entity = scene->addEntity<PhysicsSpriteEntity>();
-    EXPECT_THROW(entity->getPhysicsState(), std::runtime_error);
+    EXPECT_THROW((void)entity->getPhysicsState(), std::runtime_error);
 }
 
 TEST_F(PhysicsEntityTest, CreatePhysicsBodyWithoutPhysicsSceneThrows) {

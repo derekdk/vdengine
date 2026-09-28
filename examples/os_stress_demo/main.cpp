@@ -26,6 +26,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -56,8 +57,9 @@ class OrbitingMesh : public vde::MeshEntity {
         // Self-rotation around Y
         auto rot = getRotation();
         rot.yaw = std::fmod(rot.yaw + m_selfRotSpeed * dt, 360.0f);
-        if (rot.yaw < 0.0f)
+        if (rot.yaw < 0.0f) {
             rot.yaw += 360.0f;
+        }
         setRotation(rot);
 
         // Orbit
@@ -178,9 +180,9 @@ class OsStressScene : public vde::examples::BaseExampleScene {
         std::error_code ec;
         fs::remove_all(m_tempDir, ec);
         if (ec) {
-            std::cerr << "Warning: failed to clean temp dir: " << ec.message() << std::endl;
+            std::cerr << "Warning: failed to clean temp dir: " << ec.message() << '\n';
         } else {
-            std::cout << "Cleaned up temp directory: " << m_tempDir << std::endl;
+            std::cout << "Cleaned up temp directory: " << m_tempDir << '\n';
         }
     }
 
@@ -204,8 +206,9 @@ class OsStressScene : public vde::examples::BaseExampleScene {
 #ifdef VDE_EXAMPLE_USE_IMGUI
     void drawDebugUI() override {
         auto* game = getGame();
-        if (!game)
+        if (!game) {
             return;
+        }
 
         ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(420, 350), ImGuiCond_FirstUseEver);
@@ -226,9 +229,10 @@ class OsStressScene : public vde::examples::BaseExampleScene {
             ImGui::Separator();
             ImGui::Text("Operation Log (last 12):");
             int start = static_cast<int>(m_log.size()) - 12;
-            if (start < 0)
+            if (start < 0) {
                 start = 0;
-            for (int i = start; i < static_cast<int>(m_log.size()); ++i) {
+            }
+            for (int i = start; std::cmp_less(i, m_log.size()); ++i) {
                 auto& entry = m_log[static_cast<size_t>(i)];
                 ImVec4 color =
                     entry.success ? ImVec4(0.4f, 0.9f, 0.4f, 1.0f) : ImVec4(0.9f, 0.3f, 0.3f, 1.0f);
@@ -240,23 +244,23 @@ class OsStressScene : public vde::examples::BaseExampleScene {
 #endif
 
   protected:
-    std::string getExampleName() const override { return "OS Stress Test"; }
+    [[nodiscard]] std::string getExampleName() const override { return "OS Stress Test"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"scheduleWindowOperation / scheduleWindowResize correctness",
                 "Automated window resize, move, resizable toggle, fullscreen",
                 "File-system operations (dir scan, write, read, delete)",
                 "Vulkan rendering stability during OS calls", "Resize deduplication verification"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Complex 3D scene with orbiting cubes, spheres, and pyramids",
                 "Window repeatedly resizing and moving on screen",
                 "No Vulkan validation errors or crashes",
                 "ImGui overlay showing operation log (F1 to toggle)"};
     }
 
-    std::vector<std::string> getControls() const override { return {}; }
+    [[nodiscard]] std::vector<std::string> getControls() const override { return {}; }
 
   private:
     // Operation scheduling
@@ -283,13 +287,14 @@ class OsStressScene : public vde::examples::BaseExampleScene {
 
     void log(const std::string& msg, bool success = true) {
         m_log.push_back({m_elapsedTime, msg, success});
-        std::cout << "[OS-Stress " << m_elapsedTime << "s] " << msg << std::endl;
+        std::cout << "[OS-Stress " << m_elapsedTime << "s] " << msg << '\n';
     }
 
     void dispatchNextOperation() {
         auto* game = getGame();
-        if (!game)
+        if (!game) {
             return;
+        }
 
         // Cycle through different operation types
         int phase = m_opIndex % 10;
@@ -317,6 +322,8 @@ class OsStressScene : public vde::examples::BaseExampleScene {
             break;
         case 9:
             doMultipleResizeBurst(game);
+            break;
+        default:
             break;
         }
         ++m_opIndex;
@@ -422,7 +429,7 @@ class OsStressScene : public vde::examples::BaseExampleScene {
             bool found = false;
             for (auto& entry : fs::directory_iterator(m_tempDir)) {
                 if (entry.is_regular_file()) {
-                    auto path = entry.path();
+                    const auto& path = entry.path();
                     // Read the file
                     std::ifstream ifs(path);
                     std::string content((std::istreambuf_iterator<char>(ifs)),
@@ -454,19 +461,20 @@ class OsStressScene : public vde::examples::BaseExampleScene {
 class OsStressDemo : public vde::examples::BaseExampleGame<StressInputHandler, OsStressScene> {
   public:
     void onStart() override {
-        std::cout << "Starting OS Stress Test Demo..." << std::endl;
+        std::cout << "Starting OS Stress Test Demo..." << '\n';
         BaseExampleGame::onStart();
     }
 
     void onShutdown() override {
         BaseExampleGame::onShutdown();
-        std::cout << "OS Stress Test shutdown complete." << std::endl;
+        std::cout << "OS Stress Test shutdown complete." << '\n';
     }
 };
 
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     OsStressDemo demo;
     return vde::examples::runExample(demo, "VDE OS Stress Test", kInitialWidth, kInitialHeight,

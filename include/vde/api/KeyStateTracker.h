@@ -8,6 +8,7 @@
  * binding system for held and one-shot key/button actions.
  */
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -75,7 +76,7 @@ class KeyStateTracker {
      * @param name Action name
      * @return true if any bound key is held down
      */
-    bool isHeld(const std::string& name) const;
+    [[nodiscard]] bool isHeld(const std::string& name) const;
 
     /**
      * @brief Consume a one-shot action.
@@ -108,7 +109,7 @@ class KeyStateTracker {
     void handleRelease(int keyCode);
 
   private:
-    enum class BindingType { Held, OneShot };
+    enum class BindingType : uint8_t { Held, OneShot };
 
     struct Binding {
         std::string name;

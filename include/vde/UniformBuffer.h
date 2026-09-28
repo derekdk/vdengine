@@ -54,7 +54,7 @@ class UniformBuffer {
      * @brief Check if buffers have been created.
      * @return true if create() was called successfully
      */
-    bool isCreated() const { return !m_buffers.empty(); }
+    [[nodiscard]] bool isCreated() const { return !m_buffers.empty(); }
 
     /**
      * @brief Update the buffer for a specific frame.
@@ -73,25 +73,25 @@ class UniformBuffer {
      * @param frameIndex Index of the frame
      * @return VkBuffer handle for the specified frame
      */
-    VkBuffer getBuffer(uint32_t frameIndex) const;
+    [[nodiscard]] VkBuffer getBuffer(uint32_t frameIndex) const;
 
     /**
      * @brief Get all buffers.
      * @return Reference to the vector of buffer handles
      */
-    const std::vector<VkBuffer>& getBuffers() const { return m_buffers; }
+    [[nodiscard]] const std::vector<VkBuffer>& getBuffers() const { return m_buffers; }
 
     /**
      * @brief Get the number of buffers.
      * @return Number of per-frame buffers
      */
-    uint32_t getCount() const { return static_cast<uint32_t>(m_buffers.size()); }
+    [[nodiscard]] uint32_t getCount() const { return static_cast<uint32_t>(m_buffers.size()); }
 
     /**
      * @brief Get the size of each buffer.
      * @return Buffer size in bytes
      */
-    VkDeviceSize getBufferSize() const { return m_bufferSize; }
+    [[nodiscard]] VkDeviceSize getBufferSize() const { return m_bufferSize; }
 
   private:
     VkDevice m_device = VK_NULL_HANDLE;

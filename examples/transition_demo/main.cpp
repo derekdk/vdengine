@@ -48,28 +48,39 @@ class TransitionInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_1)
+        if (key == KEY_1) {
             m_triggerFade = true;
-        if (key == KEY_2)
+        }
+        if (key == KEY_2) {
             m_triggerWipeLeft = true;
-        if (key == KEY_3)
+        }
+        if (key == KEY_3) {
             m_triggerWipeRight = true;
-        if (key == KEY_4)
+        }
+        if (key == KEY_4) {
             m_triggerCircleReveal = true;
-        if (key == KEY_5)
+        }
+        if (key == KEY_5) {
             m_triggerBlockFall = true;
-        if (key == KEY_EQUAL || key == KEY_KP_ADD)
+        }
+        if (key == KEY_EQUAL || key == KEY_KP_ADD) {
             m_increaseDuration = true;
-        if (key == KEY_MINUS || key == KEY_KP_SUBTRACT)
+        }
+        if (key == KEY_MINUS || key == KEY_KP_SUBTRACT) {
             m_decreaseDuration = true;
-        if (key == KEY_C)
+        }
+        if (key == KEY_C) {
             m_cancelTransition = true;
-        if (key == KEY_SPACE)
+        }
+        if (key == KEY_SPACE) {
             m_togglePause = true;
-        if (key == KEY_PERIOD)
+        }
+        if (key == KEY_PERIOD) {
             m_stepFrame = true;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_cycleSpeed = true;
+        }
     }
 
     bool consumeFade() {
@@ -152,7 +163,7 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
 
     void onEnter() override {
         printExampleHeader();
-        std::cout << "[MainMenuScene] onEnter()" << std::endl;
+        std::cout << "[MainMenuScene] onEnter()" << '\n';
 
         setBackgroundColor({0.1f, 0.15f, 0.4f, 1.0f});
 
@@ -188,14 +199,14 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
         }
     }
 
-    void onExit() override { std::cout << "[MainMenuScene] onExit()" << std::endl; }
+    void onExit() override { std::cout << "[MainMenuScene] onExit()" << '\n'; }
 
     void update(float deltaTime) override {
         BaseExampleScene::update(deltaTime);
 
         // Animate the title entity with a gentle bob
         if (!getEntities().empty()) {
-            float t = static_cast<float>(getGame()->getTotalTime());
+            auto t = static_cast<float>(getGame()->getTotalTime());
             auto& title = getEntities()[0];
             float y = 2.0f + std::sin(t * 1.5f) * 0.3f;
             title->setPosition(0.0f, y, 0.0f);
@@ -203,15 +214,15 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Screen Transition Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Screen Transition Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Fade transition (cross-fade)", "Wipe transition (left/right)",
                 "Circle reveal transition",     "Random block-fall transition (32x32)",
                 "Adjustable duration (+/-)",    "Cancel mid-transition (C)"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Blue scene (MainMenu) with yellow/purple boxes",
                 "Green scene (Game) with moving orange entities",
                 "Dark red scene (Credits) with white/gray boxes",
@@ -219,7 +230,7 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
                 "Smooth transitions between scenes"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"1 - Fade to GameScene",       "2 - Wipe Left to CreditsScene",
                 "3 - Wipe Right to MainMenu",  "4 - Circle Reveal to GameScene",
                 "5 - Block Fall to Showcase",  "+/- - Adjust duration",
@@ -235,7 +246,7 @@ class MainMenuScene : public vde::examples::BaseExampleScene {
 class GameScene : public Scene {
   public:
     void onEnter() override {
-        std::cout << "[GameScene] onEnter()" << std::endl;
+        std::cout << "[GameScene] onEnter()" << '\n';
 
         setBackgroundColor({0.1f, 0.35f, 0.15f, 1.0f});
 
@@ -264,11 +275,11 @@ class GameScene : public Scene {
         addEntity(std::move(center));
     }
 
-    void onExit() override { std::cout << "[GameScene] onExit()" << std::endl; }
+    void onExit() override { std::cout << "[GameScene] onExit()" << '\n'; }
 
     void update(float deltaTime) override {
         (void)deltaTime;
-        float t = static_cast<float>(getGame()->getTotalTime());
+        auto t = static_cast<float>(getGame()->getTotalTime());
 
         // Animate entities in a circular motion
         auto& entities = getEntities();
@@ -293,7 +304,7 @@ class GameScene : public Scene {
 class CreditsScene : public Scene {
   public:
     void onEnter() override {
-        std::cout << "[CreditsScene] onEnter()" << std::endl;
+        std::cout << "[CreditsScene] onEnter()" << '\n';
 
         setBackgroundColor({0.35f, 0.1f, 0.1f, 1.0f});
 
@@ -330,7 +341,7 @@ class CreditsScene : public Scene {
         addEntity(std::move(footer));
     }
 
-    void onExit() override { std::cout << "[CreditsScene] onExit()" << std::endl; }
+    void onExit() override { std::cout << "[CreditsScene] onExit()" << '\n'; }
 
     void update(float deltaTime) override {
         (void)deltaTime;
@@ -345,7 +356,7 @@ class CreditsScene : public Scene {
 class ShowcaseScene : public Scene {
   public:
     void onEnter() override {
-        std::cout << "[ShowcaseScene] onEnter()" << std::endl;
+        std::cout << "[ShowcaseScene] onEnter()" << '\n';
 
         setBackgroundColor({0.05f, 0.08f, 0.16f, 1.0f});
 
@@ -400,11 +411,11 @@ class ShowcaseScene : public Scene {
         }
     }
 
-    void onExit() override { std::cout << "[ShowcaseScene] onExit()" << std::endl; }
+    void onExit() override { std::cout << "[ShowcaseScene] onExit()" << '\n'; }
 
     void update(float deltaTime) override {
         (void)deltaTime;
-        const float t = static_cast<float>(getGame()->getTotalTime());
+        const auto t = static_cast<float>(getGame()->getTotalTime());
 
         auto& entities = getEntities();
         if (entities.empty()) {
@@ -428,7 +439,7 @@ class ShowcaseScene : public Scene {
         const size_t topStart = 19;
         const size_t bottomStart = 29;
         for (size_t i = 0; i < 10; ++i) {
-            const float f = static_cast<float>(i);
+            const auto f = static_cast<float>(i);
             const float xTop = -9.5f + std::fmod((t * 4.0f) + f * 1.7f, 20.0f);
             const float xBottom = 9.5f - std::fmod((t * 4.0f) + f * 1.7f, 20.0f);
             const float yOffset = std::sin(t * 3.0f + f) * 0.25f;
@@ -458,7 +469,7 @@ class TransitionDemoGame
 
         std::cout << "\n[TransitionDemo] Duration: " << std::fixed << std::setprecision(2)
                   << m_transitionDuration << "s\n"
-                  << std::endl;
+                  << '\n';
     }
 
     void onUpdate(float deltaTime) override {
@@ -473,18 +484,18 @@ class TransitionDemoGame
         if (input->consumeIncreaseDuration()) {
             m_transitionDuration += 0.25f;
             std::cout << "[TransitionDemo] Duration: " << std::fixed << std::setprecision(2)
-                      << m_transitionDuration << "s" << std::endl;
+                      << m_transitionDuration << "s" << '\n';
         }
         if (input->consumeDecreaseDuration()) {
             m_transitionDuration = std::max(0.25f, m_transitionDuration - 0.25f);
             std::cout << "[TransitionDemo] Duration: " << std::fixed << std::setprecision(2)
-                      << m_transitionDuration << "s" << std::endl;
+                      << m_transitionDuration << "s" << '\n';
         }
 
         // Cancel
         if (input->consumeCancel()) {
             if (isTransitioning()) {
-                std::cout << "[TransitionDemo] Cancelling transition" << std::endl;
+                std::cout << "[TransitionDemo] Cancelling transition" << '\n';
                 cancelTransition();
             }
         }
@@ -496,7 +507,7 @@ class TransitionDemoGame
                 setTransitionPaused(nowPaused);
                 std::cout << "[TransitionDemo] " << (nowPaused ? "PAUSED" : "RESUMED")
                           << " (progress: " << std::fixed << std::setprecision(3)
-                          << getTransitionProgress() << ")" << std::endl;
+                          << getTransitionProgress() << ")" << '\n';
             }
         }
 
@@ -505,7 +516,7 @@ class TransitionDemoGame
             if (isTransitioning() && isTransitionPaused()) {
                 stepTransitionOneFrame();
                 std::cout << "[TransitionDemo] STEP -> progress: " << std::fixed
-                          << std::setprecision(3) << getTransitionProgress() << std::endl;
+                          << std::setprecision(3) << getTransitionProgress() << '\n';
             }
         }
 
@@ -523,37 +534,37 @@ class TransitionDemoGame
             }
             setTransitionSpeed(speeds[idx]);
             std::cout << "[TransitionDemo] Speed: " << std::fixed << std::setprecision(2)
-                      << speeds[idx] << "x" << std::endl;
+                      << speeds[idx] << "x" << '\n';
         }
 
         // Transition triggers
         if (input->consumeFade()) {
             std::cout << "[TransitionDemo] Fade -> GameScene (" << std::fixed
-                      << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
+                      << std::setprecision(2) << m_transitionDuration << "s)" << '\n';
             transitionToScene("game", std::make_unique<FadeTransition>(), m_transitionDuration);
         }
         if (input->consumeWipeLeft()) {
             std::cout << "[TransitionDemo] Wipe Left -> CreditsScene (" << std::fixed
-                      << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
+                      << std::setprecision(2) << m_transitionDuration << "s)" << '\n';
             transitionToScene("credits",
                               std::make_unique<WipeTransition>(TransitionDirection::Left),
                               m_transitionDuration);
         }
         if (input->consumeWipeRight()) {
             std::cout << "[TransitionDemo] Wipe Right -> MainMenuScene (" << std::fixed
-                      << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
+                      << std::setprecision(2) << m_transitionDuration << "s)" << '\n';
             transitionToScene("main", std::make_unique<WipeTransition>(TransitionDirection::Right),
                               m_transitionDuration);
         }
         if (input->consumeCircleReveal()) {
             std::cout << "[TransitionDemo] Circle Reveal -> GameScene (" << std::fixed
-                      << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
+                      << std::setprecision(2) << m_transitionDuration << "s)" << '\n';
             transitionToScene("game", std::make_unique<CircleRevealTransition>(),
                               m_transitionDuration);
         }
         if (input->consumeBlockFall()) {
             std::cout << "[TransitionDemo] Block Fall -> ShowcaseScene (" << std::fixed
-                      << std::setprecision(2) << m_transitionDuration << "s)" << std::endl;
+                      << std::setprecision(2) << m_transitionDuration << "s)" << '\n';
             transitionToScene("showcase", std::make_unique<BlockFallTransition>(),
                               m_transitionDuration);
         }
@@ -567,6 +578,7 @@ class TransitionDemoGame
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     TransitionDemoGame demo;
     return vde::examples::runExample(demo, "VDE Transition Demo", 1280, 720, argc, argv);

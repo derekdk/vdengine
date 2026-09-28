@@ -54,7 +54,7 @@ class TextEntity : public SpriteEntity {
     /**
      * @brief Get the current text string.
      */
-    const std::string& getText() const { return m_text; }
+    [[nodiscard]] const std::string& getText() const { return m_text; }
 
     // ── Font selection ──────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ class TextEntity : public SpriteEntity {
     /**
      * @brief Get the current text style.
      */
-    const TextStyle& getStyle() const { return m_style; }
+    [[nodiscard]] const TextStyle& getStyle() const { return m_style; }
 
     // ── Auto-sizing ─────────────────────────────────────────────────
 
@@ -101,7 +101,7 @@ class TextEntity : public SpriteEntity {
      * @brief Get the configured world height for auto-sizing.
      * @return The world height, or 0 if auto-sizing is disabled
      */
-    float getWorldHeight() const { return m_worldHeight; }
+    [[nodiscard]] float getWorldHeight() const { return m_worldHeight; }
 
     /**
      * @brief Set a maximum width constraint for auto-sizing.
@@ -118,7 +118,7 @@ class TextEntity : public SpriteEntity {
      * @brief Get the configured maximum width for auto-sizing.
      * @return The max width, or 0 if unconstrained
      */
-    float getMaxWidth() const { return m_maxWidth; }
+    [[nodiscard]] float getMaxWidth() const { return m_maxWidth; }
 
     // ── Lifecycle ───────────────────────────────────────────────────
 

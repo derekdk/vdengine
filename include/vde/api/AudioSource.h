@@ -27,7 +27,7 @@ class AudioSource {
     /**
      * @brief Get the current audio clip.
      */
-    const std::shared_ptr<AudioClip>& getClip() const { return m_clip; }
+    [[nodiscard]] const std::shared_ptr<AudioClip>& getClip() const { return m_clip; }
 
     /**
      * @brief Play the audio clip.
@@ -54,45 +54,45 @@ class AudioSource {
     /**
      * @brief Check if currently playing.
      */
-    bool isPlaying() const;
+    [[nodiscard]] bool isPlaying() const;
 
     // Volume control
     void setVolume(float volume) {
         m_volume = volume;
         updateVolume();
     }
-    float getVolume() const { return m_volume; }
+    [[nodiscard]] float getVolume() const { return m_volume; }
 
     // Pitch control
     void setPitch(float pitch) {
         m_pitch = pitch;
         updatePitch();
     }
-    float getPitch() const { return m_pitch; }
+    [[nodiscard]] float getPitch() const { return m_pitch; }
 
     // Spatial audio
     void setPosition(const glm::vec3& position);
     void setPosition(float x, float y, float z);
-    const glm::vec3& getPosition() const { return m_position; }
+    [[nodiscard]] const glm::vec3& getPosition() const { return m_position; }
 
     void setSpatial(bool spatial) { m_spatial = spatial; }
-    bool isSpatial() const { return m_spatial; }
+    [[nodiscard]] bool isSpatial() const { return m_spatial; }
 
     void setMinDistance(float distance) { m_minDistance = distance; }
-    float getMinDistance() const { return m_minDistance; }
+    [[nodiscard]] float getMinDistance() const { return m_minDistance; }
 
     void setMaxDistance(float distance) { m_maxDistance = distance; }
-    float getMaxDistance() const { return m_maxDistance; }
+    [[nodiscard]] float getMaxDistance() const { return m_maxDistance; }
 
     void setAttenuation(float attenuation) { m_attenuation = attenuation; }
-    float getAttenuation() const { return m_attenuation; }
+    [[nodiscard]] float getAttenuation() const { return m_attenuation; }
 
     // Playback control
     void setPlayOnAwake(bool play) { m_playOnAwake = play; }
-    bool getPlayOnAwake() const { return m_playOnAwake; }
+    [[nodiscard]] bool getPlayOnAwake() const { return m_playOnAwake; }
 
     void setLoop(bool loop) { m_loop = loop; }
-    bool isLooping() const { return m_loop; }
+    [[nodiscard]] bool isLooping() const { return m_loop; }
 
   private:
     void updateVolume();

@@ -37,6 +37,7 @@
 #include <vde/Window.h>
 
 #include <iostream>
+#include <utility>
 
 #include "GeometryReplScene.h"
 
@@ -48,8 +49,8 @@ using namespace vde::tools;
 
 class GeometryReplTool : public BaseToolGame<BaseToolInputHandler, GeometryReplScene> {
   public:
-    GeometryReplTool(ToolMode mode, const std::string& scriptFile = "")
-        : BaseToolGame(mode), m_scriptFile(scriptFile) {}
+    GeometryReplTool(ToolMode mode, std::string scriptFile = "")
+        : BaseToolGame(mode), m_scriptFile(std::move(scriptFile)) {}
 
     void onStart() override {
         BaseToolGame::onStart();
@@ -59,7 +60,7 @@ class GeometryReplTool : public BaseToolGame<BaseToolInputHandler, GeometryReplS
             auto* scene = getToolScene();
             if (scene) {
                 if (!scene->processScriptFile(m_scriptFile)) {
-                    std::cerr << "Failed to process script file: " << m_scriptFile << std::endl;
+                    std::cerr << "Failed to process script file: " << m_scriptFile << '\n';
                     m_exitCode = 1;
                 }
                 // Exit after script execution
@@ -76,6 +77,7 @@ class GeometryReplTool : public BaseToolGame<BaseToolInputHandler, GeometryReplS
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ToolMode mode = ToolMode::INTERACTIVE;
     std::string scriptFile;
@@ -98,32 +100,31 @@ int main(int argc, char** argv) {
     if (mode == ToolMode::INTERACTIVE) {
         // Adjust resolution based on DPI
         float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
-        uint32_t width = static_cast<uint32_t>(1400 * dpiScale);
-        uint32_t height = static_cast<uint32_t>(800 * dpiScale);
+        auto width = static_cast<uint32_t>(1400 * dpiScale);
+        auto height = static_cast<uint32_t>(800 * dpiScale);
 
         return runTool(tool, "VDE Geometry REPL Tool", width, height, argc, argv);
-    } else {
-        // Configure input script from CLI args if provided (beyond the script file arg)
-        vde::configureInputScriptFromArgs(tool, argc, argv);
-
-        // For script mode, run headless (minimal window)
-        vde::GameSettings settings;
-        settings.gameName = "VDE Geometry REPL (Script Mode)";
-        settings.display.windowWidth = 800;
-        settings.display.windowHeight = 600;
-        settings.debug.enableValidation = false;  // Disable validation for batch mode
-
-        if (!tool.initialize(settings)) {
-            std::cerr << "Failed to initialize tool\n";
-            return 1;
-        }
-
-        tool.run();
-
-        std::cout << "\n====================================================\n";
-        std::cout << "Script execution complete\n";
-        std::cout << "====================================================\n";
-
-        return tool.getExitCode();
     }
+    // Configure input script from CLI args if provided (beyond the script file arg)
+    vde::configureInputScriptFromArgs(tool, argc, argv);
+
+    // For script mode, run headless (minimal window)
+    vde::GameSettings settings;
+    settings.gameName = "VDE Geometry REPL (Script Mode)";
+    settings.display.windowWidth = 800;
+    settings.display.windowHeight = 600;
+    settings.debug.enableValidation = false;  // Disable validation for batch mode
+
+    if (!tool.initialize(settings)) {
+        std::cerr << "Failed to initialize tool\n";
+        return 1;
+    }
+
+    tool.run();
+
+    std::cout << "\n====================================================\n";
+    std::cout << "Script execution complete\n";
+    std::cout << "====================================================\n";
+
+    return tool.getExitCode();
 }

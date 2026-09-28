@@ -14,40 +14,50 @@ class BreakoutInputHandler : public vde::examples::BaseExampleInputHandler {
     // Keyboard input
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_LEFT)
+        if (key == vde::KEY_LEFT) {
             m_left = true;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_right = true;
-        if (key == vde::KEY_SPACE)
+        }
+        if (key == vde::KEY_SPACE) {
             m_space = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT)
+        if (key == vde::KEY_LEFT) {
             m_left = false;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_right = false;
+        }
     }
 
     // Gamepad input
     void onGamepadButtonPress(int /*gamepadId*/, int button) override {
-        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT)
+        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT) {
             m_left = true;
-        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT)
+        }
+        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT) {
             m_right = true;
-        if (button == vde::GAMEPAD_BUTTON_A)
+        }
+        if (button == vde::GAMEPAD_BUTTON_A) {
             m_space = true;
+        }
     }
 
     void onGamepadButtonRelease(int /*gamepadId*/, int button) override {
-        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT)
+        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT) {
             m_left = false;
-        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT)
+        }
+        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT) {
             m_right = false;
+        }
     }
 
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
     bool isSpacePressed() {
         bool v = m_space;
         m_space = false;
@@ -58,10 +68,11 @@ class BreakoutInputHandler : public vde::examples::BaseExampleInputHandler {
      * @brief Get the left-stick X axis value for the first connected gamepad.
      * @return Axis value in [-1, 1], or 0 if no gamepad is connected.
      */
-    float getLeftStickX() const {
+    [[nodiscard]] float getLeftStickX() const {
         for (int i = 0; i < vde::MAX_GAMEPADS; ++i) {
-            if (isGamepadConnected(i))
+            if (isGamepadConnected(i)) {
                 return getGamepadAxis(i, vde::GAMEPAD_AXIS_LEFT_X);
+            }
         }
         return 0.0f;
     }
@@ -100,28 +111,32 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
         createBricks();
 
         std::cout << "Enjoy! Use LEFT/RIGHT or gamepad left stick/D-pad to move paddle,"
-                  << " SPACE or A button to launch the ball." << std::endl;
+                  << " SPACE or A button to launch the ball." << '\n';
     }
 
     void update(float deltaTime) override {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<BreakoutInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Move paddle (keyboard / D-pad)
         float paddleSpeed = 6.0f;
         auto ppos = m_paddle->getPosition();
-        if (input->isLeft())
+        if (input->isLeft()) {
             ppos.x -= paddleSpeed * deltaTime;
-        if (input->isRight())
+        }
+        if (input->isRight()) {
             ppos.x += paddleSpeed * deltaTime;
+        }
 
         // Move paddle (left analog stick)
         float stickX = input->getLeftStickX();
-        if (std::abs(stickX) > 0.0f)  // dead zone already handled by engine
+        if (std::abs(stickX) > 0.0f) {  // dead zone already handled by engine
             ppos.x += stickX * paddleSpeed * deltaTime;
+        }
 
         // Clamp paddle to world bounds (camera half width = 5.0)
         float halfWorldX = 5.0f;
@@ -191,11 +206,13 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
             for (int i = static_cast<int>(m_bricks.size()) - 1; i >= 0; --i) {
                 EntityId id = m_bricks[i];
                 Entity* e = getEntity(id);
-                if (!e)
+                if (!e) {
                     continue;
+                }
                 auto* brick = dynamic_cast<SpriteEntity*>(e);
-                if (!brick)
+                if (!brick) {
                     continue;
+                }
 
                 if (aabbIntersect(bpos, m_ball->getScale().x, m_ball->getScale().y,
                                   brick->getPosition(), brick->getScale().x, brick->getScale().y)) {
@@ -209,7 +226,7 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
 
                     // Win condition
                     if (m_bricks.empty()) {
-                        std::cout << "All bricks cleared!" << std::endl;
+                        std::cout << "All bricks cleared!" << '\n';
                         handleTestSuccess();
                         return;
                     }
@@ -220,7 +237,7 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
 
             // Missed paddle - reset ball
             if (bpos.y < -halfWorldY - 1.0f) {
-                std::cout << "Ball missed the paddle - resetting." << std::endl;
+                std::cout << "Ball missed the paddle - resetting." << '\n';
                 resetBallToPaddle();
             }
         } else {
@@ -234,19 +251,19 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Breakout Clone"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Breakout Clone"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Simple 2D gameplay (paddle, ball, bricks)", "SpriteEntity usage",
                 "Basic collision and game logic"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Paddle at bottom (green)", "White ball bouncing",
                 "Rows of colored bricks at top breaking on hit"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"Left/Right or D-pad - Move paddle", "Left stick - Move paddle (analog)",
                 "Space or A button - Launch ball", "F - Report failure, ESC - Exit"};
     }
@@ -268,8 +285,8 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
         float bHalfW = bW * 0.5f;
         float bHalfH = bH * 0.5f;
 
-        return !(aPos.x + aHalfW < bPos.x - bHalfW || aPos.x - aHalfW > bPos.x + bHalfW ||
-                 aPos.y + aHalfH < bPos.y - bHalfH || aPos.y - aHalfH > bPos.y + bHalfH);
+        return aPos.x + aHalfW >= bPos.x - bHalfW && aPos.x - aHalfW <= bPos.x + bHalfW &&
+               aPos.y + aHalfH >= bPos.y - bHalfH && aPos.y - aHalfH <= bPos.y + bHalfH;
     }
 
     void normalizeBallVelocity() {
@@ -327,6 +344,7 @@ class BreakoutScene : public vde::examples::BaseExampleScene {
 
 class BreakoutGame : public vde::examples::BaseExampleGame<BreakoutInputHandler, BreakoutScene> {};
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     BreakoutGame demo;
     return vde::examples::runExample(demo, "VDE Breakout Demo", 1024, 768, argc, argv);

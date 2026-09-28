@@ -31,22 +31,23 @@ namespace vde {
 
 static std::string toLower(const std::string& s) {
     std::string result = s;
-    std::transform(result.begin(), result.end(), result.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(result, result.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return result;
 }
 
 static std::string toUpper(const std::string& s) {
     std::string result = s;
-    std::transform(result.begin(), result.end(), result.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    std::ranges::transform(result, result.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return result;
 }
 
 static std::string trim(const std::string& s) {
     auto start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos)
+    if (start == std::string::npos) {
         return "";
+    }
     auto end = s.find_last_not_of(" \t\r\n");
     return s.substr(start, end - start + 1);
 }
@@ -210,7 +211,7 @@ int resolveKeyName(const std::string& keyName) {
     std::string upper = toUpper(keyName);
 
     // Strip optional KEY_ prefix
-    if (upper.size() > 4 && upper.substr(0, 4) == "KEY_") {
+    if (upper.size() > 4 && upper.starts_with("KEY_")) {
         upper = upper.substr(4);
     }
 
@@ -238,7 +239,7 @@ bool parseKeyWithModifiers(const std::string& keyArg, int& keyCode, int& modifie
     }
 
     // Last part is the key, everything before is modifiers
-    std::string keyPart = parts.back();
+    const std::string& keyPart = parts.back();
     for (size_t i = 0; i + 1 < parts.size(); ++i) {
         std::string mod = toLower(parts[i]);
         if (mod == "ctrl" || mod == "control") {
@@ -847,14 +848,14 @@ const char* compareOpToString(CompareOp op) {
 // CLI argument parsing
 // ============================================================================
 
-std::string getInputScriptArg(int argc, char** argv) {
+std::string getInputScriptArg(int argc, const char* const* argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg == "--input-script" && i + 1 < argc) {
-            return std::string(argv[i + 1]);
+            return argv[i + 1];
         }
         // Also support --input-script=path
-        if (arg.substr(0, 15) == "--input-script=") {
+        if (arg.starts_with("--input-script=")) {
             return arg.substr(15);
         }
     }

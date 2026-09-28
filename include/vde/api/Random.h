@@ -58,7 +58,7 @@ class RandomStream {
     /**
      * @brief Get the current seed.
      */
-    uint32_t seed() const { return m_seed; }
+    [[nodiscard]] uint32_t seed() const { return m_seed; }
 
     /**
      * @brief Random float in [0, 1).
@@ -98,15 +98,15 @@ class RandomStream {
      */
     glm::vec2 unitDirection2D() {
         float angle = range(0.0f, 6.28318530718f);
-        return glm::vec2(std::cos(angle), std::sin(angle));
+        return {std::cos(angle), std::sin(angle)};
     }
 
     /**
      * @brief Random point inside a 2D bounds.
      */
     glm::vec2 inside(const WorldBounds2D& bounds) {
-        return glm::vec2(range(bounds.minX.value, bounds.maxX.value),
-                         range(bounds.minY.value, bounds.maxY.value));
+        return {range(bounds.minX.value, bounds.maxX.value),
+                range(bounds.minY.value, bounds.maxY.value)};
     }
 
   private:

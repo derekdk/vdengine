@@ -46,7 +46,7 @@ class SpriteAnimation {
     /**
      * @brief Check whether playback loops.
      */
-    bool isLooping() const { return m_looping; }
+    [[nodiscard]] bool isLooping() const { return m_looping; }
 
     /**
      * @brief Set the clip name.
@@ -56,17 +56,17 @@ class SpriteAnimation {
     /**
      * @brief Get the clip name.
      */
-    const std::string& getName() const { return m_name; }
+    [[nodiscard]] const std::string& getName() const { return m_name; }
 
     /**
      * @brief Get the number of frames in this clip.
      */
-    int getFrameCount() const { return static_cast<int>(m_frames.size()); }
+    [[nodiscard]] int getFrameCount() const { return static_cast<int>(m_frames.size()); }
 
     /**
      * @brief Get the full playback duration of one pass through this clip.
      */
-    float getTotalDuration() const { return m_totalDuration; }
+    [[nodiscard]] float getTotalDuration() const { return m_totalDuration; }
 
     /**
      * @brief Resolve which frame is active at a given elapsed time.
@@ -78,14 +78,14 @@ class SpriteAnimation {
      * @return Zero-based frame index inside this clip.
      * @throws std::logic_error if the clip has no frames.
      */
-    int getFrameAtTime(float time) const;
+    [[nodiscard]] int getFrameAtTime(float time) const;
 
     /**
      * @brief Get a frame by index.
      * @param index Zero-based frame index.
      * @throws std::out_of_range if index is invalid.
      */
-    const Frame& getFrame(int index) const;
+    [[nodiscard]] const Frame& getFrame(int index) const;
 
   private:
     std::string m_name;

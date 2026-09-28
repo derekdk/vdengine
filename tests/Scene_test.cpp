@@ -17,6 +17,8 @@
 #include <vde/api/ViewportRect.h>
 #include <vde/api/WorldBounds.h>
 
+#include <cstddef>
+
 #include <gtest/gtest.h>
 
 using namespace vde;
@@ -137,7 +139,7 @@ TEST_F(SceneTest, SetCameraUniquePtr) {
 }
 
 TEST_F(SceneTest, SetCameraRawPointer) {
-    OrbitCamera* camera = new OrbitCamera();
+    auto* camera = new OrbitCamera();
     scene->setCamera(camera);
 
     EXPECT_EQ(scene->getCamera(), camera);
@@ -161,7 +163,7 @@ TEST_F(SceneTest, SetLightBoxUniquePtr) {
 }
 
 TEST_F(SceneTest, SetLightBoxRawPointer) {
-    SimpleColorLightBox* lightBox = new SimpleColorLightBox(Color::red());
+    auto* lightBox = new SimpleColorLightBox(Color::red());
     scene->setLightBox(lightBox);
 
     EXPECT_EQ(scene->getLightBox(), lightBox);
@@ -621,7 +623,7 @@ TEST_F(SceneTest, Setup2DSetsBackgroundColor) {
 
 static std::shared_ptr<Texture> makeSceneTestTexture(uint32_t w, uint32_t h) {
     auto tex = std::make_shared<Texture>();
-    std::vector<uint8_t> pixels(w * h * 4, 255);
+    std::vector<uint8_t> pixels(static_cast<size_t>(w) * h * 4, 255);
     tex->loadFromData(pixels.data(), w, h);
     return tex;
 }

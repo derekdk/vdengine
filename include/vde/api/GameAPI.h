@@ -156,9 +156,9 @@
  */
 
 // Version information
-#define VDE_API_VERSION_MAJOR 0
-#define VDE_API_VERSION_MINOR 1
-#define VDE_API_VERSION_PATCH 0
+inline constexpr int VDE_API_VERSION_MAJOR = 0;
+inline constexpr int VDE_API_VERSION_MINOR = 1;
+inline constexpr int VDE_API_VERSION_PATCH = 0;
 #define VDE_API_VERSION_STRING "0.1.0"
 
 namespace vde {

@@ -26,42 +26,42 @@ class AudioClip : public Resource {
     };
 
     AudioClip() = default;
-    virtual ~AudioClip();
+    ~AudioClip() override;
 
     // Resource interface
     bool loadFromFile(const std::string& path);
-    const char* getTypeName() const override { return "AudioClip"; }
+    [[nodiscard]] const char* getTypeName() const override { return "AudioClip"; }
 
     /**
      * @brief Get audio format information.
      */
-    const Format& getFormat() const { return m_format; }
+    [[nodiscard]] const Format& getFormat() const { return m_format; }
 
     /**
      * @brief Get sample count.
      */
-    uint64_t getSampleCount() const { return m_sampleCount; }
+    [[nodiscard]] uint64_t getSampleCount() const { return m_sampleCount; }
 
     /**
      * @brief Get duration in seconds.
      */
-    float getDuration() const;
+    [[nodiscard]] float getDuration() const;
 
     /**
      * @brief Get raw PCM data.
      * @return Pointer to PCM data (float format, interleaved)
      */
-    const float* getData() const { return m_data.data(); }
+    [[nodiscard]] const float* getData() const { return m_data.data(); }
 
     /**
      * @brief Get data size in floats.
      */
-    size_t getDataSize() const { return m_data.size(); }
+    [[nodiscard]] size_t getDataSize() const { return m_data.size(); }
 
     /**
      * @brief Check if this is a streaming clip (for large music files).
      */
-    bool isStreaming() const { return m_streaming; }
+    [[nodiscard]] bool isStreaming() const { return m_streaming; }
 
     /**
      * @brief Set streaming mode.

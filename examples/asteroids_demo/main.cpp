@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <numbers>
 #include <random>
 #include <vector>
 
@@ -30,48 +31,66 @@ class AsteroidsInputHandler : public vde::examples::BaseExampleInputHandler {
   public:
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
-        if (key == vde::KEY_LEFT || key == vde::KEY_A)
+        if (key == vde::KEY_LEFT || key == vde::KEY_A) {
             m_left = true;
-        if (key == vde::KEY_RIGHT || key == vde::KEY_D)
+        }
+        if (key == vde::KEY_RIGHT || key == vde::KEY_D) {
             m_right = true;
-        if (key == vde::KEY_UP || key == vde::KEY_W)
+        }
+        if (key == vde::KEY_UP || key == vde::KEY_W) {
             m_thrust = true;
-        if (key == vde::KEY_SPACE)
+        }
+        if (key == vde::KEY_SPACE) {
             m_fire = true;
-        if (key == vde::KEY_R)
+        }
+        if (key == vde::KEY_R) {
             m_restart = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT || key == vde::KEY_A)
+        if (key == vde::KEY_LEFT || key == vde::KEY_A) {
             m_left = false;
-        if (key == vde::KEY_RIGHT || key == vde::KEY_D)
+        }
+        if (key == vde::KEY_RIGHT || key == vde::KEY_D) {
             m_right = false;
-        if (key == vde::KEY_UP || key == vde::KEY_W)
+        }
+        if (key == vde::KEY_UP || key == vde::KEY_W) {
             m_thrust = false;
+        }
     }
 
     // Gamepad input
     void onGamepadButtonPress(int /*gamepadId*/, int button) override {
-        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT || button == vde::GAMEPAD_BUTTON_LEFT_BUMPER)
+        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT || button == vde::GAMEPAD_BUTTON_LEFT_BUMPER) {
             m_left = true;
-        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT || button == vde::GAMEPAD_BUTTON_RIGHT_BUMPER)
+        }
+        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT ||
+            button == vde::GAMEPAD_BUTTON_RIGHT_BUMPER) {
             m_right = true;
-        if (button == vde::GAMEPAD_BUTTON_DPAD_UP || button == vde::GAMEPAD_BUTTON_A)
+        }
+        if (button == vde::GAMEPAD_BUTTON_DPAD_UP || button == vde::GAMEPAD_BUTTON_A) {
             m_thrust = true;
-        if (button == vde::GAMEPAD_BUTTON_X)
+        }
+        if (button == vde::GAMEPAD_BUTTON_X) {
             m_fire = true;
-        if (button == vde::GAMEPAD_BUTTON_START)
+        }
+        if (button == vde::GAMEPAD_BUTTON_START) {
             m_restart = true;
+        }
     }
 
     void onGamepadButtonRelease(int /*gamepadId*/, int button) override {
-        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT || button == vde::GAMEPAD_BUTTON_LEFT_BUMPER)
+        if (button == vde::GAMEPAD_BUTTON_DPAD_LEFT || button == vde::GAMEPAD_BUTTON_LEFT_BUMPER) {
             m_left = false;
-        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT || button == vde::GAMEPAD_BUTTON_RIGHT_BUMPER)
+        }
+        if (button == vde::GAMEPAD_BUTTON_DPAD_RIGHT ||
+            button == vde::GAMEPAD_BUTTON_RIGHT_BUMPER) {
             m_right = false;
-        if (button == vde::GAMEPAD_BUTTON_DPAD_UP || button == vde::GAMEPAD_BUTTON_A)
+        }
+        if (button == vde::GAMEPAD_BUTTON_DPAD_UP || button == vde::GAMEPAD_BUTTON_A) {
             m_thrust = false;
+        }
     }
 
     void onGamepadAxis(int /*gamepadId*/, int axis, float value) override {
@@ -83,9 +102,9 @@ class AsteroidsInputHandler : public vde::examples::BaseExampleInputHandler {
         }
     }
 
-    bool isLeft() const { return m_left; }
-    bool isRight() const { return m_right; }
-    bool isThrust() const { return m_thrust; }
+    [[nodiscard]] bool isLeft() const { return m_left; }
+    [[nodiscard]] bool isRight() const { return m_right; }
+    [[nodiscard]] bool isThrust() const { return m_thrust; }
     bool isFirePressed() {
         bool v = m_fire;
         m_fire = false;
@@ -97,8 +116,8 @@ class AsteroidsInputHandler : public vde::examples::BaseExampleInputHandler {
         return v;
     }
 
-    float getLeftStickX() const { return m_leftStickX; }
-    float getLeftStickY() const { return m_leftStickY; }
+    [[nodiscard]] float getLeftStickX() const { return m_leftStickX; }
+    [[nodiscard]] float getLeftStickY() const { return m_leftStickY; }
 
   private:
     bool m_left = false, m_right = false, m_thrust = false;
@@ -121,23 +140,27 @@ class GameObject : public SpriteEntity {
         pos.y += m_velocity.y * deltaTime;
 
         // Wrap around world boundaries (toroidal)
-        if (pos.x < -m_worldWidth * 0.5f)
+        if (pos.x < -m_worldWidth * 0.5f) {
             pos.x += m_worldWidth;
-        if (pos.x > m_worldWidth * 0.5f)
+        }
+        if (pos.x > m_worldWidth * 0.5f) {
             pos.x -= m_worldWidth;
-        if (pos.y < -m_worldHeight * 0.5f)
+        }
+        if (pos.y < -m_worldHeight * 0.5f) {
             pos.y += m_worldHeight;
-        if (pos.y > m_worldHeight * 0.5f)
+        }
+        if (pos.y > m_worldHeight * 0.5f) {
             pos.y -= m_worldHeight;
+        }
 
         setPosition(pos);
     }
 
     void setVelocity(const glm::vec2& velocity) { m_velocity = velocity; }
-    const glm::vec2& getVelocity() const { return m_velocity; }
+    [[nodiscard]] const glm::vec2& getVelocity() const { return m_velocity; }
 
     void setAngularVelocity(float angularVelocity) { m_angularVelocity = angularVelocity; }
-    float getAngularVelocity() const { return m_angularVelocity; }
+    [[nodiscard]] float getAngularVelocity() const { return m_angularVelocity; }
 
     void applyThrust(float thrust, float deltaTime) {
         // Calculate forward direction based on current rotation
@@ -190,7 +213,7 @@ class Spaceship : public GameObject {
         }
     }
 
-    bool isThrusting() const { return m_isThrusting; }
+    [[nodiscard]] bool isThrusting() const { return m_isThrusting; }
 
   private:
     bool m_isThrusting = false;
@@ -207,7 +230,7 @@ class Asteroid : public GameObject {
         // Random initial velocity
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * 3.14159f);
+        std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * std::numbers::pi_v<float>);
         std::uniform_real_distribution<float> speedDist(1.0f, 3.0f);
 
         float angle = angleDist(gen);
@@ -236,7 +259,7 @@ class Asteroid : public GameObject {
         applyRotation(m_angularVelocity, deltaTime);
     }
 
-    float getSize() const { return m_size; }
+    [[nodiscard]] float getSize() const { return m_size; }
 
   private:
     float m_size;
@@ -247,8 +270,7 @@ class Asteroid : public GameObject {
  */
 class Bullet : public GameObject {
   public:
-    Bullet(float worldWidth, float worldHeight)
-        : GameObject(worldWidth, worldHeight), m_lifetime(0.0f) {}
+    Bullet(float worldWidth, float worldHeight) : GameObject(worldWidth, worldHeight) {}
 
     void update(float deltaTime) override {
         GameObject::update(deltaTime);
@@ -267,10 +289,10 @@ class Bullet : public GameObject {
         setVisible(true);
     }
 
-    bool isExpired() const { return m_lifetime >= m_maxLifetime; }
+    [[nodiscard]] bool isExpired() const { return m_lifetime >= m_maxLifetime; }
 
   private:
-    float m_lifetime;
+    float m_lifetime{0.0f};
     float m_maxLifetime = 2.0f;
 };
 
@@ -292,23 +314,25 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         // Initialize game
         initializeGame();
 
-        std::cout << "Destroy all asteroids to win! Avoid collisions!" << std::endl;
+        std::cout << "Destroy all asteroids to win! Avoid collisions!" << '\n';
     }
 
     void update(float deltaTime) override {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<AsteroidsInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         if (m_gameOver && input->isRestartPressed()) {
             initializeGame();
             return;
         }
 
-        if (m_gameOver)
+        if (m_gameOver) {
             return;
+        }
 
         // Handle input
         handleInput(input, deltaTime);
@@ -329,26 +353,26 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
 
         // Check win condition
         if (m_asteroids.empty()) {
-            std::cout << "All asteroids destroyed! You win!" << std::endl;
+            std::cout << "All asteroids destroyed! You win!" << '\n';
             handleTestSuccess();
         }
     }
 
   protected:
-    std::string getExampleName() const override { return "Asteroids Clone"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Asteroids Clone"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Spaceship control with rotation and thrust", "Asteroid spawning and movement",
                 "Bullet firing and collision detection", "Wrap-around world boundaries",
                 "Score system and game over conditions"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Green spaceship that can rotate and thrust", "Gray asteroids of different sizes",
                 "White bullets fired from spaceship", "Score display in console"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"A/D or Left/Right - Rotate spaceship", "W or Up - Thrust",
                 "Space or X button - Fire bullets", "R or Start - Restart when game over",
                 "F - Report failure, ESC - Exit"};
@@ -374,7 +398,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         // Create asteroids
         spawnAsteroids(6);
 
-        std::cout << "Score: " << m_score << std::endl;
+        std::cout << "Score: " << m_score << '\n';
     }
 
     void clearGameEntities() {
@@ -395,8 +419,9 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
     }
 
     void handleInput(AsteroidsInputHandler* input, float deltaTime) {
-        if (!m_spaceship)
+        if (!m_spaceship) {
             return;
+        }
 
         // Rotation
         float rotationSpeed = 180.0f;  // degrees per second
@@ -445,14 +470,16 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
     }
 
     void checkCollisions() {
-        if (!m_spaceship)
+        if (!m_spaceship) {
             return;
+        }
 
         // Bullet vs Asteroid collisions
         for (int b = static_cast<int>(m_bullets.size()) - 1; b >= 0; --b) {
             auto& bullet = m_bullets[b];
-            if (!bullet->isVisible())
+            if (!bullet->isVisible()) {
                 continue;
+            }
 
             for (int a = static_cast<int>(m_asteroids.size()) - 1; a >= 0; --a) {
                 auto& asteroid = m_asteroids[a];
@@ -532,7 +559,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         removeEntity(asteroid->getId());
         m_asteroids.erase(m_asteroids.begin() + index);
 
-        std::cout << "Score: " << m_score << std::endl;
+        std::cout << "Score: " << m_score << '\n';
     }
 
     void spawnAsteroids(int count) {
@@ -542,12 +569,13 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         std::uniform_real_distribution<float> sizeDist(0.8f, 1.2f);
 
         for (int i = 0; i < count; ++i) {
-            float x, y;
             // Avoid spawning too close to the center (where spaceship starts)
-            do {
+            float x = posDist(gen);
+            float y = posDist(gen);
+            while (std::abs(x) < 3.0f && std::abs(y) < 3.0f) {
                 x = posDist(gen);
                 y = posDist(gen);
-            } while (std::abs(x) < 3.0f && std::abs(y) < 3.0f);
+            }
 
             float size = sizeDist(gen);
             spawnAsteroidAt({x, y, 0.0f}, size);
@@ -563,8 +591,8 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
 
     void gameOver() {
         m_gameOver = true;
-        std::cout << "Game Over! Final Score: " << m_score << std::endl;
-        std::cout << "Press R or Start to restart" << std::endl;
+        std::cout << "Game Over! Final Score: " << m_score << '\n';
+        std::cout << "Press R or Start to restart" << '\n';
     }
 
     static bool aabbIntersect(const vde::Position& aPos, float aW, float aH,
@@ -574,8 +602,8 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
         float bHalfW = bW * 0.5f;
         float bHalfH = bH * 0.5f;
 
-        return !(aPos.x + aHalfW < bPos.x - bHalfW || aPos.x - aHalfW > bPos.x + bHalfW ||
-                 aPos.y + aHalfH < bPos.y - bHalfH || aPos.y - aHalfH > bPos.y + bHalfH);
+        return aPos.x + aHalfW >= bPos.x - bHalfW && aPos.x - aHalfW <= bPos.x + bHalfW &&
+               aPos.y + aHalfH >= bPos.y - bHalfH && aPos.y - aHalfH <= bPos.y + bHalfH;
     }
 
   private:
@@ -598,6 +626,7 @@ class AsteroidsScene : public vde::examples::BaseExampleScene {
 class AsteroidsGame : public vde::examples::BaseExampleGame<AsteroidsInputHandler, AsteroidsScene> {
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     AsteroidsGame demo;
     return vde::examples::runExample(demo, "VDE Asteroids Demo", 1280, 720, argc, argv);

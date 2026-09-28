@@ -66,17 +66,19 @@ class TexturedCube : public vde::MeshEntity {
 
     void setRotationSpeed(float speed) { m_rotationSpeed = speed; }
     void toggleRotation() { m_rotating = !m_rotating; }
-    bool isRotating() const { return m_rotating; }
+    [[nodiscard]] bool isRotating() const { return m_rotating; }
 
     void update(float deltaTime) override {
         if (m_rotating) {
             auto rot = getRotation();
             rot.yaw += m_rotationSpeed * deltaTime;
             rot.pitch += m_rotationSpeed * 0.5f * deltaTime;
-            if (rot.yaw > 360.0f)
+            if (rot.yaw > 360.0f) {
                 rot.yaw -= 360.0f;
-            if (rot.pitch > 360.0f)
+            }
+            if (rot.pitch > 360.0f) {
                 rot.pitch -= 360.0f;
+            }
             setRotation(rot);
         }
     }
@@ -106,8 +108,7 @@ vde::ResourcePtr<vde::Mesh> createTexturedCube(float size) {
     auto uvRegion = [](int col, int row, float u, float v) -> glm::vec2 {
         float regionWidth = 1.0f / 3.0f;
         float regionHeight = 1.0f / 2.0f;
-        return glm::vec2(col * regionWidth + u * regionWidth,
-                         row * regionHeight + v * regionHeight);
+        return {col * regionWidth + u * regionWidth, row * regionHeight + v * regionHeight};
     };
 
     std::vector<vde::Vertex> vertices = {
@@ -175,23 +176,23 @@ std::shared_ptr<vde::Texture> createTextureAtlas() {
     std::vector<uint8_t> pixels(atlasWidth * atlasHeight * channels);
 
     // Define 6 different patterns/colors for each face
+    enum class PatternType : uint8_t { SOLID, CHECKER, STRIPES, DOTS, GRADIENT, GRID };
     struct FacePattern {
         int col, row;
         uint8_t r, g, b;
-        enum PatternType { SOLID, CHECKER, STRIPES, DOTS, GRADIENT, GRID } pattern;
+        PatternType pattern;
     };
 
     const FacePattern faces[6] = {
-        {0, 0, 255, 100, 100, FacePattern::CHECKER},   // Top: Red checker
-        {1, 0, 100, 255, 100, FacePattern::STRIPES},   // Front: Green stripes
-        {2, 0, 100, 100, 255, FacePattern::DOTS},      // Bottom: Blue dots
-        {0, 1, 255, 255, 100, FacePattern::GRADIENT},  // Back: Yellow gradient
-        {1, 1, 255, 100, 255, FacePattern::GRID},      // Right: Magenta grid
-        {2, 1, 100, 255, 255, FacePattern::SOLID}      // Left: Cyan solid
+        {0, 0, 255, 100, 100, PatternType::CHECKER},   // Top: Red checker
+        {1, 0, 100, 255, 100, PatternType::STRIPES},   // Front: Green stripes
+        {2, 0, 100, 100, 255, PatternType::DOTS},      // Bottom: Blue dots
+        {0, 1, 255, 255, 100, PatternType::GRADIENT},  // Back: Yellow gradient
+        {1, 1, 255, 100, 255, PatternType::GRID},      // Right: Magenta grid
+        {2, 1, 100, 255, 255, PatternType::SOLID}      // Left: Cyan solid
     };
 
-    for (int faceIdx = 0; faceIdx < 6; ++faceIdx) {
-        const auto& face = faces[faceIdx];
+    for (auto face : faces) {
         int startX = face.col * regionSize;
         int startY = face.row * regionSize;
 
@@ -207,7 +208,7 @@ std::shared_ptr<vde::Texture> createTextureAtlas() {
 
                 // Apply pattern
                 switch (face.pattern) {
-                case FacePattern::CHECKER: {
+                case PatternType::CHECKER: {
                     bool checker = ((x / 64) + (y / 64)) % 2 == 0;
                     float factor = checker ? 1.0f : 0.5f;
                     r = static_cast<uint8_t>(r * factor);
@@ -215,14 +216,14 @@ std::shared_ptr<vde::Texture> createTextureAtlas() {
                     b = static_cast<uint8_t>(b * factor);
                     break;
                 }
-                case FacePattern::STRIPES: {
+                case PatternType::STRIPES: {
                     float factor = (y / 32) % 2 == 0 ? 1.0f : 0.6f;
                     r = static_cast<uint8_t>(r * factor);
                     g = static_cast<uint8_t>(g * factor);
                     b = static_cast<uint8_t>(b * factor);
                     break;
                 }
-                case FacePattern::DOTS: {
+                case PatternType::DOTS: {
                     int dotX = x % 64;
                     int dotY = y % 64;
                     int centerX = 32;
@@ -236,14 +237,14 @@ std::shared_ptr<vde::Texture> createTextureAtlas() {
                     }
                     break;
                 }
-                case FacePattern::GRADIENT: {
+                case PatternType::GRADIENT: {
                     float factor = static_cast<float>(y) / regionSize;
                     r = static_cast<uint8_t>(r * (0.5f + 0.5f * factor));
                     g = static_cast<uint8_t>(g * (0.5f + 0.5f * factor));
                     b = static_cast<uint8_t>(b * (0.5f + 0.5f * factor));
                     break;
                 }
-                case FacePattern::GRID: {
+                case PatternType::GRID: {
                     bool gridLine = (x % 64 < 4) || (y % 64 < 4);
                     if (gridLine) {
                         r = 50;
@@ -252,7 +253,7 @@ std::shared_ptr<vde::Texture> createTextureAtlas() {
                     }
                     break;
                 }
-                case FacePattern::SOLID:
+                case PatternType::SOLID:
                 default:
                     // Keep original colors
                     break;
@@ -306,8 +307,8 @@ class TexturedCubeScene : public vde::examples::BaseExampleScene {
         m_cube->setColor(vde::Color::white());
         m_cube->setRotationSpeed(30.0f);
 
-        std::cout << "\nCube created with texture atlas (3x2 grid)." << std::endl;
-        std::cout << "Each face displays a different pattern." << std::endl;
+        std::cout << "\nCube created with texture atlas (3x2 grid)." << '\n';
+        std::cout << "Each face displays a different pattern." << '\n';
     }
 
     void update(float deltaTime) override {
@@ -315,31 +316,34 @@ class TexturedCubeScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<TexturedCubeInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         if (input->isSpacePressed()) {
             m_cube->toggleRotation();
-            std::cout << "Rotation " << (m_cube->isRotating() ? "enabled" : "paused") << std::endl;
+            std::cout << "Rotation " << (m_cube->isRotating() ? "enabled" : "paused") << '\n';
         }
 
         if (input->isResetRotation()) {
             m_cube->setRotation(0.0f, 0.0f, 0.0f);
-            std::cout << "Rotation reset to origin" << std::endl;
+            std::cout << "Rotation reset to origin" << '\n';
         }
     }
 
   protected:
-    std::string getExampleName() const override { return "Textured Cube with Atlas Mapping"; }
+    [[nodiscard]] std::string getExampleName() const override {
+        return "Textured Cube with Atlas Mapping";
+    }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Texture atlas with 6 distinct regions (3x2 grid)",
                 "Custom UV mapping for each cube face",
                 "Procedurally generated textures with different patterns",
                 "Rotating cube with interactive controls"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Rotating cube with different patterns on each face:",
                 "  - Red checkered pattern (top)",
                 "  - Green horizontal stripes (front)",
@@ -349,7 +353,7 @@ class TexturedCubeScene : public vde::examples::BaseExampleScene {
                 "  - Cyan solid color (left)"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SPACE - Toggle rotation on/off", "R - Reset rotation to default orientation"};
     }
 
@@ -369,6 +373,7 @@ class TexturedCubeGame
 /**
  * @brief Main entry point.
  */
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     TexturedCubeGame demo;
     return vde::examples::runExample(demo, "VDE Textured Cube Demo", 1280, 720, argc, argv);

@@ -56,7 +56,7 @@ struct TileVisibilityBounds {
      * @brief Check whether the bounds select any tiles.
      * @return true when the bounds are empty.
      */
-    bool empty() const { return maxColumn < minColumn || maxRow < minRow; }
+    [[nodiscard]] bool empty() const { return maxColumn < minColumn || maxRow < minRow; }
 };
 
 /**
@@ -103,13 +103,13 @@ class TileMap : public MeshEntity {
     /**
      * @brief Get the number of layers.
      */
-    int getLayerCount() const { return static_cast<int>(m_layers.size()); }
+    [[nodiscard]] int getLayerCount() const { return static_cast<int>(m_layers.size()); }
 
     /**
      * @brief Get layer metadata.
      * @param layerIndex Zero-based layer index.
      */
-    const LayerInfo& getLayerInfo(int layerIndex) const;
+    [[nodiscard]] const LayerInfo& getLayerInfo(int layerIndex) const;
 
     /**
      * @brief Rename a layer.
@@ -130,7 +130,7 @@ class TileMap : public MeshEntity {
      * @param layerIndex Zero-based layer index.
      * @return true if the layer will render.
      */
-    bool isLayerVisible(int layerIndex) const;
+    [[nodiscard]] bool isLayerVisible(int layerIndex) const;
 
     /**
      * @brief Set a layer's Z depth.
@@ -144,7 +144,7 @@ class TileMap : public MeshEntity {
      * @param layerIndex Zero-based layer index.
      * @return The layer depth value.
      */
-    float getLayerDepth(int layerIndex) const;
+    [[nodiscard]] float getLayerDepth(int layerIndex) const;
 
     /**
      * @brief Set the SpriteSheet used for tile IDs.
@@ -156,32 +156,32 @@ class TileMap : public MeshEntity {
     /**
      * @brief Get the bound SpriteSheet.
      */
-    std::shared_ptr<SpriteSheet> getTileSet() const { return m_tileSet; }
+    [[nodiscard]] std::shared_ptr<SpriteSheet> getTileSet() const { return m_tileSet; }
 
     /**
      * @brief Create a CPU-side copy of this tilemap without attached scene or GPU mesh state.
      */
-    std::shared_ptr<TileMap> clone() const;
+    [[nodiscard]] std::shared_ptr<TileMap> clone() const;
 
     /**
      * @brief Get the tile width in world units.
      */
-    float getTileWidth() const { return m_tileWidth; }
+    [[nodiscard]] float getTileWidth() const { return m_tileWidth; }
 
     /**
      * @brief Get the tile height in world units.
      */
-    float getTileHeight() const { return m_tileHeight; }
+    [[nodiscard]] float getTileHeight() const { return m_tileHeight; }
 
     /**
      * @brief Get the number of columns.
      */
-    int getColumnCount() const { return m_columns; }
+    [[nodiscard]] int getColumnCount() const { return m_columns; }
 
     /**
      * @brief Get the number of rows.
      */
-    int getRowCount() const { return m_rows; }
+    [[nodiscard]] int getRowCount() const { return m_rows; }
 
     /**
      * @brief Set a tile on the base layer.
@@ -206,7 +206,7 @@ class TileMap : public MeshEntity {
      * @param row Zero-based row.
      * @return Tile ID or kEmptyTile.
      */
-    int getTile(int column, int row) const;
+    [[nodiscard]] int getTile(int column, int row) const;
 
     /**
      * @brief Get a tile from a specific layer.
@@ -215,7 +215,7 @@ class TileMap : public MeshEntity {
      * @param row Zero-based row.
      * @return Tile ID or kEmptyTile.
      */
-    int getTile(int layerIndex, int column, int row) const;
+    [[nodiscard]] int getTile(int layerIndex, int column, int row) const;
 
     /**
      * @brief Fill an inclusive region on the base layer.
@@ -261,25 +261,25 @@ class TileMap : public MeshEntity {
     /**
      * @brief Check whether culling is enabled.
      */
-    bool isCullingEnabled() const { return m_cullingEnabled; }
+    [[nodiscard]] bool isCullingEnabled() const { return m_cullingEnabled; }
 
     /**
      * @brief Get the most recent bounds used to build the render mesh.
      */
-    TileVisibilityBounds getLastVisibleBounds() const { return m_lastVisibleBounds; }
+    [[nodiscard]] TileVisibilityBounds getLastVisibleBounds() const { return m_lastVisibleBounds; }
 
     /**
      * @brief Compute visible tile bounds for a world-space rectangle.
      * @param rect World-space visible rectangle.
      * @return Inclusive tile bounds clamped to the map.
      */
-    TileVisibilityBounds computeVisibleBounds(const Rect2D& rect) const;
+    [[nodiscard]] TileVisibilityBounds computeVisibleBounds(const Rect2D& rect) const;
 
     /**
      * @brief Compute visible tile bounds using the attached Camera2D.
      * @return Inclusive tile bounds, or the full map if no Camera2D is active.
      */
-    TileVisibilityBounds computeVisibleBoundsFromCamera() const;
+    [[nodiscard]] TileVisibilityBounds computeVisibleBoundsFromCamera() const;
 
     /**
      * @brief Assign collision meaning to a tile ID.
@@ -293,7 +293,7 @@ class TileMap : public MeshEntity {
      * @param tileId SpriteSheet tile ID.
      * @return The configured collision kind, or None if unassigned.
      */
-    TileCollisionKind getCollisionKind(int tileId) const;
+    [[nodiscard]] TileCollisionKind getCollisionKind(int tileId) const;
 
     /**
      * @brief Extract merged world-space collision rectangles.
@@ -305,7 +305,7 @@ class TileMap : public MeshEntity {
      * @param layerIndex Zero-based layer index, or -1 for all layers.
      * @return Extracted collision rectangles.
      */
-    std::vector<TileCollisionRect> extractCollisionRects(int layerIndex = -1) const;
+    [[nodiscard]] std::vector<TileCollisionRect> extractCollisionRects(int layerIndex = -1) const;
 
     /**
      * @brief Rebuild visible mesh as needed and render the tilemap.
@@ -333,7 +333,7 @@ class TileMap : public MeshEntity {
     void validateLayerIndex(int layerIndex) const;
     void validateTileCoordinate(int column, int row) const;
     void validateTileId(int tileId) const;
-    size_t getTileOffset(int column, int row) const;
+    [[nodiscard]] size_t getTileOffset(int column, int row) const;
     void rebuildMesh(const TileVisibilityBounds& bounds);
 };
 
@@ -376,7 +376,7 @@ class RepeatingBackground : public MeshEntity {
     /**
      * @brief Get the camera-follow factor.
      */
-    glm::vec2 getParallaxFactor() const { return m_parallaxFactor; }
+    [[nodiscard]] glm::vec2 getParallaxFactor() const { return m_parallaxFactor; }
 
     /**
      * @brief Set autonomous scroll velocity in world units per second.
@@ -388,7 +388,7 @@ class RepeatingBackground : public MeshEntity {
     /**
      * @brief Get the autonomous scroll velocity.
      */
-    glm::vec2 getScrollVelocity() const { return m_scrollVelocity; }
+    [[nodiscard]] glm::vec2 getScrollVelocity() const { return m_scrollVelocity; }
 
     /**
      * @brief Set an explicit scroll offset.
@@ -400,7 +400,7 @@ class RepeatingBackground : public MeshEntity {
     /**
      * @brief Get the current scroll offset.
      */
-    glm::vec2 getScrollOffset() const { return m_scrollOffset; }
+    [[nodiscard]] glm::vec2 getScrollOffset() const { return m_scrollOffset; }
 
     /**
      * @brief Advance autonomous scrolling.

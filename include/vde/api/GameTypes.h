@@ -22,43 +22,43 @@ namespace vde {
 struct Color {
     float r, g, b, a;
 
-    Color() : r(1.0f), g(1.0f), b(1.0f), a(1.0f) {}
-    Color(float r, float g, float b, float a = 1.0f) : r(r), g(g), b(b), a(a) {}
+    constexpr Color() : r(1.0f), g(1.0f), b(1.0f), a(1.0f) {}
+    constexpr Color(float r, float g, float b, float a = 1.0f) : r(r), g(g), b(b), a(a) {}
 
     /**
      * @brief Create color from 8-bit components (0-255).
      */
-    static Color fromRGB8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
-        return Color(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
+    static constexpr Color fromRGB8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
+        return {r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f};
     }
 
     /**
      * @brief Create color from hex value (0xRRGGBB or 0xRRGGBBAA).
      */
-    static Color fromHex(uint32_t hex) {
+    static constexpr Color fromHex(uint32_t hex) {
         if (hex > 0xFFFFFF) {
             // Has alpha
-            return Color(((hex >> 24) & 0xFF) / 255.0f, ((hex >> 16) & 0xFF) / 255.0f,
-                         ((hex >> 8) & 0xFF) / 255.0f, (hex & 0xFF) / 255.0f);
+            return {((hex >> 24) & 0xFF) / 255.0f, ((hex >> 16) & 0xFF) / 255.0f,
+                    ((hex >> 8) & 0xFF) / 255.0f, (hex & 0xFF) / 255.0f};
         }
-        return Color(((hex >> 16) & 0xFF) / 255.0f, ((hex >> 8) & 0xFF) / 255.0f,
-                     (hex & 0xFF) / 255.0f, 1.0f);
+        return {((hex >> 16) & 0xFF) / 255.0f, ((hex >> 8) & 0xFF) / 255.0f, (hex & 0xFF) / 255.0f,
+                1.0f};
     }
 
     bool operator==(const Color&) const = default;
 
-    glm::vec3 toVec3() const { return glm::vec3(r, g, b); }
-    glm::vec4 toVec4() const { return glm::vec4(r, g, b, a); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {r, g, b}; }
+    [[nodiscard]] glm::vec4 toVec4() const { return {r, g, b, a}; }
 
     // Predefined colors
-    static Color white() { return Color(1.0f, 1.0f, 1.0f); }
-    static Color black() { return Color(0.0f, 0.0f, 0.0f); }
-    static Color red() { return Color(1.0f, 0.0f, 0.0f); }
-    static Color green() { return Color(0.0f, 1.0f, 0.0f); }
-    static Color blue() { return Color(0.0f, 0.0f, 1.0f); }
-    static Color yellow() { return Color(1.0f, 1.0f, 0.0f); }
-    static Color cyan() { return Color(0.0f, 1.0f, 1.0f); }
-    static Color magenta() { return Color(1.0f, 0.0f, 1.0f); }
+    static constexpr Color white() { return {1.0f, 1.0f, 1.0f}; }
+    static constexpr Color black() { return {0.0f, 0.0f, 0.0f}; }
+    static constexpr Color red() { return {1.0f, 0.0f, 0.0f}; }
+    static constexpr Color green() { return {0.0f, 1.0f, 0.0f}; }
+    static constexpr Color blue() { return {0.0f, 0.0f, 1.0f}; }
+    static constexpr Color yellow() { return {1.0f, 1.0f, 0.0f}; }
+    static constexpr Color cyan() { return {0.0f, 1.0f, 1.0f}; }
+    static constexpr Color magenta() { return {1.0f, 0.0f, 1.0f}; }
 };
 
 /**
@@ -71,17 +71,17 @@ struct Position {
     Position(float x, float y, float z) : x(x), y(y), z(z) {}
     explicit Position(const glm::vec3& v) : x(v.x), y(v.y), z(v.z) {}
 
-    glm::vec3 toVec3() const { return glm::vec3(x, y, z); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {x, y, z}; }
 
     Position operator+(const Position& other) const {
-        return Position(x + other.x, y + other.y, z + other.z);
+        return {x + other.x, y + other.y, z + other.z};
     }
 
     Position operator-(const Position& other) const {
-        return Position(x - other.x, y - other.y, z - other.z);
+        return {x - other.x, y - other.y, z - other.z};
     }
 
-    Position operator*(float scalar) const { return Position(x * scalar, y * scalar, z * scalar); }
+    Position operator*(float scalar) const { return {x * scalar, y * scalar, z * scalar}; }
 };
 
 /**
@@ -94,23 +94,23 @@ struct Direction {
     Direction(float x, float y, float z) : x(x), y(y), z(z) {}
     explicit Direction(const glm::vec3& v) : x(v.x), y(v.y), z(v.z) {}
 
-    glm::vec3 toVec3() const { return glm::vec3(x, y, z); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {x, y, z}; }
 
     /**
      * @brief Returns a normalized version of this direction.
      */
-    Direction normalized() const {
+    [[nodiscard]] Direction normalized() const {
         glm::vec3 n = glm::normalize(toVec3());
-        return Direction(n.x, n.y, n.z);
+        return {n.x, n.y, n.z};
     }
 
     // Common directions
-    static Direction forward() { return Direction(0.0f, 0.0f, -1.0f); }
-    static Direction back() { return Direction(0.0f, 0.0f, 1.0f); }
-    static Direction up() { return Direction(0.0f, 1.0f, 0.0f); }
-    static Direction down() { return Direction(0.0f, -1.0f, 0.0f); }
-    static Direction left() { return Direction(-1.0f, 0.0f, 0.0f); }
-    static Direction right() { return Direction(1.0f, 0.0f, 0.0f); }
+    static Direction forward() { return {0.0f, 0.0f, -1.0f}; }
+    static Direction back() { return {0.0f, 0.0f, 1.0f}; }
+    static Direction up() { return {0.0f, 1.0f, 0.0f}; }
+    static Direction down() { return {0.0f, -1.0f, 0.0f}; }
+    static Direction left() { return {-1.0f, 0.0f, 0.0f}; }
+    static Direction right() { return {1.0f, 0.0f, 0.0f}; }
 };
 
 /**
@@ -124,7 +124,7 @@ struct Rotation {
     Rotation() : pitch(0.0f), yaw(0.0f), roll(0.0f) {}
     Rotation(float pitch, float yaw, float roll) : pitch(pitch), yaw(yaw), roll(roll) {}
 
-    glm::vec3 toVec3() const { return glm::vec3(pitch, yaw, roll); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {pitch, yaw, roll}; }
 };
 
 /**
@@ -137,9 +137,9 @@ struct Scale {
     Scale(float uniform) : x(uniform), y(uniform), z(uniform) {}
     Scale(float x, float y, float z) : x(x), y(y), z(z) {}
 
-    glm::vec3 toVec3() const { return glm::vec3(x, y, z); }
+    [[nodiscard]] glm::vec3 toVec3() const { return {x, y, z}; }
 
-    static Scale uniform(float s) { return Scale(s, s, s); }
+    static Scale uniform(float s) { return {s, s, s}; }
 };
 
 /**
@@ -159,7 +159,7 @@ struct Transform {
     /**
      * @brief Get the model matrix for this transform.
      */
-    glm::mat4 getMatrix() const;
+    [[nodiscard]] glm::mat4 getMatrix() const;
 };
 
 /**

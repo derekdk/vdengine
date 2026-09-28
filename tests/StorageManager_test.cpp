@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <vector>
@@ -233,7 +234,7 @@ TEST_F(StorageManagerTest, RawBinaryEmptyBlob) {
     ASSERT_TRUE(storage().setBinData("empty_blob", empty));
     const auto result = storage().getBinData("empty_blob");
     ASSERT_TRUE(result.has_value());
-    EXPECT_TRUE(result->empty());
+    EXPECT_TRUE(result.value().empty());
 }
 
 TEST_F(StorageManagerTest, RawBinaryAllByteValues) {
@@ -266,7 +267,7 @@ TEST_F(StorageManagerTest, TypedFloat) {
 }
 
 TEST_F(StorageManagerTest, TypedDouble) {
-    constexpr double pi = 3.14159265358979323846;
+    constexpr double pi = std::numbers::pi;
     ASSERT_TRUE(storage().setBinData<double>("pi", pi));
     const auto val = storage().getBinData<double>("pi");
     ASSERT_TRUE(val.has_value());
@@ -306,9 +307,9 @@ TEST_F(StorageManagerTest, TypedPODStruct) {
 
     const auto result = storage().getBinData<PlayerStats>("stats");
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->level, original.level);
-    EXPECT_FLOAT_EQ(result->health, original.health);
-    EXPECT_EQ(result->gold, original.gold);
+    EXPECT_EQ(result.value().level, original.level);
+    EXPECT_FLOAT_EQ(result.value().health, original.health);
+    EXPECT_EQ(result.value().gold, original.gold);
 }
 
 TEST_F(StorageManagerTest, TypedGetWithWrongSizeReturnsNullopt) {

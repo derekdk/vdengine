@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 
 // cppcheck-suppress syntaxError -- cppcheck misparses C++20 namespace syntax in header-only mode
 namespace vde {
@@ -54,12 +55,14 @@ enum class AnimationEasing : uint8_t {
  */
 inline float evaluateEasing(AnimationEasing easing, float t) noexcept {
     // Clamp input to [0, 1] before evaluation.
-    if (t <= 0.0f)
+    if (t <= 0.0f) {
         return 0.0f;
-    if (t >= 1.0f)
+    }
+    if (t >= 1.0f) {
         return 1.0f;
+    }
 
-    const float pi = 3.14159265358979323846f;
+    const float pi = std::numbers::pi_v<float>;
 
     switch (easing) {
     case AnimationEasing::Linear:
@@ -111,16 +114,17 @@ inline float evaluateEasing(AnimationEasing easing, float t) noexcept {
         const float d1 = 2.75f;
         if (t < 1.0f / d1) {
             return n1 * t * t;
-        } else if (t < 2.0f / d1) {
+        }
+        if (t < 2.0f / d1) {
             float u = t - 1.5f / d1;
             return n1 * u * u + 0.75f;
-        } else if (t < 2.5f / d1) {
+        }
+        if (t < 2.5f / d1) {
             float u = t - 2.25f / d1;
             return n1 * u * u + 0.9375f;
-        } else {
-            float u = t - 2.625f / d1;
-            return n1 * u * u + 0.984375f;
         }
+        float u = t - 2.625f / d1;
+        return n1 * u * u + 0.984375f;
     }
 
     case AnimationEasing::EaseOutElastic: {

@@ -73,7 +73,7 @@ class Material {
     /**
      * @brief Get the albedo color.
      */
-    const Color& getAlbedo() const { return m_albedo; }
+    [[nodiscard]] const Color& getAlbedo() const { return m_albedo; }
 
     /**
      * @brief Set the albedo texture.
@@ -86,12 +86,12 @@ class Material {
     /**
      * @brief Get the albedo texture.
      */
-    std::shared_ptr<Texture> getAlbedoTexture() const { return m_albedoTexture; }
+    [[nodiscard]] std::shared_ptr<Texture> getAlbedoTexture() const { return m_albedoTexture; }
 
     /**
      * @brief Check if material has an albedo texture.
      */
-    bool hasAlbedoTexture() const { return m_albedoTexture != nullptr; }
+    [[nodiscard]] bool hasAlbedoTexture() const { return m_albedoTexture != nullptr; }
 
     // =========================================================================
     // Roughness
@@ -106,7 +106,7 @@ class Material {
     /**
      * @brief Get the roughness factor.
      */
-    float getRoughness() const { return m_roughness; }
+    [[nodiscard]] float getRoughness() const { return m_roughness; }
 
     // =========================================================================
     // Metallic
@@ -121,7 +121,7 @@ class Material {
     /**
      * @brief Get the metallic factor.
      */
-    float getMetallic() const { return m_metallic; }
+    [[nodiscard]] float getMetallic() const { return m_metallic; }
 
     // =========================================================================
     // Emission
@@ -136,7 +136,7 @@ class Material {
     /**
      * @brief Get the emission color.
      */
-    const Color& getEmission() const { return m_emission; }
+    [[nodiscard]] const Color& getEmission() const { return m_emission; }
 
     /**
      * @brief Set the emission intensity multiplier.
@@ -147,12 +147,12 @@ class Material {
     /**
      * @brief Get the emission intensity.
      */
-    float getEmissionIntensity() const { return m_emissionIntensity; }
+    [[nodiscard]] float getEmissionIntensity() const { return m_emissionIntensity; }
 
     /**
      * @brief Check if material is emissive.
      */
-    bool isEmissive() const { return m_emissionIntensity > 0.0f; }
+    [[nodiscard]] bool isEmissive() const { return m_emissionIntensity > 0.0f; }
 
     // =========================================================================
     // Normal Mapping
@@ -167,12 +167,12 @@ class Material {
     /**
      * @brief Get the normal map texture.
      */
-    std::shared_ptr<Texture> getNormalMap() const { return m_normalMap; }
+    [[nodiscard]] std::shared_ptr<Texture> getNormalMap() const { return m_normalMap; }
 
     /**
      * @brief Check if material has a normal map.
      */
-    bool hasNormalMap() const { return m_normalMap != nullptr; }
+    [[nodiscard]] bool hasNormalMap() const { return m_normalMap != nullptr; }
 
     /**
      * @brief Set the normal map strength.
@@ -183,7 +183,7 @@ class Material {
     /**
      * @brief Get the normal map strength.
      */
-    float getNormalStrength() const { return m_normalStrength; }
+    [[nodiscard]] float getNormalStrength() const { return m_normalStrength; }
 
     // =========================================================================
     // Additional Properties
@@ -197,7 +197,7 @@ class Material {
     /**
      * @brief Check if material receives shadows.
      */
-    bool receivesShadows() const { return m_receivesShadows; }
+    [[nodiscard]] bool receivesShadows() const { return m_receivesShadows; }
 
     /**
      * @brief Set whether the material casts shadows.
@@ -207,7 +207,7 @@ class Material {
     /**
      * @brief Check if material casts shadows.
      */
-    bool castsShadows() const { return m_castsShadows; }
+    [[nodiscard]] bool castsShadows() const { return m_castsShadows; }
 
     /**
      * @brief Set the opacity of the material.
@@ -218,12 +218,12 @@ class Material {
     /**
      * @brief Get the opacity.
      */
-    float getOpacity() const { return m_opacity; }
+    [[nodiscard]] float getOpacity() const { return m_opacity; }
 
     /**
      * @brief Check if material is transparent (opacity < 1).
      */
-    bool isTransparent() const { return m_opacity < 1.0f; }
+    [[nodiscard]] bool isTransparent() const { return m_opacity < 1.0f; }
 
     // =========================================================================
     // GPU Data
@@ -248,7 +248,7 @@ class Material {
      * @brief Get material data packed for GPU.
      * @return GPUData structure ready for push constants
      */
-    GPUData getGPUData() const;
+    [[nodiscard]] GPUData getGPUData() const;
 
     // =========================================================================
     // Factory Methods

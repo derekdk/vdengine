@@ -27,7 +27,6 @@ glm::vec2 enemyHalfExtents(EnemyType type) {
     case EnemyType::Turret:
         return {0.35f, 0.35f};
     case EnemyType::Drone:
-        return {0.3f, 0.3f};
     case EnemyType::Chaser:
         return {0.3f, 0.3f};
     case EnemyType::Tank:
@@ -56,8 +55,9 @@ int enemyScore(EnemyType type) {
 
 bool updateEnemy(EnemyData& data, vde::SpriteEntity* sprite, float dt, glm::vec2 playerPos,
                  float /*scrollY*/, FireRequest& outFire) {
-    if (!data.alive || !sprite)
+    if (!data.alive || !sprite) {
         return false;
+    }
 
     data.timer += dt;
     auto pos = sprite->getPosition();
@@ -91,8 +91,9 @@ bool updateEnemy(EnemyData& data, vde::SpriteEntity* sprite, float dt, glm::vec2
         // Accelerate toward the player
         glm::vec2 toPlayer = playerPos - glm::vec2(pos.x, pos.y);
         float len = glm::length(toPlayer);
-        if (len > 0.1f)
+        if (len > 0.1f) {
             toPlayer /= len;
+        }
         glm::vec2 move = toPlayer * CHASER_SPEED * dt;
         sprite->setPosition(pos.x + move.x, pos.y + move.y, 0.0f);
         break;

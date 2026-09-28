@@ -3,6 +3,7 @@
  * @brief Unit tests for VLauncher executable scanning and process launch helpers.
  */
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -142,18 +143,19 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
 
     ASSERT_EQ(snapshot.entries.size(), 2u);
 
-    const auto sampleIt = std::find_if(
-        snapshot.entries.begin(), snapshot.entries.end(),
-        [](const vde::tools::ExecutableEntry& entry) { return entry.targetName == "vde_sample"; });
+    const auto sampleIt =
+        std::ranges::find_if(snapshot.entries, [](const vde::tools::ExecutableEntry& entry) {
+            return entry.targetName == "vde_sample";
+        });
     ASSERT_NE(sampleIt, snapshot.entries.end());
     const std::vector<std::string> expectedScripts = {"smoke_valid.vdescript"};
     EXPECT_EQ(sampleIt->smokeScripts, expectedScripts);
     EXPECT_EQ(sampleIt->kind, "Example");
 
-    const auto gameIt = std::find_if(snapshot.entries.begin(), snapshot.entries.end(),
-                                     [](const vde::tools::ExecutableEntry& entry) {
-                                         return entry.targetName == "vde_sample_game";
-                                     });
+    const auto gameIt =
+        std::ranges::find_if(snapshot.entries, [](const vde::tools::ExecutableEntry& entry) {
+            return entry.targetName == "vde_sample_game";
+        });
     ASSERT_NE(gameIt, snapshot.entries.end());
     const std::vector<std::string> expectedGameScripts = {"smoke_game.vdescript"};
     EXPECT_EQ(gameIt->smokeScripts, expectedGameScripts);

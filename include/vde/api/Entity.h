@@ -38,12 +38,12 @@ class Entity {
     /**
      * @brief Get the unique ID of this entity.
      */
-    EntityId getId() const { return m_id; }
+    [[nodiscard]] EntityId getId() const { return m_id; }
 
     /**
      * @brief Get the entity's name.
      */
-    const std::string& getName() const { return m_name; }
+    [[nodiscard]] const std::string& getName() const { return m_name; }
 
     /**
      * @brief Set the entity's name.
@@ -62,7 +62,7 @@ class Entity {
     /**
      * @brief Get the entity's position.
      */
-    const Position& getPosition() const { return m_transform.position; }
+    [[nodiscard]] const Position& getPosition() const { return m_transform.position; }
 
     /**
      * @brief Set the entity's rotation (Euler angles in degrees).
@@ -73,7 +73,7 @@ class Entity {
     /**
      * @brief Get the entity's rotation.
      */
-    const Rotation& getRotation() const { return m_transform.rotation; }
+    [[nodiscard]] const Rotation& getRotation() const { return m_transform.rotation; }
 
     /**
      * @brief Set the entity's scale.
@@ -85,12 +85,12 @@ class Entity {
     /**
      * @brief Get the entity's scale.
      */
-    const Scale& getScale() const { return m_transform.scale; }
+    [[nodiscard]] const Scale& getScale() const { return m_transform.scale; }
 
     /**
      * @brief Get the full transform.
      */
-    const Transform& getTransform() const { return m_transform; }
+    [[nodiscard]] const Transform& getTransform() const { return m_transform; }
 
     /**
      * @brief Set the full transform.
@@ -100,7 +100,7 @@ class Entity {
     /**
      * @brief Get the model matrix for rendering.
      */
-    glm::mat4 getModelMatrix() const;
+    [[nodiscard]] glm::mat4 getModelMatrix() const;
 
     // Visibility
 
@@ -112,7 +112,7 @@ class Entity {
     /**
      * @brief Check if the entity is visible.
      */
-    bool isVisible() const { return m_visible; }
+    [[nodiscard]] bool isVisible() const { return m_visible; }
 
     // Lifecycle methods (override in subclasses)
 
@@ -160,7 +160,7 @@ class MeshEntity : public Entity {
     using Ref = std::shared_ptr<MeshEntity>;
 
     MeshEntity();
-    virtual ~MeshEntity() = default;
+    ~MeshEntity() override = default;
 
     /**
      * @brief Set the mesh directly (takes shared ownership).
@@ -171,7 +171,7 @@ class MeshEntity : public Entity {
     /**
      * @brief Get the mesh.
      */
-    std::shared_ptr<Mesh> getMesh() const { return m_mesh; }
+    [[nodiscard]] std::shared_ptr<Mesh> getMesh() const { return m_mesh; }
 
     /**
      * @brief Set the mesh by resource ID (loaded via Scene).
@@ -182,7 +182,7 @@ class MeshEntity : public Entity {
     /**
      * @brief Get the mesh resource ID.
      */
-    ResourceId getMeshId() const { return m_meshId; }
+    [[nodiscard]] ResourceId getMeshId() const { return m_meshId; }
 
     /**
      * @brief Set the texture directly (takes shared ownership).
@@ -197,7 +197,7 @@ class MeshEntity : public Entity {
     /**
      * @brief Get the texture.
      */
-    std::shared_ptr<Texture> getTexture() const { return m_texture; }
+    [[nodiscard]] std::shared_ptr<Texture> getTexture() const { return m_texture; }
 
     /**
      * @brief Set the texture by resource ID.
@@ -208,7 +208,7 @@ class MeshEntity : public Entity {
     /**
      * @brief Get the texture resource ID.
      */
-    ResourceId getTextureId() const { return m_textureId; }
+    [[nodiscard]] ResourceId getTextureId() const { return m_textureId; }
 
     /**
      * @brief Set the base color/tint of the mesh.
@@ -218,7 +218,7 @@ class MeshEntity : public Entity {
     /**
      * @brief Get the base color/tint.
      */
-    const Color& getColor() const { return m_color; }
+    [[nodiscard]] const Color& getColor() const { return m_color; }
 
     /**
      * @brief Set the material (takes shared ownership).
@@ -229,12 +229,12 @@ class MeshEntity : public Entity {
     /**
      * @brief Get the material.
      */
-    std::shared_ptr<Material> getMaterial() const { return m_material; }
+    [[nodiscard]] std::shared_ptr<Material> getMaterial() const { return m_material; }
 
     /**
      * @brief Check if entity has a material.
      */
-    bool hasMaterial() const { return m_material != nullptr; }
+    [[nodiscard]] bool hasMaterial() const { return m_material != nullptr; }
 
     void render() override;
 
@@ -260,7 +260,7 @@ class SpriteEntity : public Entity {
 
     SpriteEntity();
     SpriteEntity(ResourceId textureId);
-    virtual ~SpriteEntity() = default;
+    ~SpriteEntity() override = default;
 
     /**
      * @brief Set the sprite texture directly (takes shared ownership).
@@ -275,7 +275,7 @@ class SpriteEntity : public Entity {
     /**
      * @brief Get the texture.
      */
-    std::shared_ptr<Texture> getTexture() const { return m_texture; }
+    [[nodiscard]] std::shared_ptr<Texture> getTexture() const { return m_texture; }
 
     /**
      * @brief Set the sprite texture by resource ID.
@@ -286,7 +286,7 @@ class SpriteEntity : public Entity {
     /**
      * @brief Get the texture resource ID.
      */
-    ResourceId getTextureId() const { return m_textureId; }
+    [[nodiscard]] ResourceId getTextureId() const { return m_textureId; }
 
     /**
      * @brief Set the sprite color/tint.
@@ -296,7 +296,7 @@ class SpriteEntity : public Entity {
     /**
      * @brief Get the sprite color/tint.
      */
-    const Color& getColor() const { return m_color; }
+    [[nodiscard]] const Color& getColor() const { return m_color; }
 
     /**
      * @brief Set the UV rectangle for sprite sheets.
@@ -318,12 +318,12 @@ class SpriteEntity : public Entity {
     /**
      * @brief Get the sprite anchor point X.
      */
-    float getAnchorX() const { return m_anchorX; }
+    [[nodiscard]] float getAnchorX() const { return m_anchorX; }
 
     /**
      * @brief Get the sprite anchor point Y.
      */
-    float getAnchorY() const { return m_anchorY; }
+    [[nodiscard]] float getAnchorY() const { return m_anchorY; }
 
     /**
      * @brief Set horizontal flip state.
@@ -343,12 +343,12 @@ class SpriteEntity : public Entity {
     /**
      * @brief Check if the sprite is horizontally flipped.
      */
-    bool isFlippedX() const { return m_flipX; }
+    [[nodiscard]] bool isFlippedX() const { return m_flipX; }
 
     /**
      * @brief Check if the sprite is vertically flipped.
      */
-    bool isFlippedY() const { return m_flipY; }
+    [[nodiscard]] bool isFlippedY() const { return m_flipY; }
 
     /**
      * @brief Size the sprite to a given world-space height, preserving aspect ratio.

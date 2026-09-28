@@ -15,6 +15,7 @@ class VLauncherTool : public BaseToolGame<BaseToolInputHandler, VLauncherScene> 
     explicit VLauncherTool(ToolMode mode) : BaseToolGame(mode) {}
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     VLauncherTool tool(ToolMode::INTERACTIVE);
 
@@ -26,8 +27,8 @@ int main(int argc, char** argv) {
     setWorkingDirectoryToExecutablePath();
 
     float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
-    uint32_t width = static_cast<uint32_t>(1280 * dpiScale);
-    uint32_t height = static_cast<uint32_t>(800 * dpiScale);
+    auto width = static_cast<uint32_t>(1280 * dpiScale);
+    auto height = static_cast<uint32_t>(800 * dpiScale);
 
     vde::GameSettings settings;
     settings.gameName = "VDE VLauncher";
@@ -37,7 +38,7 @@ int main(int argc, char** argv) {
     settings.graphics.maxFPS = 15;  // Launcher UI doesn't need high FPS
 
     if (!tool.initialize(settings)) {
-        std::cerr << "Failed to initialize VLauncher" << std::endl;
+        std::cerr << "Failed to initialize VLauncher" << '\n';
         return 1;
     }
 

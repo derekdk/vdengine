@@ -75,8 +75,8 @@ TEST_F(SpriteSheetGridTest, LastFrameUV) {
 }
 
 TEST_F(SpriteSheetGridTest, OutOfBoundsIndexThrows) {
-    EXPECT_THROW(sheet->getUVRect(-1), std::out_of_range);
-    EXPECT_THROW(sheet->getUVRect(8), std::out_of_range);
+    EXPECT_THROW((void)sheet->getUVRect(-1), std::out_of_range);
+    EXPECT_THROW((void)sheet->getUVRect(8), std::out_of_range);
 }
 
 // ============================================================================
@@ -167,7 +167,7 @@ TEST(SpriteSheetTest, NameLookupThrowsOnMissing) {
     auto tex = makeTestTexture(64, 64);
     auto sheet = SpriteSheet::create(tex);
     sheet->addSprite("a", 0, 0, 32, 32);
-    EXPECT_THROW(sheet->getUVRect("missing"), std::out_of_range);
+    EXPECT_THROW((void)sheet->getUVRect("missing"), std::out_of_range);
 }
 
 TEST(SpriteSheetTest, DuplicateNameThrows) {

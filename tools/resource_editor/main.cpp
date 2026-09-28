@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "ResourceEditorScene.h"
 
@@ -25,10 +26,10 @@ using namespace vde::tools;
 
 class ResourceEditorGame : public BaseToolGame<BaseToolInputHandler, ResourceEditorScene> {
   public:
-    ResourceEditorGame(ToolMode mode, const std::string& scriptFile = "", bool logToConsole = false,
-                       const std::string& logFile = "")
-        : BaseToolGame(mode), m_scriptFile(scriptFile), m_logToConsole(logToConsole),
-          m_logFile(logFile) {}
+    ResourceEditorGame(ToolMode mode, std::string scriptFile = "", bool logToConsole = false,
+                       std::string logFile = "")
+        : BaseToolGame(mode), m_scriptFile(std::move(scriptFile)), m_logToConsole(logToConsole),
+          m_logFile(std::move(logFile)) {}
 
     void onStart() override {
         BaseToolGame::onStart();
@@ -98,6 +99,7 @@ class ResourceEditorGame : public BaseToolGame<BaseToolInputHandler, ResourceEdi
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ToolMode mode = ToolMode::INTERACTIVE;
     std::string scriptFile;
@@ -116,7 +118,7 @@ int main(int argc, char** argv) {
         } else if (arg == "--input-script" && i + 1 < argc) {
             // Skip the value; it is consumed by configureInputScriptFromArgs below
             ++i;
-        } else if (arg.rfind("--", 0) != 0 && scriptFile.empty()) {
+        } else if (!arg.starts_with("--") && scriptFile.empty()) {
             // First non-flag argument is the script file
             scriptFile = arg;
             mode = ToolMode::SCRIPT;
@@ -142,32 +144,31 @@ int main(int argc, char** argv) {
     if (mode == ToolMode::INTERACTIVE) {
         // Adjust resolution based on DPI
         float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
-        uint32_t width = static_cast<uint32_t>(1400 * dpiScale);
-        uint32_t height = static_cast<uint32_t>(900 * dpiScale);
+        auto width = static_cast<uint32_t>(1400 * dpiScale);
+        auto height = static_cast<uint32_t>(900 * dpiScale);
 
         return runTool(tool, "VDE Resource Editor", width, height, argc, argv);
-    } else {
-        // Configure input script from CLI args if provided (beyond the script file arg)
-        vde::configureInputScriptFromArgs(tool, argc, argv);
-
-        // For script mode, run headless (minimal window)
-        vde::GameSettings settings;
-        settings.gameName = "VDE Resource Editor (Script Mode)";
-        settings.display.windowWidth = 800;
-        settings.display.windowHeight = 600;
-        settings.debug.enableValidation = false;
-
-        if (!tool.initialize(settings)) {
-            std::cerr << "Failed to initialize resource editor\n";
-            return 1;
-        }
-
-        tool.run();
-
-        std::cout << "\n====================================================\n";
-        std::cout << "Script execution complete\n";
-        std::cout << "====================================================\n";
-
-        return tool.getExitCode();
     }
+    // Configure input script from CLI args if provided (beyond the script file arg)
+    vde::configureInputScriptFromArgs(tool, argc, argv);
+
+    // For script mode, run headless (minimal window)
+    vde::GameSettings settings;
+    settings.gameName = "VDE Resource Editor (Script Mode)";
+    settings.display.windowWidth = 800;
+    settings.display.windowHeight = 600;
+    settings.debug.enableValidation = false;
+
+    if (!tool.initialize(settings)) {
+        std::cerr << "Failed to initialize resource editor\n";
+        return 1;
+    }
+
+    tool.run();
+
+    std::cout << "\n====================================================\n";
+    std::cout << "Script execution complete\n";
+    std::cout << "====================================================\n";
+
+    return tool.getExitCode();
 }

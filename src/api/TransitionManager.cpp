@@ -354,7 +354,7 @@ void TransitionManager::createPipeline(const std::string& fragShaderPath) {
     auto vertResult = compiler.compileFile(vertPath, ShaderStage::Vertex);
     if (!vertResult.success) {
         std::cerr << "[TransitionManager] Vertex shader compilation failed: " << vertResult.errorLog
-                  << std::endl;
+                  << '\n';
         throw std::runtime_error("Failed to compile transition vertex shader: " +
                                  vertResult.errorLog);
     }
@@ -363,7 +363,7 @@ void TransitionManager::createPipeline(const std::string& fragShaderPath) {
     auto fragResult = compiler.compileFile(fullFragPath, ShaderStage::Fragment);
     if (!fragResult.success) {
         std::cerr << "[TransitionManager] Fragment shader compilation failed: "
-                  << fragResult.errorLog << std::endl;
+                  << fragResult.errorLog << '\n';
         throw std::runtime_error("Failed to compile transition fragment shader: " +
                                  fragResult.errorLog);
     }

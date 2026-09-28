@@ -7,6 +7,7 @@ class PongGame : public vde::games::BaseGame<pong::PongInput, pong::PongScene> {
     PongGame() = default;
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     PongGame game;
     return vde::games::runGame(game, "VDE Pong", 1280, 720, argc, argv);

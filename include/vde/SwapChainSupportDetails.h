@@ -18,7 +18,7 @@ namespace vde {
  * to determine supported formats, present modes, and capabilities.
  */
 struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;       ///< Surface capabilities
+    VkSurfaceCapabilitiesKHR capabilities{};     ///< Surface capabilities
     std::vector<VkSurfaceFormatKHR> formats;     ///< Supported surface formats
     std::vector<VkPresentModeKHR> presentModes;  ///< Supported present modes
 };

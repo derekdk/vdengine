@@ -30,14 +30,14 @@
 constexpr float DEFAULT_AUTO_TERMINATE_SECONDS = 0.0f;
 
 // Triangle vertices with positions and colors
-const std::vector<vde::Vertex> triangleVertices = {
+constexpr std::array<vde::Vertex, 3> triangleVertices = {{
     // Position (x, y, z)       Color (r, g, b)       TexCoord (u, v)
     {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.5f, 0.0f}},  // Top (red)
     {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},   // Bottom right (green)
     {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}   // Bottom left (blue)
-};
+}};
 
-const std::vector<uint16_t> triangleIndices = {0, 1, 2};
+constexpr std::array<uint16_t, 3> triangleIndices = {0, 1, 2};
 
 /**
  * @brief Low-level triangle rendering application.
@@ -52,7 +52,7 @@ class TriangleApp {
         cleanup();
     }
 
-    int getExitCode() const { return m_exitCode; }
+    [[nodiscard]] int getExitCode() const { return m_exitCode; }
 
     void setAutoTerminateSeconds(float s) { m_autoTerminateSeconds = s; }
 
@@ -85,14 +85,13 @@ class TriangleApp {
             auto* app = static_cast<TriangleApp*>(glfwGetWindowUserPointer(window));
             if (action == GLFW_PRESS) {
                 if (key == GLFW_KEY_ESCAPE) {
-                    std::cout << "User requested early exit." << std::endl;
+                    std::cout << "User requested early exit." << '\n';
                     app->m_shouldQuit = true;
                 } else if (key == GLFW_KEY_F) {
-                    std::cerr << "\n========================================" << std::endl;
-                    std::cerr << "  TEST FAILED: User reported issue" << std::endl;
-                    std::cerr << "  Expected: Colored triangle (red/green/blue vertices)"
-                              << std::endl;
-                    std::cerr << "========================================\n" << std::endl;
+                    std::cerr << "\n========================================" << '\n';
+                    std::cerr << "  TEST FAILED: User reported issue" << '\n';
+                    std::cerr << "  Expected: Colored triangle (red/green/blue vertices)" << '\n';
+                    std::cerr << "========================================\n" << '\n';
                     app->m_exitCode = 1;
                     app->m_shouldQuit = true;
                 }
@@ -101,30 +100,29 @@ class TriangleApp {
     }
 
     void printInstructions() {
-        std::cout << "\n========================================" << std::endl;
-        std::cout << "  VDE Example: Triangle Rendering" << std::endl;
-        std::cout << "========================================\n" << std::endl;
+        std::cout << "\n========================================" << '\n';
+        std::cout << "  VDE Example: Triangle Rendering" << '\n';
+        std::cout << "========================================\n" << '\n';
 
-        std::cout << "Features demonstrated:" << std::endl;
-        std::cout << "  - Low-level Vulkan rendering" << std::endl;
-        std::cout << "  - Graphics pipeline creation" << std::endl;
-        std::cout << "  - Vertex/index buffer usage" << std::endl;
-        std::cout << "  - Shader compilation from source" << std::endl;
+        std::cout << "Features demonstrated:" << '\n';
+        std::cout << "  - Low-level Vulkan rendering" << '\n';
+        std::cout << "  - Graphics pipeline creation" << '\n';
+        std::cout << "  - Vertex/index buffer usage" << '\n';
+        std::cout << "  - Shader compilation from source" << '\n';
 
-        std::cout << "\nYou should see:" << std::endl;
-        std::cout << "  - Triangle with gradient colors" << std::endl;
-        std::cout << "  - Red vertex at top" << std::endl;
-        std::cout << "  - Green vertex at bottom-right" << std::endl;
-        std::cout << "  - Blue vertex at bottom-left" << std::endl;
+        std::cout << "\nYou should see:" << '\n';
+        std::cout << "  - Triangle with gradient colors" << '\n';
+        std::cout << "  - Red vertex at top" << '\n';
+        std::cout << "  - Green vertex at bottom-right" << '\n';
+        std::cout << "  - Blue vertex at bottom-left" << '\n';
 
-        std::cout << "\nControls:" << std::endl;
-        std::cout << "  F     - Fail test (if visuals are incorrect)" << std::endl;
-        std::cout << "  ESC   - Exit early" << std::endl;
+        std::cout << "\nControls:" << '\n';
+        std::cout << "  F     - Fail test (if visuals are incorrect)" << '\n';
+        std::cout << "  ESC   - Exit early" << '\n';
         if (m_autoTerminateSeconds > 0.0f) {
-            std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n"
-                      << std::endl;
+            std::cout << "  (Auto-closes in " << m_autoTerminateSeconds << " seconds)\n" << '\n';
         } else {
-            std::cout << "  (Run with --timeout <seconds> to auto-close)\n" << std::endl;
+            std::cout << "  (Run with --timeout <seconds> to auto-close)\n" << '\n';
         }
     }
 
@@ -408,10 +406,10 @@ class TriangleApp {
             // Check auto-terminate (only when --timeout is active)
             double elapsed = glfwGetTime() - m_startTime;
             if (m_autoTerminateSeconds > 0.0f && elapsed >= m_autoTerminateSeconds) {
-                std::cout << "\n========================================" << std::endl;
-                std::cout << "  TEST PASSED: Demo completed successfully" << std::endl;
-                std::cout << "  Duration: " << elapsed << " seconds" << std::endl;
-                std::cout << "========================================\n" << std::endl;
+                std::cout << "\n========================================" << '\n';
+                std::cout << "  TEST PASSED: Demo completed successfully" << '\n';
+                std::cout << "  Duration: " << elapsed << " seconds" << '\n';
+                std::cout << "========================================\n" << '\n';
                 break;
             }
 
@@ -447,6 +445,7 @@ class TriangleApp {
     }
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     try {
         // Parse --timeout argument
@@ -457,7 +456,7 @@ int main(int argc, char** argv) {
                 timeoutOverride = std::stof(argv[i + 1]);
                 break;
             }
-            if (arg.size() > 10 && arg.substr(0, 10) == "--timeout=") {
+            if (arg.size() > 10 && arg.starts_with("--timeout=")) {
                 timeoutOverride = std::stof(arg.substr(10));
                 break;
             }
@@ -465,7 +464,7 @@ int main(int argc, char** argv) {
 
         // Initialize glslang for shader compilation
         if (!vde::initializeGlslang()) {
-            std::cerr << "Failed to initialize glslang!" << std::endl;
+            std::cerr << "Failed to initialize glslang!" << '\n';
             return 1;
         }
 
@@ -480,7 +479,7 @@ int main(int argc, char** argv) {
 
         return app.getExitCode();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << '\n';
         vde::finalizeGlslang();
         return 1;
     }

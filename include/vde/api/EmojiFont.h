@@ -88,44 +88,44 @@ class EmojiFont {
     /**
      * @brief Check whether the font was loaded successfully.
      */
-    bool isLoaded() const { return m_loaded; }
+    [[nodiscard]] bool isLoaded() const { return m_loaded; }
 
     /**
      * @brief Get the last load failure message.
      */
-    const std::string& getLastError() const { return m_lastError; }
+    [[nodiscard]] const std::string& getLastError() const { return m_lastError; }
 
     /**
      * @brief Look up a color emoji glyph by Unicode codepoint.
      * @param codepoint Unicode codepoint (e.g., 0x1F600 for 😀)
      * @return Pointer to EmojiGlyph, or nullptr if the codepoint is not available
      */
-    const EmojiGlyph* getGlyph(char32_t codepoint) const;
+    [[nodiscard]] const EmojiGlyph* getGlyph(char32_t codepoint) const;
 
     /**
      * @brief Check whether a color emoji is available for the given codepoint.
      */
-    bool hasGlyph(char32_t codepoint) const;
+    [[nodiscard]] bool hasGlyph(char32_t codepoint) const;
 
     /**
      * @brief Get the atlas texture containing all rendered emoji.
      */
-    std::shared_ptr<Texture> getAtlasTexture() const { return m_atlas; }
+    [[nodiscard]] std::shared_ptr<Texture> getAtlasTexture() const { return m_atlas; }
 
     /**
      * @brief Get the atlas width in pixels.
      */
-    int atlasWidth() const { return m_atlasWidth; }
+    [[nodiscard]] int atlasWidth() const { return m_atlasWidth; }
 
     /**
      * @brief Get the atlas height in pixels.
      */
-    int atlasHeight() const { return m_atlasHeight; }
+    [[nodiscard]] int atlasHeight() const { return m_atlasHeight; }
 
     /**
      * @brief Get the emoji cell size in pixels (width and height are equal).
      */
-    int emojiSize() const { return m_emojiSize; }
+    [[nodiscard]] int emojiSize() const { return m_emojiSize; }
 
     /**
      * @brief Copy a single emoji's RGBA pixels into the provided buffer.
@@ -138,7 +138,9 @@ class EmojiFont {
     /**
      * @brief Get the list of all available emoji codepoints.
      */
-    const std::vector<char32_t>& getAvailableCodepoints() const { return m_availableCodepoints; }
+    [[nodiscard]] const std::vector<char32_t>& getAvailableCodepoints() const {
+        return m_availableCodepoints;
+    }
 
     /**
      * @brief Find the system's default color emoji font.

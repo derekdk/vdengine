@@ -89,7 +89,7 @@ class StorageManager {
     /**
      * @brief Returns true if the storage has been successfully initialised.
      */
-    bool isInitialized() const { return m_db != nullptr; }
+    [[nodiscard]] bool isInitialized() const { return m_db != nullptr; }
 
     // -------------------------------------------------------------------------
     // String data
@@ -192,7 +192,7 @@ class StorageManager {
      * @param appName  Subdirectory name for the application.
      * @return Absolute path including the appName subdirectory, or empty on failure.
      */
-    std::string resolveStoragePath(const std::string& appName) const;
+    [[nodiscard]] std::string resolveStoragePath(const std::string& appName) const;
 
     /**
      * @brief Create the required tables if they do not already exist.

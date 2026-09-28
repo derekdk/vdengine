@@ -9,6 +9,7 @@
 #include <vde/api/TrueTypeFont.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -131,7 +132,7 @@ TEST_F(EmojiFontSystemTest, CopyGlyphPixels) {
     const EmojiGlyph* glyph = m_emoji.getGlyph(0x1F600);
     ASSERT_NE(glyph, nullptr);
 
-    std::vector<uint8_t> pixels(glyph->width * glyph->height * 4, 0);
+    std::vector<uint8_t> pixels(static_cast<size_t>(glyph->width) * glyph->height * 4, 0);
     ASSERT_TRUE(m_emoji.copyGlyphPixels(0x1F600, pixels.data()));
 
     // Verify at least some pixels are non-transparent (the emoji should have content)
@@ -195,35 +196,41 @@ TEST_F(EmojiFontSystemTest, DifferentSizesProduceDifferentAtlases) {
 // EmojiFont's own parser.  Returns 0xFFFF on any error.
 static uint16_t readSystemFontColrVersion(const std::string& fontPath) {
     std::ifstream f(fontPath, std::ios::binary | std::ios::ate);
-    if (!f.is_open())
+    if (!f.is_open()) {
         return 0xFFFF;
+    }
     auto pos = f.tellg();
-    if (pos < 0 || pos > static_cast<std::ifstream::pos_type>(256 * 1024 * 1024))
+    if (pos < 0 || pos > static_cast<std::ifstream::pos_type>(256 * 1024 * 1024)) {
         return 0xFFFF;
+    }
     auto sz = static_cast<size_t>(pos);
-    if (sz < 12)
+    if (sz < 12) {
         return 0xFFFF;
+    }
     f.seekg(0);
     std::vector<uint8_t> data(sz);
-    if (!f.read(reinterpret_cast<char*>(data.data()), sz))
+    if (!f.read(reinterpret_cast<char*>(data.data()), sz)) {
         return 0xFFFF;
+    }
 
     // OpenType table directory: numTables at offset 4
     uint16_t numTables = (static_cast<uint16_t>(data[4]) << 8) | data[5];
-    if (sz < static_cast<size_t>(12) + numTables * 16u)
+    if (sz < static_cast<size_t>(12) + static_cast<size_t>(numTables) * 16u) {
         return 0xFFFF;
+    }
 
     constexpr uint32_t kTagCOLR = 0x434F4C52u;
     for (uint16_t i = 0; i < numTables; ++i) {
-        const uint8_t* e = data.data() + 12 + i * 16;
+        const uint8_t* e = data.data() + 12 + static_cast<ptrdiff_t>(i) * 16;
         uint32_t tag = (static_cast<uint32_t>(e[0]) << 24) | (static_cast<uint32_t>(e[1]) << 16) |
                        (static_cast<uint32_t>(e[2]) << 8) | e[3];
         if (tag == kTagCOLR) {
             uint32_t off = (static_cast<uint32_t>(e[8]) << 24) |
                            (static_cast<uint32_t>(e[9]) << 16) |
                            (static_cast<uint32_t>(e[10]) << 8) | e[11];
-            if (off + 2 > sz)
+            if (off + 2 > sz) {
                 return 0xFFFF;
+            }
             return (static_cast<uint16_t>(data[off]) << 8) | data[off + 1];
         }
     }
@@ -250,7 +257,7 @@ class EmojiFontColrInvariantsTest : public ::testing::Test {
 TEST_F(EmojiFontColrInvariantsTest, AvailableCodepointsAreSorted) {
     const auto& codepoints = m_emoji.getAvailableCodepoints();
     ASSERT_FALSE(codepoints.empty());
-    EXPECT_TRUE(std::is_sorted(codepoints.begin(), codepoints.end()))
+    EXPECT_TRUE(std::ranges::is_sorted(codepoints))
         << "Available codepoints are not in ascending order";
 }
 
@@ -258,7 +265,7 @@ TEST_F(EmojiFontColrInvariantsTest, NoDuplicateCodepoints) {
     const auto& codepoints = m_emoji.getAvailableCodepoints();
     ASSERT_FALSE(codepoints.empty());
     // The list is already sorted, so adjacent duplicates would be immediately obvious
-    auto it = std::adjacent_find(codepoints.begin(), codepoints.end());
+    auto it = std::ranges::adjacent_find(codepoints);
     EXPECT_EQ(it, codepoints.end())
         << "Duplicate codepoint U+" << std::hex << static_cast<uint32_t>(*it)
         << " found in available codepoints";

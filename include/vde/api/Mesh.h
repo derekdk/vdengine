@@ -33,7 +33,7 @@ class VulkanContext;
 class Mesh : public Resource {
   public:
     Mesh() = default;
-    virtual ~Mesh();
+    ~Mesh() override;
 
     /**
      * @brief Load mesh from a file.
@@ -52,34 +52,34 @@ class Mesh : public Resource {
     /**
      * @brief Get the vertex data.
      */
-    const std::vector<Vertex>& getVertices() const { return m_vertices; }
+    [[nodiscard]] const std::vector<Vertex>& getVertices() const { return m_vertices; }
 
     /**
      * @brief Get the index data.
      */
-    const std::vector<uint32_t>& getIndices() const { return m_indices; }
+    [[nodiscard]] const std::vector<uint32_t>& getIndices() const { return m_indices; }
 
     /**
      * @brief Get the number of vertices.
      */
-    size_t getVertexCount() const { return m_vertices.size(); }
+    [[nodiscard]] size_t getVertexCount() const { return m_vertices.size(); }
 
     /**
      * @brief Get the number of indices.
      */
-    size_t getIndexCount() const { return m_indices.size(); }
+    [[nodiscard]] size_t getIndexCount() const { return m_indices.size(); }
 
     /**
      * @brief Get the axis-aligned bounding box minimum point.
      */
-    const glm::vec3& getBoundsMin() const { return m_boundsMin; }
+    [[nodiscard]] const glm::vec3& getBoundsMin() const { return m_boundsMin; }
 
     /**
      * @brief Get the axis-aligned bounding box maximum point.
      */
-    const glm::vec3& getBoundsMax() const { return m_boundsMax; }
+    [[nodiscard]] const glm::vec3& getBoundsMax() const { return m_boundsMax; }
 
-    const char* getTypeName() const override { return "Mesh"; }
+    [[nodiscard]] const char* getTypeName() const override { return "Mesh"; }
 
     // Factory methods for primitive shapes
 
@@ -165,7 +165,7 @@ class Mesh : public Resource {
     /**
      * @brief Get the axis-aligned bounding box center.
      */
-    glm::vec3 getBoundsCenter() const { return (m_boundsMin + m_boundsMax) * 0.5f; }
+    [[nodiscard]] glm::vec3 getBoundsCenter() const { return (m_boundsMin + m_boundsMax) * 0.5f; }
 
     /**
      * @brief Get the bounding sphere radius (half-diagonal of the AABB).
@@ -173,7 +173,9 @@ class Mesh : public Resource {
      * This is a conservative approximation — the actual mesh may be
      * smaller, but will never be larger than this radius.
      */
-    float getBoundingRadius() const { return glm::length(m_boundsMax - getBoundsCenter()); }
+    [[nodiscard]] float getBoundingRadius() const {
+        return glm::length(m_boundsMax - getBoundsCenter());
+    }
 
     // GPU buffer management
 
@@ -192,7 +194,7 @@ class Mesh : public Resource {
     /**
      * @brief Check if mesh has been uploaded to GPU.
      */
-    bool isOnGPU() const { return m_vertexBuffer != VK_NULL_HANDLE; }
+    [[nodiscard]] bool isOnGPU() const { return m_vertexBuffer != VK_NULL_HANDLE; }
 
     /**
      * @brief Bind vertex and index buffers for rendering.

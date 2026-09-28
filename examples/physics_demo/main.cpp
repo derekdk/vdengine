@@ -31,23 +31,30 @@ class PhysicsInputHandler : public vde::examples::BaseExampleInputHandler {
     void onKeyPress(int key) override {
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
-        if (key == vde::KEY_R)
+        }
+        if (key == vde::KEY_R) {
             m_resetPressed = true;
-        if (key == vde::KEY_LEFT)
+        }
+        if (key == vde::KEY_LEFT) {
             m_leftHeld = true;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_rightHeld = true;
-        if (key == vde::KEY_UP)
+        }
+        if (key == vde::KEY_UP) {
             m_jumpPressed = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == vde::KEY_LEFT)
+        if (key == vde::KEY_LEFT) {
             m_leftHeld = false;
-        if (key == vde::KEY_RIGHT)
+        }
+        if (key == vde::KEY_RIGHT) {
             m_rightHeld = false;
+        }
     }
 
     bool isSpacePressed() {
@@ -62,8 +69,8 @@ class PhysicsInputHandler : public vde::examples::BaseExampleInputHandler {
         return val;
     }
 
-    bool isLeftHeld() const { return m_leftHeld; }
-    bool isRightHeld() const { return m_rightHeld; }
+    [[nodiscard]] bool isLeftHeld() const { return m_leftHeld; }
+    [[nodiscard]] bool isRightHeld() const { return m_rightHeld; }
 
     bool isJumpPressed() {
         bool val = m_jumpPressed;
@@ -118,7 +125,7 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
             [this](const vde::CollisionEvent& /*evt*/) { m_collisionCount++; });
 
         std::cout << "Physics initialized with " << getPhysicsScene()->getBodyCount() << " bodies"
-                  << std::endl;
+                  << '\n';
     }
 
     void update(float deltaTime) override {
@@ -159,15 +166,15 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
             if (hasPhysics()) {
                 std::cout << "[Physics] Bodies: " << getPhysicsScene()->getActiveBodyCount()
                           << " | Steps/frame: " << getPhysicsScene()->getLastStepCount()
-                          << " | Collisions: " << m_collisionCount << std::endl;
+                          << " | Collisions: " << m_collisionCount << '\n';
             }
         }
     }
 
   protected:
-    std::string getExampleName() const override { return "Physics Entities"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Physics Entities"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"PhysicsSpriteEntity with auto-sync",
                 "Interpolated transform from physics",
                 "Player with applyForce/applyImpulse",
@@ -177,7 +184,7 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
                 "Collision callbacks"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Dark background",
                 "Green ground platform at bottom",
                 "Colored boxes falling from above",
@@ -186,7 +193,7 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
                 "Console output showing body count and collisions"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"LEFT/RIGHT - Move player", "UP    - Jump", "SPACE      - Spawn a new box",
                 "R          - Reset all boxes"};
     }
@@ -264,7 +271,7 @@ class PhysicsDemoScene : public vde::examples::BaseExampleScene {
 
         // Respawn boxes
         spawnBoxes();
-        std::cout << "[Physics] Scene reset" << std::endl;
+        std::cout << "[Physics] Scene reset" << '\n';
     }
 };
 
@@ -282,6 +289,7 @@ class PhysicsDemoGame
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     PhysicsDemoGame demo;
     return vde::examples::runExample(demo, "VDE Physics Demo", 1280, 720, argc, argv);

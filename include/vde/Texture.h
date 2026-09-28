@@ -39,7 +39,7 @@ class VulkanContext;
 class Texture : public Resource {
   public:
     Texture() = default;
-    virtual ~Texture();
+    ~Texture() override;
 
     // Prevent copying
     Texture(const Texture&) = delete;
@@ -87,7 +87,7 @@ class Texture : public Resource {
     /**
      * @brief Check if texture has been uploaded to GPU.
      */
-    bool isOnGPU() const { return m_image != VK_NULL_HANDLE; }
+    [[nodiscard]] bool isOnGPU() const { return m_image != VK_NULL_HANDLE; }
 
     /**
      * @brief Free GPU resources (keeps CPU pixel data).
@@ -103,20 +103,20 @@ class Texture : public Resource {
     void cleanup();
 
     // Resource interface
-    const char* getTypeName() const override { return "Texture"; }
+    [[nodiscard]] const char* getTypeName() const override { return "Texture"; }
 
     // Accessors
-    VkImage getImage() const { return m_image; }
-    VkImageView getImageView() const { return m_imageView; }
-    VkSampler getSampler() const { return m_sampler; }
-    uint32_t getWidth() const { return m_width; }
-    uint32_t getHeight() const { return m_height; }
+    [[nodiscard]] VkImage getImage() const { return m_image; }
+    [[nodiscard]] VkImageView getImageView() const { return m_imageView; }
+    [[nodiscard]] VkSampler getSampler() const { return m_sampler; }
+    [[nodiscard]] uint32_t getWidth() const { return m_width; }
+    [[nodiscard]] uint32_t getHeight() const { return m_height; }
 
     /**
      * @brief Get a pointer to the CPU-side pixel data.
      * @return Pointer to RGBA pixel data, or nullptr if no data is loaded
      */
-    const uint8_t* getPixelData() const {
+    [[nodiscard]] const uint8_t* getPixelData() const {
         return m_pixelData.empty() ? nullptr : m_pixelData.data();
     }
 
@@ -124,7 +124,7 @@ class Texture : public Resource {
      * @brief Check if the texture is valid and ready for use.
      * @return true if image, image view, and sampler are all created
      */
-    bool isValid() const {
+    [[nodiscard]] bool isValid() const {
         return m_image != VK_NULL_HANDLE && m_imageView != VK_NULL_HANDLE &&
                m_sampler != VK_NULL_HANDLE;
     }

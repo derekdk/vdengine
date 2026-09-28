@@ -119,8 +119,8 @@ void VulkanContext::cleanup() {
 
     if constexpr (kEnableValidationLayers) {
         if (m_debugMessenger != VK_NULL_HANDLE) {
-            auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-                m_instance, "vkDestroyDebugUtilsMessengerEXT");
+            auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT"));
             if (func != nullptr) {
                 func(m_instance, m_debugMessenger, nullptr);
                 m_debugMessenger = VK_NULL_HANDLE;
@@ -293,7 +293,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanContext::debugCallback(
     [[maybe_unused]] VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, [[maybe_unused]] void* pUserData) {
-    std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+    std::cerr << "Validation layer: " << pCallbackData->pMessage << '\n';
     return VK_FALSE;
 }
 
@@ -314,8 +314,8 @@ void VulkanContext::setupDebugMessenger() {
         VkDebugUtilsMessengerCreateInfoEXT createInfo;
         populateDebugMessengerCreateInfo(createInfo);
 
-        auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            m_instance, "vkCreateDebugUtilsMessengerEXT");
+        auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
 
         if (func != nullptr) {
             if (func(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
@@ -361,8 +361,9 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) {
             indices.presentFamily = i;
         }
 
-        if (indices.isComplete())
+        if (indices.isComplete()) {
             break;
+        }
         i++;
     }
 
@@ -950,8 +951,9 @@ void VulkanContext::createUniformBuffers() {
 }
 
 VkCommandBuffer VulkanContext::getCurrentCommandBuffer() const {
-    if (m_commandBuffers.empty())
+    if (m_commandBuffers.empty()) {
         return VK_NULL_HANDLE;
+    }
     return m_commandBuffers[m_currentFrame];
 }
 
@@ -1170,7 +1172,8 @@ void VulkanContext::drawFrame() {
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapchain(m_swapChainExtent.width, m_swapChainExtent.height);
         return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
@@ -1251,7 +1254,8 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapchain(m_swapChainExtent.width, m_swapChainExtent.height);
         return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
@@ -1273,8 +1277,7 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
-    for (size_t i = 0; i < sceneRenderInfos.size(); ++i) {
-        const auto& info = sceneRenderInfos[i];
+    for (const auto& info : sceneRenderInfos) {
         bool isFirst = info.clearPass;
 
         // Update UBO with this scene's camera via vkCmdUpdateBuffer
@@ -1425,7 +1428,7 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulkanContext::drawFrameCustom(CustomFrameRecorder recorder) {
+void VulkanContext::drawFrameCustom(const CustomFrameRecorder& recorder) {
     // Wait for previous frame using this frame index
     vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -1438,7 +1441,8 @@ void VulkanContext::drawFrameCustom(CustomFrameRecorder recorder) {
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapchain(m_swapChainExtent.width, m_swapChainExtent.height);
         return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
@@ -1696,7 +1700,7 @@ std::vector<uint8_t> VulkanContext::captureFramebuffer(uint32_t& outWidth, uint3
                         m_swapChainImageFormat == VK_FORMAT_B8G8R8A8_UNORM);
 
     if (needSwizzle) {
-        const uint8_t* src = static_cast<const uint8_t*>(mappedData);
+        const auto* src = static_cast<const uint8_t*>(mappedData);
         for (VkDeviceSize i = 0; i < imageSize; i += 4) {
             pixels[i + 0] = src[i + 2];  // R <- B
             pixels[i + 1] = src[i + 1];  // G

@@ -17,6 +17,7 @@
 #include <deque>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -159,9 +160,9 @@ class MissionScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Mission Control"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Mission Control"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"TextEntity with lazy dirty-flag texture rebuilds",
                 "Mission clock updating every frame (HH:MM:SS.cc)",
                 "12-row telemetry grid with oscillating sensor data",
@@ -169,7 +170,7 @@ class MissionScene : public vde::examples::BaseExampleScene {
                 "Alert banner with NOMINAL/CAUTION/WARNING color states"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Green mission clock counting up at top-left",
                 "12 green telemetry readouts down the left side",
                 "NOMINAL/CAUTION/WARNING banner at top-right",
@@ -219,10 +220,11 @@ class MissionScene : public vde::examples::BaseExampleScene {
         float noise = std::sin(t * (1.3f + idx * 0.7f)) * (m_telemetryBase[idx] * 0.02f);
         float val = m_telemetryBase[idx] + noise;
         char buf[32];
-        if (std::fabs(val) >= 100.0f)
+        if (std::fabs(val) >= 100.0f) {
             std::snprintf(buf, sizeof(buf), "%7.1f", static_cast<double>(val));
-        else
+        } else {
             std::snprintf(buf, sizeof(buf), "%7.2f", static_cast<double>(val));
+        }
         return buf;
     }
 
@@ -238,12 +240,13 @@ class MissionScene : public vde::examples::BaseExampleScene {
         // Cycle through states based on time
         int newState;
         float cycle = std::fmod(m_time, 12.0f);
-        if (cycle < 6.0f)
+        if (cycle < 6.0f) {
             newState = 0;  // nominal
-        else if (cycle < 9.0f)
+        } else if (cycle < 9.0f) {
             newState = 1;  // caution
-        else
+        } else {
             newState = 2;  // warning
+        }
 
         if (newState != m_alertState) {
             m_alertState = newState;
@@ -263,6 +266,8 @@ class MissionScene : public vde::examples::BaseExampleScene {
                 m_alertBanner->setStyle(
                     {.color = Color::red(), .pixelScale = 3, .letterSpacing = 1});
                 break;
+            default:
+                break;
             }
         }
     }
@@ -270,11 +275,12 @@ class MissionScene : public vde::examples::BaseExampleScene {
     // ---- Log ----
     void appendLog(const std::string& msg) {
         m_logMessages.push_front(msg);
-        if (static_cast<int>(m_logMessages.size()) > LOG_LINES)
+        if (static_cast<int>(m_logMessages.size()) > LOG_LINES) {
             m_logMessages.pop_back();
+        }
 
         for (int i = 0; i < LOG_LINES; ++i) {
-            if (i < static_cast<int>(m_logMessages.size())) {
+            if (std::cmp_less(i, m_logMessages.size())) {
                 m_logEntities[i]->setText(m_logMessages[i]);
             } else {
                 m_logEntities[i]->setText("---");
@@ -307,6 +313,7 @@ class MissionGame : public vde::examples::BaseExampleGame<MissionInputHandler, M
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     MissionGame game;
     return vde::examples::runExample(game, "VDE Mission Control Demo", 1280, 720, argc, argv);

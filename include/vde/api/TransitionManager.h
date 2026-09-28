@@ -82,7 +82,7 @@ class TransitionManager {
     /**
      * @brief Returns true while a transition is in progress.
      */
-    bool isActive() const;
+    [[nodiscard]] bool isActive() const;
 
     /**
      * @brief Cancel the current transition immediately.
@@ -95,7 +95,7 @@ class TransitionManager {
      * @brief Get progress [0, 1] of the current transition.
      * @return 0 if no transition is active.
      */
-    float getProgress() const;
+    [[nodiscard]] float getProgress() const;
 
     /**
      * @brief Pause or unpause the active transition.
@@ -109,7 +109,7 @@ class TransitionManager {
     /**
      * @brief Returns true if the transition is currently paused.
      */
-    bool isPaused() const;
+    [[nodiscard]] bool isPaused() const;
 
     /**
      * @brief Advance a paused transition by exactly one frame's worth of time.
@@ -136,17 +136,17 @@ class TransitionManager {
     /**
      * @brief Get the current playback speed multiplier.
      */
-    float getSpeed() const;
+    [[nodiscard]] float getSpeed() const;
 
     /**
      * @brief Get the current transition uniforms (for the GPU push constants).
      */
-    const TransitionUniforms& getUniforms() const { return m_uniforms; }
+    [[nodiscard]] const TransitionUniforms& getUniforms() const { return m_uniforms; }
 
     /**
      * @brief Get the active transition (may be null).
      */
-    const Transition* getActiveTransition() const { return m_activeTransition.get(); }
+    [[nodiscard]] const Transition* getActiveTransition() const { return m_activeTransition.get(); }
 
     // ---- Render-target management ----
 
@@ -161,23 +161,23 @@ class TransitionManager {
      * @brief Get the source offscreen render target (scene being transitioned FROM).
      */
     OffscreenRenderTarget& getSourceTarget() { return m_source; }
-    const OffscreenRenderTarget& getSourceTarget() const { return m_source; }
+    [[nodiscard]] const OffscreenRenderTarget& getSourceTarget() const { return m_source; }
 
     /**
      * @brief Get the destination offscreen render target (scene being transitioned TO).
      */
     OffscreenRenderTarget& getDestTarget() { return m_dest; }
-    const OffscreenRenderTarget& getDestTarget() const { return m_dest; }
+    [[nodiscard]] const OffscreenRenderTarget& getDestTarget() const { return m_dest; }
 
     /**
      * @brief Get the source framebuffer for rendering the source scene.
      */
-    VkFramebuffer getSourceFramebuffer() const;
+    [[nodiscard]] VkFramebuffer getSourceFramebuffer() const;
 
     /**
      * @brief Get the destination framebuffer for rendering the dest scene.
      */
-    VkFramebuffer getDestFramebuffer() const;
+    [[nodiscard]] VkFramebuffer getDestFramebuffer() const;
 
     /**
      * @brief Render the composited transition frame.

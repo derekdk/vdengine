@@ -109,54 +109,59 @@ class VulkanContext {
     // Accessors
     // =========================================================================
 
-    VkInstance getInstance() const { return m_instance; }
-    VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
-    virtual VkDevice getDevice() const { return m_device; }
-    VkQueue getGraphicsQueue() const { return m_graphicsQueue; }
-    VkQueue getPresentQueue() const { return m_presentQueue; }
-    uint32_t getGraphicsQueueFamily() const { return m_graphicsQueueFamilyIndex; }
-    VkRenderPass getRenderPass() const { return m_renderPass; }
-    VkRenderPass getOffscreenRenderPass() const { return m_offscreenRenderPass; }
-    VkCommandPool getCommandPool() const { return m_commandPool; }
-    VkExtent2D getSwapChainExtent() const { return m_swapChainExtent; }
-    VkFormat getSwapChainImageFormat() const { return m_swapChainImageFormat; }
-    VkFormat getDepthFormat() const { return m_depthFormat; }
-    uint32_t getCurrentFrame() const { return m_currentFrame; }
+    [[nodiscard]] VkInstance getInstance() const { return m_instance; }
+    [[nodiscard]] VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
+    [[nodiscard]] virtual VkDevice getDevice() const { return m_device; }
+    [[nodiscard]] VkQueue getGraphicsQueue() const { return m_graphicsQueue; }
+    [[nodiscard]] VkQueue getPresentQueue() const { return m_presentQueue; }
+    [[nodiscard]] uint32_t getGraphicsQueueFamily() const { return m_graphicsQueueFamilyIndex; }
+    [[nodiscard]] VkRenderPass getRenderPass() const { return m_renderPass; }
+    [[nodiscard]] VkRenderPass getOffscreenRenderPass() const { return m_offscreenRenderPass; }
+    [[nodiscard]] VkCommandPool getCommandPool() const { return m_commandPool; }
+    [[nodiscard]] VkExtent2D getSwapChainExtent() const { return m_swapChainExtent; }
+    [[nodiscard]] VkFormat getSwapChainImageFormat() const { return m_swapChainImageFormat; }
+    [[nodiscard]] VkFormat getDepthFormat() const { return m_depthFormat; }
+    [[nodiscard]] uint32_t getCurrentFrame() const { return m_currentFrame; }
 
-    const std::vector<VkCommandBuffer>& getCommandBuffers() const { return m_commandBuffers; }
-    const std::vector<VkSemaphore>& getImageAvailableSemaphores() const {
+    [[nodiscard]] const std::vector<VkCommandBuffer>& getCommandBuffers() const {
+        return m_commandBuffers;
+    }
+    [[nodiscard]] const std::vector<VkSemaphore>& getImageAvailableSemaphores() const {
         return m_imageAvailableSemaphores;
     }
-    const std::vector<VkSemaphore>& getRenderFinishedSemaphores() const {
+    [[nodiscard]] const std::vector<VkSemaphore>& getRenderFinishedSemaphores() const {
         return m_renderFinishedSemaphores;
     }
-    const std::vector<VkFence>& getInFlightFences() const { return m_inFlightFences; }
+    [[nodiscard]] const std::vector<VkFence>& getInFlightFences() const { return m_inFlightFences; }
 
     Camera& getCamera() { return m_camera; }
-    const Camera& getCamera() const { return m_camera; }
+    [[nodiscard]] const Camera& getCamera() const { return m_camera; }
 
     DescriptorManager& getDescriptorManager() { return m_descriptorManager; }
-    const DescriptorManager& getDescriptorManager() const { return m_descriptorManager; }
+    [[nodiscard]] const DescriptorManager& getDescriptorManager() const {
+        return m_descriptorManager;
+    }
 
     /**
      * @brief Get the current frame's command buffer.
      * @return Command buffer for current frame, or VK_NULL_HANDLE if none
      */
-    VkCommandBuffer getCurrentCommandBuffer() const;
+    [[nodiscard]] VkCommandBuffer getCurrentCommandBuffer() const;
 
     /**
      * @brief Get the current frame's uniform buffer.
      * @return Uniform buffer handle for current frame
      */
-    VkBuffer getCurrentUniformBuffer() const;
+    [[nodiscard]] VkBuffer getCurrentUniformBuffer() const;
 
     /**
      * @brief Get the current frame's UBO descriptor set.
      * @return Descriptor set for current frame's uniform buffer
      */
-    VkDescriptorSet getCurrentUBODescriptorSet() const {
-        if (m_uboDescriptorSets.empty())
+    [[nodiscard]] VkDescriptorSet getCurrentUBODescriptorSet() const {
+        if (m_uboDescriptorSets.empty()) {
             return VK_NULL_HANDLE;
+        }
         return m_uboDescriptorSets[m_currentFrame];
     }
 
@@ -222,7 +227,7 @@ class VulkanContext {
      */
     using CustomFrameRecorder =
         std::function<void(VkCommandBuffer cmd, VkFramebuffer swapchainFB, VkImage swapchainImage)>;
-    void drawFrameCustom(CustomFrameRecorder recorder);
+    void drawFrameCustom(const CustomFrameRecorder& recorder);
 
     // =========================================================================
     // Viewport Override
@@ -251,14 +256,15 @@ class VulkanContext {
     /**
      * @brief Check if a viewport override is active.
      */
-    bool hasViewportOverride() const { return m_hasViewportOverride; }
+    [[nodiscard]] bool hasViewportOverride() const { return m_hasViewportOverride; }
 
     /**
      * @brief Get the effective viewport (override if set, else full window).
      */
-    VkViewport getEffectiveViewport() const {
-        if (m_hasViewportOverride)
+    [[nodiscard]] VkViewport getEffectiveViewport() const {
+        if (m_hasViewportOverride) {
             return m_viewportOverride;
+        }
         VkViewport vp{};
         vp.x = 0.0f;
         vp.y = 0.0f;
@@ -272,9 +278,10 @@ class VulkanContext {
     /**
      * @brief Get the effective scissor rect (override if set, else full window).
      */
-    VkRect2D getEffectiveScissor() const {
-        if (m_hasViewportOverride)
+    [[nodiscard]] VkRect2D getEffectiveScissor() const {
+        if (m_hasViewportOverride) {
             return m_scissorOverride;
+        }
         VkRect2D sc{};
         sc.offset = {0, 0};
         sc.extent = m_swapChainExtent;
@@ -320,7 +327,7 @@ class VulkanContext {
   protected:
     // Protected for testing subclasses
     struct MockTag {};  ///< Tag for test constructor
-    VulkanContext(MockTag) : m_device(VK_NULL_HANDLE) {}
+    VulkanContext(MockTag) {}
 
     // =========================================================================
     // Vulkan handles
@@ -340,8 +347,8 @@ class VulkanContext {
     // Swap chain
     VkSwapchainKHR m_swapChain = VK_NULL_HANDLE;
     std::vector<VkImage> m_swapChainImages;
-    VkFormat m_swapChainImageFormat;
-    VkExtent2D m_swapChainExtent;
+    VkFormat m_swapChainImageFormat = VK_FORMAT_UNDEFINED;
+    VkExtent2D m_swapChainExtent{};
     std::vector<VkImageView> m_swapChainImageViews;
 
     // Render pass and framebuffers
@@ -407,7 +414,7 @@ class VulkanContext {
      * @brief Get the current clear color.
      * @return RGBA clear color
      */
-    const glm::vec4& getClearColor() const { return m_clearColor; }
+    [[nodiscard]] const glm::vec4& getClearColor() const { return m_clearColor; }
 
   protected:
     // =========================================================================
@@ -467,7 +474,7 @@ class VulkanContext {
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
                                  VkFormatFeatureFlags features);
     VkFormat findDepthFormat();
-    bool hasStencilComponent(VkFormat format) const;
+    [[nodiscard]] bool hasStencilComponent(VkFormat format) const;
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     void createDescriptorSetLayouts();

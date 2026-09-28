@@ -53,7 +53,7 @@ class DescriptorManager {
      * @brief Check if the manager has been initialized.
      * @return true if layouts and pool have been created.
      */
-    bool isInitialized() const {
+    [[nodiscard]] bool isInitialized() const {
         return m_device != VK_NULL_HANDLE && m_uboLayout != VK_NULL_HANDLE &&
                m_samplerLayout != VK_NULL_HANDLE && m_descriptorPool != VK_NULL_HANDLE;
     }
@@ -64,25 +64,25 @@ class DescriptorManager {
      * @brief Get the uniform buffer descriptor set layout (Set 0).
      * @return VkDescriptorSetLayout for camera/MVP matrices.
      */
-    VkDescriptorSetLayout getUniformBufferLayout() const { return m_uboLayout; }
+    [[nodiscard]] VkDescriptorSetLayout getUniformBufferLayout() const { return m_uboLayout; }
 
     /**
      * @brief Get the texture sampler descriptor set layout (Set 1).
      * @return VkDescriptorSetLayout for combined image samplers.
      */
-    VkDescriptorSetLayout getSamplerLayout() const { return m_samplerLayout; }
+    [[nodiscard]] VkDescriptorSetLayout getSamplerLayout() const { return m_samplerLayout; }
 
     /**
      * @brief Get the descriptor pool.
      * @return VkDescriptorPool for allocating descriptor sets.
      */
-    VkDescriptorPool getPool() const { return m_descriptorPool; }
+    [[nodiscard]] VkDescriptorPool getPool() const { return m_descriptorPool; }
 
     /**
      * @brief Get all layouts in order for pipeline creation.
      * @return Vector of layouts: [UBO layout, Sampler layout]
      */
-    std::vector<VkDescriptorSetLayout> getAllLayouts() const {
+    [[nodiscard]] std::vector<VkDescriptorSetLayout> getAllLayouts() const {
         return {m_uboLayout, m_samplerLayout};
     }
 

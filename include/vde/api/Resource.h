@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <typeindex>
+#include <utility>
 
 #include "GameTypes.h"
 
@@ -37,26 +38,26 @@ class Resource {
     /**
      * @brief Get the unique ID of this resource.
      */
-    ResourceId getId() const { return m_id; }
+    [[nodiscard]] ResourceId getId() const { return m_id; }
 
     /**
      * @brief Get the path this resource was loaded from.
      */
-    const std::string& getPath() const { return m_path; }
+    [[nodiscard]] const std::string& getPath() const { return m_path; }
 
     /**
      * @brief Check if the resource is loaded and ready to use.
      */
-    virtual bool isLoaded() const { return m_loaded; }
+    [[nodiscard]] virtual bool isLoaded() const { return m_loaded; }
 
     /**
      * @brief Get the type name of this resource (for debugging).
      */
-    virtual const char* getTypeName() const = 0;
+    [[nodiscard]] virtual const char* getTypeName() const = 0;
 
   protected:
     Resource() = default;
-    Resource(ResourceId id, const std::string& path) : m_id(id), m_path(path) {}
+    Resource(ResourceId id, std::string path) : m_id(id), m_path(std::move(path)) {}
 
     ResourceId m_id = INVALID_RESOURCE_ID;
     std::string m_path;
@@ -80,9 +81,9 @@ class ResourceHandle {
     ResourceHandle() = default;
     ResourceHandle(ResourceId id, std::type_index type) : m_id(id), m_type(type) {}
 
-    ResourceId getId() const { return m_id; }
-    std::type_index getType() const { return m_type; }
-    bool isValid() const { return m_id != INVALID_RESOURCE_ID; }
+    [[nodiscard]] ResourceId getId() const { return m_id; }
+    [[nodiscard]] std::type_index getType() const { return m_type; }
+    [[nodiscard]] bool isValid() const { return m_id != INVALID_RESOURCE_ID; }
 
     bool operator==(const ResourceHandle& other) const {
         return m_id == other.m_id && m_type == other.m_type;

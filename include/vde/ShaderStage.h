@@ -5,6 +5,7 @@
  * @brief Shader stage enumeration and utilities
  */
 
+#include <cstdint>
 #include <string>
 
 namespace vde {
@@ -12,7 +13,14 @@ namespace vde {
 /**
  * @brief Enumeration of shader stages supported by the compiler
  */
-enum class ShaderStage { Vertex, Fragment, Compute, Geometry, TessControl, TessEvaluation };
+enum class ShaderStage : uint8_t {
+    Vertex,
+    Fragment,
+    Compute,
+    Geometry,
+    TessControl,
+    TessEvaluation
+};
 
 /**
  * @brief Get file extension for shader stage
@@ -74,18 +82,24 @@ inline ShaderStage shaderStageFromExtension(const std::string& extension) {
         ext = ext.substr(1);
     }
 
-    if (ext == "vert")
+    if (ext == "vert") {
         return ShaderStage::Vertex;
-    if (ext == "frag")
+    }
+    if (ext == "frag") {
         return ShaderStage::Fragment;
-    if (ext == "comp")
+    }
+    if (ext == "comp") {
         return ShaderStage::Compute;
-    if (ext == "geom")
+    }
+    if (ext == "geom") {
         return ShaderStage::Geometry;
-    if (ext == "tesc")
+    }
+    if (ext == "tesc") {
         return ShaderStage::TessControl;
-    if (ext == "tese")
+    }
+    if (ext == "tese") {
         return ShaderStage::TessEvaluation;
+    }
     return ShaderStage::Vertex;  // Default
 }
 

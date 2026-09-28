@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <numbers>
 
 #include "../ExampleBase.h"
 
@@ -42,8 +43,9 @@ class MaterialCube : public vde::MeshEntity {
         // Rotate around Y axis
         auto rot = getRotation();
         rot.yaw += m_rotationSpeed * deltaTime;
-        if (rot.yaw > 360.0f)
+        if (rot.yaw > 360.0f) {
             rot.yaw -= 360.0f;
+        }
         setRotation(rot);
 
         // Orbit around origin if enabled
@@ -130,7 +132,7 @@ class MaterialsLightingScene : public vde::examples::BaseExampleScene {
         greenCube->enableOrbit(true);
         greenCube->setOrbitRadius(2.5f);
         greenCube->setOrbitSpeed(0.4f);
-        greenCube->setOrbitStartAngle(3.1416f);  // 180 degrees (PI)
+        greenCube->setOrbitStartAngle(std::numbers::pi_v<float>);  // 180 degrees (PI)
 
         // Yellow emissive cube (glowing) - starts at 270 degrees
         auto yellowCube = addEntity<MaterialCube>();
@@ -144,7 +146,7 @@ class MaterialsLightingScene : public vde::examples::BaseExampleScene {
         yellowCube->setOrbitStartAngle(4.7124f);  // 270 degrees (3*PI/2);
     }
 
-    void onExit() override { std::cout << "MaterialsLightingScene: Exiting" << std::endl; }
+    void onExit() override { std::cout << "MaterialsLightingScene: Exiting" << '\n'; }
 
     void update(float deltaTime) override {
         // Call base class first (handles ESC, F, auto-terminate)
@@ -159,20 +161,20 @@ class MaterialsLightingScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Materials & Lighting"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Materials & Lighting"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"PBR Materials (albedo, roughness, metallic)",
                 "Emissive materials (self-illumination)", "Three-point lighting setup",
                 "Multiple material types"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"5 rotating cubes with different materials", "Center: White default material",
                 "Orbiting: Red, Blue metallic, Green, Yellow emissive"};
     }
 
-    std::string getFailureMessage() const override {
+    [[nodiscard]] std::string getFailureMessage() const override {
         return "User could not see expected output:\n    - 5 rotating cubes with different "
                "materials\n    - Three-point lighting illumination";
     }
@@ -185,16 +187,17 @@ class MaterialsLightingDemo
     : public vde::examples::BaseExampleGame<DemoInputHandler, MaterialsLightingScene> {
   public:
     void onStart() override {
-        std::cout << "Starting Materials & Lighting Demo..." << std::endl;
+        std::cout << "Starting Materials & Lighting Demo..." << '\n';
         BaseExampleGame::onStart();
     }
 
     void onShutdown() override {
         BaseExampleGame::onShutdown();
-        std::cout << "Demo shutdown complete." << std::endl;
+        std::cout << "Demo shutdown complete." << '\n';
     }
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     MaterialsLightingDemo demo;
     return vde::examples::runExample(demo, "VDE Materials & Lighting Demo", 1280, 720, argc, argv);

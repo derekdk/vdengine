@@ -38,10 +38,10 @@ class ScriptEnvironment {
     virtual Scene* getScene(const std::string& name) = 0;
 
     /// Get the currently active scene group.
-    virtual const SceneGroup& getActiveSceneGroup() const = 0;
+    [[nodiscard]] virtual const SceneGroup& getActiveSceneGroup() const = 0;
 
     /// Get the swap chain extent (width, height) — for viewport assertions.
-    virtual std::pair<uint32_t, uint32_t> getSwapChainExtent() const = 0;
+    [[nodiscard]] virtual std::pair<uint32_t, uint32_t> getSwapChainExtent() const = 0;
 
     /// Set the process exit code.
     virtual void setExitCode(int code) = 0;
@@ -50,10 +50,10 @@ class ScriptEnvironment {
     virtual void quit() = 0;
 
     /// Get total number of scenes added to the game via addScene().
-    virtual size_t getScenesCreated() const = 0;
+    [[nodiscard]] virtual size_t getScenesCreated() const = 0;
 
     /// Get total number of scenes removed via removeScene().
-    virtual size_t getScenesRemoved() const = 0;
+    [[nodiscard]] virtual size_t getScenesRemoved() const = 0;
 };
 
 }  // namespace vde

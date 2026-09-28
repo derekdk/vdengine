@@ -93,7 +93,7 @@ class PhysicsScene {
      * @return Current body state
      * @throws std::runtime_error if body does not exist
      */
-    PhysicsBodyState getBodyState(PhysicsBodyId id) const;
+    [[nodiscard]] PhysicsBodyState getBodyState(PhysicsBodyId id) const;
 
     /**
      * @brief Get the definition that was used to create a body.
@@ -101,14 +101,14 @@ class PhysicsScene {
      * @return Body definition
      * @throws std::runtime_error if body does not exist
      */
-    PhysicsBodyDef getBodyDef(PhysicsBodyId id) const;
+    [[nodiscard]] PhysicsBodyDef getBodyDef(PhysicsBodyId id) const;
 
     /**
      * @brief Check if a body exists.
      * @param id Body to check
      * @return true if body exists
      */
-    bool hasBody(PhysicsBodyId id) const;
+    [[nodiscard]] bool hasBody(PhysicsBodyId id) const;
 
     // ---------------------------------------------------------------
     // Forces & velocity
@@ -250,12 +250,12 @@ class PhysicsScene {
      *
      * @return Alpha in [0, 1)
      */
-    float getInterpolationAlpha() const;
+    [[nodiscard]] float getInterpolationAlpha() const;
 
     /**
      * @brief Get the number of sub-steps taken in the last step() call.
      */
-    int getLastStepCount() const;
+    [[nodiscard]] int getLastStepCount() const;
 
     // ---------------------------------------------------------------
     // Configuration
@@ -264,7 +264,7 @@ class PhysicsScene {
     /**
      * @brief Get the current physics configuration.
      */
-    const PhysicsConfig& getConfig() const;
+    [[nodiscard]] const PhysicsConfig& getConfig() const;
 
     /**
      * @brief Set gravity.
@@ -275,7 +275,7 @@ class PhysicsScene {
     /**
      * @brief Get current gravity.
      */
-    glm::vec2 getGravity() const;
+    [[nodiscard]] glm::vec2 getGravity() const;
 
     // ---------------------------------------------------------------
     // Collision callbacks
@@ -338,7 +338,8 @@ class PhysicsScene {
      * @param max Upper-right corner of the query rectangle
      * @return Vector of body IDs overlapping the region
      */
-    std::vector<PhysicsBodyId> queryAABB(const glm::vec2& min, const glm::vec2& max) const;
+    [[nodiscard]] std::vector<PhysicsBodyId> queryAABB(const glm::vec2& min,
+                                                       const glm::vec2& max) const;
 
     // ---------------------------------------------------------------
     // Queries
@@ -347,12 +348,12 @@ class PhysicsScene {
     /**
      * @brief Get total number of bodies (including destroyed slots).
      */
-    size_t getBodyCount() const;
+    [[nodiscard]] size_t getBodyCount() const;
 
     /**
      * @brief Get number of active (non-destroyed) bodies.
      */
-    size_t getActiveBodyCount() const;
+    [[nodiscard]] size_t getActiveBodyCount() const;
 
   private:
     struct Impl;

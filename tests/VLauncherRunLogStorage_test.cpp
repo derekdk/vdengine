@@ -56,7 +56,10 @@ static std::string testAppName() {
 #endif
 }
 
-static const std::string kTestApp = testAppName();
+static const std::string& testApp() {
+    static const std::string name = testAppName();
+    return name;
+}
 
 class VLauncherRunLogStorageTest : public ::testing::Test {
   protected:
@@ -64,7 +67,7 @@ class VLauncherRunLogStorageTest : public ::testing::Test {
         vde::StorageManager::getInstance().shutdown();
         removeTestDb();
 
-        ASSERT_TRUE(vde::StorageManager::getInstance().init_storage(kTestApp));
+        ASSERT_TRUE(vde::StorageManager::getInstance().init_storage(testApp()));
         ASSERT_TRUE(vde::StorageManager::getInstance().isInitialized());
     }
 
@@ -75,7 +78,7 @@ class VLauncherRunLogStorageTest : public ::testing::Test {
 
     static void removeTestDb() {
         std::error_code error;
-        const auto path = testDbPath(kTestApp);
+        const auto path = testDbPath(testApp());
         std::filesystem::remove(path, error);
         std::filesystem::remove(path.parent_path(), error);
     }
@@ -121,25 +124,25 @@ TEST_F(VLauncherRunLogStorageTest, SaveLatestRunKeepsOnlyTwoMostRecentEntries) {
     auto logsAfterFirst = vde::tools::RunLogStorage::loadRecentRuns(targetId);
     ASSERT_TRUE(logsAfterFirst[0].has_value());
     EXPECT_FALSE(logsAfterFirst[1].has_value());
-    EXPECT_EQ(logsAfterFirst[0]->output, "run one");
+    EXPECT_EQ(logsAfterFirst[0].value().output, "run one");
 
     ASSERT_TRUE(vde::tools::RunLogStorage::saveLatestRun(targetId, second, error)) << error;
 
     auto logsAfterSecond = vde::tools::RunLogStorage::loadRecentRuns(targetId);
     ASSERT_TRUE(logsAfterSecond[0].has_value());
     ASSERT_TRUE(logsAfterSecond[1].has_value());
-    EXPECT_EQ(logsAfterSecond[0]->output, "run two");
-    EXPECT_EQ(logsAfterSecond[1]->output, "run one");
+    EXPECT_EQ(logsAfterSecond[0].value().output, "run two");
+    EXPECT_EQ(logsAfterSecond[1].value().output, "run one");
 
     ASSERT_TRUE(vde::tools::RunLogStorage::saveLatestRun(targetId, third, error)) << error;
 
     auto logsAfterThird = vde::tools::RunLogStorage::loadRecentRuns(targetId);
     ASSERT_TRUE(logsAfterThird[0].has_value());
     ASSERT_TRUE(logsAfterThird[1].has_value());
-    EXPECT_EQ(logsAfterThird[0]->output, "run three");
-    EXPECT_EQ(logsAfterThird[1]->output, "run two");
-    EXPECT_EQ(logsAfterThird[0]->exitCode, 2);
-    EXPECT_EQ(logsAfterThird[1]->exitCode, 1);
+    EXPECT_EQ(logsAfterThird[0].value().output, "run three");
+    EXPECT_EQ(logsAfterThird[1].value().output, "run two");
+    EXPECT_EQ(logsAfterThird[0].value().exitCode, 2);
+    EXPECT_EQ(logsAfterThird[1].value().exitCode, 1);
 }
 
 TEST_F(VLauncherRunLogStorageTest, SaveLatestRunFailsWhenStorageIsNotInitialized) {

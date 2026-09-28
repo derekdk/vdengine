@@ -19,6 +19,8 @@ Window::Window(uint32_t width, uint32_t height, const char* title, bool resizabl
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
 
+    // Must run after glfwInit() and the window hints above.
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     if (!m_window) {
         throw std::runtime_error("Failed to create GLFW window");

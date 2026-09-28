@@ -20,6 +20,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "../ExampleBase.h"
@@ -63,9 +64,9 @@ class HexPrismStacksInputHandler : public vde::examples::BaseExampleInputHandler
         return released;
     }
 
-    bool isLeftDown() const { return m_leftDown; }
-    float getMouseX() const { return m_mouseX; }
-    float getMouseY() const { return m_mouseY; }
+    [[nodiscard]] bool isLeftDown() const { return m_leftDown; }
+    [[nodiscard]] float getMouseX() const { return m_mouseX; }
+    [[nodiscard]] float getMouseY() const { return m_mouseY; }
 
   private:
     bool m_leftDown = false;
@@ -99,7 +100,7 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
         createPrismStacks();
 
         std::cout << "Created " << m_prisms.size() << " draggable prisms in stacked groups."
-                  << std::endl;
+                  << '\n';
     }
 
     void update(float deltaTime) override {
@@ -126,21 +127,23 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Hex Prism Stacks (Pick + Drag)"; }
+    [[nodiscard]] std::string getExampleName() const override {
+        return "Hex Prism Stacks (Pick + Drag)";
+    }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Multiple stacks of textured hexagonal prisms",
                 "Mouse picking with world-space ray tests", "Drag selected prism to a new location",
                 "Blue outline on selected prism"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Several stacks of textured six-sided prisms",
                 "Only one prism at a time with a blue outline",
                 "Selected prism follows mouse while left button is held"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"Left Click      - Select prism", "Hold Left Click - Drag selected prism",
                 "Release Left    - Drop prism"};
     }
@@ -201,7 +204,7 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
         return true;
     }
 
-    Ray getMouseRay(const HexPrismStacksInputHandler& input) const {
+    [[nodiscard]] Ray getMouseRay(const HexPrismStacksInputHandler& input) const {
         auto* game = getGame();
         auto* window = game ? game->getWindow() : nullptr;
         auto* camera = getCamera();
@@ -210,8 +213,8 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
             return Ray{};
         }
 
-        float screenWidth = static_cast<float>(window->getWidth());
-        float screenHeight = static_cast<float>(window->getHeight());
+        auto screenWidth = static_cast<float>(window->getWidth());
+        auto screenHeight = static_cast<float>(window->getHeight());
 
         return camera->screenToWorldRay(input.getMouseX(), input.getMouseY(), screenWidth,
                                         screenHeight);
@@ -274,13 +277,13 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
     }
 
     void setSelectedIndex(int index) {
-        if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_prisms.size())) {
+        if (m_selectedIndex >= 0 && std::cmp_less(m_selectedIndex, m_prisms.size())) {
             m_prisms[m_selectedIndex].outline->setVisible(false);
         }
 
         m_selectedIndex = index;
 
-        if (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_prisms.size())) {
+        if (m_selectedIndex >= 0 && std::cmp_less(m_selectedIndex, m_prisms.size())) {
             m_prisms[m_selectedIndex].outline->setVisible(true);
         }
     }
@@ -363,6 +366,7 @@ class HexPrismStacksScene : public vde::examples::BaseExampleScene {
 class HexPrismStacksDemo
     : public vde::examples::BaseExampleGame<HexPrismStacksInputHandler, HexPrismStacksScene> {};
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     HexPrismStacksDemo demo;
     return vde::examples::runExample(demo, "VDE Hex Prism Stacks Demo", 1280, 720, argc, argv);

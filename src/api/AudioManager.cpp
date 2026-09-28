@@ -32,12 +32,12 @@ bool AudioManager::initialize(const AudioSettings& settings) {
     if (ma_engine_init(&config, m_engine) != MA_SUCCESS) {
         delete m_engine;
         m_engine = nullptr;
-        std::cerr << "Failed to initialize audio engine" << std::endl;
+        std::cerr << "Failed to initialize audio engine" << '\n';
         return false;
     }
 
-    std::cout << "AudioManager: Engine initialized successfully" << std::endl;
-    std::cout << "AudioManager: Engine volume: " << ma_engine_get_volume(m_engine) << std::endl;
+    std::cout << "AudioManager: Engine initialized successfully" << '\n';
+    std::cout << "AudioManager: Engine volume: " << ma_engine_get_volume(m_engine) << '\n';
 
     // Apply settings
     setMasterVolume(settings.masterVolume);
@@ -47,7 +47,7 @@ bool AudioManager::initialize(const AudioSettings& settings) {
 
     std::cout << "AudioManager: After settings - Master: " << m_masterVolume
               << ", Music: " << m_musicVolume << ", SFX: " << m_sfxVolume << ", Muted: " << m_muted
-              << std::endl;
+              << '\n';
 
     m_initialized = true;
     return true;
@@ -152,7 +152,7 @@ uint32_t AudioManager::playSFX(const std::shared_ptr<AudioClip>& clip, float vol
     }
 
     // Create a new sound
-    ma_sound* sound = new ma_sound();
+    auto* sound = new ma_sound();
     ma_uint32 flags = 0;
     if (loop) {
         flags |= MA_SOUND_FLAG_STREAM;
@@ -193,15 +193,15 @@ uint32_t AudioManager::playMusic(const std::shared_ptr<AudioClip>& clip, float v
     if (!m_initialized || !clip || !clip->isLoaded()) {
         std::cout << "AudioManager::playMusic failed - initialized: " << m_initialized
                   << ", clip: " << (clip != nullptr)
-                  << ", loaded: " << (clip ? clip->isLoaded() : false) << std::endl;
+                  << ", loaded: " << (clip ? clip->isLoaded() : false) << '\n';
         return 0;
     }
 
     std::cout << "AudioManager::playMusic - File: " << clip->getPath() << ", volume: " << volume
-              << ", musicVolume: " << m_musicVolume << ", loop: " << loop << std::endl;
+              << ", musicVolume: " << m_musicVolume << ", loop: " << loop << '\n';
 
     // Create a new sound
-    ma_sound* sound = new ma_sound();
+    auto* sound = new ma_sound();
     ma_uint32 flags = MA_SOUND_FLAG_STREAM;  // Always stream music
 
     ma_result result =
@@ -209,12 +209,12 @@ uint32_t AudioManager::playMusic(const std::shared_ptr<AudioClip>& clip, float v
 
     if (result != MA_SUCCESS) {
         std::cout << "AudioManager::playMusic - Failed to init sound from file, error code: "
-                  << result << std::endl;
+                  << result << '\n';
         delete sound;
         return 0;
     }
 
-    std::cout << "AudioManager::playMusic - Sound initialized successfully" << std::endl;
+    std::cout << "AudioManager::playMusic - Sound initialized successfully" << '\n';
 
     // Set properties
     ma_sound_set_volume(sound, volume * m_musicVolume);
@@ -230,7 +230,7 @@ uint32_t AudioManager::playMusic(const std::shared_ptr<AudioClip>& clip, float v
     // Start playing
     ma_result startResult = ma_sound_start(sound);
     std::cout << "AudioManager::playMusic - Sound start result: " << startResult
-              << ", is playing: " << ma_sound_is_playing(sound) << std::endl;
+              << ", is playing: " << ma_sound_is_playing(sound) << '\n';
 
     // Track sound
     uint32_t soundId = m_nextSoundId++;

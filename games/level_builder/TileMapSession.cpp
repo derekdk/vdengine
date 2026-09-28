@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -23,9 +25,9 @@ constexpr const char* kOverlayFileName = "level_builder_ground.overlay.json";
 constexpr const char* kOverlayFormatId = "vde.level_builder.ground_overlay";
 constexpr int kOverlayFormatVersionLegacy = 1;
 constexpr int kOverlayFormatVersion = 2;
-constexpr size_t kMaxOverlayFileBytes = 64u * 1024u * 1024u;
+constexpr size_t kMaxOverlayFileBytes = size_t{64} * 1024u * 1024u;
 constexpr size_t kMaxOverlayLayers = 64;
-constexpr size_t kMaxOverlayTotalTiles = 4u * 1024u * 1024u;
+constexpr size_t kMaxOverlayTotalTiles = size_t{4} * 1024u * 1024u;
 
 std::string readTextFile(const std::filesystem::path& path) {
     std::error_code sizeError;
@@ -261,12 +263,12 @@ std::vector<LayerAndTiles> parseOverlayLayers(const OrderedJson& root, const vde
         def.visible = tileMap.isLayerVisible(0);
         def.collisionEnabled = true;
         std::vector<LayerAndTiles> layers;
-        layers.push_back({std::move(def), std::move(tiles)});
+        layers.emplace_back(std::move(def), std::move(tiles));
         for (int layerIndex = 1; layerIndex < tileMap.getLayerCount(); ++layerIndex) {
             levelbuilder::LayerDefinition importedLayer =
                 buildImportedLayerDefinition(tileMap, layerIndex);
             std::vector<int> importedTiles = importedLayer.tiles;
-            layers.push_back({std::move(importedLayer), std::move(importedTiles)});
+            layers.emplace_back(std::move(importedLayer), std::move(importedTiles));
         }
         return layers;
     }
@@ -623,7 +625,7 @@ bool TileMapSession::setLayerVisibility(size_t index, bool visible) {
     }
 
     layer.visible = visible;
-    if (m_tileMap != nullptr && index < static_cast<size_t>(m_tileMap->getLayerCount())) {
+    if (m_tileMap != nullptr && std::cmp_less(index, m_tileMap->getLayerCount())) {
         m_tileMap->setLayerVisible(static_cast<int>(index), visible);
     }
 
@@ -649,7 +651,7 @@ bool TileMapSession::setLayerDepthZ(size_t index, float depthZ) {
     }
 
     layer.depthZ = depthZ;
-    if (m_tileMap != nullptr && index < static_cast<size_t>(m_tileMap->getLayerCount())) {
+    if (m_tileMap != nullptr && std::cmp_less(index, m_tileMap->getLayerCount())) {
         m_tileMap->setLayerDepth(static_cast<int>(index), depthZ);
     }
 
@@ -813,7 +815,7 @@ int TileMapSession::readLayerTile(size_t layerIndex, const glm::ivec2& tileCoord
         if (m_tileMap == nullptr) {
             return vde::TileMap::kEmptyTile;
         }
-        const size_t columnCount = static_cast<size_t>(m_tileMap->getColumnCount());
+        const auto columnCount = static_cast<size_t>(m_tileMap->getColumnCount());
         const size_t tileIndex =
             static_cast<size_t>(tileCoord.y) * columnCount + static_cast<size_t>(tileCoord.x);
         const auto& tiles = m_layers[layerIndex].tiles;
@@ -823,14 +825,14 @@ int TileMapSession::readLayerTile(size_t layerIndex, const glm::ivec2& tileCoord
 }
 
 void TileMapSession::writeLayerTile(size_t layerIndex, const glm::ivec2& tileCoord, int tileId) {
-    if (m_tileMap != nullptr && layerIndex < static_cast<size_t>(m_tileMap->getLayerCount())) {
+    if (m_tileMap != nullptr && std::cmp_less(layerIndex, m_tileMap->getLayerCount())) {
         m_tileMap->setTile(static_cast<int>(layerIndex), tileCoord.x, tileCoord.y, tileId);
     }
     if (layerIndex < m_layers.size()) {
         if (m_tileMap == nullptr) {
             return;
         }
-        const size_t columnCount = static_cast<size_t>(m_tileMap->getColumnCount());
+        const auto columnCount = static_cast<size_t>(m_tileMap->getColumnCount());
         const size_t tileIndex =
             static_cast<size_t>(tileCoord.y) * columnCount + static_cast<size_t>(tileCoord.x);
         auto& tiles = m_layers[layerIndex].tiles;
@@ -946,7 +948,7 @@ bool TileMapSession::applyEditableTileId(size_t layerIndex, const glm::ivec2& ti
 
     writeLayerTile(layerIndex, clampedTile, tileId);
 
-    if (layerIndex < static_cast<size_t>(m_tileMap->getLayerCount())) {
+    if (std::cmp_less(layerIndex, m_tileMap->getLayerCount())) {
         const vde::TileCollisionKind oldCollision = m_tileMap->getCollisionKind(oldTileId);
         const vde::TileCollisionKind newCollision = m_tileMap->getCollisionKind(tileId);
         if (oldCollision != vde::TileCollisionKind::None ||
@@ -1060,9 +1062,9 @@ bool TileMapSession::reloadEditableLayerOverlay() {
         newLayers.reserve(loadedLayers.size());
         newSavedTiles.reserve(loadedLayers.size());
 
-        for (size_t i = 0; i < loadedLayers.size(); ++i) {
-            LayerDefinition def = std::move(loadedLayers[i].first);
-            std::vector<int>& tiles = loadedLayers[i].second;
+        for (auto& loadedLayer : loadedLayers) {
+            LayerDefinition def = std::move(loadedLayer.first);
+            std::vector<int>& tiles = loadedLayer.second;
             def.tiles = tiles;
             newLayers.push_back(std::move(def));
             newSavedTiles.push_back(std::move(tiles));
@@ -1121,7 +1123,7 @@ void TileMapSession::refreshDirtyStateForTileEdit(size_t layerIndex,
         return;
     }
 
-    const size_t columnCount = static_cast<size_t>(m_tileMap->getColumnCount());
+    const auto columnCount = static_cast<size_t>(m_tileMap->getColumnCount());
     const size_t tileIndex =
         static_cast<size_t>(tileCoordinate.y) * columnCount + static_cast<size_t>(tileCoordinate.x);
     const auto& savedTiles = m_savedLayerTiles[layerIndex];

@@ -30,17 +30,17 @@ class BlockFallTransition : public Transition {
     explicit BlockFallTransition(float blockSizePixels = 32.0f, float randomSeed = 0.0f)
         : m_blockSizePixels(blockSizePixels), m_randomSeed(randomSeed) {}
 
-    const char* getName() const override { return "BlockFall"; }
-    std::string getFragmentShaderPath() const override;
-    bool freezesSourceScene() const override { return true; }
+    [[nodiscard]] const char* getName() const override { return "BlockFall"; }
+    [[nodiscard]] std::string getFragmentShaderPath() const override;
+    [[nodiscard]] bool freezesSourceScene() const override { return true; }
 
     /**
      * @brief Encodes normalized block size and seed into uniforms.
      */
     void update(const TransitionUpdateContext& ctx, TransitionUniforms& outUniforms) override;
 
-    float getBlockSizePixels() const { return m_blockSizePixels; }
-    float getRandomSeed() const { return m_randomSeed; }
+    [[nodiscard]] float getBlockSizePixels() const { return m_blockSizePixels; }
+    [[nodiscard]] float getRandomSeed() const { return m_randomSeed; }
 
   private:
     float m_blockSizePixels;

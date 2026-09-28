@@ -10,6 +10,7 @@
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <utility>
 
 #include <imgui.h>
 
@@ -98,7 +99,7 @@ void HexEditorScene::drawDebugUI() {
             ImGui::SameLine();
 
             ImGui::BeginChild("##HexView", ImVec2(hexWidth, bodyHeight), true);
-            if (m_selectedA >= 0 && m_selectedA < static_cast<int>(m_files.size())) {
+            if (m_selectedA >= 0 && std::cmp_less(m_selectedA, m_files.size())) {
                 drawHexPanel("##SingleHex", m_selectedA, false, -1);
             } else {
                 ImGui::TextDisabled("No file selected. Open a file to begin.");
@@ -201,7 +202,7 @@ void HexEditorScene::drawFileSelector() {
     ImGui::Text("Open Files (%d)", static_cast<int>(m_files.size()));
     ImGui::Separator();
 
-    for (int i = 0; i < static_cast<int>(m_files.size()); ++i) {
+    for (int i = 0; std::cmp_less(i, m_files.size()); ++i) {
         const auto& f = m_files[i];
         bool selected = (i == m_selectedA);
         if (ImGui::Selectable(f.label.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
@@ -229,14 +230,16 @@ void HexEditorScene::drawFileSelector() {
             ImGui::Separator();
             if (ImGui::MenuItem("Close")) {
                 // Adjust selection indices before erasing
-                if (m_selectedA == i)
+                if (m_selectedA == i) {
                     m_selectedA = -1;
-                else if (m_selectedA > i)
+                } else if (m_selectedA > i) {
                     --m_selectedA;
-                if (m_selectedB == i)
+                }
+                if (m_selectedB == i) {
                     m_selectedB = -1;
-                else if (m_selectedB > i)
+                } else if (m_selectedB > i) {
                     --m_selectedB;
+                }
                 m_files.erase(m_files.begin() + i);
                 ImGui::EndPopup();
                 break;  // vector invalidated
@@ -258,11 +261,12 @@ void HexEditorScene::drawFileSelector() {
 
 void HexEditorScene::drawHexPanel(const char* /*panelId*/, int fileIdx, bool highlightDiffs,
                                   int otherIdx) {
-    if (fileIdx < 0 || fileIdx >= static_cast<int>(m_files.size()))
+    if (fileIdx < 0 || std::cmp_greater_equal(fileIdx, m_files.size())) {
         return;
+    }
     const HexFile& f = m_files[fileIdx];
     const HexFile* other =
-        (highlightDiffs && otherIdx >= 0 && otherIdx < static_cast<int>(m_files.size()))
+        (highlightDiffs && otherIdx >= 0 && std::cmp_less(otherIdx, m_files.size()))
             ? &m_files[otherIdx]
             : nullptr;
 
@@ -351,7 +355,7 @@ void HexEditorScene::drawComparePanel() {
 
     // Left panel
     ImGui::BeginChild("##CompareL", ImVec2(halfW, bodyHeight), true);
-    if (m_selectedA >= 0 && m_selectedA < static_cast<int>(m_files.size())) {
+    if (m_selectedA >= 0 && std::cmp_less(m_selectedA, m_files.size())) {
         ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s",
                            m_files[m_selectedA].label.c_str());
         ImGui::Separator();
@@ -365,7 +369,7 @@ void HexEditorScene::drawComparePanel() {
 
     // Right panel
     ImGui::BeginChild("##CompareR", ImVec2(halfW, bodyHeight), true);
-    if (m_selectedB >= 0 && m_selectedB < static_cast<int>(m_files.size())) {
+    if (m_selectedB >= 0 && std::cmp_less(m_selectedB, m_files.size())) {
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s",
                            m_files[m_selectedB].label.c_str());
         ImGui::Separator();
@@ -378,7 +382,7 @@ void HexEditorScene::drawComparePanel() {
 
 void HexEditorScene::drawStatusBar() {
     ImGui::Separator();
-    if (m_selectedA >= 0 && m_selectedA < static_cast<int>(m_files.size())) {
+    if (m_selectedA >= 0 && std::cmp_less(m_selectedA, m_files.size())) {
         const auto& f = m_files[m_selectedA];
         ImGui::Text("  %s  |  %zu bytes", f.path.c_str(), f.data.size());
     } else {
@@ -386,15 +390,15 @@ void HexEditorScene::drawStatusBar() {
     }
 
     if (m_showCompare && m_selectedA >= 0 && m_selectedB >= 0 &&
-        m_selectedA < static_cast<int>(m_files.size()) &&
-        m_selectedB < static_cast<int>(m_files.size())) {
+        std::cmp_less(m_selectedA, m_files.size()) && std::cmp_less(m_selectedB, m_files.size())) {
         const auto& a = m_files[m_selectedA];
         const auto& b = m_files[m_selectedB];
         size_t compared = std::min(a.data.size(), b.data.size());
         size_t diffs = 0;
         for (size_t i = 0; i < compared; ++i) {
-            if (a.data[i] != b.data[i])
+            if (a.data[i] != b.data[i]) {
                 ++diffs;
+            }
         }
         size_t sizeDiff = (a.data.size() > b.data.size()) ? a.data.size() - b.data.size()
                                                           : b.data.size() - a.data.size();
@@ -433,19 +437,21 @@ void HexEditorScene::cmdOpen(std::istringstream& iss) {
 
 void HexEditorScene::cmdClose(std::istringstream& iss) {
     int idx = -1;
-    if (!(iss >> idx) || idx < 0 || idx >= static_cast<int>(m_files.size())) {
+    if (!(iss >> idx) || idx < 0 || std::cmp_greater_equal(idx, m_files.size())) {
         addConsoleMessage("ERROR: Usage: close <index>  (use 'list' to see indices)");
         return;
     }
     addConsoleMessage("Closed: " + m_files[idx].path);
-    if (m_selectedA == idx)
+    if (m_selectedA == idx) {
         m_selectedA = -1;
-    else if (m_selectedA > idx)
+    } else if (m_selectedA > idx) {
         --m_selectedA;
-    if (m_selectedB == idx)
+    }
+    if (m_selectedB == idx) {
         m_selectedB = -1;
-    else if (m_selectedB > idx)
+    } else if (m_selectedB > idx) {
         --m_selectedB;
+    }
     m_files.erase(m_files.begin() + idx);
 }
 
@@ -455,7 +461,7 @@ void HexEditorScene::cmdList() {
         return;
     }
     addConsoleMessage("Open files:");
-    for (int i = 0; i < static_cast<int>(m_files.size()); ++i) {
+    for (int i = 0; std::cmp_less(i, m_files.size()); ++i) {
         addConsoleMessage("  [" + std::to_string(i) + "] " + m_files[i].path + "  (" +
                           std::to_string(m_files[i].data.size()) + " bytes)");
     }

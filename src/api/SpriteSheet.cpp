@@ -1,6 +1,7 @@
 #include <vde/api/SpriteSheet.h>
 
 #include <stdexcept>
+#include <utility>
 
 namespace vde {
 
@@ -48,7 +49,7 @@ SpriteSheet::Ref SpriteSheet::createGrid(std::shared_ptr<Texture> texture, int c
     float invW = (texW > 0) ? 1.0f / static_cast<float>(texW) : 0.0f;
     float invH = (texH > 0) ? 1.0f / static_cast<float>(texH) : 0.0f;
 
-    sheet->m_rects.reserve(static_cast<size_t>(columns * rows));
+    sheet->m_rects.reserve(static_cast<size_t>(columns) * static_cast<size_t>(rows));
 
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < columns; ++col) {
@@ -119,7 +120,7 @@ void SpriteSheet::addSprite(const std::string& name, int x, int y, int w, int h)
 }
 
 SpriteSheet::UVRect SpriteSheet::getUVRect(int index) const {
-    if (index < 0 || index >= static_cast<int>(m_rects.size())) {
+    if (index < 0 || std::cmp_greater_equal(index, m_rects.size())) {
         throw std::out_of_range("SpriteSheet::getUVRect: index " + std::to_string(index) +
                                 " out of range [0, " + std::to_string(m_rects.size()) + ")");
     }

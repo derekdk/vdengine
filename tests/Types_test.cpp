@@ -69,7 +69,7 @@ TEST_F(UniformBufferObjectTest, UBOHasCorrectSize) {
 }
 
 TEST_F(UniformBufferObjectTest, MatricesAreInitializableAsIdentity) {
-    UniformBufferObject ubo;
+    UniformBufferObject ubo{};
     ubo.model = glm::mat4(1.0f);
     ubo.view = glm::mat4(1.0f);
     ubo.proj = glm::mat4(1.0f);
@@ -81,7 +81,7 @@ TEST_F(UniformBufferObjectTest, MatricesAreInitializableAsIdentity) {
 }
 
 TEST_F(UniformBufferObjectTest, MatricesCanBeMultiplied) {
-    UniformBufferObject ubo;
+    UniformBufferObject ubo{};
     ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     ubo.view = glm::lookAt(glm::vec3(0.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f),
                            glm::vec3(0.0f, 1.0f, 0.0f));

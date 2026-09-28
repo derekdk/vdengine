@@ -19,8 +19,8 @@ void BlockFallTransition::update(const TransitionUpdateContext& ctx,
     outUniforms.direction = m_randomSeed;
 
     const float safeBlockSize = std::max(1.0f, m_blockSizePixels);
-    const float width = static_cast<float>(ctx.frameWidth);
-    const float height = static_cast<float>(ctx.frameHeight);
+    const auto width = static_cast<float>(ctx.frameWidth);
+    const auto height = static_cast<float>(ctx.frameHeight);
 
     outUniforms.param0 = (width > 0.0f) ? (safeBlockSize / width) : 1.0f;
     outUniforms.param1 = (height > 0.0f) ? (safeBlockSize / height) : 1.0f;

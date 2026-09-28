@@ -143,13 +143,13 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
             totalWidth += gap * static_cast<float>(text.size() - 1);
 
             float x = -totalWidth / 2.0f;
-            for (size_t i = 0; i < letters.size(); ++i) {
+            for (auto& letter : letters) {
                 auto sprite = addEntity<vde::SpriteEntity>();
-                sprite->setTexture(letters[i].tex);
-                sprite->setScale(letters[i].w, letters[i].h, 1.0f);
-                sprite->setPosition(x + letters[i].w / 2.0f, -2.8f, 0.0f);
+                sprite->setTexture(letter.tex);
+                sprite->setScale(letter.w, letter.h, 1.0f);
+                sprite->setPosition(x + letter.w / 2.0f, -2.8f, 0.0f);
                 m_playerReadySprites.push_back(sprite);
-                x += letters[i].w + gap;
+                x += letter.w + gap;
             }
         }
 
@@ -247,9 +247,9 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Pixel Arcade Demo"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Pixel Arcade Demo"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "BitmapFont::small() and BitmapFont::large() usage",
             "TextRenderer::createTexture() batch creation (~30 textures)",
@@ -259,7 +259,7 @@ class ArcadeScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Flashing yellow INSERT COIN banner at top",
             "HIGH SCORES title in cyan",
@@ -287,6 +287,7 @@ class PixelArcadeDemo : public vde::examples::BaseExampleGame<ArcadeInputHandler
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     PixelArcadeDemo demo;
     return vde::examples::runExample(demo, "VDE Pixel Arcade Demo", 1280, 720, argc, argv);

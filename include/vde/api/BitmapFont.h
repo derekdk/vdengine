@@ -52,19 +52,19 @@ class BitmapFont {
      * @return Bitmask with the MSB representing the leftmost column.
      *         Returns 0 for unsupported characters or out-of-range rows.
      */
-    uint8_t glyphRow(char c, int row) const;
+    [[nodiscard]] uint8_t glyphRow(char c, int row) const;
 
     /**
      * @brief Get the width of each glyph in pixels.
      * @return Glyph width
      */
-    int glyphWidth() const { return m_glyphWidth; }
+    [[nodiscard]] int glyphWidth() const { return m_glyphWidth; }
 
     /**
      * @brief Get the height of each glyph in pixels.
      * @return Glyph height
      */
-    int glyphHeight() const { return m_glyphHeight; }
+    [[nodiscard]] int glyphHeight() const { return m_glyphHeight; }
 
   private:
     BitmapFont(int glyphWidth, int glyphHeight, const uint8_t* data, int glyphCount,

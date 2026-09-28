@@ -35,7 +35,7 @@ struct Ray {
      * @param radius Radius of the sphere
      * @return true if the ray intersects the sphere
      */
-    bool hitsSphere(const glm::vec3& center, float radius) const {
+    [[nodiscard]] bool hitsSphere(const glm::vec3& center, float radius) const {
         glm::vec3 oc = origin - center;
         float a = glm::dot(direction, direction);
         float b = 2.0f * glm::dot(oc, direction);
@@ -59,22 +59,24 @@ class GameCamera {
      * @brief Get the underlying engine camera.
      */
     Camera& getCamera() { return m_camera; }
-    const Camera& getCamera() const { return m_camera; }
+    [[nodiscard]] const Camera& getCamera() const { return m_camera; }
 
     /**
      * @brief Get the view matrix.
      */
-    glm::mat4 getViewMatrix() const { return m_camera.getViewMatrix(); }
+    [[nodiscard]] glm::mat4 getViewMatrix() const { return m_camera.getViewMatrix(); }
 
     /**
      * @brief Get the projection matrix.
      */
-    glm::mat4 getProjectionMatrix() const { return m_camera.getProjectionMatrix(); }
+    [[nodiscard]] glm::mat4 getProjectionMatrix() const { return m_camera.getProjectionMatrix(); }
 
     /**
      * @brief Get the combined view-projection matrix.
      */
-    glm::mat4 getViewProjectionMatrix() const { return m_camera.getViewProjectionMatrix(); }
+    [[nodiscard]] glm::mat4 getViewProjectionMatrix() const {
+        return m_camera.getViewProjectionMatrix();
+    }
 
     /**
      * @brief Set the camera's aspect ratio.
@@ -87,7 +89,7 @@ class GameCamera {
     /**
      * @brief Get the camera's aspect ratio.
      */
-    float getAspectRatio() const { return m_aspectRatio; }
+    [[nodiscard]] float getAspectRatio() const { return m_aspectRatio; }
 
     /**
      * @brief Set the near clipping plane.
@@ -131,7 +133,8 @@ class GameCamera {
      * @param screenHeight Viewport height in pixels
      * @return A Ray whose origin is on the near plane and whose direction points into the scene
      */
-    Ray screenToWorldRay(float screenX, float screenY, float screenWidth, float screenHeight) const;
+    [[nodiscard]] Ray screenToWorldRay(float screenX, float screenY, float screenWidth,
+                                       float screenHeight) const;
 
   protected:
     Camera m_camera;
@@ -167,7 +170,7 @@ class SimpleCamera : public GameCamera {
     /**
      * @brief Get the camera position.
      */
-    Position getPosition() const;
+    [[nodiscard]] Position getPosition() const;
 
     /**
      * @brief Set the direction the camera is looking.
@@ -177,7 +180,7 @@ class SimpleCamera : public GameCamera {
     /**
      * @brief Get the look direction.
      */
-    Direction getDirection() const;
+    [[nodiscard]] Direction getDirection() const;
 
     /**
      * @brief Set the field of view in degrees.
@@ -187,7 +190,7 @@ class SimpleCamera : public GameCamera {
     /**
      * @brief Get the field of view.
      */
-    float getFieldOfView() const { return m_fov; }
+    [[nodiscard]] float getFieldOfView() const { return m_fov; }
 
     /**
      * @brief Move the camera by a delta.
@@ -238,7 +241,7 @@ class OrbitCamera : public GameCamera {
     /**
      * @brief Get the orbit target.
      */
-    Position getTarget() const;
+    [[nodiscard]] Position getTarget() const;
 
     /**
      * @brief Set distance from target.
@@ -248,7 +251,7 @@ class OrbitCamera : public GameCamera {
     /**
      * @brief Get distance from target.
      */
-    float getDistance() const { return m_distance; }
+    [[nodiscard]] float getDistance() const { return m_distance; }
 
     /**
      * @brief Set the pitch angle (degrees).
@@ -258,7 +261,7 @@ class OrbitCamera : public GameCamera {
     /**
      * @brief Get the pitch angle.
      */
-    float getPitch() const { return m_pitch; }
+    [[nodiscard]] float getPitch() const { return m_pitch; }
 
     /**
      * @brief Set the yaw angle (degrees).
@@ -268,7 +271,7 @@ class OrbitCamera : public GameCamera {
     /**
      * @brief Get the yaw angle.
      */
-    float getYaw() const { return m_yaw; }
+    [[nodiscard]] float getYaw() const { return m_yaw; }
 
     /**
      * @brief Set field of view in degrees.
@@ -358,7 +361,7 @@ class Camera2D : public GameCamera {
     /**
      * @brief Get the camera position.
      */
-    glm::vec2 getPosition() const { return glm::vec2(m_position.x, m_position.y); }
+    [[nodiscard]] glm::vec2 getPosition() const { return {m_position.x, m_position.y}; }
 
     /**
      * @brief Set the zoom level (1.0 = normal).
@@ -368,7 +371,7 @@ class Camera2D : public GameCamera {
     /**
      * @brief Get the zoom level.
      */
-    float getZoom() const { return m_zoom; }
+    [[nodiscard]] float getZoom() const { return m_zoom; }
 
     /**
      * @brief Set the rotation in degrees.
@@ -378,7 +381,7 @@ class Camera2D : public GameCamera {
     /**
      * @brief Get the rotation in degrees.
      */
-    float getRotation() const { return m_rotation; }
+    [[nodiscard]] float getRotation() const { return m_rotation; }
 
     /**
      * @brief Set the viewport size.
@@ -448,7 +451,7 @@ class Camera2D : public GameCamera {
      *
      * @return Rect2D with left, right, bottom, top edges in world units
      */
-    Rect2D getVisibleRect() const;
+    [[nodiscard]] Rect2D getVisibleRect() const;
 
     /**
      * @brief Apply this camera to a VulkanContext using orthographic projection.

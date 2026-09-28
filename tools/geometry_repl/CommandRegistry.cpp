@@ -13,7 +13,7 @@ namespace tools {
 
 std::string CommandRegistry::toLower(const std::string& str) {
     std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    std::ranges::transform(result, result.begin(), ::tolower);
     return result;
 }
 
@@ -131,7 +131,7 @@ std::vector<std::string> CommandRegistry::getCompletions(const std::string& inpu
         // Complete command names
         std::string prefix = toLower(tokens[0]);
         for (const auto& [name, info] : m_commands) {
-            if (info.enabled && name.substr(0, prefix.size()) == prefix) {
+            if (info.enabled && name.starts_with(prefix)) {
                 results.push_back(name);
             }
         }
@@ -165,6 +165,7 @@ std::vector<const CommandInfo*> CommandRegistry::getEnabledCommands() const {
 
 std::vector<const CommandInfo*> CommandRegistry::getAllCommands() const {
     std::vector<const CommandInfo*> result;
+    result.reserve(m_commands.size());
     for (const auto& [name, info] : m_commands) {
         result.push_back(&info);
     }

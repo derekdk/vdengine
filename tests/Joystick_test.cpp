@@ -271,10 +271,12 @@ TEST_F(InputHandlerGamepadTest, FullConnectionLifecycle) {
 
     // Disconnect — state should be cleared manually (as the engine does)
     handler._setGamepadConnected(JOYSTICK_1, false);
-    for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn)
+    for (int btn = 0; btn <= GAMEPAD_BUTTON_LAST; ++btn) {
         handler._setGamepadButton(JOYSTICK_1, btn, false);
-    for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis)
+    }
+    for (int axis = 0; axis <= GAMEPAD_AXIS_LAST; ++axis) {
         handler._setGamepadAxis(JOYSTICK_1, axis, 0.0f);
+    }
 
     handler.onGamepadDisconnect(JOYSTICK_1);
     EXPECT_FALSE(handler.isGamepadConnected(JOYSTICK_1));

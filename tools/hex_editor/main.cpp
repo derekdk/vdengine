@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "HexEditorScene.h"
 
@@ -13,8 +14,8 @@ using namespace vde::tools;
 
 class HexEditorTool : public BaseToolGame<BaseToolInputHandler, HexEditorScene> {
   public:
-    HexEditorTool(ToolMode mode, const std::string& scriptFile = "")
-        : BaseToolGame(mode), m_scriptFile(scriptFile) {}
+    HexEditorTool(ToolMode mode, std::string scriptFile = "")
+        : BaseToolGame(mode), m_scriptFile(std::move(scriptFile)) {}
 
     void onStart() override {
         BaseToolGame::onStart();
@@ -37,6 +38,7 @@ class HexEditorTool : public BaseToolGame<BaseToolInputHandler, HexEditorScene> 
 // Main
 // =============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ToolMode mode = ToolMode::INTERACTIVE;
     std::string scriptFile;
@@ -61,24 +63,23 @@ int main(int argc, char** argv) {
 
     if (mode == ToolMode::INTERACTIVE) {
         float dpiScale = vde::Window::getPrimaryMonitorDPIScale();
-        uint32_t width = static_cast<uint32_t>(1400 * dpiScale);
-        uint32_t height = static_cast<uint32_t>(800 * dpiScale);
+        auto width = static_cast<uint32_t>(1400 * dpiScale);
+        auto height = static_cast<uint32_t>(800 * dpiScale);
         return runTool(tool, "VDE Hex Editor", width, height, argc, argv);
-    } else {
-        vde::configureInputScriptFromArgs(tool, argc, argv);
-
-        vde::GameSettings settings;
-        settings.gameName = "VDE Hex Editor (Script Mode)";
-        settings.display.windowWidth = 800;
-        settings.display.windowHeight = 600;
-        settings.debug.enableValidation = false;
-
-        if (!tool.initialize(settings)) {
-            std::cerr << "Failed to initialize tool\n";
-            return 1;
-        }
-
-        tool.run();
-        return tool.getExitCode();
     }
+    vde::configureInputScriptFromArgs(tool, argc, argv);
+
+    vde::GameSettings settings;
+    settings.gameName = "VDE Hex Editor (Script Mode)";
+    settings.display.windowWidth = 800;
+    settings.display.windowHeight = 600;
+    settings.debug.enableValidation = false;
+
+    if (!tool.initialize(settings)) {
+        std::cerr << "Failed to initialize tool\n";
+        return 1;
+    }
+
+    tool.run();
+    return tool.getExitCode();
 }

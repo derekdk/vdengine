@@ -115,21 +115,21 @@ class Scheduler {
     /**
      * @brief Get the number of registered tasks.
      */
-    size_t getTaskCount() const;
+    [[nodiscard]] size_t getTaskCount() const;
 
     /**
      * @brief Check if a task with the given ID exists.
      * @param id Task ID to check
      * @return true if the task exists
      */
-    bool hasTask(TaskId id) const;
+    [[nodiscard]] bool hasTask(TaskId id) const;
 
     /**
      * @brief Get the name of a task.
      * @param id Task ID
      * @return Task name, or empty string if not found
      */
-    std::string getTaskName(TaskId id) const;
+    [[nodiscard]] std::string getTaskName(TaskId id) const;
 
     /**
      * @brief Get the execution order from the last execute() call.
@@ -137,21 +137,21 @@ class Scheduler {
      * Useful for debugging and testing.
      * @return Ordered list of task IDs as they were executed
      */
-    const std::vector<TaskId>& getLastExecutionOrder() const;
+    [[nodiscard]] const std::vector<TaskId>& getLastExecutionOrder() const;
 
     /**
      * @brief Find a task by name.
      * @param name Task name to search for
      * @return Task ID, or INVALID_TASK_ID if not found
      */
-    TaskId findTaskByName(const std::string& name) const;
+    [[nodiscard]] TaskId findTaskByName(const std::string& name) const;
 
     /**
      * @brief Get a copy of the descriptor for a task.
      * @param id Task ID
      * @return Copy of the TaskDescriptor, or std::nullopt if not found
      */
-    std::optional<TaskDescriptor> getTaskDescriptor(TaskId id) const;
+    [[nodiscard]] std::optional<TaskDescriptor> getTaskDescriptor(TaskId id) const;
 
     /**
      * @brief Set the number of worker threads for parallel execution.
@@ -170,11 +170,11 @@ class Scheduler {
      * @brief Get the current worker thread count.
      * @return 0 if single-threaded, otherwise the thread count.
      */
-    size_t getWorkerThreadCount() const;
+    [[nodiscard]] size_t getWorkerThreadCount() const;
 
   private:
     struct TaskEntry {
-        TaskId id;
+        TaskId id{};
         TaskDescriptor descriptor;
     };
 
@@ -192,7 +192,7 @@ class Scheduler {
      * @return Sorted list of task IDs
      * @throws std::runtime_error if a cycle is detected
      */
-    std::vector<TaskId> topologicalSort() const;
+    [[nodiscard]] std::vector<TaskId> topologicalSort() const;
 };
 
 }  // namespace vde

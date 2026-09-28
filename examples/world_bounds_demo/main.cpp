@@ -17,6 +17,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <utility>
 
 #include "../ExampleBase.h"
 
@@ -31,35 +32,48 @@ class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
         // Call base class first for ESC and F keys
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == KEY_SPACE)
+        if (key == KEY_SPACE) {
             m_spacePressed = true;
-        if (key == KEY_W)
+        }
+        if (key == KEY_W) {
             m_up = true;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_down = true;
-        if (key == KEY_A)
+        }
+        if (key == KEY_A) {
             m_left = true;
-        if (key == KEY_D)
+        }
+        if (key == KEY_D) {
             m_right = true;
-        if (key == KEY_Q)
+        }
+        if (key == KEY_Q) {
             m_zoomOut = true;
-        if (key == KEY_E)
+        }
+        if (key == KEY_E) {
             m_zoomIn = true;
+        }
     }
 
     void onKeyRelease(int key) override {
-        if (key == KEY_W)
+        if (key == KEY_W) {
             m_up = false;
-        if (key == KEY_S)
+        }
+        if (key == KEY_S) {
             m_down = false;
-        if (key == KEY_A)
+        }
+        if (key == KEY_A) {
             m_left = false;
-        if (key == KEY_D)
+        }
+        if (key == KEY_D) {
             m_right = false;
-        if (key == KEY_Q)
+        }
+        if (key == KEY_Q) {
             m_zoomOut = false;
-        if (key == KEY_E)
+        }
+        if (key == KEY_E) {
             m_zoomIn = false;
+        }
     }
 
     void onMouseMove(double x, double y) override {
@@ -85,15 +99,15 @@ class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
         return v;
     }
 
-    float getMouseX() const { return m_mouseX; }
-    float getMouseY() const { return m_mouseY; }
+    [[nodiscard]] float getMouseX() const { return m_mouseX; }
+    [[nodiscard]] float getMouseY() const { return m_mouseY; }
 
-    bool isMovingUp() const { return m_up; }
-    bool isMovingDown() const { return m_down; }
-    bool isMovingLeft() const { return m_left; }
-    bool isMovingRight() const { return m_right; }
-    bool isZoomingIn() const { return m_zoomIn; }
-    bool isZoomingOut() const { return m_zoomOut; }
+    [[nodiscard]] bool isMovingUp() const { return m_up; }
+    [[nodiscard]] bool isMovingDown() const { return m_down; }
+    [[nodiscard]] bool isMovingLeft() const { return m_left; }
+    [[nodiscard]] bool isMovingRight() const { return m_right; }
+    [[nodiscard]] bool isZoomingIn() const { return m_zoomIn; }
+    [[nodiscard]] bool isZoomingOut() const { return m_zoomOut; }
 
   private:
     bool m_spacePressed = false;
@@ -108,10 +122,10 @@ class DemoInputHandler : public vde::examples::BaseExampleInputHandler {
  */
 class WorldMarker : public SpriteEntity {
   public:
-    WorldMarker(const std::string& label = "") : m_label(label) {}
+    WorldMarker(std::string label = "") : m_label(std::move(label)) {}
 
     void setLabel(const std::string& label) { m_label = label; }
-    const std::string& getLabel() const { return m_label; }
+    [[nodiscard]] const std::string& getLabel() const { return m_label; }
 
   private:
     std::string m_label;
@@ -201,12 +215,15 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
         // Grid markers
         for (int x = -30; x <= 30; x += 10) {
             for (int y = -30; y <= 30; y += 10) {
-                if (x == 0 && y == 0)
+                if (x == 0 && y == 0) {
                     continue;  // Skip center
-                if (std::abs(x) == 20 && y == 0)
+                }
+                if (std::abs(x) == 20 && y == 0) {
                     continue;  // Skip E/W
-                if (std::abs(y) == 20 && x == 0)
+                }
+                if (std::abs(y) == 20 && x == 0) {
                     continue;  // Skip N/S
+                }
 
                 auto marker = addEntity<WorldMarker>();
                 marker->setPosition(static_cast<float>(x), static_cast<float>(y), 0.0f);
@@ -227,21 +244,26 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<DemoInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Pan camera
         float panSpeed = 20.0f * deltaTime;
         Meters dx = 0_m, dy = 0_m;
 
-        if (input->isMovingRight())
+        if (input->isMovingRight()) {
             dx = Meters(panSpeed);
-        if (input->isMovingLeft())
+        }
+        if (input->isMovingLeft()) {
             dx = Meters(-panSpeed);
-        if (input->isMovingUp())
+        }
+        if (input->isMovingUp()) {
             dy = Meters(panSpeed);
-        if (input->isMovingDown())
+        }
+        if (input->isMovingDown()) {
             dy = Meters(-panSpeed);
+        }
 
         if (dx.value != 0.0f || dy.value != 0.0f) {
             m_cameraBounds.move(dx, dy);
@@ -269,10 +291,10 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
             m_constraintsEnabled = !m_constraintsEnabled;
             if (m_constraintsEnabled) {
                 m_cameraBounds.setConstraintBounds(m_constraintBounds);
-                std::cout << "Camera constraints ENABLED" << std::endl;
+                std::cout << "Camera constraints ENABLED" << '\n';
             } else {
                 m_cameraBounds.clearConstraintBounds();
-                std::cout << "Camera constraints DISABLED" << std::endl;
+                std::cout << "Camera constraints DISABLED" << '\n';
             }
         }
 
@@ -285,7 +307,7 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
 
             std::cout << std::fixed << std::setprecision(2);
             std::cout << "Click at screen (" << mouseX.value << ", " << mouseY.value << "px) "
-                      << "-> world (" << worldPos.x << ", " << worldPos.y << "m)" << std::endl;
+                      << "-> world (" << worldPos.x << ", " << worldPos.y << "m)" << '\n';
 
             // Show marker at click position
             m_clickMarker->setPosition(worldPos.x, worldPos.y, 0.1f);
@@ -293,7 +315,7 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
 
             // Check visibility
             if (m_cameraBounds.isVisible(Meters(worldPos.x), Meters(worldPos.y))) {
-                std::cout << "  Point is within visible bounds" << std::endl;
+                std::cout << "  Point is within visible bounds" << '\n';
             }
         }
 
@@ -307,19 +329,19 @@ class WorldBoundsScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "World Bounds System"; }
+    [[nodiscard]] std::string getExampleName() const override { return "World Bounds System"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"Type-safe world units (Meters)", "Cardinal direction-based bounds",
                 "Screen-to-world coordinate mapping", "CameraBounds2D for panning/zooming"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"Grid of colored markers", "White center marker",
                 "Cardinal direction markers (N/S/E/W)", "Dark blue background"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"WASD   - Pan camera", "Q/E    - Zoom out/in", "Click  - Print world coordinates",
                 "Space  - Toggle constraint bounds"};
     }
@@ -342,6 +364,7 @@ class WorldBoundsDemo : public vde::examples::BaseExampleGame<DemoInputHandler, 
 /**
  * @brief Main entry point
  */
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     WorldBoundsDemo demo;
     return vde::examples::runExample(demo, "World Bounds Demo", 1280, 720, argc, argv);

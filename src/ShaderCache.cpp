@@ -12,7 +12,12 @@ ShaderCache::ShaderCache(const std::string& cacheDirectory)
 
 ShaderCache::~ShaderCache() {
     if (m_initialized) {
-        saveManifest();
+        try {
+            saveManifest();
+        } catch (...) {
+            // Destructors must not throw; losing the manifest only forces recompilation.
+            m_initialized = false;
+        }
     }
 }
 
@@ -66,8 +71,8 @@ bool ShaderCache::loadManifest() {
         while ((pos = content.find("\"sourcePath\"", pos)) != std::string::npos) {
             ShaderCacheEntry entry;
 
-            size_t entryStart = content.rfind("{", pos);
-            size_t entryEnd = content.find("}", pos);
+            size_t entryStart = content.rfind('{', pos);
+            size_t entryEnd = content.find('}', pos);
             if (entryStart == std::string::npos || entryEnd == std::string::npos) {
                 pos++;
                 continue;
@@ -78,16 +83,16 @@ bool ShaderCache::loadManifest() {
             // Extract sourcePath
             size_t pathPos = entryStr.find("\"sourcePath\"");
             if (pathPos != std::string::npos) {
-                size_t pathStart = entryStr.find("\"", pathPos + 12) + 1;
-                size_t pathEnd = entryStr.find("\"", pathStart);
+                size_t pathStart = entryStr.find('\"', pathPos + 12) + 1;
+                size_t pathEnd = entryStr.find('\"', pathStart);
                 entry.sourcePath = entryStr.substr(pathStart, pathEnd - pathStart);
             }
 
             // Extract sourceHash
             size_t hashPos = entryStr.find("\"sourceHash\"");
             if (hashPos != std::string::npos) {
-                size_t hashStart = entryStr.find("\"", hashPos + 12) + 1;
-                size_t hashEnd = entryStr.find("\"", hashStart);
+                size_t hashStart = entryStr.find('\"', hashPos + 12) + 1;
+                size_t hashEnd = entryStr.find('\"', hashStart);
                 entry.sourceHash =
                     ShaderHash::fromHexString(entryStr.substr(hashStart, hashEnd - hashStart));
             }
@@ -95,30 +100,31 @@ bool ShaderCache::loadManifest() {
             // Extract spvFile
             size_t spvPos = entryStr.find("\"spvFile\"");
             if (spvPos != std::string::npos) {
-                size_t spvStart = entryStr.find("\"", spvPos + 9) + 1;
-                size_t spvEnd = entryStr.find("\"", spvStart);
+                size_t spvStart = entryStr.find('\"', spvPos + 9) + 1;
+                size_t spvEnd = entryStr.find('\"', spvStart);
                 entry.spvFileName = entryStr.substr(spvStart, spvEnd - spvStart);
             }
 
             // Extract stage
             size_t stagePos = entryStr.find("\"stage\"");
             if (stagePos != std::string::npos) {
-                size_t stageStart = entryStr.find("\"", stagePos + 7) + 1;
-                size_t stageEnd = entryStr.find("\"", stageStart);
+                size_t stageStart = entryStr.find('\"', stagePos + 7) + 1;
+                size_t stageEnd = entryStr.find('\"', stageStart);
                 std::string stageName = entryStr.substr(stageStart, stageEnd - stageStart);
 
-                if (stageName == "vertex")
+                if (stageName == "vertex") {
                     entry.stage = ShaderStage::Vertex;
-                else if (stageName == "fragment")
+                } else if (stageName == "fragment") {
                     entry.stage = ShaderStage::Fragment;
-                else if (stageName == "compute")
+                } else if (stageName == "compute") {
                     entry.stage = ShaderStage::Compute;
-                else if (stageName == "geometry")
+                } else if (stageName == "geometry") {
                     entry.stage = ShaderStage::Geometry;
-                else if (stageName == "tess_control")
+                } else if (stageName == "tess_control") {
                     entry.stage = ShaderStage::TessControl;
-                else if (stageName == "tess_eval")
+                } else if (stageName == "tess_eval") {
                     entry.stage = ShaderStage::TessEvaluation;
+                }
             }
 
             if (entry.isValid()) {
@@ -149,8 +155,9 @@ bool ShaderCache::saveManifest() {
 
     bool first = true;
     for (const auto& [path, entry] : m_entries) {
-        if (!first)
+        if (!first) {
             file << ",\n";
+        }
         first = false;
 
         std::string stageName;
@@ -179,10 +186,10 @@ bool ShaderCache::saveManifest() {
         }
 
         file << "    {\n";
-        file << "      \"sourcePath\": \"" << entry.sourcePath << "\",\n";
-        file << "      \"sourceHash\": \"" << ShaderHash::toHexString(entry.sourceHash) << "\",\n";
-        file << "      \"spvFile\": \"" << entry.spvFileName << "\",\n";
-        file << "      \"stage\": \"" << stageName << "\"\n";
+        file << R"(      "sourcePath": ")" << entry.sourcePath << "\",\n";
+        file << R"(      "sourceHash": ")" << ShaderHash::toHexString(entry.sourceHash) << "\",\n";
+        file << R"(      "spvFile": ")" << entry.spvFileName << "\",\n";
+        file << R"(      "stage": ")" << stageName << "\"\n";
         file << "    }";
     }
 
@@ -293,6 +300,7 @@ std::vector<std::string> ShaderCache::hotReload() {
 
     // Copy keys since we may modify the map
     std::vector<std::string> paths;
+    paths.reserve(m_entries.size());
     for (const auto& [path, entry] : m_entries) {
         paths.push_back(path);
     }

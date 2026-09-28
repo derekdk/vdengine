@@ -21,15 +21,20 @@ static EShLanguage toGlslangStage(const std::string& extension) {
 
     if (ext == "vert") {
         return EShLangVertex;
-    } else if (ext == "frag") {
+    }
+    if (ext == "frag") {
         return EShLangFragment;
-    } else if (ext == "comp") {
+    }
+    if (ext == "comp") {
         return EShLangCompute;
-    } else if (ext == "geom") {
+    }
+    if (ext == "geom") {
         return EShLangGeometry;
-    } else if (ext == "tesc") {
+    }
+    if (ext == "tesc") {
         return EShLangTessControl;
-    } else if (ext == "tese") {
+    }
+    if (ext == "tese") {
         return EShLangTessEvaluation;
     }
     return EShLangVertex;  // Default to vertex shader

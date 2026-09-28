@@ -42,7 +42,7 @@ class AnimatedSpriteEntity : public SpriteEntity {
     /**
      * @brief Get the active SpriteSheet.
      */
-    std::shared_ptr<SpriteSheet> getSpriteSheet() const { return m_spriteSheet; }
+    [[nodiscard]] std::shared_ptr<SpriteSheet> getSpriteSheet() const { return m_spriteSheet; }
 
     /**
      * @brief Add or replace a named animation clip.
@@ -58,13 +58,13 @@ class AnimatedSpriteEntity : public SpriteEntity {
     /**
      * @brief Check whether a named animation exists.
      */
-    bool hasAnimation(const std::string& name) const;
+    [[nodiscard]] bool hasAnimation(const std::string& name) const;
 
     /**
      * @brief Get a named animation clip.
      * @throws std::out_of_range if the animation does not exist.
      */
-    const SpriteAnimation& getAnimation(const std::string& name) const;
+    [[nodiscard]] const SpriteAnimation& getAnimation(const std::string& name) const;
 
     /**
      * @brief Start or resume playback of a named animation.
@@ -103,34 +103,34 @@ class AnimatedSpriteEntity : public SpriteEntity {
     /**
      * @brief Get playback speed multiplier.
      */
-    float getSpeed() const { return m_speed; }
+    [[nodiscard]] float getSpeed() const { return m_speed; }
 
     /**
      * @brief Check whether playback is currently advancing.
      */
-    bool isPlaying() const { return m_isPlaying; }
+    [[nodiscard]] bool isPlaying() const { return m_isPlaying; }
 
     /**
      * @brief Check whether playback is paused.
      */
-    bool isPaused() const { return m_isPaused; }
+    [[nodiscard]] bool isPaused() const { return m_isPaused; }
 
     /**
      * @brief Check whether the current non-looping animation finished naturally.
      *
      * Returns false after stop() because stop() resets playback state.
      */
-    bool isAnimationFinished() const { return m_finished; }
+    [[nodiscard]] bool isAnimationFinished() const { return m_finished; }
 
     /**
      * @brief Get the active animation name.
      */
-    const std::string& getCurrentAnimation() const { return m_currentAnimationName; }
+    [[nodiscard]] const std::string& getCurrentAnimation() const { return m_currentAnimationName; }
 
     /**
      * @brief Get the active frame index within the current animation clip.
      */
-    int getCurrentFrame() const { return m_currentFrameIndex; }
+    [[nodiscard]] int getCurrentFrame() const { return m_currentFrameIndex; }
 
     /**
      * @brief Register a callback for when a specific frame becomes active.
@@ -172,22 +172,26 @@ class AnimatedSpriteEntity : public SpriteEntity {
     /**
      * @brief Check whether a transition blend window is active.
      */
-    bool hasActiveBlend() const { return m_activeBlend.active; }
+    [[nodiscard]] bool hasActiveBlend() const { return m_activeBlend.active; }
 
     /**
      * @brief Get current blend progress in the range 0..1.
      */
-    float getBlendProgress() const { return m_activeBlend.progress; }
+    [[nodiscard]] float getBlendProgress() const { return m_activeBlend.progress; }
 
     /**
      * @brief Get the source state for the active blend window.
      */
-    const std::string& getBlendSourceAnimation() const { return m_activeBlend.fromAnimation; }
+    [[nodiscard]] const std::string& getBlendSourceAnimation() const {
+        return m_activeBlend.fromAnimation;
+    }
 
     /**
      * @brief Get the target state for the active blend window.
      */
-    const std::string& getBlendTargetAnimation() const { return m_activeBlend.toAnimation; }
+    [[nodiscard]] const std::string& getBlendTargetAnimation() const {
+        return m_activeBlend.toAnimation;
+    }
 
     void update(float deltaTime) override;
 
@@ -218,7 +222,7 @@ class AnimatedSpriteEntity : public SpriteEntity {
         bool active = false;
     };
 
-    const SpriteAnimation* currentAnimation() const;
+    [[nodiscard]] const SpriteAnimation* currentAnimation() const;
     void resetPlayback();
     void advanceFrame();
     void fireFrameCallbacks(const std::string& animName, int frameIndex);

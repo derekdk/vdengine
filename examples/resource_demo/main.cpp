@@ -29,12 +29,15 @@ class ResourceInputHandler : public vde::examples::BaseExampleInputHandler {
         // Call base class first for ESC and F keys
         BaseExampleInputHandler::onKeyPress(key);
 
-        if (key == vde::KEY_SPACE)
+        if (key == vde::KEY_SPACE) {
             m_spacePressed = true;
-        if (key == vde::KEY_R)
+        }
+        if (key == vde::KEY_R) {
             m_reload = true;
-        if (key == vde::KEY_C)
+        }
+        if (key == vde::KEY_C) {
             m_clear = true;
+        }
     }
 
     bool isSpacePressed() {
@@ -76,22 +79,24 @@ class StatDisplay : public vde::Entity {
         }
     }
 
-    const std::string& getStatsText() const { return m_statsText; }
+    [[nodiscard]] const std::string& getStatsText() const { return m_statsText; }
 
   private:
     void updateStats() {
         std::ostringstream oss;
-        oss << "=== Resource Manager Stats ===" << std::endl;
-        oss << "Cached Resources: " << m_resourceManager->getCachedCount() << std::endl;
-        oss << "Memory Usage: " << formatBytes(m_resourceManager->getMemoryUsage()) << std::endl;
+        oss << "=== Resource Manager Stats ===" << '\n';
+        oss << "Cached Resources: " << m_resourceManager->getCachedCount() << '\n';
+        oss << "Memory Usage: " << formatBytes(m_resourceManager->getMemoryUsage()) << '\n';
         m_statsText = oss.str();
     }
 
-    std::string formatBytes(size_t bytes) const {
-        if (bytes < 1024)
+    [[nodiscard]] std::string formatBytes(size_t bytes) const {
+        if (bytes < 1024) {
             return std::to_string(bytes) + " B";
-        if (bytes < 1024 * 1024)
+        }
+        if (bytes < 1024 * 1024) {
             return std::to_string(bytes / 1024) + " KB";
+        }
         return std::to_string(bytes / (1024 * 1024)) + " MB";
     }
 
@@ -114,7 +119,7 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         // Get resource manager from game
         auto* game = getGame();
         if (!game) {
-            std::cerr << "ERROR: No game instance!" << std::endl;
+            std::cerr << "ERROR: No game instance!" << '\n';
             return;
         }
 
@@ -136,8 +141,8 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         camera->setPosition(0.0f, 0.0f);
         setCamera(std::move(camera));
 
-        std::cout << "\n=== Resource Loading Demo ===" << std::endl;
-        std::cout << "Loading 'red_texture' for the first time..." << std::endl;
+        std::cout << "\n=== Resource Loading Demo ===" << '\n';
+        std::cout << "Loading 'red_texture' for the first time..." << '\n';
         demonstrateResourceCaching();
     }
 
@@ -146,24 +151,25 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::update(deltaTime);
 
         auto* input = dynamic_cast<ResourceInputHandler*>(getInputHandler());
-        if (!input)
+        if (!input) {
             return;
+        }
 
         // Space: Toggle animation
         if (input->isSpacePressed()) {
             m_animating = !m_animating;
-            std::cout << "Animation: " << (m_animating ? "ON" : "OFF") << std::endl;
+            std::cout << "Animation: " << (m_animating ? "ON" : "OFF") << '\n';
         }
 
         // R: Reload demonstration
         if (input->isReloadPressed()) {
-            std::cout << "\n=== Re-loading Resources ===" << std::endl;
+            std::cout << "\n=== Re-loading Resources ===" << '\n';
             demonstrateResourceCaching();
         }
 
         // C: Clear cache and recreate
         if (input->isClearPressed()) {
-            std::cout << "\n=== Clearing Cache ===" << std::endl;
+            std::cout << "\n=== Clearing Cache ===" << '\n';
             clearAndRecreate();
         }
 
@@ -186,22 +192,22 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
     }
 
   protected:
-    std::string getExampleName() const override { return "Resource Management"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Resource Management"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {"ResourceManager with automatic caching", "Texture two-phase loading (CPU → GPU)",
                 "Automatic resource deduplication",       "Weak pointer memory management",
                 "Resource statistics and monitoring",     "Shared textures across entities"};
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {"4x3 grid of colored squares (sprites)",
                 "Different colors: Red, Green, Blue, Yellow",
                 "Same colors share the same texture instance",
                 "Resource stats printed to console every 2 seconds"};
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {"SPACE - Toggle sprite animation", "R - Reload resources (demonstrates caching)",
                 "C - Clear cache and recreate", "ESC - Exit early", "F - Report test failure"};
     }
@@ -269,8 +275,8 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         m_blueTexture->uploadToGPU(context);
         m_yellowTexture->uploadToGPU(context);
 
-        std::cout << "Created 4 demo textures (16x16 each)" << std::endl;
-        std::cout << "Added to ResourceManager cache" << std::endl;
+        std::cout << "Created 4 demo textures (16x16 each)" << '\n';
+        std::cout << "Added to ResourceManager cache" << '\n';
     }
 
     void createSpriteGrid() {
@@ -301,8 +307,8 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
             }
         }
 
-        std::cout << "Created " << m_sprites.size() << " sprites in a 4x3 grid" << std::endl;
-        std::cout << "Each texture is shared by 3 sprites" << std::endl;
+        std::cout << "Created " << m_sprites.size() << " sprites in a 4x3 grid" << '\n';
+        std::cout << "Each texture is shared by 3 sprites" << '\n';
     }
 
     void demonstrateResourceCaching() {
@@ -311,12 +317,12 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         auto red2 = m_resourceManager->get<vde::Texture>("red_texture");
 
         bool same = (red1 == red2);
-        std::cout << "First load:  " << red1.get() << std::endl;
-        std::cout << "Second load: " << red2.get() << std::endl;
-        std::cout << "Same instance? " << (same ? "YES ✓" : "NO ✗") << std::endl;
+        std::cout << "First load:  " << red1.get() << '\n';
+        std::cout << "Second load: " << red2.get() << '\n';
+        std::cout << "Same instance? " << (same ? "YES ✓" : "NO ✗") << '\n';
 
         if (!same) {
-            std::cout << "ERROR: Resource deduplication failed!" << std::endl;
+            std::cout << "ERROR: Resource deduplication failed!" << '\n';
         }
     }
 
@@ -331,8 +337,8 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         m_resourceManager->clear();
         size_t countAfter = m_resourceManager->getCachedCount();
 
-        std::cout << "Cached before clear: " << countBefore << std::endl;
-        std::cout << "Cached after clear:  " << countAfter << std::endl;
+        std::cout << "Cached before clear: " << countBefore << '\n';
+        std::cout << "Cached after clear:  " << countAfter << '\n';
 
         // Re-add textures
         m_resourceManager->add<vde::Texture>("red_texture", m_redTexture);
@@ -340,8 +346,8 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
         m_resourceManager->add<vde::Texture>("blue_texture", m_blueTexture);
         m_resourceManager->add<vde::Texture>("yellow_texture", m_yellowTexture);
 
-        std::cout << "Re-added textures to cache" << std::endl;
-        std::cout << "Cached now: " << m_resourceManager->getCachedCount() << std::endl;
+        std::cout << "Re-added textures to cache" << '\n';
+        std::cout << "Cached now: " << m_resourceManager->getCachedCount() << '\n';
     }
 
     void animateSprites(float deltaTime) {
@@ -349,8 +355,9 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
 
         for (size_t i = 0; i < m_sprites.size(); ++i) {
             auto* sprite = m_sprites[i];
-            if (!sprite)
+            if (!sprite) {
                 continue;
+            }
 
             // Gentle rotation
             float phase = static_cast<float>(i) * 0.3f;
@@ -365,21 +372,22 @@ class ResourceDemoScene : public vde::examples::BaseExampleScene {
     }
 
     void printResourceStats() {
-        if (!m_statDisplay)
+        if (!m_statDisplay) {
             return;
+        }
 
         std::cout << "\n" << m_statDisplay->getStatsText();
 
         // Also print which textures are cached
-        std::cout << "Textures in cache:" << std::endl;
+        std::cout << "Textures in cache:" << '\n';
         std::cout << "  red_texture:    " << (m_resourceManager->has("red_texture") ? "✓" : "✗")
-                  << std::endl;
+                  << '\n';
         std::cout << "  green_texture:  " << (m_resourceManager->has("green_texture") ? "✓" : "✗")
-                  << std::endl;
+                  << '\n';
         std::cout << "  blue_texture:   " << (m_resourceManager->has("blue_texture") ? "✓" : "✗")
-                  << std::endl;
+                  << '\n';
         std::cout << "  yellow_texture: " << (m_resourceManager->has("yellow_texture") ? "✓" : "✗")
-                  << std::endl;
+                  << '\n';
     }
 
     // Resource manager reference
@@ -415,6 +423,7 @@ class ResourceDemoGame
 /**
  * @brief Main entry point.
  */
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     ResourceDemoGame demo;
     return vde::examples::runExample(demo, "VDE Resource Management Demo", 1280, 720, argc, argv);

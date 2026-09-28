@@ -97,8 +97,9 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
         BaseExampleScene::drawDebugUI();
 
         auto* game = getGame();
-        if (!game)
+        if (!game) {
             return;
+        }
 
         ImGui::SetNextWindowPos(ImVec2(10, 160), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
@@ -141,9 +142,9 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
 #endif
 
   protected:
-    std::string getExampleName() const override { return "Color Emoji Rendering"; }
+    [[nodiscard]] std::string getExampleName() const override { return "Color Emoji Rendering"; }
 
-    std::vector<std::string> getFeatures() const override {
+    [[nodiscard]] std::vector<std::string> getFeatures() const override {
         return {
             "Color emoji loaded from system font (COLR/CPAL)",
             "Engine TextRenderer compositing emoji inline with TrueType text",
@@ -152,7 +153,7 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getExpectedVisuals() const override {
+    [[nodiscard]] std::vector<std::string> getExpectedVisuals() const override {
         return {
             "Engine text labels with inline color emoji on the left",
             "ImGui window with color emoji text on the right",
@@ -160,7 +161,7 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
         };
     }
 
-    std::vector<std::string> getControls() const override {
+    [[nodiscard]] std::vector<std::string> getControls() const override {
         return {
             "TAB  - Cycle display page",
         };
@@ -168,8 +169,9 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
 
   private:
     void buildScene(vde::VulkanContext* ctx) {
-        if (!ctx || !m_ttfFont || !m_ttfFont->isLoaded())
+        if (!ctx || !m_ttfFont || !m_ttfFont->isLoaded()) {
             return;
+        }
 
         const vde::TextStyle whiteStyle = {.color = vde::Color::white(), .pixelScale = 1};
 
@@ -213,6 +215,8 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
             addEmojiLabel(ctx, "Pizza \xF0\x9F\x8D\x95 Burger \xF0\x9F\x8D\x94", whiteStyle, 0.0f,
                           yPos);
             break;
+        default:
+            break;
         }
     }
 
@@ -229,8 +233,9 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
 
     void addTextLabel(vde::VulkanContext* ctx, const std::string& text, const vde::TextStyle& style,
                       float x, float y) {
-        if (!m_ttfFont || !m_ttfFont->isLoaded())
+        if (!m_ttfFont || !m_ttfFont->isLoaded()) {
             return;
+        }
         auto tex = vde::TextRenderer::createTexture(ctx, text, *m_ttfFont, style);
         auto entity = addEntity<vde::SpriteEntity>();
         entity->setTexture(tex);
@@ -241,8 +246,9 @@ class EmojiDemoScene : public vde::examples::BaseExampleScene {
 
     void addEmojiLabel(vde::VulkanContext* ctx, const std::string& utf8Text,
                        const vde::TextStyle& style, float x, float y) {
-        if (!m_ttfFont || !m_ttfFont->isLoaded())
+        if (!m_ttfFont || !m_ttfFont->isLoaded()) {
             return;
+        }
         auto tex =
             vde::TextRenderer::createTexture(ctx, utf8Text, *m_ttfFont, m_emojiFont.get(), style);
         auto entity = addEntity<vde::SpriteEntity>();
@@ -271,6 +277,7 @@ class EmojiDemoGame : public vde::examples::BaseExampleGame<EmojiDemoInputHandle
 // Main
 // ============================================================================
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     EmojiDemoGame game;
     return vde::examples::runExample(game, "Emoji Demo", 1280, 720, argc, argv);

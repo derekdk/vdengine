@@ -81,7 +81,7 @@ class ShaderCompiler {
      * @brief Get last error message
      * @return The most recent error message
      */
-    const std::string& getLastError() const { return m_lastError; }
+    [[nodiscard]] const std::string& getLastError() const { return m_lastError; }
 
     /**
      * @brief Set optimization level
@@ -121,8 +121,8 @@ class ShaderCompiler {
     int m_spvMajor = 1;
     int m_spvMinor = 0;
 
-    std::string readFile(const std::string& path) const;
-    std::string getFileExtension(const std::string& path) const;
+    [[nodiscard]] std::string readFile(const std::string& path) const;
+    [[nodiscard]] std::string getFileExtension(const std::string& path) const;
 };
 
 /**

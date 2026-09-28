@@ -65,8 +65,9 @@ std::string ToolPalette::onCanvasMouseDrag(uint32_t /*canvasId*/, int pixelX, in
 }
 
 std::string ToolPalette::onCanvasMouseUp(uint32_t /*canvasId*/, int pixelX, int pixelY) {
-    if (!m_state.drawingShape)
+    if (!m_state.drawingShape) {
         return "";
+    }
 
     m_state.drawingShape = false;
     std::string hexColor = colorToHex(m_state.color);
@@ -169,7 +170,7 @@ std::string ToolPalette::toolToString(EditorTool tool) {
 
 bool ToolPalette::stringToTool(const std::string& name, EditorTool& outTool) {
     std::string lower = name;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    std::ranges::transform(lower, lower.begin(), ::tolower);
 
     if (lower == "brush") {
         outTool = EditorTool::Brush;

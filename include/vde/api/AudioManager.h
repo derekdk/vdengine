@@ -51,7 +51,7 @@ class AudioManager {
     /**
      * @brief Check if audio system is initialized.
      */
-    bool isInitialized() const { return m_initialized; }
+    [[nodiscard]] bool isInitialized() const { return m_initialized; }
 
     /**
      * @brief Update audio system (process streaming, update 3D positions, etc).
@@ -63,13 +63,13 @@ class AudioManager {
     void setMasterVolume(float volume);
     void setMusicVolume(float volume);
     void setSFXVolume(float volume);
-    float getMasterVolume() const { return m_masterVolume; }
-    float getMusicVolume() const { return m_musicVolume; }
-    float getSFXVolume() const { return m_sfxVolume; }
+    [[nodiscard]] float getMasterVolume() const { return m_masterVolume; }
+    [[nodiscard]] float getMusicVolume() const { return m_musicVolume; }
+    [[nodiscard]] float getSFXVolume() const { return m_sfxVolume; }
 
     // Mute controls
     void setMuted(bool muted);
-    bool isMuted() const { return m_muted; }
+    [[nodiscard]] bool isMuted() const { return m_muted; }
 
     /**
      * @brief Play a sound effect (one-shot).
@@ -128,7 +128,7 @@ class AudioManager {
     /**
      * @brief Check if a sound is playing.
      */
-    bool isPlaying(uint32_t soundId) const;
+    [[nodiscard]] bool isPlaying(uint32_t soundId) const;
 
     /**
      * @brief Set sound position (for 3D audio).
