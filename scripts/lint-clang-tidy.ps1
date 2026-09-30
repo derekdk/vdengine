@@ -71,11 +71,17 @@ if ($Help) {
     Show-Help
 }
 
+if ($ChunkSize -le 0 -and ($Chunk -gt 0 -or $ListChunks)) {
+    Write-Host "ERROR: -Chunk and -ListChunks require -ChunkSize." -ForegroundColor Red
+    exit 1
+}
+
 $RepoRoot = Get-VdeLintRepoRoot -ScriptRoot $PSScriptRoot
 Set-Location $RepoRoot
 
+# -ListChunks only needs the compile database, so clang-tidy presence is checked later.
 $clangTidy = Get-Command clang-tidy -ErrorAction SilentlyContinue
-if (-not $clangTidy) {
+if (-not $clangTidy -and -not $ListChunks) {
     Write-Host "SKIPPED: clang-tidy (not found in PATH)" -ForegroundColor DarkGray
     exit 0
 }
@@ -268,20 +274,30 @@ if ($Path.Count -gt 0) {
         $scopeRelative.TrimEnd('\')
     })
 
-    $targets = @(foreach ($target in $targets) {
-        $relative = Get-VdeRelativePath -RepoRoot $RepoRoot -Path $target
-        foreach ($prefix in $scopePrefixes) {
-            if ($prefix -eq '' -or
-                $relative.Equals($prefix, [System.StringComparison]::OrdinalIgnoreCase) -or
-                $relative.StartsWith($prefix + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $target
-                break
+    $selectScoped = {
+        param([string[]]$Candidates)
+        @(foreach ($candidate in $Candidates) {
+            $relative = Get-VdeRelativePath -RepoRoot $RepoRoot -Path $candidate
+            foreach ($prefix in $scopePrefixes) {
+                if ($prefix -eq '' -or
+                    $relative.Equals($prefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $relative.StartsWith($prefix + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $candidate
+                    break
+                }
             }
-        }
-    })
+        })
+    }
+
+    $targets = @(& $selectScoped -Candidates $targets)
 
     if ($targets.Count -eq 0) {
-        Write-Host "ERROR: no translation units in the compile database match -Path $($Path -join ', ')." -ForegroundColor Red
+        $pathLabel = $Path -join ', '
+        if ($Files.Count -gt 0 -and (& $selectScoped -Candidates $userTranslationUnits).Count -gt 0) {
+            Write-Host "SKIPPED: clang-tidy (no translation units selected by -Files are under -Path $pathLabel)" -ForegroundColor DarkGray
+            exit 0
+        }
+        Write-Host "ERROR: no translation units in the compile database match -Path $pathLabel." -ForegroundColor Red
         exit 1
     }
 }
@@ -319,9 +335,11 @@ if ($ChunkSize -gt 0) {
     $end = [Math]::Min($start + $ChunkSize, $selectedCount) - 1
     $targets = @($targets[$start..$end])
     $chunkLabel = " (chunk $Chunk/$chunkTotal of $selectedCount selected)"
-} elseif ($Chunk -gt 0 -or $ListChunks) {
-    Write-Host "ERROR: -Chunk and -ListChunks require -ChunkSize." -ForegroundColor Red
-    exit 1
+}
+
+if (-not $clangTidy) {
+    Write-Host "SKIPPED: clang-tidy (not found in PATH)" -ForegroundColor DarkGray
+    exit 0
 }
 
 Write-Host "Using compile database: $compileDb" -ForegroundColor Cyan
@@ -386,7 +404,12 @@ foreach ($target in $targets) {
 
 Write-Host ("clang-tidy finished in {0:N1}s{1}." -f $runTimer.Elapsed.TotalSeconds, $chunkLabel) -ForegroundColor Cyan
 if ($chunkTotal -gt 0 -and $Chunk -lt $chunkTotal) {
-    Write-Host "Next chunk: -ChunkSize $ChunkSize -Chunk $($Chunk + 1)" -ForegroundColor Cyan
+    $nextArgs = @()
+    if ($Files.Count -gt 0) { $nextArgs += "-Files $($Files -join ',')" }
+    if ($Path.Count -gt 0) { $nextArgs += "-Path $($Path -join ',')" }
+    if ($Generator -ne 'Auto') { $nextArgs += "-Generator $Generator" }
+    $nextArgs += "-ChunkSize $ChunkSize -Chunk $($Chunk + 1)"
+    Write-Host "Next chunk: $($nextArgs -join ' ')" -ForegroundColor Cyan
 }
 
 if ($hasFindings) {
