@@ -4,7 +4,7 @@ wait startup
 press SPACE
 wait_frames 2
 assert scene "main" state.jumping == 1
-wait 2800
+wait 5000
 assert scene "main" state.game_over == 1
 press SPACE
 wait_frames 2

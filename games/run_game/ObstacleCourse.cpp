@@ -28,7 +28,7 @@ ObstacleCourse::ObstacleCourse(vde::Scene& scene) {
 void ObstacleCourse::update(float deltaTime, float runSpeed) {
     for (auto& obstacle : m_obstacles) {
         obstacle.x -= runSpeed * deltaTime;
-        if (obstacle.x + obstacle.width * 0.5f < -12.5f) {
+        while (obstacle.x + obstacle.width * 0.5f < -12.5f) {
             obstacle.x += kWrapDistance;
         }
         obstacle.sprite->setPosition(obstacle.x, kGroundY + obstacle.height * 0.5f, 0.52f);

@@ -26,6 +26,8 @@ void RunGameScene::onEnter() {
 
 void RunGameScene::update(float deltaTime) {
     BaseGameScene::update(deltaTime);
+    // Bounds obstacle travel per frame so collisions can't be stepped over.
+    deltaTime = std::min(deltaTime, kMaxStep);
 
     auto* controls = dynamic_cast<RunGameInput*>(getInputHandler());
     if (!controls || !m_background || !m_runner || !m_obstacles) {

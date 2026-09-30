@@ -34,6 +34,8 @@ class RunGameScene : public vde::games::BaseGameScene {
     void resetGame();
     void updateHud();
 
+    static constexpr float kMaxStep = 1.0f / 30.0f;
+
     std::unique_ptr<ParallaxBackground> m_background;
     std::unique_ptr<RunnerCharacter> m_runner;
     std::unique_ptr<ObstacleCourse> m_obstacles;
