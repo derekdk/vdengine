@@ -427,11 +427,15 @@ Run the clang-tidy stage directly.
 
 **Syntax:**
 ```powershell
-.\scripts\lint-clang-tidy.ps1 [-Files <paths>] [-Generator Auto|Ninja|MSBuild] [-Help]
+.\scripts\lint-clang-tidy.ps1 [-Files <paths>] [-Path <paths>] [-ChunkSize <n>] [-Chunk <k>] [-ListChunks] [-Generator Auto|Ninja|MSBuild] [-Help]
 ```
 
 **Parameters:**
 - `-Files <paths>` - Optional explicit source/header file list
+- `-Path <paths>` - Only lint translation units under these repo-relative directories/files (e.g. `src`, `tests`, `examples\sprite_demo`)
+- `-ChunkSize <n>` - Split the selected translation units into chunks of `n` files
+- `-Chunk <k>` - Run only chunk `k` (1-based); requires `-ChunkSize`
+- `-ListChunks` - Print the chunk layout and exit without running clang-tidy
 - `-Generator` - Prefer compile database from `Auto` (default), `Ninja`, or `MSBuild`
 - `-Help` - Show detailed help
 
@@ -442,6 +446,11 @@ Run the clang-tidy stage directly.
 
 # Run clang-tidy for one file / nearby translation units
 .\scripts\lint-clang-tidy.ps1 -Files src\BufferUtils.cpp
+
+# Incremental clean-up: lint one area, or one chunk at a time
+.\scripts\lint-clang-tidy.ps1 -Path src,tests
+.\scripts\lint-clang-tidy.ps1 -Path src -ChunkSize 10 -ListChunks
+.\scripts\lint-clang-tidy.ps1 -Path src -ChunkSize 10 -Chunk 1
 ```
 
 ### install-hooks.ps1

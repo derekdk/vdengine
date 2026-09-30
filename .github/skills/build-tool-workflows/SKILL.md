@@ -228,6 +228,9 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 
 **lint-clang-tidy.ps1**
 - `-Files` - Explicit source/header file list
+- `-Path` - Only lint translation units under these repo-relative directories/files
+- `-ChunkSize` / `-Chunk` - Run chunk `k` (1-based) of fixed-size chunks of the selected translation units
+- `-ListChunks` - Print the chunk layout and exit
 - `-Generator` - Auto (default), Ninja, or MSBuild compile database preference
 - `-Help` - Show detailed help
 

@@ -59,6 +59,22 @@ Runs four linters in order. Each linter is **skipped silently** if its tool is n
 .\scripts\lint-clang-tidy.ps1 -Files src\BufferUtils.cpp
 ```
 
+### Incremental clang-tidy clean-up
+
+A full clang-tidy pass is slow. To find and fix issues in manageable pieces, narrow the scope with `-Path` and/or split into deterministic chunks:
+
+```powershell
+# One area at a time
+.\scripts\lint-clang-tidy.ps1 -Path src
+.\scripts\lint-clang-tidy.ps1 -Path examples\sprite_demo,tests
+
+# Preview the chunk layout, then run one chunk, fix, re-run the same chunk, move on
+.\scripts\lint-clang-tidy.ps1 -Path src -ChunkSize 10 -ListChunks
+.\scripts\lint-clang-tidy.ps1 -Path src -ChunkSize 10 -Chunk 1
+```
+
+Chunks come from the sorted target list, so the same arguments select the same files each run. Each TU prints `[i/n] ok|FAILURE <file> (<seconds>)` as it finishes, and the run ends with a list of failing TUs plus the next `-Chunk` to run.
+
 ---
 
 ## Tool Discovery — Required Setup

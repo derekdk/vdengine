@@ -39,6 +39,7 @@ Write-Cmd '.\scripts\lint.ps1 -Fix' 'Auto-fix formatting issues'
 Write-Cmd '.\scripts\lint-shaders.ps1' 'Run shader validation only'
 Write-Cmd '.\scripts\lint-cppcheck.ps1' 'Run cppcheck only'
 Write-Cmd '.\scripts\lint-clang-tidy.ps1' 'Run clang-tidy only'
+Write-Cmd '.\scripts\lint-clang-tidy.ps1 -Path src -ChunkSize 10 -Chunk 1' 'Run clang-tidy on one chunk of an area (use -ListChunks to preview)'
 Write-Cmd '.\scripts\format.ps1' 'Format all C++ files with clang-format'
 Write-Cmd '.\scripts\format.ps1 -Check' 'Check formatting without modifying files'
 
