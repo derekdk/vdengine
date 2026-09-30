@@ -461,7 +461,8 @@ class Scene {
      * @param key Lowercase key following the `state.` prefix.
      * @return The value, or std::nullopt when the scene does not expose @p key.
      */
-    virtual std::optional<double> getScriptStateValue(const std::string& /*key*/) const {
+    [[nodiscard]] virtual std::optional<double>
+    getScriptStateValue(const std::string& /*key*/) const {
         return std::nullopt;
     }
 
