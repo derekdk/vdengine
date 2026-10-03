@@ -1,0 +1,35 @@
+# Signal Break: movement, physics, combat, pause, camera, and clean restart.
+wait startup
+wait 300
+assert scene "main" state.grounded == 1
+screenshot render_verify_output/signal_break_start.png
+wait 500
+keydown J
+keydown D
+wait 700
+press SPACE
+wait 250
+assert scene "main" state.player_y > 1.5
+assert scene "main" state.jumps == 1
+wait 900
+keyup D
+keyup J
+assert scene "main" state.player_x > 12
+assert scene "main" state.camera_x > 15
+assert scene "main" state.shots > 5
+assert scene "main" state.enemy_shots > 0
+press P
+wait 400
+assert scene "main" state.paused == 1
+press P
+wait 400
+assert scene "main" state.paused == 0
+screenshot render_verify_output/signal_break_combat.png
+wait 500
+press R
+wait 400
+assert scene "main" state.player_x == 3
+assert scene "main" state.health == 6
+assert scene "main" state.shots == 0
+assert scene "main" state.phase == 0
+exit

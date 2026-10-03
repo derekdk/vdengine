@@ -1,0 +1,5 @@
+[smoke]
+scripts = ["smoke_signal_break.vdescript"]
+source_paths = ["."]
+priority = 2
+sections = ["entity", "input", "physics", "text"]

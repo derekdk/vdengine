@@ -55,6 +55,10 @@ set(VDE_TEST_SOURCES
     # Input / KeyStateTracker tests
     InputActionMap_test.cpp
     LevelBuilderInput_test.cpp
+    SignalBreak_test.cpp
+    ${CMAKE_SOURCE_DIR}/games/signal_break/Input.cpp
+    ${CMAKE_SOURCE_DIR}/games/signal_break/Level.cpp
+    ${CMAKE_SOURCE_DIR}/games/signal_break/Gameplay.cpp
     KeyStateTracker_test.cpp
     # Input script tests
     InputScript_test.cpp
