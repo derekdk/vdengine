@@ -16,9 +16,15 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <type_traits>
 #include <vector>
 
 #include <stb_truetype.h>
+
+#ifdef __APPLE__
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
+#endif
 
 namespace vde {
 
@@ -633,8 +639,8 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
     m_emojiSize = 0;
     m_lastError.clear();
 
-    if (sizePixels <= 0) {
-        m_lastError = "Emoji size must be greater than zero";
+    if (sizePixels <= 0 || sizePixels > 16384) {
+        m_lastError = "Emoji size must be between 1 and 16384 pixels";
         return false;
     }
 
@@ -670,8 +676,12 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
     TableEntry cpalEntry = findTable(fontData.data(), fontData.size(), kTagCPAL);
 
     if (colrEntry.length == 0 || cpalEntry.length == 0) {
+#ifdef __APPLE__
+        return loadAppleBitmapFont(ctx, fontData, sizePixels);
+#else
         m_lastError = "Font does not contain COLR/CPAL color emoji tables: " + path;
         return false;
+#endif
     }
 
     // Parse COLR and CPAL
@@ -820,6 +830,145 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
               << "px from " << path << " (atlas " << atlasW << "x" << atlasH << ")\n";
     return true;
 }
+
+#ifdef __APPLE__
+bool EmojiFont::loadAppleBitmapFont(VulkanContext* ctx, const std::vector<uint8_t>& fontData,
+                                    int sizePixels) {
+    std::unique_ptr<std::remove_pointer_t<CGDataProviderRef>, decltype(&CGDataProviderRelease)>
+        provider(CGDataProviderCreateWithData(nullptr, fontData.data(), fontData.size(), nullptr),
+                 CGDataProviderRelease);
+    std::unique_ptr<std::remove_pointer_t<CGFontRef>, decltype(&CGFontRelease)> graphicsFont(
+        provider ? CGFontCreateWithDataProvider(provider.get()) : nullptr, CGFontRelease);
+    std::unique_ptr<std::remove_pointer_t<CTFontRef>, decltype(&CFRelease)> font(
+        graphicsFont
+            ? CTFontCreateWithGraphicsFont(graphicsFont.get(), sizePixels, nullptr, nullptr)
+            : nullptr,
+        CFRelease);
+    std::unique_ptr<std::remove_pointer_t<CFDataRef>, decltype(&CFRelease)> bitmapTable(
+        font ? CTFontCopyTable(font.get(), 0x73626978, kCTFontTableOptionNoOptions) : nullptr,
+        CFRelease);
+    if (!bitmapTable) {
+        m_lastError = "Font does not contain supported COLR/CPAL or Apple sbix emoji tables";
+        return false;
+    }
+
+    struct PendingGlyph {
+        char32_t codepoint;
+        CGGlyph glyph;
+    };
+    std::vector<PendingGlyph> pending;
+    for (const auto& range : kEmojiRanges) {
+        for (char32_t cp = range.first; cp <= range.last; ++cp) {
+            UniChar characters[2] = {static_cast<UniChar>(cp), 0};
+            CFIndex length = 1;
+            if (cp > 0xFFFF) {
+                characters[0] = static_cast<UniChar>(0xD800 + ((cp - 0x10000) >> 10));
+                characters[1] = static_cast<UniChar>(0xDC00 + ((cp - 0x10000) & 0x3FF));
+                length = 2;
+            }
+            CGGlyph glyphs[2] = {};
+            CTFontGetGlyphsForCharacters(font.get(), characters, glyphs, length);
+            if (glyphs[0] != 0) {
+                pending.push_back({cp, glyphs[0]});
+            }
+        }
+    }
+    if (pending.empty()) {
+        m_lastError = "Apple bitmap font contains no supported emoji codepoints";
+        return false;
+    }
+
+    const int columns = static_cast<int>(std::ceil(std::sqrt(pending.size())));
+    const int rows = (static_cast<int>(pending.size()) + columns - 1) / columns;
+    if (columns > 16384 / sizePixels || rows > 16384 / sizePixels) {
+        m_lastError = "Apple emoji atlas exceeds maximum dimensions of 16384x16384";
+        return false;
+    }
+    const int atlasWidth = columns * sizePixels;
+    const int atlasHeight = rows * sizePixels;
+    std::vector<uint8_t> pixels(static_cast<size_t>(atlasWidth) * atlasHeight * 4, 0);
+    std::vector<uint8_t> cell(static_cast<size_t>(sizePixels) * sizePixels * 4, 0);
+    std::unique_ptr<std::remove_pointer_t<CGColorSpaceRef>, decltype(&CGColorSpaceRelease)>
+        colorSpace(CGColorSpaceCreateWithName(kCGColorSpaceSRGB), CGColorSpaceRelease);
+    std::unique_ptr<std::remove_pointer_t<CGContextRef>, decltype(&CGContextRelease)> bitmap(
+        colorSpace
+            ? CGBitmapContextCreate(cell.data(), sizePixels, sizePixels, 8,
+                                    static_cast<size_t>(sizePixels) * 4, colorSpace.get(),
+                                    static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
+                                        kCGBitmapByteOrder32Big)
+            : nullptr,
+        CGContextRelease);
+    if (!bitmap) {
+        m_lastError = "Failed to create Apple emoji bitmap context";
+        return false;
+    }
+
+    for (size_t i = 0; i < pending.size(); ++i) {
+        const auto& entry = pending[i];
+        const CGRect bounds = CTFontGetBoundingRectsForGlyphs(
+            font.get(), kCTFontOrientationHorizontal, &entry.glyph, nullptr, 1);
+        if (CGRectIsEmpty(bounds) || CGRectIsInfinite(bounds)) {
+            continue;
+        }
+        const CGFloat scale = std::min(static_cast<CGFloat>(sizePixels) / bounds.size.width,
+                                       static_cast<CGFloat>(sizePixels) / bounds.size.height);
+        CGContextClearRect(bitmap.get(), CGRectMake(0, 0, sizePixels, sizePixels));
+        CGContextSaveGState(bitmap.get());
+        CGContextTranslateCTM(
+            bitmap.get(), (sizePixels - bounds.size.width * scale) / 2 - bounds.origin.x * scale,
+            (sizePixels - bounds.size.height * scale) / 2 - bounds.origin.y * scale);
+        CGContextScaleCTM(bitmap.get(), scale, scale);
+        const CGPoint position = CGPointZero;
+        CTFontDrawGlyphs(font.get(), &entry.glyph, &position, 1, bitmap.get());
+        CGContextRestoreGState(bitmap.get());
+
+        const int cellX = static_cast<int>(i % columns) * sizePixels;
+        const int cellY = static_cast<int>(i / columns) * sizePixels;
+        bool visible = false;
+        for (int y = 0; y < sizePixels; ++y) {
+            for (int x = 0; x < sizePixels; ++x) {
+                // CoreGraphics stores top-down premultiplied pixels; VDE uses straight RGBA.
+                const auto src = (static_cast<size_t>(y) * sizePixels + x) * 4;
+                const auto dst = (static_cast<size_t>(cellY + y) * atlasWidth + cellX + x) * 4;
+                const unsigned int alpha = cell[src + 3];
+                if (alpha == 0) {
+                    continue;
+                }
+                visible = true;
+                for (size_t channel = 0; channel < 3; ++channel) {
+                    pixels[dst + channel] = static_cast<uint8_t>(
+                        std::min(255u, (cell[src + channel] * 255u + alpha / 2) / alpha));
+                }
+                pixels[dst + 3] = static_cast<uint8_t>(alpha);
+            }
+        }
+        if (visible) {
+            m_glyphMap[entry.codepoint] = {
+                sizePixels, sizePixels, 0, 0, static_cast<float>(sizePixels), cellX, cellY};
+            m_availableCodepoints.push_back(entry.codepoint);
+        }
+    }
+    if (m_glyphMap.empty()) {
+        m_lastError = "Failed to render any Apple bitmap emoji";
+        return false;
+    }
+
+    m_atlas = std::make_shared<Texture>();
+    if (!m_atlas->loadFromData(pixels.data(), atlasWidth, atlasHeight) ||
+        (ctx && !m_atlas->uploadToGPU(ctx))) {
+        m_lastError = "Failed to create Apple emoji atlas texture";
+        m_atlas.reset();
+        return false;
+    }
+    m_atlasWidth = atlasWidth;
+    m_atlasHeight = atlasHeight;
+    m_emojiSize = sizePixels;
+    m_loaded = true;
+    std::cout << "EmojiFont: Loaded " << m_glyphMap.size() << " Apple bitmap emoji at "
+              << sizePixels << "px\n";
+    return true;
+}
+#endif
 
 // ============================================================================
 // Glyph lookup

@@ -136,17 +136,23 @@ smoke() {
             sleeper=$!
             wait "$sleeper"
             kill -TERM "$pid" 2>/dev/null
-            sleep 2
+            sleep 2 &
+            sleeper=$!
+            wait "$sleeper"
             kill -KILL "$pid" 2>/dev/null || true
         ) &
         watchdog=$!
+        trap 'kill -KILL "$pid" 2>/dev/null || true; kill "$watchdog" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; wait "$watchdog" 2>/dev/null || true' EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
         status=0
         wait "$pid" || status=$?
         kill "$watchdog" 2>/dev/null || true
         wait "$watchdog" 2>/dev/null || true
+        trap - EXIT INT TERM
         if [ "$status" -ne 0 ] ||
             ! grep -qF '[VDE:InputScript] exit' "$log" ||
-            grep -Eiq 'Validation Error|ASSERT FAILED|(^|[[:space:]])error:|failed to|fatal|exception' "$log"; then
+            grep -Eiq '^Validation layer:.*Validation Error|ASSERT FAILED|(^|[[:space:]])error:|failed to|fatal|exception' "$log"; then
             printf 'FAIL: %s (exit %s; %s)\n' "$name" "$status" "$log"
             tail -n 25 "$log"
             failures=$((failures + 1))

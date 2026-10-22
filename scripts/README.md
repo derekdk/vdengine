@@ -30,6 +30,8 @@ their existing behavior.
 - `setup` installs CMake, Ninja, Git LFS, Vulkan headers/loader, MoltenVK, and
   validation layers. GLFW, GLM, glslang, and other source dependencies continue
   to be fetched by CMake, as on Windows.
+- Native audio links CoreAudio/AudioUnit/AudioToolbox. Apple Color Emoji bitmap
+  fonts use CoreText and CoreGraphics; COLR/CPAL rendering on Windows is unchanged.
 - Homebrew is discovered dynamically, supporting both `/opt/homebrew` on Apple
   Silicon and `/usr/local` on Intel. Use a native terminal/toolchain rather than
   mixing ARM and Rosetta libraries.
@@ -49,6 +51,9 @@ their existing behavior.
   These are quick launch checks, **not** the Windows metadata-driven interaction
   suite or golden-image render verification. The low-level triangle example
   does not support input scripts and is excluded.
+- Known limitation: the existing framebuffer screenshot/readback path triggers
+  swapchain transfer-usage and image-ownership validation errors on MoltenVK.
+  Screenshot-based golden-image verification is not part of this macOS workflow.
 - The build, build-and-test, test, smoke-test, verify, lint, and run-vlauncher
   VS Code tasks have macOS overrides. Other existing tasks remain PowerShell
   utilities and are not part of the native Mac workflow.

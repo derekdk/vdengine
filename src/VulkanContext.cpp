@@ -297,10 +297,14 @@ void VulkanContext::createInstance() {
 // =========================================================================
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanContext::debugCallback(
-    [[maybe_unused]] VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, [[maybe_unused]] void* pUserData) {
-    std::cerr << "Validation layer: " << pCallbackData->pMessage << '\n';
+    std::cerr << "Validation layer: ";
+    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        std::cerr << "ERROR: ";
+    }
+    std::cerr << pCallbackData->pMessage << '\n';
     return VK_FALSE;
 }
 
@@ -500,13 +504,6 @@ void VulkanContext::createLogicalDevice() {
 #endif
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-
-    if constexpr (kEnableValidationLayers) {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
-        createInfo.ppEnabledLayerNames = m_validationLayers.data();
-    } else {
-        createInfo.enabledLayerCount = 0;
-    }
 
     if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device!");
@@ -735,7 +732,9 @@ void VulkanContext::createMainRenderPass() {
     dependency.dstSubpass = 0;
     dependency.srcStageMask =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
+    // Clear/load passes share framebuffers and pipelines, so dependencies must match.
+    dependency.srcAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     dependency.dstStageMask =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask =

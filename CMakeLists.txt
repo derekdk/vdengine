@@ -393,16 +393,20 @@ target_link_libraries(vde PRIVATE
 )
 
 if(APPLE)
-    # miniaudio's CoreAudio backend uses these native frameworks.
+    # Native audio and Apple bitmap emoji rendering.
     find_library(VDE_COREAUDIO_FRAMEWORK CoreAudio REQUIRED)
     find_library(VDE_AUDIOUNIT_FRAMEWORK AudioUnit REQUIRED)
     find_library(VDE_AUDIOTOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
     find_library(VDE_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    find_library(VDE_CORETEXT_FRAMEWORK CoreText REQUIRED)
+    find_library(VDE_COREGRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
     target_link_libraries(vde PRIVATE
         ${VDE_COREAUDIO_FRAMEWORK}
         ${VDE_AUDIOUNIT_FRAMEWORK}
         ${VDE_AUDIOTOOLBOX_FRAMEWORK}
         ${VDE_COREFOUNDATION_FRAMEWORK}
+        ${VDE_CORETEXT_FRAMEWORK}
+        ${VDE_COREGRAPHICS_FRAMEWORK}
     )
 endif()
 

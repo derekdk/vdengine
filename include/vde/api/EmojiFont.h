@@ -13,6 +13,8 @@
  * model. Fonts that rely on unsupported paint formats, blend modes, or other
  * advanced COLR v1 behavior may load partially or render differently from a
  * full COLR v1 renderer.
+ * On macOS, sbix bitmap fonts (including Apple Color Emoji) are rendered
+ * through CoreText and CoreGraphics.
  *
  * Usage:
  * @code
@@ -76,7 +78,7 @@ class EmojiFont {
     /**
      * @brief Load a color emoji font and build the glyph atlas.
      * @param ctx Vulkan context for GPU upload (may be nullptr for CPU-only)
-     * @param path Path to the emoji font file (.ttf/.otf)
+     * @param path Path to the emoji font file (.ttf/.otf, or .ttc on macOS)
      * @param sizePixels Desired emoji render size in pixels
      * @return true if the font was loaded and at least one color emoji was found
      * @note On failure, getLastError() contains a human-readable reason.
@@ -154,6 +156,10 @@ class EmojiFont {
     static std::string findSystemEmojiFont();
 
   private:
+#ifdef __APPLE__
+    bool loadAppleBitmapFont(VulkanContext* ctx, const std::vector<uint8_t>& fontData,
+                             int sizePixels);
+#endif
     bool m_loaded = false;
     int m_emojiSize = 0;
     int m_atlasWidth = 0;
