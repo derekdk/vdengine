@@ -11,6 +11,10 @@ struct LaunchedProcess {
     std::uintptr_t processHandle = 0;
     std::filesystem::path outputPath;
     std::string commandLine;
+#ifdef __APPLE__
+    bool completed = false;
+    uint32_t exitCode = 0;
+#endif
 };
 
 class ProcessLauncher {
@@ -19,7 +23,7 @@ class ProcessLauncher {
     static bool launchWithOutputCapture(const std::filesystem::path& executablePath,
                                         LaunchedProcess& launchedProcess, std::string& error,
                                         const std::vector<std::string>& extraArgs = {});
-    static bool pollCompletion(const LaunchedProcess& launchedProcess, bool& completed,
+    static bool pollCompletion(LaunchedProcess& launchedProcess, bool& completed,
                                uint32_t& exitCode, std::string& error);
     static void release(LaunchedProcess& launchedProcess);
     static bool readOutputFile(const std::filesystem::path& outputPath, std::string& output,

@@ -7,6 +7,7 @@
 #include <vde/api/AnimatedSpriteEntity.h>
 #include <vde/api/SpriteAnimationImport.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -421,8 +422,7 @@ TEST(SpriteAnimationImportTest, ImportAsepriteJsonFileReadsMetadataFromDisk) {
 }
 )json";
 
-    const auto uniqueStamp =
-        std::filesystem::file_time_type::clock::now().time_since_epoch().count();
+    const auto uniqueStamp = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto jsonPath =
         std::filesystem::temp_directory_path() /
         ("vde_sprite_animation_import_test_" + std::to_string(uniqueStamp) + ".json");

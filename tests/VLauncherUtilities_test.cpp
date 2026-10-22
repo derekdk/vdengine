@@ -27,6 +27,12 @@ namespace {
 
 using namespace std::chrono_literals;
 
+#ifdef __APPLE__
+constexpr const char* kExecutableSuffix = "";
+#else
+constexpr const char* kExecutableSuffix = ".exe";
+#endif
+
 std::string makeUniqueSuffix() {
     return std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
 }
@@ -97,9 +103,10 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
     const std::filesystem::path sourceDir = repoRoot / "examples" / "sample";
     const std::filesystem::path gameSourceDir = repoRoot / "games" / "sample_game";
     const std::filesystem::path executablePath =
-        repoRoot / "build_ninja" / "examples" / "vde_sample.exe";
+        repoRoot / "build_ninja" / "examples" / ("vde_sample" + std::string(kExecutableSuffix));
     const std::filesystem::path gameExecutablePath =
-        repoRoot / "build_ninja" / "games" / "sample_game" / "vde_sample_game.exe";
+        repoRoot / "build_ninja" / "games" / "sample_game" /
+        ("vde_sample_game" + std::string(kExecutableSuffix));
 
     std::error_code error;
     std::filesystem::create_directories(sourceDir, error);
@@ -134,6 +141,14 @@ TEST_F(VLauncherUtilitiesTest, ScannerRejectsSmokeScriptPathsFromVdeToml) {
                                               "priority = 2\n");
     writeTextFile(executablePath, "");
     writeTextFile(gameExecutablePath, "");
+#ifdef __APPLE__
+    std::filesystem::permissions(executablePath, std::filesystem::perms::owner_exec,
+                                 std::filesystem::perm_options::add);
+    std::filesystem::permissions(gameExecutablePath, std::filesystem::perms::owner_exec,
+                                 std::filesystem::perm_options::add);
+    writeTextFile(executablePath.parent_path() / "vde_not_executable", "");
+    writeTextFile(executablePath.parent_path() / "vde_not_an_app.stamp", "");
+#endif
 
     vde::tools::ExecutableScanner scanner(repoRoot, std::chrono::seconds(1),
                                           std::chrono::seconds(1));
@@ -263,6 +278,62 @@ TEST_F(VLauncherUtilitiesTest, LaunchWithOutputCapturePreservesExplicitEmptyArgu
     EXPECT_NE(output.find("ARG=[omega]"), std::string::npos) << output;
     EXPECT_NE(launchedProcess.commandLine.find("\"\""), std::string::npos)
         << launchedProcess.commandLine;
+}
+#elif defined(__APPLE__)
+TEST_F(VLauncherUtilitiesTest, LaunchWithOutputCapturePreservesExplicitEmptyArguments) {
+    vde::tools::LaunchedProcess launchedProcess;
+    std::string error;
+    const std::vector<std::string> extraArgs = {
+        "-c",
+        "printf 'ARG=[%s]\\n' \"$@\"; printf 'STDERR\\n' >&2; exit 7",
+        "test",
+        "alpha",
+        "",
+        "spaces and \"quotes\"",
+        "$(not a command); *"};
+    ASSERT_TRUE(vde::tools::ProcessLauncher::launchWithOutputCapture("/bin/sh", launchedProcess,
+                                                                     error, extraArgs))
+        << error;
+
+    bool completed = false;
+    uint32_t exitCode = 0;
+    for (int attempt = 0; attempt < 200 && !completed; ++attempt) {
+        ASSERT_TRUE(vde::tools::ProcessLauncher::pollCompletion(launchedProcess, completed,
+                                                                exitCode, error))
+            << error;
+        if (!completed) {
+            std::this_thread::sleep_for(20ms);
+        }
+    }
+    ASSERT_TRUE(completed);
+    EXPECT_EQ(exitCode, 7u);
+    ASSERT_TRUE(
+        vde::tools::ProcessLauncher::pollCompletion(launchedProcess, completed, exitCode, error))
+        << error;
+    EXPECT_TRUE(completed);
+    EXPECT_EQ(exitCode, 7u);
+    std::string output;
+    ASSERT_TRUE(
+        vde::tools::ProcessLauncher::readOutputFile(launchedProcess.outputPath, output, error))
+        << error;
+    EXPECT_NE(output.find("ARG=[alpha]"), std::string::npos);
+    EXPECT_NE(output.find("ARG=[]"), std::string::npos);
+    EXPECT_NE(output.find("ARG=[spaces and \"quotes\"]"), std::string::npos);
+    EXPECT_NE(output.find("ARG=[$(not a command); *]"), std::string::npos);
+    EXPECT_NE(output.find("STDERR"), std::string::npos);
+    vde::tools::ProcessLauncher::release(launchedProcess);
+    EXPECT_EQ(launchedProcess.processHandle, 0u);
+    std::filesystem::remove(launchedProcess.outputPath);
+}
+
+TEST_F(VLauncherUtilitiesTest, LaunchMissingExecutableReportsFailure) {
+    vde::tools::LaunchedProcess launchedProcess;
+    std::string error;
+    EXPECT_FALSE(vde::tools::ProcessLauncher::launchWithOutputCapture(
+        m_tempRoot / "missing executable", launchedProcess, error));
+    EXPECT_FALSE(error.empty());
+    EXPECT_EQ(launchedProcess.processHandle, 0u);
+    EXPECT_TRUE(launchedProcess.outputPath.empty());
 }
 #else
 TEST_F(VLauncherUtilitiesTest, LaunchWithOutputCapturePreservesExplicitEmptyArguments) {

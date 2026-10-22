@@ -26,7 +26,6 @@ if(MSVC)
     endif()
     set(VDE_WARNING_FLAGS /W4 /WX /FS)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
     if(VDE_TIMING)
         add_compile_options(-ftime-report)
         message(STATUS "VDE: compiler timing enabled (-ftime-report)")
@@ -156,7 +155,9 @@ FetchContent_Declare(
 FetchContent_GetProperties(sqlite3)
 if(NOT sqlite3_POPULATED)
     # Policy CMP0169: allow direct FetchContent_Populate for content with no CMakeLists
-    cmake_policy(SET CMP0169 OLD)
+    if(POLICY CMP0169)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
     FetchContent_Populate(sqlite3)
     add_library(sqlite3 STATIC ${sqlite3_SOURCE_DIR}/sqlite3.c)
     target_include_directories(sqlite3 PUBLIC ${sqlite3_SOURCE_DIR})
@@ -346,6 +347,12 @@ endif()
 
 # Strict warnings on VDE sources only (not third-party dependencies)
 target_compile_options(vde PRIVATE ${VDE_WARNING_FLAGS})
+if(APPLE)
+    # stb's implementation uses sprintf, deprecated by recent Apple SDKs.
+    set_source_files_properties(src/stb_impl.cpp PROPERTIES
+        COMPILE_OPTIONS "-Wno-deprecated-declarations"
+    )
+endif()
 
 # Add alias for namespaced target
 add_library(vde::vde ALIAS vde)
@@ -384,6 +391,20 @@ target_link_libraries(vde PRIVATE
     sqlite3
     nlohmann_json::nlohmann_json
 )
+
+if(APPLE)
+    # miniaudio's CoreAudio backend uses these native frameworks.
+    find_library(VDE_COREAUDIO_FRAMEWORK CoreAudio REQUIRED)
+    find_library(VDE_AUDIOUNIT_FRAMEWORK AudioUnit REQUIRED)
+    find_library(VDE_AUDIOTOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
+    find_library(VDE_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    target_link_libraries(vde PRIVATE
+        ${VDE_COREAUDIO_FRAMEWORK}
+        ${VDE_AUDIOUNIT_FRAMEWORK}
+        ${VDE_AUDIOTOOLBOX_FRAMEWORK}
+        ${VDE_COREFOUNDATION_FRAMEWORK}
+    )
+endif()
 
 # Shader directory configuration
 target_compile_definitions(vde PRIVATE

@@ -143,8 +143,9 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
                 return;
             }
             if (input->isSpacePressed()) {
-                spawnSingleBox((static_cast<float>(rand()) / RAND_MAX - 0.5f) * 6.0f,
-                               8.0f + static_cast<float>(rand()) / RAND_MAX * 4.0f);
+                spawnSingleBox(
+                    (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) - 0.5f) * 6.0f,
+                    8.0f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 4.0f);
                 std::cout << "[GameLogic] Spawned extra box" << '\n';
             }
             if (input->isResetPressed()) {
@@ -290,12 +291,12 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
     }
 
     void spawnSingleBox(float x, float y) {
-        float halfSize = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.2f;
+        float halfSize = 0.2f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 0.2f;
 
         // Random warm color
-        float r = 0.5f + static_cast<float>(rand()) / RAND_MAX * 0.5f;
-        float g = 0.2f + static_cast<float>(rand()) / RAND_MAX * 0.4f;
-        float b = 0.1f + static_cast<float>(rand()) / RAND_MAX * 0.2f;
+        float r = 0.5f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 0.5f;
+        float g = 0.2f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 0.4f;
+        float b = 0.1f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 0.2f;
 
         auto sprite = addEntity<vde::PhysicsSpriteEntity>();
         sprite->setColor(vde::Color(r, g, b, 1.0f));
@@ -339,7 +340,8 @@ class PhysicsAudioScene : public vde::examples::BaseExampleScene {
             vde::AudioEvent audioEvt;
             audioEvt.type = vde::AudioEventType::PlaySFX;
             audioEvt.volume = std::min(evt.depth * 5.0f, 1.0f);  // Louder for deeper collisions
-            audioEvt.pitch = 0.8f + static_cast<float>(rand()) / RAND_MAX * 0.4f;
+            audioEvt.pitch =
+                0.8f + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 0.4f;
             queueAudioEvent(audioEvt);
         }
 

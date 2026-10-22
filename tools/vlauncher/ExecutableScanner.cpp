@@ -466,9 +466,20 @@ ExecutableScanner::findExecutablePaths(const std::filesystem::path& repoRoot) {
             }
 
             const auto& path = it->path();
+#ifdef __APPLE__
+            const auto permissions = it->status().permissions();
+            constexpr auto executablePermissions = std::filesystem::perms::owner_exec |
+                                                   std::filesystem::perms::group_exec |
+                                                   std::filesystem::perms::others_exec;
+            if (path.has_extension() ||
+                (permissions & executablePermissions) == std::filesystem::perms::none) {
+                continue;
+            }
+#else
             if (path.extension() != ".exe") {
                 continue;
             }
+#endif
 
             std::string stem = path.stem().string();
             if (!stem.starts_with("vde_")) {

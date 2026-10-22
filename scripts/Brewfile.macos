@@ -1,0 +1,7 @@
+brew "cmake"
+brew "ninja"
+brew "git-lfs"
+brew "vulkan-headers"
+brew "vulkan-loader"
+brew "molten-vk"
+brew "vulkan-validationlayers"

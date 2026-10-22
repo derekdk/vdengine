@@ -243,6 +243,10 @@ std::vector<const char*> VulkanContext::getRequiredExtensions() {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
+#ifdef __APPLE__
+    extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
+
     return extensions;
 }
 
@@ -264,6 +268,9 @@ void VulkanContext::createInstance() {
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
+#ifdef __APPLE__
+    createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
 
     auto extensions = getRequiredExtensions();
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
@@ -471,8 +478,28 @@ void VulkanContext::createLogicalDevice() {
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(m_deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
+    auto deviceExtensions = m_deviceExtensions;
+#ifdef __APPLE__
+    // Portability drivers require this device extension when they advertise it.
+    uint32_t extensionCount = 0;
+    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &extensionCount, nullptr) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to enumerate device extensions!");
+    }
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &extensionCount,
+                                             availableExtensions.data()) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to enumerate device extensions!");
+    }
+    for (const auto& extension : availableExtensions) {
+        if (strcmp(extension.extensionName, "VK_KHR_portability_subset") == 0) {
+            deviceExtensions.push_back("VK_KHR_portability_subset");
+            break;
+        }
+    }
+#endif
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     if constexpr (kEnableValidationLayers) {
         createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
