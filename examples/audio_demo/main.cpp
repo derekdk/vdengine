@@ -195,6 +195,16 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
         AudioManager::getInstance().stopAll();
     }
 
+    std::optional<double> getScriptStateValue(const std::string& key) const override {
+        if (key == "sfx_loaded") {
+            return m_sfxClip && m_sfxClip->isLoaded() ? 1.0 : 0.0;
+        }
+        if (key == "sfx_playback_started") {
+            return m_sfxPlaybackStarted ? 1.0 : 0.0;
+        }
+        return BaseExampleScene::getScriptStateValue(key);
+    }
+
     void update(float deltaTime) override {
         BaseExampleScene::update(deltaTime);
 
@@ -394,7 +404,12 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
         }
 
         auto& audio = AudioManager::getInstance();
-        audio.playSFX(m_sfxClip, 1.0f, 1.0f, false);
+        const auto soundId = audio.playSFX(m_sfxClip, 1.0f, 1.0f, false);
+        m_sfxPlaybackStarted = soundId != 0 && audio.isPlaying(soundId);
+        if (!m_sfxPlaybackStarted) {
+            std::cerr << "Failed to start sound effect playback\n";
+            return;
+        }
         std::cout << "Playing sound effect\n";
     }
 
@@ -438,6 +453,7 @@ class AudioDemoScene : public vde::examples::BaseExampleScene {
     uint32_t m_musicSoundId = 0;
     uint32_t m_spatialSoundId = 0;
     bool m_isMusicPlaying = false;
+    bool m_sfxPlaybackStarted = false;
 };
 
 // =============================================================================

@@ -114,7 +114,7 @@ find_app() {
 
 smoke() {
     check_build
-    local timeout="${VDE_SMOKE_TIMEOUT:-45}" count=0 failures=0 exe name log pid watchdog status
+    local timeout="${VDE_SMOKE_TIMEOUT:-45}" count=0 failures=0 exe name log pid watchdog status script
     case "$timeout" in ''|*[!0-9]*|0) fail "VDE_SMOKE_TIMEOUT must be a positive integer" ;; esac
     mkdir -p "$root/logs"
     while IFS= read -r -d '' exe; do
@@ -125,8 +125,13 @@ smoke() {
         case "$name" in ${1:-vde_*}) ;; *) continue ;; esac
         count=$((count + 1))
         log="$root/logs/macos-smoke-$name.log"
+        script="$root/smoketests/scripts/smoke_quick.vdescript"
+        # Audio requires input to start playback; launch-only coverage would be silent.
+        if [ "$name" = vde_audio_demo ]; then
+            script="$root/smoketests/scripts/smoke_audio.vdescript"
+        fi
         (cd "$(dirname "$exe")"; exec "$exe" --input-script \
-            "$root/smoketests/scripts/smoke_quick.vdescript") >"$log" 2>&1 &
+            "$script") >"$log" 2>&1 &
         pid=$!
         # A bounded watchdog prevents an unresponsive graphics app hanging verification.
         (

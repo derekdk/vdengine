@@ -3,9 +3,12 @@
 wait startup
 wait 1000
 
-# Trigger a few sounds if keybindings exist
+# Require the asset and real playback, not just a successful window launch.
+assert scene "main" state.sfx_loaded == 1
 press SPACE
-wait 500
+wait 100
+assert scene "main" state.sfx_playback_started == 1
+wait 400
 press 1
 wait 500
 press 2

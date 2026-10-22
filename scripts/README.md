@@ -16,7 +16,7 @@ their existing behavior.
 | `bash scripts/macos.sh build vde_vlauncher` | Build a specific target |
 | `bash scripts/macos.sh test` | Run all registered CTest unit tests after building |
 | `bash scripts/macos.sh test 'VLauncherUtilitiesTest'` | Run tests matching a CTest regular expression |
-| `bash scripts/macos.sh smoke` | Run quick startup/render/scripted-exit checks on all built Game API applications |
+| `bash scripts/macos.sh smoke` | Run quick startup/render/scripted-exit checks, plus actual audio playback for the audio demo |
 | `bash scripts/macos.sh smoke '*sprite*'` | Filter quick smoke checks by executable-name glob |
 | `bash scripts/macos.sh run vde_vlauncher` | Build and launch VLauncher |
 | `bash scripts/macos.sh run vde_sprite_demo --input-script /absolute/path/test.vdescript` | Pass arguments to an application |
@@ -51,6 +51,11 @@ their existing behavior.
   These are quick launch checks, **not** the Windows metadata-driven interaction
   suite or golden-image render verification. The low-level triangle example
   does not support input scripts and is excluded.
+- The audio demo uses the existing `smoke_audio.vdescript` instead of the quick
+  launch script. It presses SPACE to play the beep and asserts that the asset
+  loaded and playback started. Run `bash scripts/macos.sh smoke '*audio_demo'`
+  for this audible check. Actual speaker output still requires listening; the
+  automated assertions cannot verify system volume or output-device routing.
 - Known limitation: the existing framebuffer screenshot/readback path triggers
   swapchain transfer-usage and image-ownership validation errors on MoltenVK.
   Screenshot-based golden-image verification is not part of this macOS workflow.
