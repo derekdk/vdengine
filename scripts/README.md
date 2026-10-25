@@ -27,9 +27,9 @@ their existing behavior.
 
 - Install Homebrew and Apple command-line tools (`xcode-select --install`) first.
   A recent Apple Clang with C++20 library support is required.
-- `setup` installs CMake, Ninja, Git LFS, Vulkan headers/loader, MoltenVK, and
-  validation layers. GLFW, GLM, glslang, and other source dependencies continue
-  to be fetched by CMake, as on Windows.
+- `setup` installs CMake, Ninja, Git LFS, clang-format, glslangValidator, Vulkan
+  headers/loader, MoltenVK, and validation layers. GLFW, GLM, glslang libraries,
+  and other source dependencies continue to be fetched by CMake, as on Windows.
 - Native audio links CoreAudio/AudioUnit/AudioToolbox. Apple Color Emoji bitmap
   fonts use CoreText and CoreGraphics; COLR/CPAL rendering on Windows is unchanged.
 - Homebrew is discovered dynamically, supporting both `/opt/homebrew` on Apple

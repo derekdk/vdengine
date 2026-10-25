@@ -172,8 +172,9 @@ smoke() {
 }
 
 lint() {
-    local file formatter
-    formatter="$(xcrun --find clang-format)"
+    local file formatter glslang_validator
+    require clang-format
+    formatter="$(command -v clang-format)"
     bash -n "$root/scripts/macos.sh"
     if command -v shellcheck >/dev/null 2>&1; then
         shellcheck "$root/scripts/macos.sh"
@@ -183,7 +184,11 @@ lint() {
     while IFS= read -r -d '' file; do
         case "$file" in
             *.cpp|*.h|*.hpp) "$formatter" --dry-run --Werror "$root/$file" ;;
-            *.vert|*.frag) require glslangValidator; glslangValidator -V "$root/$file" -o /dev/null ;;
+            *.vert|*.frag)
+                require glslangValidator
+                glslang_validator="$(command -v glslangValidator)"
+                "$glslang_validator" -V "$root/$file" -o /dev/null
+                ;;
         esac
     done < <(git -C "$root" diff --name-only -z --diff-filter=ACMR HEAD)
     printf 'PASS: macOS changed-file lint checks.\n'

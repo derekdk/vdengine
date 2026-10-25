@@ -1,6 +1,8 @@
 brew "cmake"
 brew "ninja"
 brew "git-lfs"
+brew "clang-format"
+brew "glslang"
 brew "vulkan-headers"
 brew "vulkan-loader"
 brew "molten-vk"
