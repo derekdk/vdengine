@@ -41,6 +41,28 @@ For a current picture of implemented, partial, and planned features, start with 
 
 > **Windows note:** The default build generator is **Ninja**, which requires the Visual Studio Developer environment to be active. Open a *Developer PowerShell for VS 2022* (or run `scripts/build.ps1`, which loads it automatically). Alternatively, use `-Generator MSBuild` with any PowerShell terminal.
 
+### macOS Quick Start
+
+macOS runs Vulkan through **MoltenVK**, which translates Vulkan to Metal. Use a
+current Xcode/Apple command-line toolchain with C++20 support and
+[Homebrew](https://brew.sh/). No PowerShell or Visual Studio installation is needed.
+
+```bash
+xcode-select --install             # If Apple command-line tools are not installed
+bash scripts/macos.sh setup        # Install dependencies and retrieve Git LFS assets
+bash scripts/macos.sh build
+bash scripts/macos.sh test
+bash scripts/macos.sh run vde_simple_game_example
+bash scripts/macos.sh run vde_vlauncher
+bash scripts/macos.sh verify       # Build, unit tests, quick smoke checks, lint
+```
+
+For Release builds, prefix commands with `VDE_CONFIG=Release`. See the
+[macOS workflow reference](scripts/README.md#macos-native-workflow) for SDK
+selection, logs, and filters. Existing Windows PowerShell commands below are
+unchanged. The main build/test/smoke/verify/lint/launcher VS Code tasks select the
+native shell workflow automatically on macOS.
+
 ### Building with the Scripts (Recommended)
 
 VDE provides PowerShell scripts that handle all environment setup automatically:

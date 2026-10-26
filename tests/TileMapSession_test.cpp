@@ -3,6 +3,7 @@
  * @brief Unit tests for levelbuilder::TileMapSession persistence helpers.
  */
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -69,8 +70,7 @@ std::shared_ptr<vde::TileMap> makeCollisionMultiLayerMap() {
 }
 
 std::filesystem::path makeTempOverlayPath() {
-    const auto uniqueStamp =
-        std::filesystem::file_time_type::clock::now().time_since_epoch().count();
+    const auto uniqueStamp = std::chrono::steady_clock::now().time_since_epoch().count();
     return std::filesystem::temp_directory_path() /
            ("vde_level_builder_overlay_" + std::to_string(uniqueStamp) + ".json");
 }

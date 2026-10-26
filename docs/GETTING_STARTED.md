@@ -41,7 +41,25 @@ cmake --build . --config Debug
 .\tests\Debug\vde_tests.exe
 ```
 
-### Linux / macOS
+### macOS
+
+Use the native shell workflow with Homebrew and a current Apple Clang toolchain:
+
+```bash
+cd vdengine
+bash scripts/macos.sh setup
+bash scripts/macos.sh build
+bash scripts/macos.sh test
+bash scripts/macos.sh run vde_simple_game_example
+```
+
+Vulkan runs through MoltenVK over Metal. `setup` installs the loader, headers,
+MoltenVK, validation layers, CMake, Ninja, and Git LFS, then retrieves the assets.
+See [the native workflow reference](../scripts/README.md#macos-native-workflow)
+for optional LunarG SDK configuration and verification commands. Windows builds
+continue to use the existing PowerShell scripts.
+
+### Linux
 
 ```bash
 cd vdengine

@@ -74,6 +74,41 @@ TEST_F(EmojiFontTest, DefaultStateIsUnloaded) {
     EXPECT_EQ(emoji.getGlyph(0x1F600), nullptr);
 }
 
+#ifdef __APPLE__
+TEST_F(EmojiFontTest, AppleBitmapFontRendersColoredGlyphsWithoutGPU) {
+    const auto path = EmojiFont::findSystemEmojiFont();
+    ASSERT_FALSE(path.empty());
+    EmojiFont emoji;
+    ASSERT_TRUE(emoji.loadFromFile(nullptr, path, 32)) << emoji.getLastError();
+    ASSERT_TRUE(emoji.hasGlyph(0x1F600));
+    ASSERT_TRUE(emoji.hasGlyph(0x1F680));
+    const auto* glyph = emoji.getGlyph(0x1F600);
+    ASSERT_NE(glyph, nullptr);
+    EXPECT_EQ(glyph->width, 32);
+    EXPECT_EQ(glyph->height, 32);
+    EXPECT_EQ(emoji.emojiSize(), 32);
+    std::vector<uint8_t> pixels(static_cast<size_t>(glyph->width) * glyph->height * 4);
+    ASSERT_TRUE(emoji.copyGlyphPixels(0x1F600, pixels.data()));
+    bool hasColor = false;
+    bool hasTransparency = false;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+        hasTransparency = hasTransparency || pixels[i + 3] == 0;
+        hasColor = hasColor || (pixels[i + 3] > 0 &&
+                                (pixels[i] != pixels[i + 1] || pixels[i + 1] != pixels[i + 2]));
+    }
+    EXPECT_TRUE(hasColor);
+    EXPECT_TRUE(hasTransparency);
+    ASSERT_NE(emoji.getAtlasTexture(), nullptr);
+    EXPECT_FALSE(emoji.getAtlasTexture()->isOnGPU());
+
+    EXPECT_FALSE(emoji.loadFromFile(nullptr, path, 16385));
+    EXPECT_FALSE(emoji.isLoaded());
+    EXPECT_TRUE(emoji.getAvailableCodepoints().empty());
+    EXPECT_EQ(emoji.getAtlasTexture(), nullptr);
+    EXPECT_FALSE(emoji.getLastError().empty());
+}
+#endif
+
 // ---- System font tests (skipped if no emoji font is available) -------------
 
 class EmojiFontSystemTest : public ::testing::Test {

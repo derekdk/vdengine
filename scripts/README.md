@@ -1,6 +1,71 @@
 # VDE Build Scripts
 
-This directory contains PowerShell scripts to simplify building, testing, and maintaining the VDE project.
+This directory contains Windows PowerShell workflows and a native macOS shell
+workflow for building, testing, and running VDE.
+
+## macOS Native Workflow
+
+Run `bash scripts/macos.sh help` from the repository root. The script supports
+Apple's bundled Bash 3.2 and does not require PowerShell. Windows scripts retain
+their existing behavior.
+
+| Command | Purpose |
+|---------|---------|
+| `bash scripts/macos.sh setup` | Install the dependencies in `scripts/Brewfile.macos`, enable Git LFS locally, and fetch assets |
+| `bash scripts/macos.sh build` | Configure Ninja and build all examples, games, tools, and unit tests |
+| `bash scripts/macos.sh build vde_vlauncher` | Build a specific target |
+| `bash scripts/macos.sh test` | Run all registered CTest unit tests after building |
+| `bash scripts/macos.sh test 'VLauncherUtilitiesTest'` | Run tests matching a CTest regular expression |
+| `bash scripts/macos.sh smoke` | Run quick startup/render/scripted-exit checks, plus actual audio playback for the audio demo |
+| `bash scripts/macos.sh smoke '*sprite*'` | Filter quick smoke checks by executable-name glob |
+| `bash scripts/macos.sh run vde_vlauncher` | Build and launch VLauncher |
+| `bash scripts/macos.sh run vde_sprite_demo --input-script /absolute/path/test.vdescript` | Pass arguments to an application |
+| `bash scripts/macos.sh lint` | Check changed C++ formatting, shader validity, and shell syntax; run ShellCheck if installed |
+| `bash scripts/macos.sh verify` | Build, unit tests, quick smoke checks, lint; log to `logs/verify-macos-latest.log` |
+
+### Requirements and environment
+
+- Install Homebrew and Apple command-line tools (`xcode-select --install`) first.
+  A recent Apple Clang with C++20 library support is required.
+- `setup` installs CMake, Ninja, Git LFS, clang-format, glslangValidator, Vulkan
+  headers/loader, MoltenVK, and validation layers. GLFW, GLM, glslang libraries,
+  and other source dependencies continue to be fetched by CMake, as on Windows.
+- Native audio links CoreAudio/AudioUnit/AudioToolbox. Apple Color Emoji bitmap
+  fonts use CoreText and CoreGraphics; COLR/CPAL rendering on Windows is unchanged.
+- Homebrew is discovered dynamically, supporting both `/opt/homebrew` on Apple
+  Silicon and `/usr/local` on Intel. Use a native terminal/toolchain rather than
+  mixing ARM and Rosetta libraries.
+- Alternatively set `VULKAN_SDK` to an installed LunarG SDK's **macOS** directory.
+  The scripts configure CMake search paths, loader library paths, the MoltenVK
+  ICD manifest, and validation-layer discovery for their child processes only.
+  Explicit `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, and `VK_LAYER_PATH` overrides
+  are respected. No shell profiles or machine-wide Xcode settings are modified.
+- `VDE_CONFIG=Release bash scripts/macos.sh build` selects Release; Debug is the
+  default. Build before running tests or smoke checks with a different config.
+  Both configs use `build_ninja`, reconfiguring it on each build.
+- `VDE_JOBS=4` limits parallel compilation. `VDE_SMOKE_TIMEOUT=60` changes the
+  per-application smoke watchdog timeout (default 45 seconds).
+- Graphics tests require an interactive macOS desktop with a Metal-capable GPU.
+  Each smoke check writes `logs/macos-smoke-<target>.log` and requires the input
+  script's exit marker, exit code zero, and no validation errors.
+  These are quick launch checks, **not** the Windows metadata-driven interaction
+  suite or golden-image render verification. The low-level triangle example
+  does not support input scripts and is excluded.
+- The audio demo uses the existing `smoke_audio.vdescript` instead of the quick
+  launch script. It presses SPACE to play the beep and asserts that the asset
+  loaded and playback started. Run `bash scripts/macos.sh smoke '*audio_demo'`
+  for this audible check. Actual speaker output still requires listening; the
+  automated assertions cannot verify system volume or output-device routing.
+- Known limitation: the existing framebuffer screenshot/readback path triggers
+  swapchain transfer-usage and image-ownership validation errors on MoltenVK.
+  Screenshot-based golden-image verification is not part of this macOS workflow.
+- The build, build-and-test, test, smoke-test, verify, lint, and run-vlauncher
+  VS Code tasks have macOS overrides. Other existing tasks remain PowerShell
+  utilities and are not part of the native Mac workflow.
+
+VLauncher discovers executable Unix files on macOS and supports launching,
+capturing output, polling completion, and opening logs in VS Code. App bundles,
+signing, and distribution packaging are not provided by this development workflow.
 
 ## Scripts Overview
 
