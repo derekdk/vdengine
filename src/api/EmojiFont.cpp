@@ -663,6 +663,14 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
     }
     file.close();
 
+#ifdef __APPLE__
+    // Apple Color Emoji is a TrueType Collection; stb_truetype and the table
+    // directory lookup below expect a standalone font face.
+    if (fontData.size() >= 4 && std::memcmp(fontData.data(), "ttcf", 4) == 0) {
+        return loadAppleBitmapFont(ctx, path, sizePixels);
+    }
+#endif
+
     // Initialize stb_truetype
     stbtt_fontinfo fontInfo{};
     if (!stbtt_InitFont(&fontInfo, fontData.data(),
