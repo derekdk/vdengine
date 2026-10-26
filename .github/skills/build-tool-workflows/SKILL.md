@@ -27,6 +27,7 @@ test, smoke-test, verify, lint, and run-vlauncher VS Code tasks automatically us
 this native workflow on macOS; Windows commands remain unchanged.
 `verify` records `logs/verify-macos-latest.log`. Mac smoke checks are quick
 startup/render/exit checks, not the Windows metadata-driven or render-verify suite.
+`VDE_LLDB_ON_FAILURE=1` makes `test` rerun failed tests under lldb for native backtraces.
 See `scripts/README.md` for dependencies and SDK environment selection.
 
 **For standard operations, always prefer VS Code tasks over running scripts directly.** Tasks are the correct method for AI agents using the `run_task` tool and for interactive use via **Terminal → Run Task...** in VS Code.

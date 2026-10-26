@@ -38,11 +38,18 @@ their existing behavior.
 - Alternatively set `VULKAN_SDK` to an installed LunarG SDK's **macOS** directory.
   The scripts configure CMake search paths, loader library paths, the MoltenVK
   ICD manifest, and validation-layer discovery for their child processes only.
+  Loader libraries are exposed through `DYLD_FALLBACK_LIBRARY_PATH`, never
+  `DYLD_LIBRARY_PATH`: the latter is searched before install names, so on
+  case-insensitive APFS Homebrew's `libpng`/`libjpeg`/`libgif` replace ImageIO's
+  private `libPng`/`libJPEG`/`libGIF` and crash Apple Color Emoji rendering.
   Explicit `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, and `VK_LAYER_PATH` overrides
   are respected. No shell profiles or machine-wide Xcode settings are modified.
 - `VDE_CONFIG=Release bash scripts/macos.sh build` selects Release; Debug is the
   default. Build before running tests or smoke checks with a different config.
   Both configs use `build_ninja`, reconfiguring it on each build.
+- `VDE_LLDB_ON_FAILURE=1 bash scripts/macos.sh test` reruns up to three failed
+  tests under `lldb` and writes native backtraces to `logs/macos-lldb-<test>.log`
+  (CI enables this so crashes such as `Bus error` are diagnosable).
 - `VDE_JOBS=4` limits parallel compilation. `VDE_SMOKE_TIMEOUT=60` changes the
   per-application smoke watchdog timeout (default 45 seconds).
 - Graphics tests require an interactive macOS desktop with a Metal-capable GPU.

@@ -78,7 +78,8 @@ class EmojiFont {
     /**
      * @brief Load a color emoji font and build the glyph atlas.
      * @param ctx Vulkan context for GPU upload (may be nullptr for CPU-only)
-     * @param path Path to the emoji font file (.ttf/.otf, or .ttc on macOS)
+     * @param path Path to the emoji font file (.ttf/.otf, or a .ttc collection;
+     *             the collection's first face is used)
      * @param sizePixels Desired emoji render size in pixels
      * @return true if the font was loaded and at least one color emoji was found
      * @note On failure, getLastError() contains a human-readable reason.

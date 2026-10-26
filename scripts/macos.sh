@@ -24,6 +24,7 @@ Environment:
   VDE_CONFIG=Debug|Release (default Debug)
   VDE_JOBS=<positive integer> (default logical CPU count)
   VDE_SMOKE_TIMEOUT=<seconds> (default 45)
+  VDE_LLDB_ON_FAILURE=1 (test: rerun up to 3 failed tests under lldb for backtraces)
   VULKAN_SDK=<SDK's macOS directory> (optional; otherwise use Homebrew)
 Build output: build_ninja. Windows PowerShell workflows are unchanged.
 HELP
@@ -59,7 +60,11 @@ else
 fi
 export CMAKE_PREFIX_PATH="$prefix${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 export PATH="$prefix/bin:$PATH"
-export DYLD_LIBRARY_PATH="$prefix/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+# Use the fallback path so leaf-name dlopen() calls (GLFW's libvulkan.1.dylib) find
+# SDK libraries without overriding system dylibs. DYLD_LIBRARY_PATH is searched
+# before install names, so on case-insensitive APFS Homebrew's libpng/libjpeg/libgif
+# would replace ImageIO's private libPng/libJPEG/libGIF used to draw Apple emoji.
+export DYLD_FALLBACK_LIBRARY_PATH="$prefix/lib:${DYLD_FALLBACK_LIBRARY_PATH:-$HOME/lib:/usr/local/lib:/usr/lib}"
 if [ -z "${VK_DRIVER_FILES:-}" ] && [ -z "${VK_ICD_FILENAMES:-}" ]; then
     for manifest in "$prefix/share/vulkan/icd.d/MoltenVK_icd.json" \
                     "$prefix/etc/vulkan/icd.d/MoltenVK_icd.json"; do
@@ -91,10 +96,45 @@ check_build() {
         fail "Build configuration differs. Run build with VDE_CONFIG=$config first."
 }
 
+# Rerun failed tests under lldb so crashes (e.g. SIGBUS) produce native backtraces.
+crash_backtraces() {
+    local failed="$build_dir/Testing/Temporary/LastTestsFailed.log" count=0 line name log
+    local -a env_args=()
+    [ -f "$failed" ] || return 0
+    if ! command -v lldb >/dev/null 2>&1; then
+        printf 'WARNING: lldb not found; failed-test backtraces skipped.\n'
+        return 0
+    fi
+    # /usr/bin/lldb is SIP-protected, so DYLD_* variables must be forwarded explicitly.
+    for name in DYLD_LIBRARY_PATH DYLD_FALLBACK_LIBRARY_PATH; do
+        if [ -n "${!name:-}" ]; then
+            env_args+=(-O "settings set target.env-vars $name=${!name}")
+        fi
+    done
+    mkdir -p "$root/logs"
+    while IFS= read -r line && [ "$count" -lt 3 ]; do
+        name="${line#*:}"
+        case "$name" in ''|*[!A-Za-z0-9_./-]*) continue ;; esac
+        count=$((count + 1))
+        log="$root/logs/macos-lldb-${name//\//_}.log"
+        printf '==> lldb backtrace for %s (%s)\n' "$name" "$log"
+        lldb --batch ${env_args[@]+"${env_args[@]}"} -o run \
+            -k 'thread backtrace all' -k 'image list' -k quit \
+            -- "$build_dir/tests/vde_tests" "--gtest_filter=$name" </dev/null >"$log" 2>&1 || true
+        sed -n '/stop reason/,/image list/p' "$log" | head -n 120 || true
+        grep -Ei 'homebrew|/usr/local/|libpng|libjpeg|libgif|libtiff' "$log" | grep -v 'gtest_filter' || true
+    done <"$failed"
+}
+
 unit_tests() {
     require ctest
     check_build
-    ctest --test-dir "$build_dir" --output-on-failure --no-tests=error -R "${1:-.}"
+    local status=0
+    ctest --test-dir "$build_dir" --output-on-failure --no-tests=error -R "${1:-.}" || status=$?
+    if [ "$status" -ne 0 ]; then
+        if [ "${VDE_LLDB_ON_FAILURE:-0}" = 1 ]; then crash_backtraces; fi
+        fail "macOS unit tests failed (ctest exit $status)"
+    fi
     printf 'PASS: macOS unit tests.\n'
 }
 

@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <type_traits>
 #include <vector>
 
@@ -54,24 +55,52 @@ inline uint32_t readU24BE(const uint8_t* p) {
 
 constexpr uint32_t kTagCOLR = 0x434F4C52;  // 'COLR'
 constexpr uint32_t kTagCPAL = 0x4350414C;  // 'CPAL'
+constexpr uint32_t kTagTTCF = 0x74746366;  // 'ttcf'
 
 struct TableEntry {
     uint32_t offset = 0;
     uint32_t length = 0;
 };
 
-/// Find a table by its 4-byte tag in the OpenType table directory.
-TableEntry findTable(const uint8_t* data, size_t dataSize, uint32_t tag) {
+/// Return the offset of the first face's table directory in a standalone font
+/// or TrueType collection, or -1 if the header or directory is out of bounds.
+int64_t selectFaceOffset(const uint8_t* data, size_t dataSize) {
     if (dataSize < 12) {
-        return {};
+        return -1;
     }
-    uint16_t numTables = readU16BE(data + 4);
-    if (dataSize < static_cast<size_t>(12) + static_cast<size_t>(numTables) * 16) {
-        return {};
+    uint64_t faceOffset = 0;
+    if (readU32BE(data) == kTagTTCF) {
+        if (dataSize < 16 || readU32BE(data + 8) == 0) {
+            return -1;
+        }
+        faceOffset = readU32BE(data + 12);
+    }
+    if (faceOffset > static_cast<uint64_t>(std::numeric_limits<int>::max()) ||
+        faceOffset + 12 > dataSize) {
+        return -1;
     }
 
+    // Same sfnt versions accepted by stb_truetype: TrueType 1/1.0, 'true', 'typ1', 'OTTO'.
+    const uint32_t version = readU32BE(data + faceOffset);
+    if (version != 0x00010000 && version != 0x74727565 && version != 0x74797031 &&
+        version != 0x4F54544F && version != 0x31000000) {
+        return -1;
+    }
+    const uint16_t numTables = readU16BE(data + faceOffset + 4);
+    if (faceOffset + 12 + static_cast<uint64_t>(numTables) * 16 > dataSize) {
+        return -1;
+    }
+    return static_cast<int64_t>(faceOffset);
+}
+
+/// Find a table by its 4-byte tag in the table directory at @p faceOffset.
+/// The directory must have been validated by selectFaceOffset(). Returned
+/// offsets are relative to the start of the file, as in TrueType collections.
+TableEntry findTable(const uint8_t* data, size_t dataSize, uint64_t faceOffset, uint32_t tag) {
+    const uint8_t* directory = data + faceOffset;
+    const uint16_t numTables = readU16BE(directory + 4);
     for (uint16_t i = 0; i < numTables; ++i) {
-        const uint8_t* entry = data + 12 + static_cast<ptrdiff_t>(i) * 16;
+        const uint8_t* entry = directory + 12 + static_cast<ptrdiff_t>(i) * 16;
         if (readU32BE(entry) == tag) {
             uint32_t offset = readU32BE(entry + 8);
             uint32_t length = readU32BE(entry + 12);
@@ -81,6 +110,21 @@ TableEntry findTable(const uint8_t* data, size_t dataSize, uint32_t tag) {
         }
     }
     return {};
+}
+
+/// stb_truetype reads these tables without bounds checks, so require them to be
+/// present and inside the file before calling stbtt_InitFont().
+bool hasStbRequiredTables(const uint8_t* data, size_t dataSize, uint64_t faceOffset) {
+    auto has = [&](uint32_t tag) { return findTable(data, dataSize, faceOffset, tag).length > 0; };
+    constexpr uint32_t kTagCmap = 0x636D6170;  // 'cmap'
+    constexpr uint32_t kTagHead = 0x68656164;  // 'head'
+    constexpr uint32_t kTagHhea = 0x68686561;  // 'hhea'
+    constexpr uint32_t kTagHmtx = 0x686D7478;  // 'hmtx'
+    constexpr uint32_t kTagGlyf = 0x676C7966;  // 'glyf'
+    constexpr uint32_t kTagLoca = 0x6C6F6361;  // 'loca'
+    constexpr uint32_t kTagCFF = 0x43464620;   // 'CFF '
+    return has(kTagCmap) && has(kTagHead) && has(kTagHhea) && has(kTagHmtx) &&
+           ((has(kTagGlyf) && has(kTagLoca)) || has(kTagCFF));
 }
 
 // ---- COLR v0 structures ---------------------------------------------------
@@ -663,33 +707,38 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
     }
     file.close();
 
+    const int64_t selectedFace = selectFaceOffset(fontData.data(), fontData.size());
+    if (selectedFace < 0) {
+        m_lastError = "Not a valid OpenType font or font collection: " + path;
+        return false;
+    }
+    const auto faceOffset = static_cast<uint64_t>(selectedFace);
+
+    // Select the backend from the first face's tables. A 'ttcf' header only
+    // identifies a collection; it does not imply bitmap (sbix) glyphs.
 #ifdef __APPLE__
-    // Apple Color Emoji is a TrueType Collection; stb_truetype and the table
-    // directory lookup below expect a standalone font face.
-    if (fontData.size() >= 4 && std::memcmp(fontData.data(), "ttcf", 4) == 0) {
+    constexpr uint32_t kTagSBIX = 0x73626978;  // 'sbix'
+    if (findTable(fontData.data(), fontData.size(), faceOffset, kTagSBIX).length > 0) {
         return loadAppleBitmapFont(ctx, path, sizePixels);
     }
 #endif
-
-    // Initialize stb_truetype
-    stbtt_fontinfo fontInfo{};
-    if (!stbtt_InitFont(&fontInfo, fontData.data(),
-                        stbtt_GetFontOffsetForIndex(fontData.data(), 0))) {
-        m_lastError = "Failed to initialize emoji font data: " + path;
-        return false;
-    }
-
-    // Find COLR and CPAL tables
-    TableEntry colrEntry = findTable(fontData.data(), fontData.size(), kTagCOLR);
-    TableEntry cpalEntry = findTable(fontData.data(), fontData.size(), kTagCPAL);
-
+    TableEntry colrEntry = findTable(fontData.data(), fontData.size(), faceOffset, kTagCOLR);
+    TableEntry cpalEntry = findTable(fontData.data(), fontData.size(), faceOffset, kTagCPAL);
     if (colrEntry.length == 0 || cpalEntry.length == 0) {
 #ifdef __APPLE__
-        return loadAppleBitmapFont(ctx, path, sizePixels);
+        m_lastError = "Font does not contain COLR/CPAL or Apple sbix emoji tables: " + path;
 #else
         m_lastError = "Font does not contain COLR/CPAL color emoji tables: " + path;
-        return false;
 #endif
+        return false;
+    }
+
+    // Initialize stb_truetype on the selected face
+    stbtt_fontinfo fontInfo{};
+    if (!hasStbRequiredTables(fontData.data(), fontData.size(), faceOffset) ||
+        !stbtt_InitFont(&fontInfo, fontData.data(), static_cast<int>(faceOffset))) {
+        m_lastError = "Failed to initialize emoji font data: " + path;
+        return false;
     }
 
     // Parse COLR and CPAL
