@@ -157,8 +157,7 @@ class EmojiFont {
 
   private:
 #ifdef __APPLE__
-    bool loadAppleBitmapFont(VulkanContext* ctx, const std::vector<uint8_t>& fontData,
-                             int sizePixels);
+    bool loadAppleBitmapFont(VulkanContext* ctx, const std::string& path, int sizePixels);
 #endif
     bool m_loaded = false;
     int m_emojiSize = 0;

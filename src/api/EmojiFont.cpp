@@ -677,7 +677,7 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
 
     if (colrEntry.length == 0 || cpalEntry.length == 0) {
 #ifdef __APPLE__
-        return loadAppleBitmapFont(ctx, fontData, sizePixels);
+        return loadAppleBitmapFont(ctx, path, sizePixels);
 #else
         m_lastError = "Font does not contain COLR/CPAL color emoji tables: " + path;
         return false;
@@ -832,17 +832,20 @@ bool EmojiFont::loadFromFile(VulkanContext* ctx, const std::string& path, int si
 }
 
 #ifdef __APPLE__
-bool EmojiFont::loadAppleBitmapFont(VulkanContext* ctx, const std::vector<uint8_t>& fontData,
-                                    int sizePixels) {
-    std::unique_ptr<std::remove_pointer_t<CGDataProviderRef>, decltype(&CGDataProviderRelease)>
-        provider(CGDataProviderCreateWithData(nullptr, fontData.data(), fontData.size(), nullptr),
-                 CGDataProviderRelease);
-    std::unique_ptr<std::remove_pointer_t<CGFontRef>, decltype(&CGFontRelease)> graphicsFont(
-        provider ? CGFontCreateWithDataProvider(provider.get()) : nullptr, CGFontRelease);
+bool EmojiFont::loadAppleBitmapFont(VulkanContext* ctx, const std::string& path, int sizePixels) {
+    const auto* pathBytes = reinterpret_cast<const UInt8*>(path.data());
+    std::unique_ptr<std::remove_pointer_t<CFURLRef>, decltype(&CFRelease)> fontURL(
+        CFURLCreateFromFileSystemRepresentation(nullptr, pathBytes,
+                                                static_cast<CFIndex>(path.size()), false),
+        CFRelease);
+    std::unique_ptr<std::remove_pointer_t<CFArrayRef>, decltype(&CFRelease)> descriptors(
+        fontURL ? CTFontManagerCreateFontDescriptorsFromURL(fontURL.get()) : nullptr, CFRelease);
+    CTFontDescriptorRef descriptor =
+        descriptors && CFArrayGetCount(descriptors.get()) > 0
+            ? static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(descriptors.get(), 0))
+            : nullptr;
     std::unique_ptr<std::remove_pointer_t<CTFontRef>, decltype(&CFRelease)> font(
-        graphicsFont
-            ? CTFontCreateWithGraphicsFont(graphicsFont.get(), sizePixels, nullptr, nullptr)
-            : nullptr,
+        descriptor ? CTFontCreateWithFontDescriptor(descriptor, sizePixels, nullptr) : nullptr,
         CFRelease);
     std::unique_ptr<std::remove_pointer_t<CFDataRef>, decltype(&CFRelease)> bitmapTable(
         font ? CTFontCopyTable(font.get(), 0x73626978, kCTFontTableOptionNoOptions) : nullptr,
