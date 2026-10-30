@@ -8,6 +8,16 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <cerrno>
+#include <cstring>
+#include <thread>
+
+#include <AvailabilityMacros.h>
+#include <crt_externs.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 namespace vde::tools {
@@ -61,6 +71,68 @@ std::string escapeCommandLineArg(const std::string& arg) {
 }
 #endif
 
+#ifdef __APPLE__
+bool spawnProcess(const std::filesystem::path& executablePath,
+                  const std::vector<std::string>& extraArgs, int outputFd, pid_t& pid,
+                  std::string& error) {
+    std::vector<std::string> arguments = {executablePath.string()};
+    arguments.insert(arguments.end(), extraArgs.begin(), extraArgs.end());
+    std::vector<char*> argv;
+    for (auto& argument : arguments) {
+        argv.push_back(argument.data());
+    }
+    argv.push_back(nullptr);
+
+    posix_spawn_file_actions_t actions;
+    int result = posix_spawn_file_actions_init(&actions);
+    if (result != 0) {
+        error = "Failed to initialize process actions: " + std::string(std::strerror(result));
+        return false;
+    }
+    if (executablePath.has_parent_path()) {
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 260000
+        if (__builtin_available(macOS 26.0, *)) {
+            result =
+                posix_spawn_file_actions_addchdir(&actions, executablePath.parent_path().c_str());
+        } else
+#endif
+        {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            result = posix_spawn_file_actions_addchdir_np(&actions,
+                                                          executablePath.parent_path().c_str());
+#pragma clang diagnostic pop
+        }
+    }
+    if (result == 0 && outputFd >= 0) {
+        result = posix_spawn_file_actions_adddup2(&actions, outputFd, STDOUT_FILENO);
+        if (result == 0) {
+            result = posix_spawn_file_actions_adddup2(&actions, outputFd, STDERR_FILENO);
+        }
+        if (result == 0) {
+            result = posix_spawn_file_actions_addclose(&actions, outputFd);
+        }
+    }
+    if (result == 0) {
+        result = posix_spawnp(&pid, executablePath.c_str(), &actions, nullptr, argv.data(),
+                              *_NSGetEnviron());
+    }
+    posix_spawn_file_actions_destroy(&actions);
+    if (result != 0) {
+        error = "Failed to launch process: " + std::string(std::strerror(result));
+        return false;
+    }
+    return true;
+}
+
+void reapDetachedProcess(pid_t pid) {
+    std::thread([pid]() {
+        int status = 0;
+        while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+    }).detach();
+}
+#endif
+
 }  // namespace
 
 bool ProcessLauncher::launchDetached(const std::filesystem::path& executablePath,
@@ -94,6 +166,13 @@ bool ProcessLauncher::launchDetached(const std::filesystem::path& executablePath
 
     CloseHandle(processInfo.hThread);
     CloseHandle(processInfo.hProcess);
+    return true;
+#elif defined(__APPLE__)
+    pid_t pid = 0;
+    if (!spawnProcess(std::filesystem::absolute(executablePath), {}, -1, pid, error)) {
+        return false;
+    }
+    reapDetachedProcess(pid);
     return true;
 #else
     (void)executablePath;
@@ -172,6 +251,36 @@ bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& execu
     launchedProcess.outputPath = outputPath;
     launchedProcess.commandLine = commandLine;
     return true;
+#elif defined(__APPLE__)
+    launchedProcess = {};
+    std::error_code pathError;
+    auto tempDir = std::filesystem::temp_directory_path(pathError);
+    if (pathError) {
+        error = "Failed to determine temp output path: " + pathError.message();
+        return false;
+    }
+    std::string outputTemplate = (tempDir / "vde_vlauncher_XXXXXX").string();
+    int outputFd = mkstemp(outputTemplate.data());
+    if (outputFd < 0) {
+        error = "Failed to create temp output file: " + std::string(std::strerror(errno));
+        return false;
+    }
+    pid_t pid = 0;
+    bool launched =
+        spawnProcess(std::filesystem::absolute(executablePath), extraArgs, outputFd, pid, error);
+    close(outputFd);
+    if (!launched) {
+        std::error_code removeError;
+        std::filesystem::remove(outputTemplate, removeError);
+        return false;
+    }
+    launchedProcess.processHandle = static_cast<std::uintptr_t>(pid);
+    launchedProcess.outputPath = outputTemplate;
+    launchedProcess.commandLine = executablePath.string();
+    for (const auto& argument : extraArgs) {
+        launchedProcess.commandLine += " \"" + argument + "\"";
+    }
+    return true;
 #else
     (void)executablePath;
     (void)launchedProcess;
@@ -181,7 +290,7 @@ bool ProcessLauncher::launchWithOutputCapture(const std::filesystem::path& execu
 #endif
 }
 
-bool ProcessLauncher::pollCompletion(const LaunchedProcess& launchedProcess, bool& completed,
+bool ProcessLauncher::pollCompletion(LaunchedProcess& launchedProcess, bool& completed,
                                      uint32_t& exitCode, std::string& error) {
 #ifdef _WIN32
     completed = false;
@@ -214,6 +323,32 @@ bool ProcessLauncher::pollCompletion(const LaunchedProcess& launchedProcess, boo
     completed = true;
     exitCode = static_cast<uint32_t>(winExitCode);
     return true;
+#elif defined(__APPLE__)
+    completed = launchedProcess.completed;
+    exitCode = launchedProcess.exitCode;
+    if (launchedProcess.processHandle == 0) {
+        error = "Invalid process handle";
+        return false;
+    }
+    if (completed) {
+        return true;
+    }
+    int status = 0;
+    pid_t result = waitpid(static_cast<pid_t>(launchedProcess.processHandle), &status, WNOHANG);
+    if (result < 0) {
+        if (errno == EINTR) {
+            return true;
+        }
+        error = "Failed to poll process: " + std::string(std::strerror(errno));
+        return false;
+    }
+    if (result > 0) {
+        completed = launchedProcess.completed = true;
+        exitCode = launchedProcess.exitCode = WIFEXITED(status)
+                                                  ? static_cast<uint32_t>(WEXITSTATUS(status))
+                                                  : static_cast<uint32_t>(128 + WTERMSIG(status));
+    }
+    return true;
 #else
     (void)launchedProcess;
     (void)completed;
@@ -231,6 +366,11 @@ void ProcessLauncher::release(LaunchedProcess& launchedProcess) {
         CloseHandle(processHandle);
         launchedProcess.processHandle = 0;
     }
+#elif defined(__APPLE__)
+    if (launchedProcess.processHandle != 0 && !launchedProcess.completed) {
+        reapDetachedProcess(static_cast<pid_t>(launchedProcess.processHandle));
+    }
+    launchedProcess.processHandle = 0;
 #else
     (void)launchedProcess;
 #endif
@@ -298,6 +438,14 @@ bool ProcessLauncher::openFileInVSCode(const std::filesystem::path& filePath, st
 
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+    return true;
+#elif defined(__APPLE__)
+    pid_t pid = 0;
+    if (!spawnProcess("/usr/bin/open", {"-a", "Visual Studio Code", filePath.string()}, -1, pid,
+                      error)) {
+        return false;
+    }
+    reapDetachedProcess(pid);
     return true;
 #else
     (void)filePath;

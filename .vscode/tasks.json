@@ -3,6 +3,10 @@
   "tasks": [
     {
       "label": "scripts: build",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "build"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -42,6 +46,10 @@
     },
     {
       "label": "scripts: build-and-test",
+      "osx": {
+        "command": "bash",
+        "args": ["-c", "bash \"${workspaceFolder}/scripts/macos.sh\" build && bash \"${workspaceFolder}/scripts/macos.sh\" test"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -60,6 +68,10 @@
     },
     {
       "label": "scripts: test",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "test"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -81,6 +93,10 @@
     },
     {
       "label": "scripts: smoke-test",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "smoke"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -150,6 +166,10 @@
     },
     {
       "label": "scripts: lint",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "lint"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -253,6 +273,10 @@
     },
     {
       "label": "scripts: run-vlauncher",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "run", "vde_vlauncher"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -290,6 +314,10 @@
     },
     {
       "label": "scripts: verify",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "verify"]
+      },
       "type": "shell",
       "command": "powershell",
       "args": [

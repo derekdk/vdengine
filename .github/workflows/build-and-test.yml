@@ -14,6 +14,61 @@ permissions:
   contents: read
 
 jobs:
+  macos:
+    name: Build & Test (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install native dependencies
+        run: bash scripts/macos.sh setup
+      - name: Build
+        run: bash scripts/macos.sh build
+      - name: Run unit tests
+        env:
+          VDE_LLDB_ON_FAILURE: 1
+        run: bash scripts/macos.sh test
+      - name: Upload lldb crash logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-lldb-logs
+          path: logs/macos-lldb-*.log
+          if-no-files-found: ignore
+
+  # The Linux sanitizer job cannot compile the CoreText/CoreGraphics emoji path.
+  macos-emoji-sanitizer:
+    name: Emoji tests (macOS ASan+UBSan)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install native dependencies
+        run: bash scripts/macos.sh setup
+      - name: Configure and build tests with sanitizers
+        run: |
+          cmake -S . -B build_asan -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DVDE_BUILD_EXAMPLES=OFF \
+            -DVDE_BUILD_GAMES=OFF \
+            -DVDE_BUILD_TOOLS=OFF \
+            -DVDE_BUILD_TESTS=ON
+          cmake --build build_asan --parallel --target vde_tests
+      - name: Run emoji tests under sanitizers
+        env:
+          # LeakSanitizer is unsupported on Apple Silicon.
+          ASAN_OPTIONS: "detect_leaks=0:halt_on_error=1"
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+        run: build_asan/tests/vde_tests --gtest_filter='*Emoji*'
+
   # ── Standard build + tests ────────────────────────────────────────────────
   build-and-test:
     name: Build & Test (${{ matrix.config }})

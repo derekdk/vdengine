@@ -9,10 +9,16 @@
 #include <vde/api/TrueTypeFont.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
+#include <string>
+#include <system_error>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -72,6 +78,298 @@ TEST_F(EmojiFontTest, DefaultStateIsUnloaded) {
     EXPECT_EQ(emoji.getAtlasTexture(), nullptr);
     EXPECT_FALSE(emoji.hasGlyph(0x1F600));
     EXPECT_EQ(emoji.getGlyph(0x1F600), nullptr);
+}
+
+#ifdef __APPLE__
+// ImageIO decodes sbix emoji bitmaps with private codec dylibs (libPng.dylib,
+// libJPEG.dylib, ...). DYLD_LIBRARY_PATH is searched by leaf name before their
+// install paths and APFS is case-insensitive by default, so a directory holding
+// Homebrew's libpng.dylib/libjpeg.dylib/libgif.dylib/libtiff.dylib replaces
+// ImageIO's copies inside CoreText rendering.
+static std::vector<std::string> findShadowedImageIOCodecs() {
+    std::vector<std::string> shadowed;
+    const char* searchPath = std::getenv("DYLD_LIBRARY_PATH");
+    if (!searchPath) {
+        return shadowed;
+    }
+    const std::string paths = searchPath;
+    size_t start = 0;
+    while (start <= paths.size()) {
+        size_t end = paths.find(':', start);
+        if (end == std::string::npos) {
+            end = paths.size();
+        }
+        const std::filesystem::path dir = paths.substr(start, end - start);
+        if (!dir.empty()) {
+            for (const char* name :
+                 {"libPng.dylib", "libJPEG.dylib", "libGIF.dylib", "libTIFF.dylib"}) {
+                std::error_code error;
+                if (std::filesystem::exists(dir / name, error)) {
+                    shadowed.push_back((dir / name).string());
+                }
+            }
+        }
+        start = end + 1;
+    }
+    return shadowed;
+}
+
+static std::string joinPaths(const std::vector<std::string>& paths) {
+    std::string joined;
+    for (const auto& path : paths) {
+        joined += (joined.empty() ? "" : ", ") + path;
+    }
+    return joined;
+}
+
+TEST_F(EmojiFontTest, AppleImageIOCodecsAreNotShadowedByDyldLibraryPath) {
+    const auto shadowed = findShadowedImageIOCodecs();
+    EXPECT_TRUE(shadowed.empty())
+        << "DYLD_LIBRARY_PATH replaces ImageIO codec libraries used to draw Apple emoji: "
+        << joinPaths(shadowed) << ". Use DYLD_FALLBACK_LIBRARY_PATH instead.";
+}
+
+TEST_F(EmojiFontTest, AppleBitmapFontRendersColoredGlyphsWithoutGPU) {
+    const auto shadowed = findShadowedImageIOCodecs();
+    ASSERT_TRUE(shadowed.empty()) << "ImageIO codecs shadowed by DYLD_LIBRARY_PATH: "
+                                  << joinPaths(shadowed);
+    const auto path = EmojiFont::findSystemEmojiFont();
+    ASSERT_FALSE(path.empty());
+    EmojiFont emoji;
+    ASSERT_TRUE(emoji.loadFromFile(nullptr, path, 32)) << emoji.getLastError();
+    ASSERT_TRUE(emoji.hasGlyph(0x1F600));
+    ASSERT_TRUE(emoji.hasGlyph(0x1F680));
+    const auto* glyph = emoji.getGlyph(0x1F600);
+    ASSERT_NE(glyph, nullptr);
+    EXPECT_EQ(glyph->width, 32);
+    EXPECT_EQ(glyph->height, 32);
+    EXPECT_EQ(emoji.emojiSize(), 32);
+    std::vector<uint8_t> pixels(static_cast<size_t>(glyph->width) * glyph->height * 4);
+    ASSERT_TRUE(emoji.copyGlyphPixels(0x1F600, pixels.data()));
+    bool hasColor = false;
+    bool hasTransparency = false;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+        hasTransparency = hasTransparency || pixels[i + 3] == 0;
+        hasColor = hasColor || (pixels[i + 3] > 0 &&
+                                (pixels[i] != pixels[i + 1] || pixels[i + 1] != pixels[i + 2]));
+    }
+    EXPECT_TRUE(hasColor);
+    EXPECT_TRUE(hasTransparency);
+    ASSERT_NE(emoji.getAtlasTexture(), nullptr);
+    EXPECT_FALSE(emoji.getAtlasTexture()->isOnGPU());
+
+    EXPECT_FALSE(emoji.loadFromFile(nullptr, path, 16385));
+    EXPECT_FALSE(emoji.isLoaded());
+    EXPECT_TRUE(emoji.getAvailableCodepoints().empty());
+    EXPECT_EQ(emoji.getAtlasTexture(), nullptr);
+    EXPECT_FALSE(emoji.getLastError().empty());
+}
+#endif
+
+// ---- Synthetic font / collection dispatch tests ------------------------------
+
+namespace {
+
+void putU16(std::vector<uint8_t>& out, size_t at, uint32_t value) {
+    out[at] = static_cast<uint8_t>(value >> 8);
+    out[at + 1] = static_cast<uint8_t>(value);
+}
+
+void putU32(std::vector<uint8_t>& out, size_t at, uint32_t value) {
+    putU16(out, at, value >> 16);
+    putU16(out, at + 2, value & 0xFFFF);
+}
+
+std::vector<uint8_t> bytesU16(std::initializer_list<uint32_t> values) {
+    std::vector<uint8_t> out(values.size() * 2);
+    size_t at = 0;
+    for (uint32_t value : values) {
+        putU16(out, at, value);
+        at += 2;
+    }
+    return out;
+}
+
+struct SyntheticTable {
+    uint32_t tag;
+    std::vector<uint8_t> data;
+};
+
+/// Build an sfnt face whose table offsets are relative to a file in which the
+/// face starts at @p faceOffset (as required inside a TrueType collection).
+std::vector<uint8_t> buildFace(const std::vector<SyntheticTable>& tables, uint32_t faceOffset) {
+    const size_t headerSize = 12 + tables.size() * 16;
+    std::vector<uint8_t> face(headerSize, 0);
+    putU32(face, 0, 0x00010000);
+    putU16(face, 4, static_cast<uint32_t>(tables.size()));
+    for (size_t i = 0; i < tables.size(); ++i) {
+        const size_t record = 12 + i * 16;
+        putU32(face, record, tables[i].tag);
+        putU32(face, record + 8, static_cast<uint32_t>(faceOffset + face.size()));
+        putU32(face, record + 12, static_cast<uint32_t>(tables[i].data.size()));
+        face.insert(face.end(), tables[i].data.begin(), tables[i].data.end());
+        face.resize((face.size() + 3) & ~size_t{3}, 0);
+    }
+    return face;
+}
+
+/// One-glyph font mapping U+1F600 to a square drawn with a red COLR v0 layer.
+std::vector<SyntheticTable> colorEmojiTables(bool includeColor, bool includeOutlines) {
+    std::vector<uint8_t> head(54, 0);
+    putU32(head, 0, 0x00010000);
+    putU32(head, 12, 0x5F0F3CF5);
+    putU16(head, 18, 1000);  // unitsPerEm; indexToLocFormat (offset 50) = short
+    std::vector<uint8_t> hhea(36, 0);
+    putU32(hhea, 0, 0x00010000);
+    putU16(hhea, 4, 800);              // ascender
+    putU16(hhea, 6, 0x10000 - 200);    // descender
+    putU16(hhea, 34, 2);               // numberOfHMetrics
+    std::vector<uint8_t> cmap(40, 0);  // format 12, platform 3 encoding 10
+    putU16(cmap, 2, 1);
+    putU16(cmap, 4, 3);
+    putU16(cmap, 6, 10);
+    putU32(cmap, 8, 12);
+    putU16(cmap, 12, 12);
+    putU32(cmap, 16, 28);
+    putU32(cmap, 24, 1);
+    putU32(cmap, 28, 0x1F600);
+    putU32(cmap, 32, 0x1F600);
+    putU32(cmap, 36, 1);
+    // Glyph 1: square (100,0)-(900,800), one contour of four on-curve points.
+    const auto glyf = bytesU16(
+        {1, 100, 0, 900, 800, 3, 0, 0x0101, 0x0101, 100, 800, 0, 0x10000 - 800, 0, 0, 800, 0});
+
+    std::vector<SyntheticTable> tables;
+    if (includeColor) {
+        tables.push_back({0x434F4C52, bytesU16({0, 1, 0, 14, 0, 20, 1, 1, 0, 1, 1, 0})});  // COLR
+        tables.push_back({0x4350414C, bytesU16({0, 1, 1, 1, 0, 14, 0, 0, 0xFFFF})});       // CPAL
+    }
+    tables.push_back({0x636D6170, cmap});  // cmap
+    if (includeOutlines) {
+        tables.push_back({0x676C7966, glyf});  // glyf
+    }
+    tables.push_back({0x68656164, head});                            // head
+    tables.push_back({0x68686561, hhea});                            // hhea
+    tables.push_back({0x686D7478, bytesU16({1000, 0, 1000, 100})});  // hmtx
+    if (includeOutlines) {
+        tables.push_back({0x6C6F6361, bytesU16({0, 0, 17})});  // loca
+    }
+    tables.push_back({0x6D617870, bytesU16({0, 0x5000, 2})});  // maxp
+    return tables;
+}
+
+std::vector<uint8_t> buildCollection(const std::vector<SyntheticTable>& tables) {
+    std::vector<uint8_t> collection(16, 0);
+    putU32(collection, 0, 0x74746366);  // 'ttcf'
+    putU32(collection, 4, 0x00010000);
+    putU32(collection, 8, 1);
+    putU32(collection, 12, 16);
+    const auto face = buildFace(tables, 16);
+    collection.insert(collection.end(), face.begin(), face.end());
+    return collection;
+}
+
+class TempFontFile {
+  public:
+    explicit TempFontFile(const std::vector<uint8_t>& bytes) {
+        static int counter = 0;
+        m_path = std::filesystem::temp_directory_path() /
+                 ("vde_emoji_test_" +
+                  std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                  "_" + std::to_string(counter++) + ".ttf");
+        std::ofstream out(m_path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+    }
+    ~TempFontFile() {
+        std::error_code error;
+        std::filesystem::remove(m_path, error);
+    }
+    TempFontFile(const TempFontFile&) = delete;
+    TempFontFile& operator=(const TempFontFile&) = delete;
+    [[nodiscard]] std::string path() const { return m_path.string(); }
+
+  private:
+    std::filesystem::path m_path;
+};
+
+void expectRedSyntheticEmoji(const EmojiFont& emoji) {
+    ASSERT_TRUE(emoji.isLoaded());
+    ASSERT_TRUE(emoji.hasGlyph(0x1F600));
+    EXPECT_EQ(emoji.getAvailableCodepoints().size(), 1u);
+    ASSERT_NE(emoji.getAtlasTexture(), nullptr);
+    EXPECT_FALSE(emoji.getAtlasTexture()->isOnGPU());
+    std::vector<uint8_t> pixels(16 * 16 * 4);
+    ASSERT_TRUE(emoji.copyGlyphPixels(0x1F600, pixels.data()));
+    bool hasRed = false;
+    bool hasTransparency = false;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+        hasTransparency = hasTransparency || pixels[i + 3] == 0;
+        hasRed = hasRed || (pixels[i + 3] > 200 && pixels[i] > 200 && pixels[i + 1] < 50 &&
+                            pixels[i + 2] < 50);
+    }
+    EXPECT_TRUE(hasRed);
+    EXPECT_TRUE(hasTransparency);
+}
+
+}  // namespace
+
+TEST_F(EmojiFontTest, SyntheticColrFontLoads) {
+    TempFontFile file(buildFace(colorEmojiTables(true, true), 0));
+    EmojiFont emoji;
+    ASSERT_TRUE(emoji.loadFromFile(nullptr, file.path(), 16)) << emoji.getLastError();
+    expectRedSyntheticEmoji(emoji);
+}
+
+TEST_F(EmojiFontTest, ColrCollectionUsesFirstFaceTables) {
+    // A 'ttcf' header is only a container: COLR/CPAL collections must still use
+    // the COLR backend on every platform, with tables read from the selected face.
+    TempFontFile file(buildCollection(colorEmojiTables(true, true)));
+    EmojiFont emoji;
+    ASSERT_TRUE(emoji.loadFromFile(nullptr, file.path(), 16)) << emoji.getLastError();
+    expectRedSyntheticEmoji(emoji);
+}
+
+TEST_F(EmojiFontTest, CollectionWithoutColorTablesFails) {
+    TempFontFile file(buildCollection(colorEmojiTables(false, true)));
+    EmojiFont emoji;
+    EXPECT_FALSE(emoji.loadFromFile(nullptr, file.path(), 16));
+    EXPECT_FALSE(emoji.isLoaded());
+    EXPECT_NE(emoji.getLastError().find("COLR/CPAL"), std::string::npos) << emoji.getLastError();
+}
+
+TEST_F(EmojiFontTest, ColorFaceWithoutOutlineTablesFails) {
+    TempFontFile file(buildCollection(colorEmojiTables(true, false)));
+    EmojiFont emoji;
+    EXPECT_FALSE(emoji.loadFromFile(nullptr, file.path(), 16));
+    EXPECT_FALSE(emoji.isLoaded());
+    EXPECT_NE(emoji.getLastError().find("Failed to initialize"), std::string::npos)
+        << emoji.getLastError();
+}
+
+TEST_F(EmojiFontTest, MalformedFontHeadersFail) {
+    auto truncatedCollection = buildCollection(colorEmojiTables(true, true));
+    truncatedCollection.resize(14);
+
+    auto facePastEnd = buildCollection(colorEmojiTables(true, true));
+    putU32(facePastEnd, 12, 0xFFFFFF00);
+
+    auto directoryPastEnd = buildCollection(colorEmojiTables(true, true));
+    putU16(directoryPastEnd, 16 + 4, 0xFFFF);
+
+    auto unknownVersion = buildFace(colorEmojiTables(true, true), 0);
+    putU32(unknownVersion, 0, 0xDEADBEEF);
+
+    const std::vector<uint8_t> tooShort = {'t', 't', 'c', 'f'};
+
+    for (const auto& bytes :
+         {truncatedCollection, facePastEnd, directoryPastEnd, unknownVersion, tooShort}) {
+        TempFontFile file(bytes);
+        EmojiFont emoji;
+        EXPECT_FALSE(emoji.loadFromFile(nullptr, file.path(), 16));
+        EXPECT_FALSE(emoji.isLoaded());
+        EXPECT_FALSE(emoji.getLastError().empty());
+    }
 }
 
 // ---- System font tests (skipped if no emoji font is available) -------------

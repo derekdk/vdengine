@@ -19,6 +19,17 @@ For the fast inner loop while debugging one failing unit test, also consult the 
 
 ## Quick Start — VS Code Tasks (RECOMMENDED)
 
+### Native macOS
+
+Use `bash scripts/macos.sh setup` once, then `build`, `test`, `smoke`, `run <target>`,
+`lint`, or `verify`. `VDE_CONFIG=Release` selects Release. The build, build-and-test,
+test, smoke-test, verify, lint, and run-vlauncher VS Code tasks automatically use
+this native workflow on macOS; Windows commands remain unchanged.
+`verify` records `logs/verify-macos-latest.log`. Mac smoke checks are quick
+startup/render/exit checks, not the Windows metadata-driven or render-verify suite.
+`VDE_LLDB_ON_FAILURE=1` makes `test` rerun failed tests under lldb for native backtraces.
+See `scripts/README.md` for dependencies and SDK environment selection.
+
 **For standard operations, always prefer VS Code tasks over running scripts directly.** Tasks are the correct method for AI agents using the `run_task` tool and for interactive use via **Terminal → Run Task...** in VS Code.
 
 ### Available Tasks

@@ -137,7 +137,7 @@ class PhysicsWorldScene : public vde::Scene {
     }
 
     void spawnExtraBox() {
-        float x = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 4.0f;
+        float x = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) - 0.5f) * 4.0f;
         spawnSingleBox(x, 7.0f);
     }
 
@@ -182,7 +182,7 @@ class PhysicsWorldScene : public vde::Scene {
 
     void spawnSingleBox(float x, float y) {
         float halfSize = 0.25f;
-        float variation = static_cast<float>(rand()) / RAND_MAX * 0.3f;
+        float variation = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 0.3f;
         vde::Color color(m_boxColor.r + variation, m_boxColor.g - variation * 0.5f,
                          m_boxColor.b + variation * 0.2f, 1.0f);
 
