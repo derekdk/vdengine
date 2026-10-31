@@ -71,7 +71,7 @@ void SignalBreakScene::createWorldVisuals() {
     auto extraction = label("EXTRACTION", 0.32f, 0x25383b);
     sprite(extraction)->setPosition(117.8f, 4.1f, 0.3f);
     m_player = rectangle(3.0f, 0.7f, 1.45f, 1.8f, 0xffffff, 1);
-    sprite(m_player)->setTexture(m_art.player[0]);
+    sprite(m_player)->setTexture(m_art.player[PLAYER_IDLE_POSE][1]);
     for (const auto& enemy : m_gameplay.enemies()) {
         auto entity = rectangle(enemy.position.x, enemy.position.y, 1.45f, 1.8f,
                                 enemy.commander ? 0xffcf75 : 0xffffff, 1);
@@ -127,9 +127,16 @@ void SignalBreakScene::updatePresentation() {
     playerSprite->setPosition(player.x, player.y + 0.08f, 1);
     playerSprite->setFlipX(m_gameplay.facing() < 0);
     const bool running = std::abs(m_gameplay.playerVelocity().x) > 0.2f;
-    const int animation = running ? static_cast<int>(m_gameplay.time() * 10.0f) % 2 : 0;
-    if (playerSprite->getTexture() != m_art.player[animation]) {
-        playerSprite->setTexture(m_art.player[animation]);
+    int pose = PLAYER_IDLE_POSE + static_cast<int>(m_gameplay.time() * 2.5f) % 2;
+    if (!m_gameplay.grounded()) {
+        pose = PLAYER_JUMP_POSE;
+    } else if (running) {
+        pose = PLAYER_RUN_POSE + static_cast<int>(m_gameplay.time() * 12.0f) % 4;
+    }
+    const int aim = m_gameplay.aim() > 0.0f ? 2 : (m_gameplay.aim() < 0.0f ? 0 : 1);
+    const auto& frame = m_art.player[pose][aim];
+    if (playerSprite->getTexture() != frame) {
+        playerSprite->setTexture(frame);
     }
     const bool blink =
         m_gameplay.invulnerability() > 0 && static_cast<int>(m_gameplay.time() * 16.0f) % 2 == 0;

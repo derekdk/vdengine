@@ -3,7 +3,7 @@
 Signal Break is a single-player, side-scrolling run-and-gun game built with VDE.
 Cross an industrial outpost, jump onto elevated platforms, exchange fire with
 patrolling sentries, and defeat the commander guarding extraction at the far right.
-Original pixel textures are generated in memory; no downloaded assets are required.
+Original pixel art lives in `assets/signal_break/` as PNG files.
 
 ## How to play
 
@@ -50,6 +50,21 @@ physical controller hardware is not required by the automated tests.
 Alternatively launch VLauncher with `.\scripts\run-vlauncher.ps1` and select the
 `vde_signal_break` game. Run commands from the repository root.
 
+## Art Assets
+
+Edit the PNGs in `assets/signal_break/` with any image editor and rebuild; the
+build copies them next to the executable. No code changes are needed.
+
+| File | Layout |
+|------|--------|
+| `player.png` | Gunslinger frame grid. Columns: aim down, level, up. Rows: idle 1-2, run 1-4, jump |
+| `enemy.png` | Two sentry walk frames side by side |
+| `sky.png`, `skyline.png`, `metal.png` | Single background, parallax and platform textures |
+
+Sprite sheets are drawn at native pixel size and enlarged 4x when loaded. Frame
+size comes from the sheet size divided by its grid, so the frames can be resized
+as long as every frame in a sheet stays the same size.
+
 ## Code Organization
 
 | Files | Responsibility |
@@ -58,7 +73,7 @@ Alternatively launch VLauncher with `.\scripts\run-vlauncher.ps1` and select the
 | `Input.h`, `Input.cpp` | Keyboard and gamepad actions |
 | `Level.h`, `Level.cpp` | Platform layout, enemy spawns, tuning constants |
 | `Gameplay.h`, `Gameplay.cpp` | Player movement, enemy AI, combat, checkpoints and run state |
-| `Artwork.h`, `Artwork.cpp` | Original character, sky, skyline and metal textures |
+| `Artwork.h`, `Artwork.cpp` | Loads and slices the PNG art in `assets/signal_break/` |
 | `SignalBreakScene.h`, `SignalBreakScene.cpp` | VDE scene lifecycle and script diagnostics |
 | `Presentation.cpp` | Camera, scenery, pooled effects, animation and HUD |
 
