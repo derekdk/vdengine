@@ -280,7 +280,7 @@ VDE uses CMake FetchContent for most dependencies. Only the Vulkan SDK requires 
 | **Vulkan SDK** | 1.3+ | Graphics API — **system install required** |
 | **GLFW** | 3.4 | Window/input management |
 | **GLM** | 1.0.1 | Mathematics library |
-| **glslang** | 14.3.0 | Runtime GLSL → SPIR-V compilation |
+| **glslang** | 15.0.0 | Runtime GLSL → SPIR-V compilation |
 | **stb_image** | v2.30 | Image loading |
 | **miniaudio** | 0.11.21 | Cross-platform audio |
 | **SQLite3** | 3.49.1 | Persistent key-value storage |

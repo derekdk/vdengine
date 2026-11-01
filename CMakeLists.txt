@@ -86,7 +86,7 @@ include(FetchContent)
 FetchContent_Declare(
     glslang
     GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
-    GIT_TAG 14.3.0
+    GIT_TAG 15.0.0
 )
 
 # Configure glslang options before fetching
