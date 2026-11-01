@@ -11,10 +11,10 @@ their existing behavior.
 
 | Command | Purpose |
 |---------|---------|
-| `bash scripts/macos.sh setup` | Install the dependencies in `scripts/Brewfile.macos`, enable Git LFS locally, and fetch assets |
+| `bash scripts/macos.sh setup` | Install the dependencies in `scripts/Brewfile.macos`, enable Git LFS and repository hooks locally, and fetch assets |
 | `bash scripts/macos.sh build` | Configure Ninja and build all examples, games, tools, and unit tests |
 | `bash scripts/macos.sh build vde_vlauncher` | Build a specific target |
-| `bash scripts/macos.sh test` | Run all registered CTest unit tests after building |
+| `bash scripts/macos.sh test` | Run all registered CTest unit tests in parallel after building |
 | `bash scripts/macos.sh test 'VLauncherUtilitiesTest'` | Run tests matching a CTest regular expression |
 | `bash scripts/macos.sh smoke` | Run quick startup/render/scripted-exit checks, plus actual audio playback for the audio demo |
 | `bash scripts/macos.sh smoke '*sprite*'` | Filter quick smoke checks by executable-name glob |
@@ -35,6 +35,8 @@ their existing behavior.
 - Homebrew is discovered dynamically, supporting both `/opt/homebrew` on Apple
   Silicon and `/usr/local` on Intel. Use a native terminal/toolchain rather than
   mixing ARM and Rosetta libraries.
+- Unit tests use the logical CPU count for parallel CTest execution by default.
+  Set `VDE_JOBS` to a positive integer to limit concurrency for build and test.
 - Alternatively set `VULKAN_SDK` to an installed LunarG SDK's **macOS** directory.
   The scripts configure CMake search paths, loader library paths, the MoltenVK
   ICD manifest, and validation-layer discovery for their child processes only.

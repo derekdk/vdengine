@@ -9,6 +9,7 @@ This folder contains documentation for the Vulkan Display Engine.
 - [Getting Started](GETTING_STARTED.md) - Quick start guide
 - [Architecture](ARCHITECTURE.md) - System design and architecture
 - [Contributing](CONTRIBUTING.md) - Guidelines for contributors
+- [Dev Workflow Recommendations](DEV_WORKFLOW_RECOMMENDATIONS.md) - Cross-platform (Windows/macOS) tooling review and prioritized improvements
 - [Git LFS Setup](GIT_LFS_SETUP.md) - Git Large File Storage configuration and usage
 - [Open Suggestions](OPEN_SUGGESTIONS.md) - Historical backlog context; not the canonical current status
 

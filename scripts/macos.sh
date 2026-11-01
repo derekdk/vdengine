@@ -12,7 +12,7 @@ require() { command -v "$1" >/dev/null 2>&1 || fail "Missing $1. Run: bash scrip
 if [ "$command_name" = help ] || [ "$command_name" = --help ]; then
     cat <<'HELP'
 Usage: bash scripts/macos.sh <command> [arguments]
-  setup                  Install Homebrew dependencies and retrieve Git LFS assets
+  setup                  Install dependencies, Git LFS assets, and repository hooks
   build [target ...]     Configure and build (all targets by default)
   test [ctest regex]    Run registered unit tests (requires a build)
   smoke [name glob]     Quick startup/render/exit checks for built apps
@@ -40,7 +40,8 @@ if [ "$command_name" = setup ]; then
     brew bundle --file="$root/scripts/Brewfile.macos"
     git -C "$root" lfs install --local
     git -C "$root" lfs pull
-    printf 'PASS: macOS dependencies and assets installed.\n'
+    git -C "$root" config --local core.hooksPath .githooks
+    printf 'PASS: macOS dependencies, assets, and git hooks installed.\n'
     exit 0
 fi
 
@@ -130,7 +131,8 @@ unit_tests() {
     require ctest
     check_build
     local status=0
-    ctest --test-dir "$build_dir" --output-on-failure --no-tests=error -R "${1:-.}" || status=$?
+    ctest --test-dir "$build_dir" --output-on-failure --no-tests=error \
+        --parallel "$jobs" -R "${1:-.}" || status=$?
     if [ "$status" -ne 0 ]; then
         if [ "${VDE_LLDB_ON_FAILURE:-0}" = 1 ]; then crash_backtraces; fi
         fail "macOS unit tests failed (ctest exit $status)"
