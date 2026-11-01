@@ -152,7 +152,7 @@ windows:
     - uses: actions/checkout@v4
       with: { lfs: true }
     - uses: humbletim/install-vulkan-sdk@v1   # or the LunarG installer
-      with: { version: 1.3.290.0, cache: true }
+      with: { version: 1.4.309.0, cache: true }
     - uses: ilammy/msvc-dev-cmd@v1
     - run: cmake --preset windows-debug        # see 3.4
     - run: cmake --build --preset windows-debug
