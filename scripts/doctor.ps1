@@ -87,9 +87,29 @@ Write-Check "glslangValidator $glslangVersion" ($null -ne $glslangVersion) "Inst
 $vulkanSdk = $env:VULKAN_SDK
 $loaderPath = if ($vulkanSdk) { Join-Path $vulkanSdk "Bin\vulkan-1.dll" } else { "" }
 $icdPath = if ($vulkanSdk) { Join-Path $vulkanSdk "Bin\VkICD" } else { "" }
-$hasSdkIcd = $icdPath -and (Test-Path $icdPath) -and @(Get-ChildItem -Path $icdPath -Filter "*.json" -ErrorAction SilentlyContinue).Count -gt 0
-$hasRegisteredIcd = Test-Path "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
-Write-Check "Vulkan SDK loader and ICD" ((Test-Path $loaderPath) -and ($hasSdkIcd -or $hasRegisteredIcd)) "Install the Vulkan SDK and configure a Vulkan ICD."
+$hasSdkLoader = $vulkanSdk -and (Test-Path -LiteralPath $loaderPath -PathType Leaf)
+$hasSdkIcd = $vulkanSdk -and (Test-Path -LiteralPath $icdPath -PathType Container) -and
+    @(Get-ChildItem -Path $icdPath -Filter "*.json" -File -ErrorAction SilentlyContinue).Count -gt 0
+$driverOverride = if ($env:VK_DRIVER_FILES) { $env:VK_DRIVER_FILES } else { $env:VK_ICD_FILENAMES }
+if (-not [string]::IsNullOrWhiteSpace($driverOverride)) {
+    $overridePaths = @($driverOverride -split ";" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $hasIcd = $overridePaths.Count -gt 0 -and
+        @($overridePaths | Where-Object { -not (Test-Path -LiteralPath $_) }).Count -eq 0
+} else {
+    $adapterIcdPaths = @()
+    foreach ($registryPath in @(
+        "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\*",
+        "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{5c4c3332-344d-483c-8739-259e934c9cc8}\*"
+    )) {
+        $adapterIcdPaths += @(Get-ItemProperty -Path $registryPath -Name VulkanDriverName, VulkanDriverNameWow -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.VulkanDriverName; $_.VulkanDriverNameWow })
+    }
+    $hasAdapterIcd = @($adapterIcdPaths | Where-Object { $_ -and (Test-Path -LiteralPath $_) }).Count -gt 0
+    $hasRegisteredIcd = Test-Path "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+    $hasIcd = $hasSdkIcd -or $hasAdapterIcd -or $hasRegisteredIcd
+}
+$hasVulkanLoader = $hasSdkLoader
+Write-Check "Vulkan loader and ICD" ($hasVulkanLoader -and $hasIcd) "Install the Vulkan SDK or configure a Vulkan ICD."
 
 $vsWhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 $vsFound = $false
@@ -100,8 +120,12 @@ if (Test-Path $vsWhere) {
 Write-Check "MSVC C++ build tools" $vsFound "Install Visual Studio 2022 with the Desktop development with C++ workload."
 
 $null = & git -C $repoRoot lfs fsck 2>&1
-$lfsPassed = $LASTEXITCODE -eq 0
-Write-Check "Git LFS assets" $lfsPassed "Run: git lfs pull"
+$lfsFsckPassed = $LASTEXITCODE -eq 0
+$lfsListing = & git -C $repoRoot lfs ls-files --long 2>&1
+$lfsListPassed = $LASTEXITCODE -eq 0
+$unmaterializedLfsFiles = @($lfsListing | Where-Object { "$_" -match "^[0-9a-f]{64} - " })
+$lfsPassed = $lfsFsckPassed -and $lfsListPassed -and $unmaterializedLfsFiles.Count -eq 0
+Write-Check "Git LFS assets" $lfsPassed "Run: git lfs pull; git lfs checkout"
 
 $hooksPath = & git -C $repoRoot config --local --get core.hooksPath 2>$null
 $hooksPassed = $LASTEXITCODE -eq 0 -and $hooksPath -eq ".githooks"

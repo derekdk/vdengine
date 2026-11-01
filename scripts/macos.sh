@@ -47,7 +47,7 @@ if [ "$command_name" = setup ]; then
     export PATH
     python3 -m venv "$root/.venv"
     "$root/.venv/bin/python" -m pip install --disable-pip-version-check "clang-format==21.1.8"
-    git -C "$root" lfs install --local
+    git -C "$root" lfs install --local --skip-repo
     git -C "$root" lfs pull
     git -C "$root" config --local core.hooksPath .githooks
     printf 'PASS: macOS dependencies, clang-format, assets, and git hooks installed.\n'
@@ -86,10 +86,12 @@ if [ -z "${VK_LAYER_PATH:-}" ] && [ -d "$prefix/share/vulkan/explicit_layer.d" ]
 fi
 
 doctor() {
-    local failures=0 version loader_prefix molten_prefix manifest hooks_path override
+    local failures=0 version loader_prefix molten_prefix manifest hooks_path override lfs_listing
     printf 'VDE macOS preflight\n'
 
-    if brew bundle check --file="$root/scripts/Brewfile.macos" >/dev/null 2>&1; then
+    if [ -n "${VULKAN_SDK:-}" ]; then
+        printf 'PASS: Using Vulkan SDK (%s).\n' "$VULKAN_SDK"
+    elif brew bundle check --file="$root/scripts/Brewfile.macos" >/dev/null 2>&1; then
         printf 'PASS: Homebrew dependencies are installed.\n'
     else
         printf 'FAIL: Homebrew dependencies are missing. Fix: bash scripts/macos.sh setup\n'
@@ -126,15 +128,29 @@ doctor() {
         failures=$((failures + 1))
     fi
 
-    loader_prefix="$(brew --prefix vulkan-loader 2>/dev/null || true)"
-    if [ -n "$loader_prefix" ] && [ -d "$loader_prefix/lib" ]; then
-        printf 'PASS: Vulkan loader found (%s).\n' "$loader_prefix"
+    if [ -n "${VULKAN_SDK:-}" ]; then
+        loader_prefix="$VULKAN_SDK"
+        if [ -f "$loader_prefix/lib/libvulkan.1.dylib" ]; then
+            printf 'PASS: Vulkan loader found (%s).\n' "$loader_prefix/lib/libvulkan.1.dylib"
+        else
+            printf 'FAIL: Vulkan loader is missing from VULKAN_SDK. Fix: install or select a complete LunarG Vulkan SDK.\n'
+            failures=$((failures + 1))
+        fi
     else
-        printf 'FAIL: Vulkan loader is missing. Fix: brew bundle --file=scripts/Brewfile.macos\n'
-        failures=$((failures + 1))
+        loader_prefix="$(brew --prefix vulkan-loader 2>/dev/null || true)"
+        if [ -n "$loader_prefix" ] && [ -d "$loader_prefix/lib" ]; then
+            printf 'PASS: Vulkan loader found (%s).\n' "$loader_prefix"
+        else
+            printf 'FAIL: Vulkan loader is missing. Fix: brew bundle --file=scripts/Brewfile.macos\n'
+            failures=$((failures + 1))
+        fi
     fi
 
-    molten_prefix="$(brew --prefix molten-vk 2>/dev/null || true)"
+    if [ -n "${VULKAN_SDK:-}" ]; then
+        molten_prefix="$VULKAN_SDK"
+    else
+        molten_prefix="$(brew --prefix molten-vk 2>/dev/null || true)"
+    fi
     manifest=""
     for candidate in "$molten_prefix/share/vulkan/icd.d/MoltenVK_icd.json" \
                      "$molten_prefix/etc/vulkan/icd.d/MoltenVK_icd.json"; do
@@ -153,7 +169,17 @@ doctor() {
     fi
 
     if git -C "$root" lfs fsck >/dev/null 2>&1; then
-        printf 'PASS: Git LFS objects are present.\n'
+        if lfs_listing="$(git -C "$root" lfs ls-files --long 2>/dev/null)"; then
+            if printf '%s\n' "$lfs_listing" | grep -Eq '^[0-9a-f]{64} - '; then
+                printf 'FAIL: Git LFS assets are still pointer files. Fix: git -C "%s" lfs pull && git -C "%s" lfs checkout\n' "$root" "$root"
+                failures=$((failures + 1))
+            else
+                printf 'PASS: Git LFS assets are present in the working tree.\n'
+            fi
+        else
+            printf 'FAIL: Could not verify Git LFS working-tree assets. Fix: git -C "%s" lfs pull\n' "$root"
+            failures=$((failures + 1))
+        fi
     else
         printf 'FAIL: Git LFS objects are missing or invalid. Fix: git -C "%s" lfs pull\n' "$root"
         failures=$((failures + 1))
@@ -350,6 +376,6 @@ case "$command_name" in
         ;;
     verify)
         mkdir -p "$root/logs"
-        (doctor && build && unit_tests && smoke && lint) 2>&1 | tee "$root/logs/verify-macos-latest.log"
+        (doctor; build; unit_tests; smoke; lint) 2>&1 | tee "$root/logs/verify-macos-latest.log"
         ;;
 esac
