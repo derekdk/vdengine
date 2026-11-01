@@ -203,11 +203,11 @@ build() {
     cmake -S "$root" -B "$build_dir" -G Ninja \
         "-DCMAKE_BUILD_TYPE=$config" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DVDE_BUILD_EXAMPLES=ON -DVDE_BUILD_GAMES=ON -DVDE_BUILD_TOOLS=ON -DVDE_BUILD_TESTS=ON \
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 || return $?
     if [ "$#" -gt 0 ]; then
-        cmake --build "$build_dir" --parallel "$jobs" --target "$@"
+        cmake --build "$build_dir" --parallel "$jobs" --target "$@" || return $?
     else
-        cmake --build "$build_dir" --parallel "$jobs"
+        cmake --build "$build_dir" --parallel "$jobs" || return $?
     fi
     printf 'PASS: macOS %s build.\n' "$config"
 }
@@ -376,6 +376,22 @@ case "$command_name" in
         ;;
     verify)
         mkdir -p "$root/logs"
-        (doctor; build; unit_tests; smoke; lint) 2>&1 | tee "$root/logs/verify-macos-latest.log"
+        (
+            doctor
+            status=$?
+            [ "$status" -eq 0 ] || exit "$status"
+            build
+            status=$?
+            [ "$status" -eq 0 ] || exit "$status"
+            unit_tests
+            status=$?
+            [ "$status" -eq 0 ] || exit "$status"
+            smoke
+            status=$?
+            [ "$status" -eq 0 ] || exit "$status"
+            lint
+            status=$?
+            [ "$status" -eq 0 ] || exit "$status"
+        ) 2>&1 | tee "$root/logs/verify-macos-latest.log"
         ;;
 esac
