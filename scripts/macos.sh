@@ -8,11 +8,16 @@ if [ "$#" -gt 0 ]; then shift; fi
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 require() { command -v "$1" >/dev/null 2>&1 || fail "Missing $1. Run: bash scripts/macos.sh setup"; }
+if [ -x "$root/.venv/bin/clang-format" ]; then
+    PATH="$root/.venv/bin:$PATH"
+    export PATH
+fi
 
 if [ "$command_name" = help ] || [ "$command_name" = --help ]; then
     cat <<'HELP'
 Usage: bash scripts/macos.sh <command> [arguments]
   setup                  Install dependencies, Git LFS assets, and repository hooks
+  doctor                 Check required tools, Vulkan, Git LFS assets, and hooks
   build [target ...]     Configure and build (all targets by default)
   test [ctest regex]    Run registered unit tests (requires a build)
   smoke [name glob]     Quick startup/render/exit checks for built apps
@@ -32,16 +37,20 @@ HELP
 fi
 
 [ "$(uname -s)" = Darwin ] || fail "This workflow is for macOS. Use the existing PowerShell scripts on Windows."
-case "$command_name" in setup|build|test|smoke|run|lint|verify) ;; *) fail "Unknown command: $command_name (use help)" ;; esac
+case "$command_name" in setup|doctor|build|test|smoke|run|lint|verify) ;; *) fail "Unknown command: $command_name (use help)" ;; esac
 
 if [ "$command_name" = setup ]; then
     require brew
     xcode-select -p >/dev/null || fail "Install Apple command-line tools with: xcode-select --install"
     brew bundle --file="$root/scripts/Brewfile.macos"
+    PATH="$(brew --prefix)/bin:$PATH"
+    export PATH
+    python3 -m venv "$root/.venv"
+    "$root/.venv/bin/python" -m pip install --disable-pip-version-check "clang-format==21.1.8"
     git -C "$root" lfs install --local
     git -C "$root" lfs pull
     git -C "$root" config --local core.hooksPath .githooks
-    printf 'PASS: macOS dependencies, assets, and git hooks installed.\n'
+    printf 'PASS: macOS dependencies, clang-format, assets, and git hooks installed.\n'
     exit 0
 fi
 
@@ -60,7 +69,7 @@ else
     prefix="$(brew --prefix)"
 fi
 export CMAKE_PREFIX_PATH="$prefix${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
-export PATH="$prefix/bin:$PATH"
+export PATH="$root/.venv/bin:$prefix/bin:$PATH"
 # Use the fallback path so leaf-name dlopen() calls (GLFW's libvulkan.1.dylib) find
 # SDK libraries without overriding system dylibs. DYLD_LIBRARY_PATH is searched
 # before install names, so on case-insensitive APFS Homebrew's libpng/libjpeg/libgif
@@ -75,6 +84,92 @@ fi
 if [ -z "${VK_LAYER_PATH:-}" ] && [ -d "$prefix/share/vulkan/explicit_layer.d" ]; then
     export VK_LAYER_PATH="$prefix/share/vulkan/explicit_layer.d"
 fi
+
+doctor() {
+    local failures=0 version loader_prefix molten_prefix manifest hooks_path override
+    printf 'VDE macOS preflight\n'
+
+    if brew bundle check --file="$root/scripts/Brewfile.macos" >/dev/null 2>&1; then
+        printf 'PASS: Homebrew dependencies are installed.\n'
+    else
+        printf 'FAIL: Homebrew dependencies are missing. Fix: bash scripts/macos.sh setup\n'
+        failures=$((failures + 1))
+    fi
+
+    for tool in cmake ninja git git-lfs python3 glslangValidator; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            case "$tool" in
+                cmake) version="$(cmake --version | head -n 1)" ;;
+                ninja) version="$(ninja --version)" ;;
+                git) version="$(git --version)" ;;
+                git-lfs) version="$(git-lfs version)" ;;
+                python3) version="$(python3 --version)" ;;
+                glslangValidator) version="$(glslangValidator --version | head -n 1)" ;;
+            esac
+            printf 'PASS: %s (%s).\n' "$tool" "$version"
+        else
+            printf 'FAIL: %s is missing. Fix: bash scripts/macos.sh setup\n' "$tool"
+            failures=$((failures + 1))
+        fi
+    done
+
+    if command -v clang-format >/dev/null 2>&1; then
+        version="$(clang-format --version)"
+        if printf '%s\n' "$version" | grep -Eq '(^|[^0-9])21\.1\.8([^0-9]|$)'; then
+            printf 'PASS: clang-format is pinned (%s).\n' "$version"
+        else
+            printf 'FAIL: clang-format must be version 21.1.8 (found %s). Fix: bash scripts/macos.sh setup\n' "$version"
+            failures=$((failures + 1))
+        fi
+    else
+        printf 'FAIL: clang-format 21.1.8 is missing. Fix: bash scripts/macos.sh setup\n'
+        failures=$((failures + 1))
+    fi
+
+    loader_prefix="$(brew --prefix vulkan-loader 2>/dev/null || true)"
+    if [ -n "$loader_prefix" ] && [ -d "$loader_prefix/lib" ]; then
+        printf 'PASS: Vulkan loader found (%s).\n' "$loader_prefix"
+    else
+        printf 'FAIL: Vulkan loader is missing. Fix: brew bundle --file=scripts/Brewfile.macos\n'
+        failures=$((failures + 1))
+    fi
+
+    molten_prefix="$(brew --prefix molten-vk 2>/dev/null || true)"
+    manifest=""
+    for candidate in "$molten_prefix/share/vulkan/icd.d/MoltenVK_icd.json" \
+                     "$molten_prefix/etc/vulkan/icd.d/MoltenVK_icd.json"; do
+        if [ -f "$candidate" ]; then manifest="$candidate"; break; fi
+    done
+    override="${VK_DRIVER_FILES:-${VK_ICD_FILENAMES:-}}"
+    if [ -z "$manifest" ] && [ -n "$override" ]; then
+        case "$override" in *:*) override="${override%%:*}" ;; esac
+        [ -f "$override" ] && manifest="$override"
+    fi
+    if [ -n "$manifest" ]; then
+        printf 'PASS: Vulkan ICD is available%s.\n' "${manifest:+ ($manifest)}"
+    else
+        printf 'FAIL: MoltenVK ICD manifest is missing. Fix: brew bundle --file=scripts/Brewfile.macos\n'
+        failures=$((failures + 1))
+    fi
+
+    if git -C "$root" lfs fsck >/dev/null 2>&1; then
+        printf 'PASS: Git LFS objects are present.\n'
+    else
+        printf 'FAIL: Git LFS objects are missing or invalid. Fix: git -C "%s" lfs pull\n' "$root"
+        failures=$((failures + 1))
+    fi
+
+    hooks_path="$(git -C "$root" config --local --get core.hooksPath 2>/dev/null || true)"
+    if [ "$hooks_path" = ".githooks" ]; then
+        printf 'PASS: Repository hooks are enabled.\n'
+    else
+        printf 'FAIL: Repository hooks are not enabled. Fix: bash scripts/macos.sh setup\n'
+        failures=$((failures + 1))
+    fi
+
+    [ "$failures" -eq 0 ] || fail "Preflight found $failures problem(s)"
+    printf 'PASS: macOS preflight checks.\n'
+}
 
 build() {
     require cmake
@@ -214,9 +309,12 @@ smoke() {
 }
 
 lint() {
-    local file formatter glslang_validator
+    local file formatter glslang_validator version
     require clang-format
     formatter="$(command -v clang-format)"
+    version="$("$formatter" --version)"
+    printf '%s\n' "$version" | grep -Eq '(^|[^0-9])21\.1\.8([^0-9]|$)' ||
+        fail "clang-format 21.1.8 is required (found $version). Run: bash scripts/macos.sh setup"
     bash -n "$root/scripts/macos.sh"
     if command -v shellcheck >/dev/null 2>&1; then
         shellcheck "$root/scripts/macos.sh"
@@ -237,6 +335,7 @@ lint() {
 }
 
 case "$command_name" in
+    doctor) doctor ;;
     build) build "$@" ;;
     test) unit_tests "$@" ;;
     smoke) smoke "$@" ;;
@@ -251,6 +350,6 @@ case "$command_name" in
         ;;
     verify)
         mkdir -p "$root/logs"
-        (build; unit_tests; smoke; lint) 2>&1 | tee "$root/logs/verify-macos-latest.log"
+        (doctor && build && unit_tests && smoke && lint) 2>&1 | tee "$root/logs/verify-macos-latest.log"
         ;;
 esac

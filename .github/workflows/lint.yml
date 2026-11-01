@@ -24,6 +24,11 @@ jobs:
       - name: Install clang-format
         run: pip install "clang-format==21.1.8"
 
+      - name: Verify clang-format version
+        run: |
+          clang-format --version
+          clang-format --version | grep -Eq '(^|[^0-9])21\.1\.8([^0-9]|$)'
+
       - name: Check C++ formatting
         run: |
           echo "::group::Finding C++ files"

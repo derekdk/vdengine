@@ -163,7 +163,22 @@ Write-Log "  VDE Verification" "Cyan"
 Write-Log "  Generator : $Generator   Config : $Config" "Cyan"
 Write-LogDivider "Cyan"
 
-# Stage 1: Build
+# Stage 1: Preflight
+$doctorPass = Invoke-Stage "PREFLIGHT" "doctor.ps1" @("-Generator", $Generator)
+$stageResults["PREFLIGHT"] = $doctorPass
+if (-not $doctorPass) {
+    $overallPass = $false
+    Write-Log ""
+    Write-LogDivider "Red"
+    Write-Log "  OVERALL: FAILED (preflight failed; remaining stages skipped)" "Red"
+    Write-LogDivider "Red"
+    Write-Log ""
+    Write-Log "Log:     $latestLog"
+    Write-Log "Archive: $archiveLog"
+    exit 1
+}
+
+# Stage 2: Build
 if (-not $SkipBuild) {
     $buildArgs = @("-Generator", $Generator, "-Config", $Config)
     $buildPass = Invoke-Stage "BUILD" "build.ps1" $buildArgs
@@ -182,14 +197,14 @@ if (-not $SkipBuild) {
     }
 }
 
-# Stage 2: Unit Tests
+# Stage 3: Unit Tests
 $testArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
 if ($Filter) { $testArgs += "-Filter", $Filter }
 $testPass = Invoke-Stage "UNIT TESTS" "test.ps1" $testArgs
 $stageResults["UNIT TESTS"] = $testPass
 if (-not $testPass) { $overallPass = $false }
 
-# Stage 3: Smoke Tests
+# Stage 4: Smoke Tests
 if (-not $SkipSmoke) {
     $smokeArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
     if ($SmokeFilter) { $smokeArgs += "-Filter", $SmokeFilter }
@@ -204,7 +219,7 @@ if (-not $SkipSmoke) {
     if (-not $smokePass) { $overallPass = $false }
 }
 
-# Stage 4: Render Verification
+# Stage 5: Render Verification
 if (-not $SkipRenderVerify) {
     $renderArgs = @("-Generator", $Generator, "-Config", $Config, "-ProblemsOnly")
     if ($SmokeFilter) { $renderArgs += "-Filter", $SmokeFilter }
@@ -214,7 +229,7 @@ if (-not $SkipRenderVerify) {
     if (-not $renderPass) { $overallPass = $false }
 }
 
-# Stage 5: Lint
+# Stage 6: Lint
 if (-not $SkipLint) {
     $lintArgs = @('-Generator', $Generator)
     if (-not $FullLint) {

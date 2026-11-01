@@ -59,6 +59,7 @@ _deps/
 
 # Package manager
 vcpkg_installed/
+.venv/
 
 # CMake generated
 CMakeCache.txt

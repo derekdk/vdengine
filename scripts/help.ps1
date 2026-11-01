@@ -20,6 +20,7 @@ Write-Cmd '.\scripts\build.ps1' 'Build the project (default Ninja Debug)'
 Write-Cmd '.\scripts\rebuild.ps1' 'Clean and rebuild'
 Write-Cmd '.\scripts\clean.ps1' 'Clean build artifacts'
 Write-Cmd '.\scripts\clean-all.ps1' 'Clean both Ninja and MSBuild build directories'
+Write-Cmd '.\scripts\doctor.ps1' 'Check required tools, Vulkan SDK, Git LFS assets, and repository hooks'
 Write-Cmd '.\scripts\test.ps1' 'Run unit tests'
 Write-Cmd '.\scripts\smoke-test.ps1' 'Run changed-only smoke tests (default)'
 Write-Cmd '.\scripts\smoke-test.ps1 -ChangedOnly' 'Run smoke tests affected by changed source/header or shader files; auto-resolve a committed Git base when available'
@@ -60,6 +61,7 @@ Write-Cmd '.\scripts\install-hooks.ps1' 'Enable local main-branch commit protect
 
 Write-Title "COMMON TASKS"
 Write-Cmd '.\scripts\build.ps1' 'Fast incremental build (Ninja)'
+Write-Cmd '.\scripts\doctor.ps1' 'Check setup before starting an expensive verification run'
 Write-Cmd '.\scripts\test.ps1 -Filter "Camera*"' 'Run specific tests'
 Write-Cmd '.\scripts\test.ps1 -ProblemsOnly' 'Show only warnings/failures plus final status'
 Write-Cmd '.\scripts\smoke-test.ps1 -ProblemsOnly' 'Show only smoke-test warnings/failures plus final status'

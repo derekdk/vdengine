@@ -16,7 +16,7 @@ permissions:
 jobs:
   macos:
     name: Build & Test (macOS)
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,8 @@ jobs:
           lfs: true
       - name: Install native dependencies
         run: bash scripts/macos.sh setup
+      - name: Check macOS build environment
+        run: bash scripts/macos.sh doctor
       - name: Build
         run: bash scripts/macos.sh build
       - name: Run unit tests
@@ -38,10 +40,38 @@ jobs:
           path: logs/macos-lldb-*.log
           if-no-files-found: ignore
 
+  windows:
+    name: Build & Test (Windows MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1
+        with:
+          version: 1.3.290.0
+          cache: true
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install pinned clang-format
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install "clang-format==21.1.8"
+      - name: Enable repository hooks
+        run: .\scripts\install-hooks.ps1
+      - name: Check Windows build environment
+        run: .\scripts\doctor.ps1
+      - name: Build
+        run: .\scripts\build.ps1 -Generator Ninja
+      - name: Run unit tests
+        run: .\scripts\test.ps1 -Generator Ninja
+
   # The Linux sanitizer job cannot compile the CoreText/CoreGraphics emoji path.
   macos-emoji-sanitizer:
     name: Emoji tests (macOS ASan+UBSan)
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +79,8 @@ jobs:
           lfs: true
       - name: Install native dependencies
         run: bash scripts/macos.sh setup
+      - name: Check macOS build environment
+        run: bash scripts/macos.sh doctor
       - name: Configure and build tests with sanitizers
         run: |
           cmake -S . -B build_asan -G Ninja \

@@ -27,6 +27,27 @@
       "problemMatcher": []
     },
     {
+      "label": "scripts: doctor",
+      "osx": {
+        "command": "bash",
+        "args": ["${workspaceFolder}/scripts/macos.sh", "doctor"]
+      },
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/doctor.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "scripts: rebuild",
       "type": "shell",
       "command": "powershell",

@@ -11,7 +11,8 @@ their existing behavior.
 
 | Command | Purpose |
 |---------|---------|
-| `bash scripts/macos.sh setup` | Install the dependencies in `scripts/Brewfile.macos`, enable Git LFS and repository hooks locally, and fetch assets |
+| `bash scripts/macos.sh setup` | Install dependencies and pinned clang-format, enable Git LFS and repository hooks locally, and fetch assets |
+| `bash scripts/macos.sh doctor` | Check required tools, Vulkan, Git LFS assets, and hooks before verification |
 | `bash scripts/macos.sh build` | Configure Ninja and build all examples, games, tools, and unit tests |
 | `bash scripts/macos.sh build vde_vlauncher` | Build a specific target |
 | `bash scripts/macos.sh test` | Run all registered CTest unit tests in parallel after building |
@@ -27,9 +28,13 @@ their existing behavior.
 
 - Install Homebrew and Apple command-line tools (`xcode-select --install`) first.
   A recent Apple Clang with C++20 library support is required.
-- `setup` installs CMake, Ninja, Git LFS, clang-format, glslangValidator, Vulkan
+- `setup` installs CMake, Ninja, Git LFS, glslangValidator, Vulkan
   headers/loader, MoltenVK, and validation layers. GLFW, GLM, glslang libraries,
   and other source dependencies continue to be fetched by CMake, as on Windows.
+- `setup` uses the system Python 3 to install clang-format 21.1.8 into the
+  ignored repo-local `.venv`.
+  Run `doctor` before verification to check tools and their versions, Vulkan
+  loader/ICD, Git LFS assets, and repository hooks.
 - Native audio links CoreAudio/AudioUnit/AudioToolbox. Apple Color Emoji bitmap
   fonts use CoreText and CoreGraphics; COLR/CPAL rendering on Windows is unchanged.
 - Homebrew is discovered dynamically, supporting both `/opt/homebrew` on Apple
@@ -80,6 +85,7 @@ signing, and distribution packaging are not provided by this development workflo
 
 | Script | Purpose | Quick Example |
 |--------|---------|---------------|
+| **doctor.ps1** | Check required tools, Vulkan SDK, Git LFS assets, and hooks | `.\scripts\doctor.ps1` |
 | **build.ps1** | Build the project | `.\scripts\build.ps1` |
 | **rebuild.ps1** | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator Ninja` |
 | **clean.ps1** | Clean build artifacts | `.\scripts\clean.ps1 -Full` |
@@ -98,6 +104,32 @@ signing, and distribution packaging are not provided by this development workflo
 | **install-hooks.ps1** | Configure repo-managed Git hooks | `.\scripts\install-hooks.ps1` |
 | **benchmark-compile.ps1** | Capture per-TU compile timing for benchmarking | `.\scripts\benchmark-compile.ps1 -Label "baseline"` |
 | **compare-benchmarks.ps1** | Compare two benchmark reports | `.\scripts\compare-benchmarks.ps1 -Baseline baseline -Candidate candidate` |
+
+### doctor.ps1
+
+Checks the Windows prerequisites and local repository state before an expensive
+build or verification run. `verify.ps1` runs this check first and stops before
+building if any prerequisite is missing.
+
+**Syntax:**
+```powershell
+.\scripts\doctor.ps1 [-Generator Ninja|MSBuild]
+```
+
+**Parameters:**
+- `-Generator` - Build system to check (`Ninja` by default)
+
+**Examples:**
+```powershell
+.\scripts\doctor.ps1
+.\scripts\doctor.ps1 -Generator MSBuild
+```
+
+Install the project's pinned formatter in the repo-local environment with:
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install clang-format==21.1.8
+```
 
 ## Quick Start
 
@@ -446,7 +478,7 @@ Changed-header clang-tidy runs use a local heuristic: paired source files first,
 ```
 
 **Tool Installation:**
-- **clang-format:** Visual Studio C++ clang tools or LLVM distribution
+- **clang-format:** Version 21.1.8 in the repo-local `.venv` (`bash scripts/macos.sh setup` on macOS, or `python -m venv .venv` followed by `.\.venv\Scripts\python.exe -m pip install clang-format==21.1.8` on Windows)
 - **glslangValidator:** Vulkan SDK
 - **cppcheck:** https://cppcheck.sourceforge.io/ or package manager
 - **clang-tidy:** Visual Studio C++ clang tools or LLVM distribution
@@ -895,7 +927,10 @@ The old `build-and-test.ps1` script is still available for backward compatibilit
 ```
 
 **Problem:** clang-format not found
-**Solution:** Install clang-format via Visual Studio (C++ clang tools component) or download LLVM from https://releases.llvm.org/
+**Solution:** Install the pinned version in `.venv`: `python -m venv .venv; .\.venv\Scripts\python.exe -m pip install clang-format==21.1.8`
+
+**Problem:** `doctor.ps1` reports missing tools or repository setup
+**Solution:** Follow the `Fix:` command printed for each failed check, then rerun `.\scripts\doctor.ps1`.
 
 ## Help
 
