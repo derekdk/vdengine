@@ -282,10 +282,12 @@ const InputScriptExecutor::Handler InputScriptExecutor::s_handlers[] = {
     &InputScriptExecutor::handleCompare,           // Compare
     &InputScriptExecutor::handleSet,               // Set
     &InputScriptExecutor::handleHoldKey,           // HoldKey
+    &InputScriptExecutor::handleAssertGameState,   // AssertGameState
 };
 
 InputScriptExecutor::InputScriptExecutor(ScriptEnvironment& env) : m_env(env) {
-    static_assert(std::size(s_handlers) == static_cast<size_t>(InputCommandType::HoldKey) + 1,
+    static_assert(std::size(s_handlers) ==
+                      static_cast<size_t>(InputCommandType::AssertGameState) + 1,
                   "Dispatch table out of sync with InputCommandType enum");
 }
 
@@ -645,6 +647,7 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
             state.currentCommand++;
             return true;
         }
+
         assertValue = varIt->second;
     }
 
@@ -660,6 +663,34 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
         state.assertionFailed = true;
     }
 
+    state.currentCommand++;
+    return true;
+}
+
+bool InputScriptExecutor::handleAssertGameState(InputScriptState& state, const ScriptCommand& cmd) {
+    double expected = cmd.assertValue;
+    if (!cmd.assertVarRef.empty()) {
+        auto it = state.variables.find(cmd.assertVarRef);
+        if (it == state.variables.end()) {
+            std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                      << ": undefined variable '$" << cmd.assertVarRef << "'\n";
+            state.assertionFailed = true;
+            state.currentCommand++;
+            return true;
+        }
+        expected = it->second;
+    }
+    const auto actual = m_env.getScriptStateValue(cmd.assertField.substr(6));
+    if (!actual) {
+        std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
+                  << ": unknown game field '" << cmd.assertField << "'\n";
+        state.assertionFailed = true;
+    } else if (!evaluateComparison(*actual, cmd.assertOp, expected)) {
+        std::cerr << "[VDE:InputScript] ASSERT FAILED at line " << cmd.lineNumber << ": game "
+                  << cmd.assertField << " (" << *actual << ") " << compareOpToString(cmd.assertOp)
+                  << " " << expected << '\n';
+        state.assertionFailed = true;
+    }
     state.currentCommand++;
     return true;
 }

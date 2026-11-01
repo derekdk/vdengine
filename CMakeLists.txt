@@ -193,6 +193,7 @@ set(VDE_SOURCES
     # Game API
     src/api/Entity.cpp
     src/api/Game.cpp
+    src/api/GameState.cpp
     src/api/GameCamera.cpp
     src/api/GameTypes.cpp
     src/api/LightBox.cpp
@@ -268,6 +269,7 @@ set(VDE_PUBLIC_HEADERS
     # Game API headers
     include/vde/api/GameAPI.h
     include/vde/api/Game.h
+    include/vde/api/GameState.h
     include/vde/api/GameSettings.h
     include/vde/api/GameTypes.h
     include/vde/api/GameCamera.h

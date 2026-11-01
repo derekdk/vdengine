@@ -59,6 +59,7 @@ set(VDE_TEST_SOURCES
     # Input script tests
     InputScript_test.cpp
     GameInputScriptExecution_test.cpp
+    GameState_test.cpp
     # Storage tests
     StorageManager_test.cpp
     # Offscreen render target tests

@@ -10,11 +10,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -557,6 +559,41 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
                     return false;
                 }
             }
+        } else if (subVerb == "game") {
+            if (tokens.size() != 5 || !toLower(tokens[2]).starts_with("state.") ||
+                tokens[2].size() <= 6) {
+                errorMsg = "at line " + std::to_string(lineNumber) +
+                           ": 'assert game' requires state.<key> <op> <value>";
+                return false;
+            }
+            cmd.type = InputCommandType::AssertGameState;
+            cmd.assertField = toLower(tokens[2]);
+            if (!parseCompareOp(tokens[3], cmd.assertOp, errorMsg)) {
+                errorMsg = "at line " + std::to_string(lineNumber) + ": " + errorMsg;
+                return false;
+            }
+            const auto value = toLower(tokens[4]);
+            if (value == "true" || value == "false") {
+                cmd.assertValue = value == "true" ? 1.0 : 0.0;
+            } else if (tokens[4].starts_with("$") && tokens[4].size() > 1) {
+                cmd.assertVarRef = tokens[4].substr(1);
+            } else {
+                try {
+                    size_t consumed = 0;
+                    cmd.assertValue = std::stod(tokens[4], &consumed);
+                    if (consumed != tokens[4].size() || !std::isfinite(cmd.assertValue)) {
+                        throw std::invalid_argument("invalid numeric assertion");
+                    }
+                } catch (const std::invalid_argument&) {
+                    errorMsg = "at line " + std::to_string(lineNumber) +
+                               ": invalid assert value '" + tokens[4] + "'";
+                    return false;
+                } catch (const std::out_of_range&) {
+                    errorMsg =
+                        "at line " + std::to_string(lineNumber) + ": assert value out of range";
+                    return false;
+                }
+            }
         } else if (subVerb == "scene") {
             // assert scene "name" <field> <op> <value>
             // Parse the quoted scene name from the original line
@@ -649,7 +686,7 @@ bool parseScriptLine(const std::string& line, int lineNumber, ScriptCommand& cmd
             errorMsg = "at line " + std::to_string(lineNumber) + ": unknown assert type '" +
                        tokens[1] +
                        "' (expected 'rendered_scene_count', 'scenes_created', 'scenes_removed', "
-                       "or 'scene')";
+                       "'game', or 'scene')";
             return false;
         }
     }

@@ -18,6 +18,26 @@
 namespace vde {
 namespace test {
 
+TEST(InputScriptParse, GameStateAssertions) {
+    ScriptCommand cmd{};
+    std::string error;
+    EXPECT_TRUE(parseScriptLine("assert game state.Score >= $EXPECTED", 1, cmd, error));
+    EXPECT_EQ(cmd.type, InputCommandType::AssertGameState);
+    EXPECT_EQ(cmd.assertField, "state.score");
+    EXPECT_EQ(cmd.assertVarRef, "EXPECTED");
+    EXPECT_EQ(cmd.assertOp, CompareOp::Ge);
+    EXPECT_TRUE(parseScriptLine("assert game state.ready == true", 2, cmd, error));
+    EXPECT_EQ(cmd.assertValue, 1.0);
+    EXPECT_TRUE(parseScriptLine("assert game state.score != -2.5", 3, cmd, error));
+    EXPECT_EQ(cmd.assertValue, -2.5);
+    for (const auto* line : {"assert game state. == 1", "assert game score == 1",
+                             "assert game state.score", "assert game state.score == 1junk",
+                             "assert game state.score == nan", "assert game state.score == $"}) {
+        EXPECT_FALSE(parseScriptLine(line, 4, cmd, error)) << line;
+        EXPECT_FALSE(error.empty());
+    }
+}
+
 // ============================================================================
 // Key name resolution tests
 // ============================================================================
