@@ -4,10 +4,12 @@
 # Usage:
 #   .\scripts\doctor.ps1
 #   .\scripts\doctor.ps1 -Generator MSBuild
+#   .\scripts\doctor.ps1 -SkipIcdCheck
 
 param(
     [ValidateSet("MSBuild", "Ninja")]
-    [string]$Generator = "Ninja"
+    [string]$Generator = "Ninja",
+    [switch]$SkipIcdCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,11 +45,11 @@ function Get-CommandVersion {
         return $null
     }
 
-    $output = & $tool.Source @Arguments 2>&1 | Select-Object -First 1
-    if ($LASTEXITCODE -ne 0) {
+    $output = & $tool.Source @Arguments 2>&1
+    if (-not $?) {
         return $null
     }
-    return [string]$output
+    return [string]($output | Select-Object -First 1)
 }
 
 Write-Host "VDE Windows preflight (generator: $Generator)"
@@ -109,7 +111,12 @@ if (-not [string]::IsNullOrWhiteSpace($driverOverride)) {
     $hasIcd = $hasSdkIcd -or $hasAdapterIcd -or $hasRegisteredIcd
 }
 $hasVulkanLoader = $hasSdkLoader
-Write-Check "Vulkan loader and ICD" ($hasVulkanLoader -and $hasIcd) "Install the Vulkan SDK or configure a Vulkan ICD."
+if ($SkipIcdCheck) {
+    Write-Check "Vulkan loader" $hasVulkanLoader "Install the Vulkan SDK."
+    Write-Host "[SKIP] Vulkan ICD - not required for this build/test workflow." -ForegroundColor DarkGray
+} else {
+    Write-Check "Vulkan loader and ICD" ($hasVulkanLoader -and $hasIcd) "Install the Vulkan SDK or configure a Vulkan ICD."
+}
 
 $vsWhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 $vsFound = $false
