@@ -61,6 +61,7 @@ jobs:
           .\.venv\Scripts\python.exe -m pip install "clang-format==21.1.8"
       - name: Enable repository hooks
         run: .\scripts\install-hooks.ps1
+      # CMake and the linker validate the SDK; this job does not require a Vulkan runtime/device.
       - name: Check Windows build environment
         run: .\scripts\doctor.ps1 -SkipVulkanRuntimeCheck
       - name: Build
