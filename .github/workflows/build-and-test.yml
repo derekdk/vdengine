@@ -55,15 +55,23 @@ jobs:
           cache: true
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+      - name: Add Vulkan loader to PATH
+        run: |
+          $vulkanBin = Join-Path $env:VULKAN_SDK "Bin"
+          $vulkanLoader = Join-Path $vulkanBin "vulkan-1.dll"
+          if (-not (Test-Path -LiteralPath $vulkanLoader -PathType Leaf)) {
+            throw "Vulkan loader not found: $vulkanLoader"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $vulkanBin
       - name: Install pinned clang-format
         run: |
           python -m venv .venv
           .\.venv\Scripts\python.exe -m pip install "clang-format==21.1.8"
       - name: Enable repository hooks
         run: .\scripts\install-hooks.ps1
-      # CMake and the linker validate the SDK; this job does not require a Vulkan runtime/device.
+      # The loader DLL is needed to start test executables; no Vulkan ICD/device is required.
       - name: Check Windows build environment
-        run: .\scripts\doctor.ps1 -SkipVulkanRuntimeCheck
+        run: .\scripts\doctor.ps1 -SkipIcdCheck
       - name: Build
         run: .\scripts\build.ps1 -Generator Ninja
       - name: Run unit tests
