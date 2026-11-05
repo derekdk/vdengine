@@ -62,7 +62,7 @@ jobs:
       - name: Enable repository hooks
         run: .\scripts\install-hooks.ps1
       - name: Check Windows build environment
-        run: .\scripts\doctor.ps1 -SkipIcdCheck
+        run: .\scripts\doctor.ps1 -SkipVulkanRuntimeCheck
       - name: Build
         run: .\scripts\build.ps1 -Generator Ninja
       - name: Run unit tests

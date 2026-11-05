@@ -113,18 +113,20 @@ building if any prerequisite is missing.
 
 **Syntax:**
 ```powershell
-.\scripts\doctor.ps1 [-Generator Ninja|MSBuild] [-SkipIcdCheck]
+.\scripts\doctor.ps1 [-Generator Ninja|MSBuild] [-SkipIcdCheck] [-SkipVulkanRuntimeCheck]
 ```
 
 **Parameters:**
 - `-Generator` - Build system to check (`Ninja` by default)
 - `-SkipIcdCheck` - Skip the runtime ICD requirement for headless build/test workflows; the Vulkan loader is still checked
+- `-SkipVulkanRuntimeCheck` - Skip both runtime loader and ICD checks for headless build/test workflows
 
 **Examples:**
 ```powershell
 .\scripts\doctor.ps1
 .\scripts\doctor.ps1 -Generator MSBuild
 .\scripts\doctor.ps1 -SkipIcdCheck
+.\scripts\doctor.ps1 -SkipVulkanRuntimeCheck
 ```
 
 Install the project's pinned formatter in the repo-local environment with:

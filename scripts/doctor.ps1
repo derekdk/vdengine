@@ -9,7 +9,8 @@
 param(
     [ValidateSet("MSBuild", "Ninja")]
     [string]$Generator = "Ninja",
-    [switch]$SkipIcdCheck
+    [switch]$SkipIcdCheck,
+    [switch]$SkipVulkanRuntimeCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -113,7 +114,9 @@ if (-not [string]::IsNullOrWhiteSpace($driverOverride)) {
     $hasIcd = $hasSdkIcd -or $hasAdapterIcd -or $hasRegisteredIcd
 }
 $hasVulkanLoader = $hasSdkLoader -or $hasSystemLoader
-if ($SkipIcdCheck) {
+if ($SkipVulkanRuntimeCheck) {
+    Write-Host "[SKIP] Vulkan loader and ICD - not required for this headless build/test workflow." -ForegroundColor DarkGray
+} elseif ($SkipIcdCheck) {
     Write-Check "Vulkan loader" $hasVulkanLoader "Install a Vulkan-capable driver or place vulkan-1.dll in the SDK Bin directory."
     Write-Host "[SKIP] Vulkan ICD - not required for this build/test workflow." -ForegroundColor DarkGray
 } else {
