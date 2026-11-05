@@ -55,13 +55,23 @@ jobs:
           cache: true
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
-      - name: Add Vulkan loader to PATH
+      - name: Install Vulkan loader
         run: |
-          $vulkanBin = Join-Path $env:VULKAN_SDK "Bin"
-          $vulkanLoader = Join-Path $vulkanBin "vulkan-1.dll"
-          if (-not (Test-Path -LiteralPath $vulkanLoader -PathType Leaf)) {
-            throw "Vulkan loader not found: $vulkanLoader"
+          $runtimeArchive = Join-Path $env:RUNNER_TEMP "VulkanRT-1.4.309.0-Components.zip"
+          $runtimeDirectory = Join-Path $env:RUNNER_TEMP "vulkan-runtime"
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/1.4.309.0/windows/VulkanRT-1.4.309.0-Components.zip" -OutFile $runtimeArchive
+          $expectedHash = "7d969f4d7b44e387667d3148f61559497c22d50cbe3d50adc9e5409afbce2df1"
+          $actualHash = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash
+          if ($actualHash -ne $expectedHash) {
+            throw "Unexpected Vulkan runtime archive hash: $actualHash"
           }
+          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath $runtimeDirectory
+          $runtimeLoader = Join-Path $runtimeDirectory "VulkanRT-1.4.309.0-Components\x64\vulkan-1.dll"
+          $vulkanBin = Join-Path $env:VULKAN_SDK "Bin"
+          if (-not (Test-Path -LiteralPath $runtimeLoader -PathType Leaf)) {
+            throw "Vulkan loader not found in runtime archive: $runtimeLoader"
+          }
+          Copy-Item -LiteralPath $runtimeLoader -Destination $vulkanBin -Force
           Add-Content -Path $env:GITHUB_PATH -Value $vulkanBin
       - name: Install pinned clang-format
         run: |
