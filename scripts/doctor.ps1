@@ -91,7 +91,7 @@ $loaderPath = if ($vulkanSdk) { Join-Path $vulkanSdk "Bin\vulkan-1.dll" } else {
 $systemLoaderPath = if ($env:SystemRoot) { Join-Path $env:SystemRoot "System32\vulkan-1.dll" } else { "" }
 $icdPath = if ($vulkanSdk) { Join-Path $vulkanSdk "Bin\VkICD" } else { "" }
 $hasSdkLoader = $vulkanSdk -and (Test-Path -LiteralPath $loaderPath -PathType Leaf)
-$hasSystemLoader = $env:SystemRoot -and (Test-Path -LiteralPath $systemLoaderPath -PathType Leaf)
+$hasSystemLoader = $systemLoaderPath -and (Test-Path -LiteralPath $systemLoaderPath -PathType Leaf)
 $hasSdkIcd = $vulkanSdk -and (Test-Path -LiteralPath $icdPath -PathType Container) -and
     @(Get-ChildItem -Path $icdPath -Filter "*.json" -File -ErrorAction SilentlyContinue).Count -gt 0
 $driverOverride = if ($env:VK_DRIVER_FILES) { $env:VK_DRIVER_FILES } else { $env:VK_ICD_FILENAMES }
