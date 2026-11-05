@@ -5,6 +5,7 @@
 #   .\scripts\doctor.ps1
 #   .\scripts\doctor.ps1 -Generator MSBuild
 #   .\scripts\doctor.ps1 -SkipIcdCheck
+#   .\scripts\doctor.ps1 -SkipVulkanRuntimeCheck
 
 param(
     [ValidateSet("MSBuild", "Ninja")]
