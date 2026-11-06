@@ -22,6 +22,7 @@ This document describes the VDE (Vulkan Display Engine) Game API, a high-level i
 - [Physics System](#physics-system)
 - [Audio System](#audio-system)
 - [Multi-Scene & Split-Screen](#multi-scene--split-screen)
+- [Game Shared State](#game-shared-state)
 - [Screen Transitions](#screen-transitions)
 - [Deferred Commands & Thread Safety](#deferred-commands--thread-safety)
 - [Common Types](#common-types)
@@ -1954,6 +1955,99 @@ vde::Rotation rot(45.0f, 90.0f, 0.0f);  // pitch, yaw, roll (degrees)
 
 ---
 
+## Game Shared State
+
+`Game` owns a `GameState` store, independent of scene lifetime. No Game subclass
+casts are necessary:
+
+```cpp
+struct Progress {
+    int coins = 0;
+    std::string player = "Alice";
+};
+
+game.getSharedState().initialize(Progress{});
+
+// In any attached Scene:
+const auto& progress = state<Progress>();
+getSharedState().update<Progress>([](Progress& next) { next.coins += 1; });
+// progress still describes the committed snapshot, not the pending write.
+```
+
+Initialize the typed object once before the first scheduled frame (later
+initialization is rejected). Missing/wrong types and detached scene access
+throw `std::logic_error`. Types must be copyable and have **value semantics**:
+copies must not share mutable objects through pointers. Retain copies, not
+references, across commits. Mutation callbacks should only modify their supplied
+state object; serializers should be pure functions.
+
+### Visibility and conflicts
+
+- All operations run on the constructing/game thread, not physics workers.
+- Setup changes (including `onStart` and initial scene `onEnter`) publish before
+  the first scheduled frame.
+- During a frame, input, Game hooks, all scene callbacks (including background
+  and transition scenes), and rendering read the same committed snapshot.
+- After the complete scheduler execution, typed and loose state publish together.
+  Script assertions in the next frame's Input phase see that publication.
+- Typed mutations compose on the pending copy in submission order. Loose writes
+  coalesce per key. Conflicts are last-writer-wins, **not** an ordering guarantee
+  between scenes. Use additive mutations or a single owner for conflicting fields.
+- `game.commitSharedState()` permits setup/CPU-test publication outside `run()`;
+  manual and recursive commits during execution are forbidden.
+
+### Optional key/value storage and notifications
+
+```cpp
+auto& shared = game.getSharedState();
+shared.setValue("coins", int64_t{10});
+shared.setValue("ready", true);
+auto subscription = shared.subscribe(
+    [](const std::string& key, const auto& oldValue, const auto& newValue) {
+        // All changes are already committed. nullopt means absent/removed.
+    });
+shared.eraseValue("coins");
+shared.unsubscribe(subscription); // Required before captured scene objects die.
+```
+
+Values are `bool`, `int64_t`, finite `double`, or `std::string`. Nonempty keys are
+ASCII-case-insensitive. `getValue()` returns committed data or `nullopt`.
+Notifications fire once per changed key in key order, after the whole publication;
+unchanged values and removal of missing keys emit nothing. Subscription changes
+are safe during dispatch; newly added listeners wait until the next commit.
+Writes from callbacks remain pending until the next commit. Exceptions propagate
+and stop notification dispatch, but do not roll back already published state.
+
+`assert game state.coins == 10` resolves committed bool/numeric loose values via
+`Game::getScriptStateValue()`. Override that method to expose typed fields; call
+the base implementation for loose keys. Missing/string-valued keys fail numeric
+assertions. Comparisons use doubles (integers above 2^53 may lose precision).
+
+### Save slots through StorageManager
+
+Initialize `StorageManager` as usual. `save(slot)` writes one versioned document
+under `vde.game_state.slot.<slot>`, atomically replacing that SQLite string row.
+It saves **committed** typed and loose state, never pending mutations.
+
+Typed state requires an explicit serializer with a stable schema/version ID:
+
+```cpp
+game.getSharedState().setSerializer<Progress>(
+    "progress-v1",
+    [](const Progress& p) { return encodeProgress(p); }, // application string format
+    [](const std::string& text) { return decodeProgress(text); }); // validate or throw
+game.getSharedState().save("slot-1");
+game.getSharedState().load("slot-1");
+```
+
+Loose-only stores need no serializer. `load()` validates format, schema, and value
+types before staging a complete replacement (also removing keys absent in the
+save). It replaces earlier pending writes and publishes at the normal boundary,
+emitting ordinary key change notifications. Empty slots, missing/corrupt saves,
+incompatible schemas, missing codecs, and storage failures throw; failed loads
+leave committed and pending data unchanged. Applications own typed schema
+migration in their decoder; raw object memory is never serialized automatically.
+
 ## Scripted Input & Render Verification
 
 VDE's scripted input system drives automation, smoke testing, and render verification. Scripts use a plain-text `.vdescript` format and are supplied via CLI argument, environment variable, or API call.
@@ -2006,6 +2100,7 @@ VDE's scripted input system drives automation, smoke testing, and render verific
 | `assert scene "name" was_rendered == true` | Verify a named scene rendered |
 | `assert scene "name" not_blank` | Verify scene is not a blank frame |
 | `assert scene "name" state.<key> <op> <value>` | Compare game-defined state from `Scene::getScriptStateValue(key)`; unknown keys fail the script |
+| `assert game state.<key> <op> <value>` | Compare committed game state from `Game::getScriptStateValue(key)`; supports numeric/boolean RHS and `$VARIABLE` |
 
 #### Screenshot and Image Comparison
 

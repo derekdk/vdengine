@@ -220,6 +220,11 @@ void Game::run() {
     }
 
     m_running = true;
+    struct RunGuard {
+        bool* active;
+        explicit RunGuard(bool& value) : active(&value) { *active = true; }
+        ~RunGuard() { *active = false; }
+    } runGuard(m_runActive);
 
     // Call start hook
     onStart();
@@ -254,6 +259,9 @@ void Game::run() {
             focusedScene->m_diagnostics.isFocused = true;
         }
     }
+
+    m_sharedState.m_initializationLocked = true;
+    m_sharedState.commit();
 
     // Build the initial scheduler task graph
     rebuildSchedulerGraph();
@@ -295,6 +303,7 @@ void Game::run() {
         // Execute the scheduler task graph
         // (covers: input script, onUpdate, scene update, audio, pre-render, render)
         m_scheduler.execute();
+        m_sharedState.commit();
 
         m_frameCount++;
     }
@@ -309,6 +318,13 @@ void Game::run() {
 
 void Game::quit() {
     m_running = false;
+}
+
+void Game::commitSharedState() {
+    if (m_runActive) {
+        throw std::logic_error("Game: shared state can only be committed outside run()");
+    }
+    m_sharedState.commit();
 }
 
 void Game::setExitCode(int code) {

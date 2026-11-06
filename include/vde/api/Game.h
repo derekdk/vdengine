@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "GameSettings.h"
+#include "GameState.h"
 #include "InputHandler.h"
 #include "InputScript.h"
 #include "InputScriptExecutor.h"
@@ -135,6 +136,24 @@ class Game : private ScriptEnvironment {
      * @brief Check if the game is running.
      */
     [[nodiscard]] bool isRunning() const { return m_running; }
+
+    /// @brief Access the Game-owned state store. Writes publish after scheduler execution.
+    GameState& getSharedState() { return m_sharedState; }
+    [[nodiscard]] const GameState& getSharedState() const { return m_sharedState; }
+
+    /// @brief Typed committed state access without scene-side casts.
+    template <typename T>
+    [[nodiscard]] const T& state() const {
+        return m_sharedState.state<T>();
+    }
+
+    /// @brief Publish staged setup/test changes outside run(); forbidden while running.
+    void commitSharedState();
+
+    /// @brief Resolve committed game values for script assertions; override for typed fields.
+    [[nodiscard]] std::optional<double> getScriptStateValue(const std::string& key) const override {
+        return m_sharedState.getScriptStateValue(key);
+    }
 
     // Scene management
 
@@ -633,6 +652,8 @@ class Game : private ScriptEnvironment {
     std::unique_ptr<Window> m_window;
     std::unique_ptr<VulkanContext> m_vulkanContext;
     ResourceManager m_resourceManager;
+    GameState m_sharedState;
+    bool m_runActive = false;
 
     // Rendering infrastructure (Phase 2)
     VkPipelineLayout m_meshPipelineLayout = VK_NULL_HANDLE;

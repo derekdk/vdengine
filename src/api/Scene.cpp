@@ -19,6 +19,20 @@
 
 namespace vde {
 
+GameState& Scene::getSharedState() {
+    if (!m_game) {
+        throw std::logic_error("Scene: shared state requires an attached Game");
+    }
+    return m_game->getSharedState();
+}
+
+const GameState& Scene::getSharedState() const {
+    if (!m_game) {
+        throw std::logic_error("Scene: shared state requires an attached Game");
+    }
+    return m_game->getSharedState();
+}
+
 // Default lighting instance (used when no LightBox is set)
 // NOLINTNEXTLINE(bugprone-throwing-static-initialization,cppcoreguidelines-avoid-non-const-global-variables)
 static SimpleColorLightBox s_defaultLightBox(Color::white());

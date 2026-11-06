@@ -51,6 +51,9 @@ class MockScriptEnv : public ScriptEnvironment {
     void quit() override { quitCalled = true; }
     [[nodiscard]] size_t getScenesCreated() const override { return scenesCreated; }
     [[nodiscard]] size_t getScenesRemoved() const override { return scenesRemoved; }
+    [[nodiscard]] std::optional<double> getScriptStateValue(const std::string& key) const override {
+        return key == "score" ? std::optional<double>(7.0) : std::nullopt;
+    }
 
     int exitCode = 0;
     bool quitCalled = false;
@@ -80,6 +83,29 @@ ScriptCommand makePressCommand(int keyCode) {
     ScriptCommand cmd = makeCommand(InputCommandType::Press);
     cmd.keyCode = keyCode;
     return cmd;
+}
+
+TEST(InputScriptExecutor, GameStateAssertionsReportFailuresAndResolveVariables) {
+    for (const auto* text : {"assert game state.score == $EXPECTED", "assert game state.score < 8",
+                             "assert game state.missing == 0", "assert game state.score == 8",
+                             "assert game state.score == $MISSING"}) {
+        MockScriptEnv env;
+        InputScriptExecutor executor(env);
+        auto state = std::make_unique<InputScriptState>();
+        ScriptCommand cmd{};
+        std::string error;
+        ASSERT_TRUE(parseScriptLine(text, 1, cmd, error)) << error;
+        state->variables["EXPECTED"] = 7;
+        state->commands = {cmd, makeCommand(InputCommandType::Exit)};
+        executor.setState(std::move(state));
+        executor.processFrame(0.016f);
+        const bool shouldFail = cmd.assertField == "state.missing" ||
+                                (cmd.assertOp == CompareOp::Eq && cmd.assertValue == 8) ||
+                                cmd.assertVarRef == "MISSING";
+        EXPECT_EQ(executor.hasAssertionFailure(), shouldFail) << text;
+        EXPECT_EQ(env.exitCode, shouldFail ? 1 : 0) << text;
+        EXPECT_TRUE(env.quitCalled);
+    }
 }
 
 TEST(InputScriptExecutor, ResolveInputHandlerPrefersFocusedSceneHandler) {

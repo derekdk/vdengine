@@ -9,6 +9,7 @@
  */
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -54,6 +55,11 @@ class ScriptEnvironment {
 
     /// Get total number of scenes removed via removeScene().
     [[nodiscard]] virtual size_t getScenesRemoved() const = 0;
+
+    /// Resolve a committed game-level numeric state value (missing keys fail assertions).
+    [[nodiscard]] virtual std::optional<double> getScriptStateValue(const std::string&) const {
+        return std::nullopt;
+    }
 };
 
 }  // namespace vde
