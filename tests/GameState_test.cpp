@@ -54,6 +54,23 @@ TEST(GameState, SceneOrderDoesNotAffectReadsOrAdditiveWrites) {
     }
 }
 
+TEST(GameState, TypedOnlyCommitPreservesLooseValuesWithoutNotifications) {
+    Game game;
+    auto& shared = game.getSharedState();
+    shared.initialize(SharedProgress{});
+    shared.setValue("ready", true);
+    game.commitSharedState();
+
+    int notifications = 0;
+    shared.subscribe([&](const auto&, const auto&, const auto&) { ++notifications; });
+    shared.update<SharedProgress>([](auto& value) { value.score = 7; });
+    game.commitSharedState();
+
+    EXPECT_EQ(game.state<SharedProgress>().score, 7);
+    EXPECT_EQ(shared.getScriptStateValue("ready"), 1.0);
+    EXPECT_EQ(notifications, 0);
+}
+
 TEST(GameState, FailedMutationPreservesPendingState) {
     Game game;
     auto& shared = game.getSharedState();

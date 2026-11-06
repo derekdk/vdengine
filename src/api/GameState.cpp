@@ -89,6 +89,13 @@ void GameState::commit() {
         explicit CommitGuard(bool& value) : flag(&value) { *flag = true; }
         ~CommitGuard() { *flag = false; }
     } guard(m_committing);
+    if (m_pendingValues.empty()) {
+        if (m_pending.has_value()) {
+            m_committed.swap(m_pending);
+            m_pending.reset();
+        }
+        return;
+    }
     auto nextValues = m_values;
     std::vector<std::tuple<std::string, std::optional<Value>, std::optional<Value>>> changes;
     for (const auto& [key, value] : m_pendingValues) {
