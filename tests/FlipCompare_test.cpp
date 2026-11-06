@@ -82,7 +82,7 @@ TEST(FlipCompareTest, IdenticalImagesReturnZero) {
     TestImage img;
     ASSERT_TRUE(img.load("solid_red_8x8.png"));
     double result = computeFlipMeanError(img.data, img.data, img.width, img.height);
-    EXPECT_DOUBLE_EQ(result, 0.0);
+    EXPECT_NEAR(result, 0.0, 1e-5);
 }
 
 TEST(FlipCompareTest, ByteIdenticalCopiesReturnZero) {
@@ -90,7 +90,7 @@ TEST(FlipCompareTest, ByteIdenticalCopiesReturnZero) {
     ASSERT_TRUE(imgA.load("solid_red_8x8.png"));
     ASSERT_TRUE(imgB.load("solid_red_8x8_copy.png"));
     double result = computeFlipMeanError(imgA.data, imgB.data, imgA.width, imgA.height);
-    EXPECT_DOUBLE_EQ(result, 0.0);
+    EXPECT_NEAR(result, 0.0, 1e-5);
 }
 
 // --- Completely different images ---

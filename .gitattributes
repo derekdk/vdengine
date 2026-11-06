@@ -1,3 +1,11 @@
+# Normalize text files and keep scripts runnable across Windows and macOS.
+* text=auto
+*.sh text eol=lf
+.githooks/* text eol=lf
+*.ps1 text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # Git LFS Configuration for VDE (Vulkan Display Engine)
 # This file specifies which file types should be tracked with Git Large File Storage
 

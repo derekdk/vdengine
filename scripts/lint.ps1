@@ -77,6 +77,10 @@ if ($ChangedOnly -and $Files.Count -gt 0) {
 $scriptDir = $PSScriptRoot
 $projectRoot = Get-VdeLintRepoRoot -ScriptRoot $scriptDir
 Set-Location $projectRoot
+$localTools = Join-Path $projectRoot ".venv\Scripts"
+if (Test-Path $localTools) {
+    $env:PATH = "$localTools;$env:PATH"
+}
 
 $scriptHost = if (Get-Command powershell -ErrorAction SilentlyContinue) { 'powershell' } else { 'pwsh' }
 $bar = '=' * 50

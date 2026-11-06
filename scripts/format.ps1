@@ -42,17 +42,28 @@ if ($Help) {
 
 $projectRoot = Get-VdeLintRepoRoot -ScriptRoot $PSScriptRoot
 Set-Location $projectRoot
+$localTools = Join-Path $projectRoot ".venv\Scripts"
+if (Test-Path $localTools) {
+    $env:PATH = "$localTools;$env:PATH"
+}
 
 $clangFormat = Get-Command clang-format -ErrorAction SilentlyContinue
 if (-not $clangFormat) {
     Write-Host "ERROR: clang-format not found in PATH" -ForegroundColor Red
     Write-Host "Please install clang-format:" -ForegroundColor Yellow
-    Write-Host "  - With Visual Studio: Install C++ clang tools component" -ForegroundColor Yellow
-    Write-Host "  - With LLVM: Download from https://releases.llvm.org/" -ForegroundColor Yellow
+    Write-Host "  python -m venv .venv" -ForegroundColor Yellow
+    Write-Host "  .\.venv\Scripts\python.exe -m pip install clang-format==21.1.8" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "Using clang-format: $($clangFormat.Source)" -ForegroundColor Cyan
+$clangFormatVersion = (& $clangFormat.Source --version 2>&1 | Out-String).Trim()
+if ($clangFormatVersion -notmatch '(^|[^0-9])21\.1\.8([^0-9]|$)') {
+    Write-Host "ERROR: clang-format 21.1.8 is required (found $clangFormatVersion)" -ForegroundColor Red
+    Write-Host "Run: python -m venv .venv; .\.venv\Scripts\python.exe -m pip install clang-format==21.1.8" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "Using $clangFormatVersion from $($clangFormat.Source)" -ForegroundColor Cyan
 
 $allowedExtensions = @('.h', '.hpp', '.hh', '.hxx', '.cpp', '.cc', '.cxx')
 if ($Files.Count -gt 0) {

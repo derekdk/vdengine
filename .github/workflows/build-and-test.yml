@@ -16,7 +16,7 @@ permissions:
 jobs:
   macos:
     name: Build & Test (macOS)
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,8 @@ jobs:
           lfs: true
       - name: Install native dependencies
         run: bash scripts/macos.sh setup
+      - name: Check macOS build environment
+        run: bash scripts/macos.sh doctor
       - name: Build
         run: bash scripts/macos.sh build
       - name: Run unit tests
@@ -38,10 +40,57 @@ jobs:
           path: logs/macos-lldb-*.log
           if-no-files-found: ignore
 
+  windows:
+    name: Build & Test (Windows MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Vulkan loader
+        run: |
+          $runtimeArchive = Join-Path $env:RUNNER_TEMP "VulkanRT-1.4.309.0-Components.zip"
+          $runtimeDirectory = Join-Path $env:RUNNER_TEMP "vulkan-runtime"
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/1.4.309.0/windows/VulkanRT-1.4.309.0-Components.zip" -OutFile $runtimeArchive
+          $expectedHash = "7d969f4d7b44e387667d3148f61559497c22d50cbe3d50adc9e5409afbce2df1"
+          $actualHash = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash
+          if ($actualHash -ne $expectedHash) {
+            throw "Unexpected Vulkan runtime archive hash: $actualHash"
+          }
+          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath $runtimeDirectory
+          $runtimeLoader = Join-Path $runtimeDirectory "VulkanRT-1.4.309.0-Components\x64\vulkan-1.dll"
+          $vulkanBin = Join-Path $env:VULKAN_SDK "Bin"
+          if (-not (Test-Path -LiteralPath $runtimeLoader -PathType Leaf)) {
+            throw "Vulkan loader not found in runtime archive: $runtimeLoader"
+          }
+          Copy-Item -LiteralPath $runtimeLoader -Destination $vulkanBin -Force
+          Add-Content -Path $env:GITHUB_PATH -Value $vulkanBin
+      - name: Install pinned clang-format
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install "clang-format==21.1.8"
+      - name: Enable repository hooks
+        run: .\scripts\install-hooks.ps1
+      # The loader DLL is needed to start test executables; no Vulkan ICD/device is required.
+      - name: Check Windows build environment
+        run: .\scripts\doctor.ps1 -SkipIcdCheck
+      - name: Build
+        run: .\scripts\build.ps1 -Generator Ninja
+      - name: Run unit tests
+        run: .\scripts\test.ps1 -Generator Ninja
+
   # The Linux sanitizer job cannot compile the CoreText/CoreGraphics emoji path.
   macos-emoji-sanitizer:
     name: Emoji tests (macOS ASan+UBSan)
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +98,8 @@ jobs:
           lfs: true
       - name: Install native dependencies
         run: bash scripts/macos.sh setup
+      - name: Check macOS build environment
+        run: bash scripts/macos.sh doctor
       - name: Configure and build tests with sanitizers
         run: |
           cmake -S . -B build_asan -G Ninja \

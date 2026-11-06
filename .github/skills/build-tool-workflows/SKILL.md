@@ -36,6 +36,7 @@ See `scripts/README.md` for dependencies and SDK environment selection.
 
 | Task ID | Purpose |
 |---------|---------|
+| `scripts: doctor` | Check required tools, Vulkan, Git LFS assets, and hooks |
 | `scripts: build` | Build the project (Ninja, Debug) |
 | `scripts: rebuild` | Clean and rebuild (Ninja, Debug) |
 | `scripts: build-and-test` | Build the project and run all unit tests |
@@ -84,6 +85,7 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 
 | Script | Purpose | Example |
 |--------|---------|---------|
+| `doctor.ps1` | Check Windows tools and repository state | `.\scripts\doctor.ps1` |
 | `build.ps1` | Build the project | `.\scripts\build.ps1 -Generator Ninja -Config Debug` |
 | `rebuild.ps1` | Clean and rebuild | `.\scripts\rebuild.ps1 -Generator MSBuild -Config Release` |
 | `clean.ps1` | Clean build artifacts | `.\scripts\clean.ps1 -Generator Ninja -Full` |
@@ -158,6 +160,9 @@ Tasks use fixed default parameters (Ninja, Debug). Use scripts directly when you
 - `-Config` - Debug (default) or Release
 - `-Clean` - Clean before building
 - `-Parallel <N>` - Number of parallel build jobs (0 = auto)
+
+**doctor.ps1**
+- `-Generator` - Ninja (default) or MSBuild; selects the generator prerequisites to check
 
 **rebuild.ps1**
 - `-Generator` - Ninja (default) or MSBuild

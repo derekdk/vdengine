@@ -86,7 +86,7 @@ include(FetchContent)
 FetchContent_Declare(
     glslang
     GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
-    GIT_TAG 14.3.0
+    GIT_TAG 15.0.0
 )
 
 # Configure glslang options before fetching
@@ -129,6 +129,7 @@ FetchContent_MakeAvailable(miniaudio)
 FetchContent_Declare(
     sqlite3
     URL https://www.sqlite.org/2025/sqlite-amalgamation-3490100.zip
+    URL_HASH SHA256=6CEBD1D8403FC58C30E93939B246F3E6E58D0765A5CD50546F16C00FD805D2C3
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
