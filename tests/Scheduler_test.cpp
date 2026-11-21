@@ -301,9 +301,10 @@ TEST_F(SchedulerTest, TaskWithNullWorkDoesNotCrash) {
 
 TEST_F(SchedulerTest, IsExecutingOnlyWhileTasksRun) {
     bool seenDuringExecute = false;
-    scheduler.addTask({.name = "probe", .phase = TaskPhase::GameLogic, .work = [&]() {
-                           seenDuringExecute = scheduler.isExecuting();
-                       }});
+    scheduler.addTask({.name = "probe",
+                       .phase = TaskPhase::GameLogic,
+                       .work = [&]() { seenDuringExecute = scheduler.isExecuting(); },
+                       .dependsOn = {}});
 
     EXPECT_FALSE(scheduler.isExecuting());
     scheduler.execute();
@@ -312,9 +313,10 @@ TEST_F(SchedulerTest, IsExecutingOnlyWhileTasksRun) {
 }
 
 TEST_F(SchedulerTest, IsExecutingResetsWhenTaskThrows) {
-    scheduler.addTask({.name = "throws", .phase = TaskPhase::GameLogic, .work = []() {
-                           throw std::runtime_error("task failure");
-                       }});
+    scheduler.addTask({.name = "throws",
+                       .phase = TaskPhase::GameLogic,
+                       .work = []() { throw std::runtime_error("task failure"); },
+                       .dependsOn = {}});
 
     EXPECT_THROW(scheduler.execute(), std::runtime_error);
     EXPECT_FALSE(scheduler.isExecuting());
