@@ -700,9 +700,13 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
         GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
     }
 
+    Names draws;
     ASSERT_TRUE(game.initialize(GameSettings{}));
     FlowScene* source = add("source");
     FlowScene* destination = add("destination");
+    const auto recordDraw = [&draws](FlowScene& scene) { draws.push_back(scene.getName()); };
+    source->onRenderHook = recordDraw;
+    destination->onRenderHook = recordDraw;
     game.setActiveScene("source");
     constexpr float duration = 1.0f;
     game.transitionToScene("destination", std::make_unique<FadeTransition>(), duration);
@@ -720,6 +724,7 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
 
     ASSERT_FLOAT_EQ(game.getTransitionProgress(), 1.0f);
     ASSERT_EQ(activeNames(), Names{"source"});
+    EXPECT_EQ(draws, Names{"source"});
     game.applyPendingSceneChanges();
 
     EXPECT_EQ(activeNames(), Names{"source"});

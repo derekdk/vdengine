@@ -481,7 +481,8 @@ game.run();
 While the loop is running, scene-flow calls (`setActiveScene`, `setActiveSceneGroup`, `pushScene`,
 `popScene`, transitions, `cancelTransition`) take effect at the start of the next frame, in call
 order. Animated transition completion goes through the same queue: a cancellation queued before
-completion keeps the source group, even if the effect finishes later in that frame. Before `run()`,
+completion keeps the source group visible without drawing a destination frame, even if the
+effect finishes later in that frame. Before `run()`,
 scene-flow calls apply immediately.
 
 ### Input Focus (Split-Screen)

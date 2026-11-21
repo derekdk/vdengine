@@ -2669,6 +2669,16 @@ std::vector<Game::RenderLayer> Game::collectGroupLayers(const SceneGroup& group)
 
 std::vector<Game::RenderLayer> Game::collectFrameLayers() const {
     if (m_transitionActive && m_transitionCompletionPending) {
+        // Honor an earlier cancellation without applying lifecycle changes mid-frame.
+        using Kind = SceneFlowRequest::Kind;
+        const auto first = std::ranges::find_if(m_sceneFlowRequests, [this](const auto& request) {
+            return request.kind == Kind::CancelTransition ||
+                   (request.kind == Kind::CompleteTransition &&
+                    request.transitionId == m_transitionGeneration);
+        });
+        if (first != m_sceneFlowRequests.end() && first->kind == Kind::CancelTransition) {
+            return collectVisibleLayers();
+        }
         // The effect finished this frame; draw what becomes active at the next frame boundary.
         std::vector<RenderLayer> layers =
             m_viewportTransition ? collectStackLayers() : std::vector<RenderLayer>{};
