@@ -366,7 +366,8 @@ class Game : private ScriptEnvironment {
      * Snaps back to the source; destination scenes that the transition
      * entered receive onExit() (scenes it resumed are paused again).
      * A cancellation queued before the scheduler advances the transition skips
-     * that frame's effect update and completion hook.
+     * that frame's effect update and completion hook. A cancellation requested
+     * from the effect's update callback also skips the completion hook.
      * Follows the scene-flow timing described on setActiveScene().
      */
     void cancelTransition();

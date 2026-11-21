@@ -78,7 +78,8 @@ class TransitionManager {
      *
      * @param deltaTime Frame delta in seconds
      */
-    void update(float deltaTime);
+    /// `canComplete`, when supplied, is checked after the effect's update callback.
+    void update(float deltaTime, const std::function<bool()>& canComplete = {});
 
     /**
      * @brief Returns true while a transition is in progress.
@@ -121,7 +122,7 @@ class TransitionManager {
      *
      * @param deltaTime The frame delta to advance by (in seconds)
      */
-    void stepOneFrame(float deltaTime);
+    void stepOneFrame(float deltaTime, const std::function<bool()>& canComplete = {});
 
     /**
      * @brief Set the playback speed multiplier for transitions.

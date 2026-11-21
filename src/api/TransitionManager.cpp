@@ -79,7 +79,7 @@ void TransitionManager::start(std::unique_ptr<Transition> transition, float dura
     m_paused = false;  // Reset pause state for new transitions
 }
 
-void TransitionManager::update(float deltaTime) {
+void TransitionManager::update(float deltaTime, const std::function<bool()>& canComplete) {
     if (!m_activeTransition) {
         return;
     }
@@ -111,7 +111,7 @@ void TransitionManager::update(float deltaTime) {
     m_activeTransition->update(ctx, m_uniforms);
 
     // Check for completion
-    if (m_progress >= 1.0f) {
+    if (m_progress >= 1.0f && (!canComplete || canComplete())) {
         m_activeTransition->onComplete();
 
         auto completionCallback = std::move(m_onComplete);
@@ -157,14 +157,14 @@ bool TransitionManager::isPaused() const {
     return m_paused;
 }
 
-void TransitionManager::stepOneFrame(float deltaTime) {
+void TransitionManager::stepOneFrame(float deltaTime, const std::function<bool()>& canComplete) {
     if (!m_paused || !m_activeTransition) {
         return;
     }
 
     // Temporarily unpause, advance, re-pause
     m_paused = false;
-    update(deltaTime);
+    update(deltaTime, canComplete);
     // Only re-pause if the transition is still active (didn't complete)
     if (m_activeTransition) {
         m_paused = true;

@@ -1198,7 +1198,10 @@ void Game::stepTransitionOneFrame() {
             bool previous = false;
             ~RestoreProcessingFlag() { flag.get() = previous; }
         } restore{m_processingSceneFlow, std::exchange(m_processingSceneFlow, true)};
-        m_transitionManager->stepOneFrame(m_deltaTime);
+        if (!hasEarlierTransitionCancellation()) {
+            m_transitionManager->stepOneFrame(
+                m_deltaTime, [this]() { return !hasEarlierTransitionCancellation(); });
+        }
     }
     if (!shouldDeferSceneFlow()) {
         processPendingSceneChange();
@@ -3195,7 +3198,10 @@ void Game::rebuildSchedulerGraph() {
                                  [this]() {
                                      if (m_transitionManager && m_transitionManager->isActive() &&
                                          !hasEarlierTransitionCancellation()) {
-                                         m_transitionManager->update(m_deltaTime);
+                                         m_transitionManager->update(
+                                             m_deltaTime, [this]() {
+                                                 return !hasEarlierTransitionCancellation();
+                                             });
                                      }
                                  },
                              .dependsOn = preRenderDeps,
