@@ -156,6 +156,7 @@ class Game : private ScriptEnvironment {
      * or onExit()), during manual transition stepping, or during a scheduler frame with
      * an active transition is queued. Otherwise removal is immediate, but scene destruction
      * may be deferred until scheduler tasks and GPU work are complete.
+     * Queued removals that invalidate a transition suppress its effect before completion.
      * @param name Name of the scene to remove
      */
     void removeScene(const std::string& name);
@@ -938,6 +939,7 @@ class Game : private ScriptEnvironment {
     void refreshFocusDiagnostics();
     [[nodiscard]] bool sceneExists(const std::string& name) const;
     [[nodiscard]] bool shouldDeferSceneFlow() const;
+    [[nodiscard]] bool isRegionTransitionScene(const std::string& name) const;
     [[nodiscard]] bool hasEarlierTransitionCancellation() const;
 
     // Render layer collection

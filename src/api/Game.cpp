@@ -29,6 +29,7 @@
 #include <iostream>
 #include <iterator>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
 
 #include "stb_image.h"
@@ -516,11 +517,11 @@ void Game::applyRemoveScene(const std::string& requestedName) {
     // A transition that can no longer complete as requested is cancelled with the normal undo
     // (exits scenes it entered, re-pauses scenes it resumed).
     if (m_transitionActive) {
-        const bool regionSceneRemoved =
-            name == m_transitionSourceScene || name == m_transitionDestScene;
-        const bool destGroupEmptied = !m_viewportTransition && m_transitionDestGroup.size() == 1 &&
-                                      groupContains(m_transitionDestGroup, name);
-        if (regionSceneRemoved || destGroupEmptied) {
+        const bool destGroupEmptied =
+            !m_viewportTransition &&
+            std::ranges::all_of(m_transitionDestGroup.sceneNames,
+                                [&name](const std::string& dest) { return dest == name; });
+        if (isRegionTransitionScene(name) || destGroupEmptied) {
             applyCancelTransition();
         }
     }
@@ -1019,7 +1020,8 @@ void Game::applyStartTransition(SceneFlowRequest& request) {
     if (request.hasRegion) {
         const std::string& destName = request.sceneName;
         const bool enteredOnlyByTransition =
-            std::ranges::find(m_transitionEnteredScenes, destName) != m_transitionEnteredScenes.end();
+            std::ranges::find(m_transitionEnteredScenes, destName) !=
+            m_transitionEnteredScenes.end();
         if (m_activeSceneNames.contains(destName) && !enteredOnlyByTransition) {
             std::cerr << "[VDE] transitionToScene(region): scene '" << destName
                       << "' is already active or paused; request ignored\n";
@@ -2644,14 +2646,38 @@ Game::collectGroupLayers(const SceneGroup& group, const std::string* regionDesti
     return layers;
 }
 
+bool Game::isRegionTransitionScene(const std::string& name) const {
+    return m_viewportTransition &&
+           ((!m_transitionSourceScene.empty() && name == m_transitionSourceScene) ||
+            name == m_transitionDestScene);
+}
+
 bool Game::hasEarlierTransitionCancellation() const {
     using Kind = SceneFlowRequest::Kind;
-    const auto first = std::ranges::find_if(m_sceneFlowRequests, [this](const auto& request) {
-        return request.kind == Kind::CancelTransition ||
-               (request.kind == Kind::CompleteTransition &&
-                request.transitionId == m_transitionGeneration);
-    });
-    return first != m_sceneFlowRequests.end() && first->kind == Kind::CancelTransition;
+    std::unordered_set<std::string_view> removedDestinations;
+    for (const auto& request : m_sceneFlowRequests) {
+        if (request.kind == Kind::CompleteTransition &&
+            request.transitionId == m_transitionGeneration) {
+            return false;
+        }
+        if (request.kind == Kind::CancelTransition) {
+            return true;
+        }
+        if (!m_transitionActive || request.kind != Kind::Remove) {
+            continue;
+        }
+        if (isRegionTransitionScene(request.sceneName)) {
+            return true;
+        }
+        if (!m_viewportTransition && groupContains(m_transitionDestGroup, request.sceneName) &&
+            removedDestinations.insert(request.sceneName).second &&
+            std::ranges::all_of(m_transitionDestGroup.sceneNames, [&](const std::string& name) {
+                return removedDestinations.contains(name);
+            })) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::vector<Game::RenderLayer> Game::collectFrameLayers() const {
