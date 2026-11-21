@@ -81,6 +81,17 @@ void Scheduler::execute() {
     auto sorted = topologicalSort();
     m_lastExecutionOrder = sorted;
 
+    m_executing = true;
+    try {
+        executeSorted(sorted);
+    } catch (...) {
+        m_executing = false;
+        throw;
+    }
+    m_executing = false;
+}
+
+void Scheduler::executeSorted(const std::vector<TaskId>& sorted) {
     if (m_workerThreadCount == 0 || !m_threadPool) {
         // ---------------------------------------------------------------
         // Single-threaded path (unchanged from Phase 1)

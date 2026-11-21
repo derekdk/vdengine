@@ -156,6 +156,10 @@ void VulkanContext::cleanupSwapChain() {
         vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
         m_offscreenRenderPass = VK_NULL_HANDLE;
     }
+    if (m_offscreenRenderPassLoad != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(m_device, m_offscreenRenderPassLoad, nullptr);
+        m_offscreenRenderPassLoad = VK_NULL_HANDLE;
+    }
 
     if (m_depthImageView != VK_NULL_HANDLE) {
         vkDestroyImageView(m_device, m_depthImageView, nullptr);
@@ -668,6 +672,7 @@ void VulkanContext::createRenderPass() {
     createMainRenderPass();
     createLoadRenderPass();
     createOffscreenRenderPass();
+    createOffscreenLoadRenderPass();
 }
 
 namespace {
@@ -702,6 +707,43 @@ VkAttachmentDescription makeDepthAttachment(VkFormat format, VkAttachmentLoadOp 
     return desc;
 }
 
+/**
+ * Subpass dependencies shared by every scene render pass (swapchain clear/load and
+ * offscreen clear/load).  Render pass compatibility requires identical dependencies, and
+ * all graphics pipelines are created against the main render pass, so these must match.
+ *
+ *  [0] external → subpass: earlier attachment writes (previous pass / acquire) before this
+ *      pass's attachment loads and writes.
+ *  [1] subpass → external: color writes visible to later fragment-shader sampling
+ *      (offscreen targets composited by transitions).
+ */
+std::array<VkSubpassDependency, 2> makeSceneRenderPassDependencies() {
+    std::array<VkSubpassDependency, 2> deps{};
+
+    deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    deps[0].dstSubpass = 0;
+    deps[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                           VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    deps[0].srcAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    deps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                           VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    deps[0].dstAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+    deps[1].srcSubpass = 0;
+    deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    deps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    deps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    deps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    deps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    return deps;
+}
+
 }  // namespace
 
 void VulkanContext::createMainRenderPass() {
@@ -727,18 +769,7 @@ void VulkanContext::createMainRenderPass() {
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    // Clear/load passes share framebuffers and pipelines, so dependencies must match.
-    dependency.srcAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    const auto dependencies = makeSceneRenderPassDependencies();
 
     std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
 
@@ -748,8 +779,8 @@ void VulkanContext::createMainRenderPass() {
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
+    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    renderPassInfo.pDependencies = dependencies.data();
 
     if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPass) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass!");
@@ -779,17 +810,7 @@ void VulkanContext::createLoadRenderPass() {
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    const auto dependencies = makeSceneRenderPassDependencies();
 
     std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
 
@@ -799,8 +820,8 @@ void VulkanContext::createLoadRenderPass() {
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
+    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    renderPassInfo.pDependencies = dependencies.data();
 
     if (vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPassLoad) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create load render pass!");
@@ -830,30 +851,7 @@ void VulkanContext::createOffscreenRenderPass() {
     offscreenSubpass.pColorAttachments = &offscreenColorRef;
     offscreenSubpass.pDepthStencilAttachment = &offscreenDepthRef;
 
-    // Dependency 0: external → subpass 0 (matches the main render pass synchronization setup
-    // and stage/access masks for color/depth attachment writes at subpass start)
-    VkSubpassDependency offscreenDeps[2]{};
-    offscreenDeps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    offscreenDeps[0].dstSubpass = 0;
-    offscreenDeps[0].srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    offscreenDeps[0].srcAccessMask = 0;
-    offscreenDeps[0].dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    offscreenDeps[0].dstAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    // Dependency 1: subpass 0 → external — ensures color attachment writes are visible to
-    // subsequent fragment shader reads (e.g., composite/post-process sampling the offscreen image).
-    // Without this, there is no memory dependency guaranteeing the writes are visible after
-    // vkCmdEndRenderPass, which can cause read-after-write hazards on some drivers.
-    offscreenDeps[1].srcSubpass = 0;
-    offscreenDeps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    offscreenDeps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    offscreenDeps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    offscreenDeps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    offscreenDeps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    offscreenDeps[1].dependencyFlags = 0;
+    const auto dependencies = makeSceneRenderPassDependencies();
 
     std::array<VkAttachmentDescription, 2> offscreenAttachments = {offscreenColor, offscreenDepth};
 
@@ -863,12 +861,56 @@ void VulkanContext::createOffscreenRenderPass() {
     offscreenRPInfo.pAttachments = offscreenAttachments.data();
     offscreenRPInfo.subpassCount = 1;
     offscreenRPInfo.pSubpasses = &offscreenSubpass;
-    offscreenRPInfo.dependencyCount = 2;
-    offscreenRPInfo.pDependencies = offscreenDeps;
+    offscreenRPInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    offscreenRPInfo.pDependencies = dependencies.data();
 
     if (vkCreateRenderPass(m_device, &offscreenRPInfo, nullptr, &m_offscreenRenderPass) !=
         VK_SUCCESS) {
         throw std::runtime_error("Failed to create offscreen render pass!");
+    }
+}
+
+void VulkanContext::createOffscreenLoadRenderPass() {
+    // Compatible with m_offscreenRenderPass (same formats/samples) so the same offscreen
+    // framebuffers can be reused to layer additional scenes on top of the first pass.
+    auto offscreenColor = makeColorAttachment(m_swapChainImageFormat, VK_ATTACHMENT_LOAD_OP_LOAD,
+                                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    VkAttachmentReference offscreenColorRef{};
+    offscreenColorRef.attachment = 0;
+    offscreenColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    auto offscreenDepth = makeDepthAttachment(findDepthFormat(), VK_ATTACHMENT_LOAD_OP_LOAD,
+                                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    VkAttachmentReference offscreenDepthRef{};
+    offscreenDepthRef.attachment = 1;
+    offscreenDepthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription offscreenSubpass{};
+    offscreenSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    offscreenSubpass.colorAttachmentCount = 1;
+    offscreenSubpass.pColorAttachments = &offscreenColorRef;
+    offscreenSubpass.pDepthStencilAttachment = &offscreenDepthRef;
+
+    const auto dependencies = makeSceneRenderPassDependencies();
+
+    std::array<VkAttachmentDescription, 2> offscreenAttachments = {offscreenColor, offscreenDepth};
+
+    VkRenderPassCreateInfo offscreenRPInfo{};
+    offscreenRPInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    offscreenRPInfo.attachmentCount = static_cast<uint32_t>(offscreenAttachments.size());
+    offscreenRPInfo.pAttachments = offscreenAttachments.data();
+    offscreenRPInfo.subpassCount = 1;
+    offscreenRPInfo.pSubpasses = &offscreenSubpass;
+    offscreenRPInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    offscreenRPInfo.pDependencies = dependencies.data();
+
+    if (vkCreateRenderPass(m_device, &offscreenRPInfo, nullptr, &m_offscreenRenderPassLoad) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to create offscreen load render pass!");
     }
 }
 
@@ -1303,87 +1345,8 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
-    for (const auto& info : sceneRenderInfos) {
-        bool isFirst = info.clearPass;
-
-        // Update UBO with this scene's camera via vkCmdUpdateBuffer
-        // (Must be outside render pass)
-        UniformBufferObject ubo{};
-        ubo.model = glm::mat4(1.0f);
-        ubo.view = info.viewMatrix;
-        ubo.proj = info.projMatrix;
-
-        VkBuffer uboBuffer = m_uniformBuffer.getBuffer(m_currentFrame);
-        vkCmdUpdateBuffer(commandBuffer, uboBuffer, 0, sizeof(UniformBufferObject), &ubo);
-
-        // Pipeline barrier: transfer write -> uniform read
-        VkBufferMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.buffer = uboBuffer;
-        barrier.offset = 0;
-        barrier.size = sizeof(UniformBufferObject);
-
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0,
-                             nullptr);
-
-        // Begin render pass
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = isFirst ? m_renderPass : m_renderPassLoad;
-        renderPassInfo.framebuffer = m_swapChainFramebuffers[imageIndex];
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = m_swapChainExtent;
-
-        std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = {{m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a}};
-        clearValues[1].depthStencil = {1.0f, 0};
-        if (isFirst) {
-            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassInfo.pClearValues = clearValues.data();
-        } else {
-            renderPassInfo.clearValueCount = 0;
-            renderPassInfo.pClearValues = nullptr;
-        }
-
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        // Set per-scene viewport and scissor
-        vkCmdSetViewport(commandBuffer, 0, 1, &info.viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &info.scissor);
-
-        // Clear depth for this viewport area (not just first scene)
-        // This ensures each scene has a clean depth buffer in its viewport
-        VkClearAttachment clearAttachment{};
-        clearAttachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        clearAttachment.clearValue.depthStencil = {1.0f, 0};
-
-        VkClearRect clearRect{};
-        clearRect.rect = info.scissor;
-        clearRect.baseArrayLayer = 0;
-        clearRect.layerCount = 1;
-
-        vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
-
-        // Set viewport override so entity render methods use this viewport
-        m_viewportOverride = info.viewport;
-        m_scissorOverride = info.scissor;
-        m_hasViewportOverride = true;
-
-        // Call scene's render callback
-        if (info.renderCallback) {
-            info.renderCallback(commandBuffer);
-        }
-
-        vkCmdEndRenderPass(commandBuffer);
-    }
-
-    // Clear viewport override after multi-scene rendering
-    m_hasViewportOverride = false;
+    recordScenePasses(commandBuffer, m_swapChainFramebuffers[imageIndex], m_renderPass,
+                      m_renderPassLoad, sceneRenderInfos, m_clearColor);
 
     // Transition final layout from COLOR_ATTACHMENT_OPTIMAL to PRESENT_SRC_KHR
     // This is needed because all our render passes now keep the image in COLOR_ATTACHMENT_OPTIMAL,
@@ -1452,6 +1415,102 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanContext::recordScenePasses(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer,
+                                      VkRenderPass clearPass, VkRenderPass loadPass,
+                                      const std::vector<SceneRenderInfo>& sceneRenderInfos,
+                                      const glm::vec4& clearColor) {
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {{clearColor.r, clearColor.g, clearColor.b, clearColor.a}};
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    auto beginPass = [&](bool clear) {
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = clear ? clearPass : loadPass;
+        renderPassInfo.framebuffer = framebuffer;
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = m_swapChainExtent;
+        if (clear) {
+            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassInfo.pClearValues = clearValues.data();
+        }
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    };
+
+    if (sceneRenderInfos.empty()) {
+        beginPass(true);
+        vkCmdEndRenderPass(commandBuffer);
+        return;
+    }
+
+    VkBuffer uboBuffer = m_uniformBuffer.getBuffer(m_currentFrame);
+
+    for (size_t i = 0; i < sceneRenderInfos.size(); ++i) {
+        const auto& info = sceneRenderInfos[i];
+        const bool clear = (i == 0) || info.clearPass;
+
+        // Earlier passes in this command buffer may still be reading the camera UBO;
+        // order those reads before overwriting it (write-after-read).
+        vkCmdPipelineBarrier(commandBuffer,
+                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+        // Update UBO with this scene's camera (must be outside a render pass)
+        UniformBufferObject ubo{};
+        ubo.model = glm::mat4(1.0f);
+        ubo.view = info.viewMatrix;
+        ubo.proj = info.projMatrix;
+        vkCmdUpdateBuffer(commandBuffer, uboBuffer, 0, sizeof(UniformBufferObject), &ubo);
+
+        VkBufferMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = uboBuffer;
+        barrier.offset = 0;
+        barrier.size = sizeof(UniformBufferObject);
+
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 1, &barrier, 0, nullptr);
+
+        beginPass(clear);
+
+        vkCmdSetViewport(commandBuffer, 0, 1, &info.viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &info.scissor);
+
+        // Each scene gets a clean depth buffer inside its own viewport so layered
+        // scenes (e.g. a HUD over a 3D world) never depth-test against each other.
+        VkClearAttachment clearAttachment{};
+        clearAttachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        clearAttachment.clearValue.depthStencil = {1.0f, 0};
+
+        VkClearRect clearRect{};
+        clearRect.rect = info.scissor;
+        clearRect.baseArrayLayer = 0;
+        clearRect.layerCount = 1;
+
+        vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
+
+        // Entity render methods read the viewport from the override
+        m_viewportOverride = info.viewport;
+        m_scissorOverride = info.scissor;
+        m_hasViewportOverride = true;
+
+        if (info.renderCallback) {
+            info.renderCallback(commandBuffer);
+        }
+
+        vkCmdEndRenderPass(commandBuffer);
+    }
+
+    m_hasViewportOverride = false;
 }
 
 void VulkanContext::drawFrameCustom(const CustomFrameRecorder& recorder) {

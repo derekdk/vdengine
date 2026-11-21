@@ -772,7 +772,8 @@ class HUDScene : public vde::Scene {
     HUDScene() = default;
 
     void onEnter() override {
-        setBackgroundColor(Color(0, 0, 0, 0));  // Transparent (engine may not support alpha clear)
+        m_displayTime = 0.0f;
+        setBackgroundColor(Color(0, 0, 0, 0));  // Only the bottom scene's background clears
 
         auto label = addEntity<SpriteEntity>();
         label->setPosition(0, 8.0f, 0.5f);
@@ -894,7 +895,8 @@ class MultiSceneDemo : public vde::Game {
                 auto group = vde::SceneGroup::create("dual", {"space", "city"});
                 setActiveSceneGroup(group);
                 std::cout << "\n>> SCENE GROUP MODE: Space + City rendering simultaneously" << '\n';
-                std::cout << "   (Space is primary camera/background, City entities overlay)"
+                std::cout << "   (Space draws first and sets the background; City overlays it "
+                             "with its own camera)"
                           << '\n';
             } else {
                 // Return to single-scene mode
@@ -963,8 +965,8 @@ class MultiSceneDemo : public vde::Game {
 
         std::cout << "\nMulti-Scene Group (Phase 2):" << '\n';
         std::cout << "  G     - Toggle dual-scene group (Space + City rendered together)" << '\n';
-        std::cout << "          Space is the primary scene (camera/background)" << '\n';
-        std::cout << "          City entities are rendered as overlay" << '\n';
+        std::cout << "          Space draws first (background); City overlays it" << '\n';
+        std::cout << "          using its own camera and lighting" << '\n';
 
         std::cout << "\nSplit-Screen Viewports (Phase 3):" << '\n';
         std::cout << "  V     - Toggle viewport mode (Space left, City right)" << '\n';
@@ -975,7 +977,7 @@ class MultiSceneDemo : public vde::Game {
         std::cout << "  TAB   - Cycle to next scene" << '\n';
         std::cout << "  G     - Toggle scene group mode (Space + City)" << '\n';
         std::cout << "  V     - Toggle split-screen viewport mode" << '\n';
-        std::cout << "  P     - Push HUD overlay (tests pushScene)" << '\n';
+        std::cout << "  P     - Push HUD overlay (current scene pauses, stays visible)" << '\n';
         std::cout << "  O     - Pop overlay (tests popScene)" << '\n';
         std::cout << "  B     - Toggle background simulation for current scene" << '\n';
         std::cout << "  SPACE - Print status of all scenes" << '\n';

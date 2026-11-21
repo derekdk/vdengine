@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace vde {
 
@@ -39,6 +40,9 @@ class ScriptEnvironment {
 
     /// Get the currently active scene group.
     [[nodiscard]] virtual const SceneGroup& getActiveSceneGroup() const = 0;
+
+    /// Get the scenes drawn each frame in draw order (paused stack scenes, then the active group).
+    [[nodiscard]] virtual std::vector<std::string> getVisibleSceneNames() const = 0;
 
     /// Get the swap chain extent (width, height) — for viewport assertions.
     [[nodiscard]] virtual std::pair<uint32_t, uint32_t> getSwapChainExtent() const = 0;

@@ -296,6 +296,31 @@ TEST_F(SchedulerTest, TaskWithNullWorkDoesNotCrash) {
 }
 
 // ============================================================================
+// Execution State
+// ============================================================================
+
+TEST_F(SchedulerTest, IsExecutingOnlyWhileTasksRun) {
+    bool seenDuringExecute = false;
+    scheduler.addTask({.name = "probe", .phase = TaskPhase::GameLogic, .work = [&]() {
+                           seenDuringExecute = scheduler.isExecuting();
+                       }});
+
+    EXPECT_FALSE(scheduler.isExecuting());
+    scheduler.execute();
+    EXPECT_TRUE(seenDuringExecute);
+    EXPECT_FALSE(scheduler.isExecuting());
+}
+
+TEST_F(SchedulerTest, IsExecutingResetsWhenTaskThrows) {
+    scheduler.addTask({.name = "throws", .phase = TaskPhase::GameLogic, .work = []() {
+                           throw std::runtime_error("task failure");
+                       }});
+
+    EXPECT_THROW(scheduler.execute(), std::runtime_error);
+    EXPECT_FALSE(scheduler.isExecuting());
+}
+
+// ============================================================================
 // Complex Graph Ordering
 // ============================================================================
 

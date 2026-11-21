@@ -91,22 +91,19 @@ std::string makeScreenshotFramePath(const std::string& basePath, uint64_t /*fram
     return basePath;
 }
 
-bool isSceneInActiveGroup(const SceneGroup& group, const std::string& sceneName) {
-    return std::ranges::any_of(group.sceneNames, [&](const std::string& activeSceneName) {
-        return activeSceneName == sceneName;
-    });
+bool isSceneVisible(const std::vector<std::string>& visibleScenes, const std::string& sceneName) {
+    return std::ranges::find(visibleScenes, sceneName) != visibleScenes.end();
 }
 
 bool tryResolveAssertSceneFieldValue(std::pair<uint32_t, uint32_t> swapExtent, Scene* targetScene,
-                                     bool inActiveGroup, const ScriptCommand& cmd,
-                                     double& fieldValue) {
+                                     bool isVisible, const ScriptCommand& cmd, double& fieldValue) {
     if (cmd.assertField == "was_rendered" || cmd.assertField == "not_blank") {
-        fieldValue = (targetScene && inActiveGroup) ? 1.0 : 0.0;
+        fieldValue = (targetScene && isVisible) ? 1.0 : 0.0;
         return true;
     }
 
     if (cmd.assertField == "draw_calls") {
-        if (targetScene && inActiveGroup) {
+        if (targetScene && isVisible) {
             fieldValue = targetScene->getEntities().empty() ? 0.0 : 1.0;
         }
         return true;
@@ -600,7 +597,7 @@ bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
     std::string fieldLabel;
 
     if (cmd.assertField.empty() || cmd.assertField == "rendered_scene_count") {
-        count = static_cast<double>(m_env.getActiveSceneGroup().sceneNames.size());
+        count = static_cast<double>(m_env.getVisibleSceneNames().size());
         fieldLabel = "rendered_scene_count";
     } else if (cmd.assertField == "scenes_created") {
         count = static_cast<double>(m_env.getScenesCreated());
@@ -629,9 +626,8 @@ bool InputScriptExecutor::handleAssertSceneCount(InputScriptState& state,
 }
 
 bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const ScriptCommand& cmd) {
-    const auto& activeGroup = m_env.getActiveSceneGroup();
     Scene* targetScene = m_env.getScene(cmd.assertSceneName);
-    const bool inActiveGroup = isSceneInActiveGroup(activeGroup, cmd.assertSceneName);
+    const bool isVisible = isSceneVisible(m_env.getVisibleSceneNames(), cmd.assertSceneName);
     double fieldValue = 0.0;
 
     // Resolve assert value (may be a variable reference)
@@ -648,8 +644,8 @@ bool InputScriptExecutor::handleAssertScene(InputScriptState& state, const Scrip
         assertValue = varIt->second;
     }
 
-    if (!tryResolveAssertSceneFieldValue(m_env.getSwapChainExtent(), targetScene, inActiveGroup,
-                                         cmd, fieldValue)) {
+    if (!tryResolveAssertSceneFieldValue(m_env.getSwapChainExtent(), targetScene, isVisible, cmd,
+                                         fieldValue)) {
         std::cerr << "[VDE:InputScript] ASSERT ERROR at line " << cmd.lineNumber
                   << ": unknown field '" << cmd.assertField << "'" << '\n';
         state.assertionFailed = true;

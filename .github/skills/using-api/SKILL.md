@@ -69,7 +69,7 @@ Implement scenes by inheriting from `vde::Scene` and overriding lifecycle method
 | `onEnter()` | Scene becomes active | Setup camera, lighting, load resources, create entities |
 | `update(dt)` | Every frame | Update game logic; **must call `Scene::update(dt)`** |
 | `render()` | Every frame after update | Custom rendering (usually just call `Scene::render()`) |
-| `onPause()` | Another scene pushed on top | Pause timers, animations |
+| `onPause()` | Another scene pushed on top (stops updating, stays visible beneath) | Pause timers, animations |
 | `onResume()` | Returned to after pop | Resume timers |
 | `onExit()` | Scene deactivated | Cleanup (usually automatic) |
 
@@ -260,9 +260,11 @@ transitionToScene("game", std::make_unique<vde::CircleRevealTransition>(), 1.5f)
 **Key points:**
 - Both source and destination scenes update during the transition
 - `onEnter()` fires on the destination scene at transition start; `onExit()` fires on the source scene at completion
+- Use `transitionToSceneGroup(group, ...)` to land on a group (e.g. menu + HUD); scenes in both groups stay entered
 - Duration ≤ 0 performs an instant switch (equivalent to `setActiveScene`)
 - Call `cancelTransition()` to snap back to the source scene
-- Use the viewport overload for split-screen transitions: `transitionToScene(name, transition, duration, viewportRect)`
+- Use the viewport overload for split-screen transitions: `transitionToScene(name, transition, duration, viewportRect)` replaces only the scene in that region
+- Scene-flow calls (`setActiveScene`, `setActiveSceneGroup`, `pushScene`, `popScene`, transitions) made while running take effect at the start of the next frame
 
 See [API-DOC.md#screen-transitions](../../../API-DOC.md#screen-transitions) for complete reference.
 

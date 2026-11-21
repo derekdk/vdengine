@@ -38,6 +38,74 @@ namespace vde {
 // Forward declaration of sprite descriptor cache cleanup function from Entity.cpp
 extern void clearSpriteDescriptorCache();
 
+namespace {
+
+/// Upper bound on scene-flow requests applied in one flush (guards against scene
+/// callbacks that keep requesting changes from onEnter()/onExit()).
+constexpr size_t kMaxSceneFlowRequestsPerFlush = 256;
+
+bool groupContains(const SceneGroup& group, const std::string& name) {
+    return std::ranges::find(group.sceneNames, name) != group.sceneNames.end();
+}
+
+void eraseSceneFromGroup(SceneGroup& group, const std::string& name) {
+    std::erase(group.sceneNames, name);
+    std::erase_if(group.entries,
+                  [&name](const SceneGroupEntry& entry) { return entry.sceneName == name; });
+}
+
+/**
+ * Build one SceneRenderInfo per layer: viewport/scissor from the layer, view/projection
+ * from the layer scene's own camera (aspect matched to its viewport).  Scenes without a
+ * camera reuse the primary (bottom) layer's matrices.
+ */
+template <typename Layers>
+std::vector<VulkanContext::SceneRenderInfo> buildSceneRenderInfos(VulkanContext& context,
+                                                                  const Layers& layers) {
+    const VkExtent2D extent = context.getSwapChainExtent();
+    std::vector<VulkanContext::SceneRenderInfo> infos;
+    infos.reserve(layers.size());
+
+    glm::mat4 fallbackView = context.getCamera().getViewMatrix();
+    glm::mat4 fallbackProj = context.getCamera().getProjectionMatrix();
+
+    for (const auto& layer : layers) {
+        Scene* scene = layer.scene;
+        VulkanContext::SceneRenderInfo info{};
+        info.viewport = layer.viewport.toVkViewport(extent.width, extent.height);
+        info.scissor = layer.viewport.toVkScissor(extent.width, extent.height);
+
+        if (GameCamera* camera = scene->getCamera()) {
+            camera->setAspectRatio(layer.viewport.getAspectRatio(extent.width, extent.height));
+            camera->applyTo(context);
+            info.viewMatrix = context.getCamera().getViewMatrix();
+            info.projMatrix = context.getCamera().getProjectionMatrix();
+        } else {
+            info.viewMatrix = fallbackView;
+            info.projMatrix = fallbackProj;
+        }
+        if (infos.empty()) {
+            fallbackView = info.viewMatrix;
+            fallbackProj = info.projMatrix;
+        }
+
+        info.renderCallback = [scene](VkCommandBuffer /*cmd*/) { scene->render(); };
+        infos.push_back(std::move(info));
+    }
+    return infos;
+}
+
+template <typename Layers>
+glm::vec4 bottomLayerClearColor(const Layers& layers, const glm::vec4& fallback) {
+    if (layers.empty()) {
+        return fallback;
+    }
+    const Color& bg = layers.front().scene->getBackgroundColor();
+    return {bg.r, bg.g, bg.b, bg.a};
+}
+
+}  // namespace
+
 // ============================================================================
 // Game Implementation
 // ============================================================================
@@ -166,18 +234,26 @@ void Game::shutdown() {
     // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
     onShutdown();
 
-    // Deactivate all currently active scenes
+    // Deactivate all currently active scenes (including paused stack scenes).
+    // Scene-flow requests made from onExit() are dropped: nothing may re-enter during shutdown.
+    m_processingSceneFlow = true;
     std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
     for (const auto& sceneName : activeScenes) {
         deactivateScene(sceneName);
     }
+    m_sceneFlowRequests.clear();
+    m_processingSceneFlow = false;
+    clearTransitionState();
     m_activeScene = nullptr;
     m_activeSceneGroup = SceneGroup{};
     m_activeSceneNames.clear();  // Defensive: ensure clean state on shutdown
+    m_pausedSceneNames.clear();
+    m_groupAssignedViewports.clear();
 
     // Clear all scenes
     m_scenes.clear();
     m_sceneStack.clear();
+    m_retiredScenes.clear();
 
     // Release persistent GPU resources while the Vulkan device is still alive
     m_resourceManager.clear();
@@ -224,36 +300,9 @@ void Game::run() {
     // Call start hook
     onStart();
 
-    // Enter active scene if one is set
-    if (m_activeScene) {
-        // Ensure there's a scene group for the active scene
-        if (m_activeSceneGroup.empty()) {
-            for (auto& [name, scenePtr] : m_scenes) {
-                if (scenePtr.get() == m_activeScene) {
-                    m_activeSceneGroup = SceneGroup::create(name, {name});
-                    break;
-                }
-            }
-        }
-        // Enter all scenes in the initial group
-        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-            activateScene(sceneName);
-        }
-
-        // Set isFocused based on getFocusedScene() to match actual input routing
-        for (auto& [name, scenePtr] : m_scenes) {
-            if (scenePtr) {
-                scenePtr->m_diagnostics.isFocused = false;
-            }
-        }
-        Scene* focusedScene = getFocusedScene();
-        if (!focusedScene) {
-            focusedScene = m_activeScene;
-        }
-        if (focusedScene) {
-            focusedScene->m_diagnostics.isFocused = true;
-        }
-    }
+    // Scene-flow requests made before run() were applied immediately (requests from
+    // onStart() apply at the first frame boundary).  Sync focus diagnostics with input routing.
+    refreshFocusDiagnostics();
 
     // Build the initial scheduler task graph
     rebuildSchedulerGraph();
@@ -418,23 +467,82 @@ void Game::addScene(const std::string& name, std::unique_ptr<Scene> scene) {
 }
 
 void Game::removeScene(const std::string& name) {
-    auto it = m_scenes.find(name);
-    if (it == m_scenes.end()) {
+    if (m_processingSceneFlow) {
+        SceneFlowRequest request;
+        request.kind = SceneFlowRequest::Kind::Remove;
+        request.sceneName = name;
+        requestSceneFlow(std::move(request));
         return;
     }
 
-    // If this scene is active, deactivate it
-    bool wasActiveScene = (m_activeScene == it->second.get());
-    deactivateScene(name);
-    if (wasActiveScene) {
-        m_activeScene = nullptr;
+    if (!sceneExists(name)) {
+        return;
     }
 
-    // Remove from stack if present
-    std::erase(m_sceneStack, name);
+    // Keep direct removal immediate, but serialize requests from its lifecycle callbacks.
+    m_processingSceneFlow = true;
+    try {
+        applyRemoveScene(name);
+    } catch (...) {
+        m_processingSceneFlow = false;
+        throw;
+    }
+    m_processingSceneFlow = false;
 
-    m_scenes.erase(it);
+    if (!shouldDeferSceneFlow()) {
+        processPendingSceneChange();
+    } else if (!m_scheduler.isExecuting()) {
+        rebuildSchedulerGraph();
+    }
+}
+
+void Game::applyRemoveScene(const std::string& name) {
+    if (!sceneExists(name)) {
+        return;
+    }
+
+    // A transition that can no longer complete as requested is cancelled with the normal undo
+    // (exits scenes it entered, re-pauses scenes it resumed).
+    if (m_transitionActive) {
+        const bool regionSceneRemoved =
+            name == m_transitionSourceScene || name == m_transitionDestScene;
+        const bool destGroupEmptied = !m_viewportTransition && m_transitionDestGroup.size() == 1 &&
+                                      groupContains(m_transitionDestGroup, name);
+        if (regionSceneRemoved || destGroupEmptied) {
+            applyCancelTransition();
+        }
+    }
+    eraseSceneFromGroup(m_transitionDestGroup, name);
+    std::erase(m_transitionEnteredScenes, name);
+    std::erase(m_transitionResumedScenes, name);
+
+    // Exit the scene if it is active or paused
+    m_pausedSceneNames.erase(name);
+    m_groupAssignedViewports.erase(name);
+    deactivateScene(name);
+
+    // Remove from the active group and the scene stack
+    eraseSceneFromGroup(m_activeSceneGroup, name);
+    for (auto& stacked : m_sceneStack) {
+        eraseSceneFromGroup(stacked, name);
+    }
+    std::erase_if(m_sceneStack, [](const SceneGroup& group) { return group.empty(); });
+    m_activeScene =
+        m_activeSceneGroup.empty() ? nullptr : getScene(m_activeSceneGroup.sceneNames.front());
+    if (m_focusedSceneName == name) {
+        m_focusedSceneName.clear();
+    }
+
+    auto removed = m_scenes.extract(name);
     m_scenesRemoved++;
+    refreshFocusDiagnostics();
+
+    // Scheduler tasks hold raw Scene pointers: when called mid-frame, keep the scene alive
+    // until the frame boundary, where the task graph is rebuilt without it.
+    if (m_scheduler.isExecuting()) {
+        m_retiredScenes.push_back(std::move(removed.mapped()));
+    }
+    m_schedulerRebuildPending = true;
 }
 
 Scene* Game::getScene(const std::string& name) {
@@ -445,136 +553,342 @@ Scene* Game::getScene(const std::string& name) {
     return nullptr;
 }
 
+// ============================================================================
+// Scene flow
+//
+// All scene-flow changes (set/push/pop/transition start/cancel/complete) go through
+// one queue.  While the game loop runs (or a frame is executing) requests are applied
+// in call order at the next frame boundary, so the task graph and the set of drawn
+// scenes never change mid-frame.  Otherwise they apply immediately.
+// ============================================================================
+
 void Game::setActiveScene(const std::string& name) {
-    // Defer scene switch to avoid issues during update/render.
-    // Internally creates a single-scene group.
-    m_pendingScene = name;
-    m_sceneSwitchPending = true;
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::SetGroup;
+    request.group = SceneGroup::create(name, {name});
+    requestSceneFlow(std::move(request));
 }
 
 void Game::setActiveSceneGroup(const SceneGroup& group) {
-    // Validate that all scenes exist
-    for (const auto& sceneName : group.sceneNames) {
-        if (m_scenes.find(sceneName) == m_scenes.end()) {
-            return;  // Silently ignore invalid groups
-        }
-    }
-
-    // Build set for new group for fast lookup
-    std::unordered_set<std::string> newGroupSet(group.sceneNames.begin(), group.sceneNames.end());
-
-    // Exit scenes that are currently active but NOT in the NEW group
-    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
-    for (const auto& sceneName : activeScenes) {
-        if (newGroupSet.find(sceneName) == newGroupSet.end()) {
-            deactivateScene(sceneName);
-        }
-    }
-
-    // Clear scene stack (group switch resets the stack)
-    m_sceneStack.clear();
-
-    // Set new group
-    m_activeSceneGroup = group;
-
-    // Set primary scene (first in the group)
-    if (!group.sceneNames.empty()) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-        auto it = m_scenes.find(group.sceneNames[0]);
-        if (it != m_scenes.end()) {
-            m_activeScene = it->second.get();
-        }
-    } else {
-        m_activeScene = nullptr;
-    }
-
-    // Enter scenes that are in the NEW group but NOT currently active
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        activateScene(sceneName);
-    }
-
-    // Refresh focus diagnostics: exactly one scene in the group is focused —
-    // the explicitly focused scene if it is in the group, otherwise the primary scene.
-    Scene* focusedScene = nullptr;
-    if (!m_focusedSceneName.empty() && newGroupSet.count(m_focusedSceneName) > 0) {
-        auto focusedIt = m_scenes.find(m_focusedSceneName);
-        if (focusedIt != m_scenes.end()) {
-            focusedScene = focusedIt->second.get();
-        }
-    }
-    if (focusedScene == nullptr) {
-        focusedScene = m_activeScene;
-    }
-
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        auto it = m_scenes.find(sceneName);
-        if (it != m_scenes.end()) {
-            it->second->m_diagnostics.isFocused = (it->second.get() == focusedScene);
-        }
-    }
-
-    // Apply per-scene viewport rects from group entries (if present)
-    if (m_activeSceneGroup.hasViewports()) {
-        for (const auto& entry : m_activeSceneGroup.entries) {
-            auto it = m_scenes.find(entry.sceneName);
-            if (it != m_scenes.end()) {
-                it->second->setViewportRect(entry.viewport);
-            }
-        }
-    }
-
-    // Rebuild the scheduler graph for the new group
-    rebuildSchedulerGraph();
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::SetGroup;
+    request.group = group;
+    requestSceneFlow(std::move(request));
 }
 
 void Game::pushScene(const std::string& name) {
-    auto it = m_scenes.find(name);
-    if (it == m_scenes.end()) {
-        return;
-    }
-
-    // Pause current scene
-    if (m_activeScene) {
-        m_activeScene->m_diagnostics.isFocused = false;
-        m_activeScene->m_diagnostics.pauseCount++;
-        m_activeScene->onPause();
-        // Find current scene name and push to stack
-        for (auto& pair : m_scenes) {
-            if (pair.second.get() == m_activeScene) {
-                m_sceneStack.push_back(pair.first);
-                break;
-            }
-        }
-    }
-
-    // Activate new scene
-    m_activeScene = it->second.get();
-    activateScene(name);
-    m_activeScene->m_diagnostics.isFocused = true;
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::Push;
+    request.sceneName = name;
+    requestSceneFlow(std::move(request));
 }
 
 void Game::popScene() {
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::Pop;
+    requestSceneFlow(std::move(request));
+}
+
+std::vector<std::string> Game::getVisibleSceneNames() const {
+    std::vector<std::string> names;
+    for (const auto& layer : collectFrameLayers()) {
+        names.push_back(layer.scene->getName());
+    }
+    return names;
+}
+
+bool Game::sceneExists(const std::string& name) const {
+    return m_scenes.find(name) != m_scenes.end();
+}
+
+void Game::applyPendingSceneChanges() {
+    if (m_scheduler.isExecuting()) {
+        return;
+    }
+    processPendingSceneChange();
+}
+
+bool Game::shouldDeferSceneFlow() const {
+    return m_running || m_scheduler.isExecuting();
+}
+
+void Game::requestSceneFlow(SceneFlowRequest request) {
+    m_sceneFlowRequests.push_back(std::move(request));
+    if (!shouldDeferSceneFlow()) {
+        processPendingSceneChange();
+    }
+}
+
+void Game::processPendingSceneChange() {
+    if (m_processingSceneFlow) {
+        return;  // Re-entrant request from a scene callback: the outer flush applies it
+    }
+
+    m_processingSceneFlow = true;
+    try {
+        size_t applied = 0;
+        while (!m_sceneFlowRequests.empty()) {
+            if (applied++ >= kMaxSceneFlowRequestsPerFlush) {
+                std::cerr << "[VDE] Scene flow: more than " << kMaxSceneFlowRequestsPerFlush
+                          << " requests in one frame (scene callbacks requesting changes in a "
+                             "loop?); dropping "
+                          << m_sceneFlowRequests.size() << " request(s)\n";
+                m_sceneFlowRequests.clear();
+                break;
+            }
+            SceneFlowRequest request = std::move(m_sceneFlowRequests.front());
+            m_sceneFlowRequests.erase(m_sceneFlowRequests.begin());
+            applySceneFlowRequest(request);
+        }
+    } catch (...) {
+        m_processingSceneFlow = false;
+        throw;
+    }
+    m_processingSceneFlow = false;
+
+    if (m_schedulerRebuildPending) {
+        rebuildSchedulerGraph();
+    }
+    // Safe now: the rebuilt graph no longer references scenes removed mid-frame.
+    m_retiredScenes.clear();
+}
+
+void Game::applySceneFlowRequest(SceneFlowRequest& request) {
+    using Kind = SceneFlowRequest::Kind;
+
+    // A transition whose effect already finished counts as complete before any later request.
+    if (m_transitionCompletionPending && request.kind != Kind::CompleteTransition) {
+        applyCompleteTransition();
+    }
+
+    switch (request.kind) {
+    case Kind::SetGroup: {
+        for (const auto& sceneName : request.group.sceneNames) {
+            if (!sceneExists(sceneName)) {
+                std::cerr << "[VDE] setActiveScene/Group: unknown scene '" << sceneName
+                          << "'; request ignored\n";
+                return;
+            }
+        }
+        if (m_transitionActive) {
+            // Abandon without lifecycle undo: applySceneGroup() exits/keeps scenes itself.
+            if (m_transitionManager) {
+                m_transitionManager->cancel();
+            }
+            clearTransitionState();
+        }
+        applySceneGroup(request.group, /*keepStack=*/false);
+        break;
+    }
+    case Kind::Push: {
+        // Validate before touching a running transition: an ignored push must not cancel it.
+        const bool enteredOnlyByTransition =
+            std::ranges::find(m_transitionEnteredScenes, request.sceneName) !=
+            m_transitionEnteredScenes.end();
+        if (!sceneExists(request.sceneName) ||
+            (m_activeSceneNames.contains(request.sceneName) && !enteredOnlyByTransition)) {
+            applyPushScene(request.sceneName);  // Reports why the request is ignored
+            break;
+        }
+        applyCancelTransition();
+        applyPushScene(request.sceneName);
+        break;
+    }
+    case Kind::Pop:
+        if (m_sceneStack.empty()) {
+            break;  // Nothing to pop; leave any running transition alone
+        }
+        applyCancelTransition();
+        applyPopScene();
+        break;
+    case Kind::Remove:
+        applyRemoveScene(request.sceneName);
+        break;
+    case Kind::StartTransition:
+        applyStartTransition(request);
+        break;
+    case Kind::CancelTransition:
+        applyCancelTransition();
+        break;
+    case Kind::CompleteTransition:
+        if (request.transitionId == m_transitionGeneration) {
+            applyCompleteTransition();
+        }
+        break;
+    }
+}
+
+void Game::applySceneGroup(const SceneGroup& group, bool keepStack) {
+    std::unordered_set<std::string> keep(group.sceneNames.begin(), group.sceneNames.end());
+    if (keepStack) {
+        for (const auto& stacked : m_sceneStack) {
+            keep.insert(stacked.sceneNames.begin(), stacked.sceneNames.end());
+        }
+    }
+
+    // Exit entered scenes that are neither in the new group nor (if kept) the stack.
+    // Order: active group top-down, then the stack top-down, then anything else by name.
+    std::vector<std::string> exitOrder(m_activeSceneGroup.sceneNames.rbegin(),
+                                       m_activeSceneGroup.sceneNames.rend());
+    for (auto stackIt = m_sceneStack.rbegin(); stackIt != m_sceneStack.rend(); ++stackIt) {
+        exitOrder.insert(exitOrder.end(), stackIt->sceneNames.rbegin(), stackIt->sceneNames.rend());
+    }
+    std::vector<std::string> remaining;
+    for (const auto& sceneName : m_activeSceneNames) {
+        if (std::ranges::find(exitOrder, sceneName) == exitOrder.end()) {
+            remaining.push_back(sceneName);
+        }
+    }
+    std::ranges::sort(remaining);
+    exitOrder.insert(exitOrder.end(), remaining.begin(), remaining.end());
+
+    for (const auto& sceneName : exitOrder) {
+        if (keep.contains(sceneName) || !m_activeSceneNames.contains(sceneName)) {
+            continue;
+        }
+        m_pausedSceneNames.erase(sceneName);
+        deactivateScene(sceneName);
+    }
+
+    if (!keepStack) {
+        m_sceneStack.clear();
+    }
+
+    m_activeSceneGroup = group;
+    m_activeScene = group.empty() ? nullptr : getScene(group.sceneNames.front());
+    applyGroupViewports(group);
+
+    for (const auto& sceneName : group.sceneNames) {
+        if (m_pausedSceneNames.erase(sceneName) > 0) {
+            Scene* scene = getScene(sceneName);
+            scene->m_diagnostics.resumeCount++;
+            scene->onResume();
+        }
+        activateScene(sceneName);
+    }
+
+    refreshFocusDiagnostics();
+    m_schedulerRebuildPending = true;
+}
+
+void Game::applyPushScene(const std::string& name) {
+    Scene* pushed = getScene(name);
+    if (!pushed) {
+        std::cerr << "[VDE] pushScene: unknown scene '" << name << "'; request ignored\n";
+        return;
+    }
+    if (m_activeSceneNames.contains(name)) {
+        std::cerr << "[VDE] pushScene: scene '" << name
+                  << "' is already active or paused; request ignored\n";
+        return;
+    }
+
+    // Pause the current group; it stays visible (frozen) beneath the pushed scene.
+    if (!m_activeSceneGroup.empty()) {
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            Scene* scene = getScene(sceneName);
+            if (scene && m_pausedSceneNames.insert(sceneName).second) {
+                scene->m_diagnostics.pauseCount++;
+                scene->onPause();
+            }
+        }
+        m_sceneStack.push_back(m_activeSceneGroup);
+    }
+
+    m_activeSceneGroup = SceneGroup::create(name, {name});
+    m_activeScene = pushed;
+    applyGroupViewports(m_activeSceneGroup);
+    activateScene(name);
+
+    refreshFocusDiagnostics();
+    m_schedulerRebuildPending = true;
+}
+
+void Game::applyPopScene() {
     if (m_sceneStack.empty()) {
         return;
     }
 
-    // Exit current scene
-    if (m_activeScene) {
-        deactivateScene(m_activeScene->getName());
-    }
-
-    // Resume previous scene
-    std::string prevName = m_sceneStack.back();
+    SceneGroup restored = std::move(m_sceneStack.back());
     m_sceneStack.pop_back();
 
-    auto it = m_scenes.find(prevName);
-    if (it != m_scenes.end()) {
-        m_activeScene = it->second.get();
-        m_activeScene->m_diagnostics.isFocused = true;
-        m_activeScene->m_diagnostics.resumeCount++;
-        m_activeScene->onResume();
-    } else {
-        m_activeScene = nullptr;
+    std::unordered_set<std::string> keep(restored.sceneNames.begin(), restored.sceneNames.end());
+    for (const auto& stacked : m_sceneStack) {
+        keep.insert(stacked.sceneNames.begin(), stacked.sceneNames.end());
+    }
+
+    // Exit the popped group, topmost scene first
+    const std::vector<std::string> popped = m_activeSceneGroup.sceneNames;
+    for (auto it = popped.rbegin(); it != popped.rend(); ++it) {
+        if (!keep.contains(*it)) {
+            m_pausedSceneNames.erase(*it);
+            deactivateScene(*it);
+        }
+    }
+
+    m_activeSceneGroup = std::move(restored);
+    m_activeScene =
+        m_activeSceneGroup.empty() ? nullptr : getScene(m_activeSceneGroup.sceneNames.front());
+
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        if (m_pausedSceneNames.erase(sceneName) > 0) {
+            Scene* scene = getScene(sceneName);
+            scene->m_diagnostics.resumeCount++;
+            scene->onResume();
+        }
+        activateScene(sceneName);
+    }
+
+    refreshFocusDiagnostics();
+    m_schedulerRebuildPending = true;
+}
+
+void Game::applyGroupViewports(const SceneGroup& group) {
+    for (const auto& sceneName : group.sceneNames) {
+        Scene* scene = getScene(sceneName);
+        if (!scene) {
+            continue;
+        }
+        const ViewportRect viewport = resolveGroupViewport(group, sceneName, *scene);
+        const bool hasEntry = std::ranges::any_of(group.entries, [&](const SceneGroupEntry& entry) {
+            return entry.sceneName == sceneName;
+        });
+        if (hasEntry) {
+            if (scene->getViewportRect() != viewport) {
+                scene->setViewportRect(viewport);
+                m_groupAssignedViewports[sceneName] = viewport;
+            }
+        } else {
+            scene->setViewportRect(viewport);
+            m_groupAssignedViewports.erase(sceneName);
+        }
+    }
+}
+
+ViewportRect Game::resolveGroupViewport(const SceneGroup& group, const std::string& sceneName,
+                                        const Scene& scene) const {
+    for (const auto& entry : group.entries) {
+        if (entry.sceneName == sceneName) {
+            return entry.viewport;
+        }
+    }
+    // No entry: a viewport an earlier group assigned (and the scene has not changed since)
+    // reverts to full window; a viewport the scene chose itself is kept.
+    auto assigned = m_groupAssignedViewports.find(sceneName);
+    if (assigned != m_groupAssignedViewports.end() && scene.getViewportRect() == assigned->second) {
+        return ViewportRect::fullWindow();
+    }
+    return scene.getViewportRect();
+}
+
+void Game::refreshFocusDiagnostics() {
+    for (auto& [name, scenePtr] : m_scenes) {
+        if (scenePtr) {
+            scenePtr->m_diagnostics.isFocused = false;
+        }
+    }
+    if (Scene* focused = getFocusedScene()) {
+        focused->m_diagnostics.isFocused = true;
     }
 }
 
@@ -584,100 +898,251 @@ void Game::popScene() {
 
 void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
                              float duration) {
-    // Validate destination scene exists before mutating any state
-    auto it = m_scenes.find(name);
-    if (it == m_scenes.end()) {
+    if (!sceneExists(name)) {
         throw std::runtime_error("[VDE] transitionToScene: unknown scene '" + name + "'");
     }
-
-    // Full-screen transition (default)
-    m_viewportTransition = false;
-    m_transitionViewport = ViewportRect::fullWindow();
-
-    // If duration <= 0, do an instant switch
-    if (duration <= 0.0f) {
-        setActiveScene(name);
-        return;
-    }
-
-    // If already transitioning, cancel first (exits dest scene)
-    if (m_transitionManager && m_transitionManager->isActive()) {
-        cancelTransition();
-    }
-
-    // Record source scene name (current primary scene)
-    m_transitionSourceScene.clear();
-    if (m_activeScene) {
-        for (const auto& [sceneName, scenePtr] : m_scenes) {
-            if (scenePtr.get() == m_activeScene) {
-                m_transitionSourceScene = sceneName;
-                break;
-            }
-        }
-    }
-    m_transitionDestScene = name;
-
-    // Enter the destination scene (so it starts receiving updates)
-    // activateScene is idempotent — no-op if already active
-    activateScene(name);
-
-    // Start the transition
-    m_transitionManager->start(std::move(transition), duration, [this]() {
-        // Transition complete callback
-        auto destIt = m_scenes.find(m_transitionDestScene);
-        if (destIt != m_scenes.end()) {
-            m_activeScene = destIt->second.get();
-            m_activeScene->m_diagnostics.isFocused = true;
-        }
-        m_activeSceneGroup = SceneGroup::create(m_transitionDestScene, {m_transitionDestScene});
-
-        // Finish the source-scene exit and scheduler rebuild at the next frame boundary.
-        m_pendingScene = m_transitionDestScene;
-        m_sceneSwitchPending = true;
-
-        // Clear transition state
-        m_transitionSourceScene.clear();
-        m_transitionDestScene.clear();
-        m_viewportTransition = false;
-        m_transitionViewport = ViewportRect::fullWindow();
-    });
+    transitionToSceneGroup(SceneGroup::create(name, {name}), std::move(transition), duration);
 }
 
 void Game::transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
                              float duration, const ViewportRect& region) {
-    // Store viewport info before delegating to the main overload
-    transitionToScene(name, std::move(transition), duration);
-
-    // Apply viewport-scoped transition settings (after transitionToScene sets up state).
-    // The render task reads m_viewportTransition at runtime, so no scheduler rebuild is needed.
-    if (m_transitionManager && m_transitionManager->isActive()) {
-        m_viewportTransition = true;
-        m_transitionViewport = region;
+    if (!sceneExists(name)) {
+        throw std::runtime_error("[VDE] transitionToScene: unknown scene '" + name + "'");
     }
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::StartTransition;
+    request.sceneName = name;
+    request.transition = std::move(transition);
+    request.duration = duration;
+    request.hasRegion = true;
+    request.region = region;
+    requestSceneFlow(std::move(request));
 }
 
-bool Game::isTransitioning() const {
-    return m_transitionManager && m_transitionManager->isActive();
+void Game::transitionToSceneGroup(const SceneGroup& group, std::unique_ptr<Transition> transition,
+                                  float duration) {
+    if (group.empty()) {
+        throw std::runtime_error("[VDE] transitionToSceneGroup: group '" + group.name +
+                                 "' is empty");
+    }
+    for (const auto& sceneName : group.sceneNames) {
+        if (!sceneExists(sceneName)) {
+            throw std::runtime_error("[VDE] transitionToSceneGroup: unknown scene '" + sceneName +
+                                     "'");
+        }
+    }
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::StartTransition;
+    request.group = group;
+    request.transition = std::move(transition);
+    request.duration = duration;
+    requestSceneFlow(std::move(request));
 }
 
-void Game::cancelTransition() {
-    if (!m_transitionManager || !m_transitionManager->isActive()) {
+void Game::applyStartTransition(SceneFlowRequest& request) {
+    // Build the group that becomes active when the transition completes.
+    SceneGroup destGroup;
+    std::string sourceScene;
+    if (request.hasRegion) {
+        const std::string& destName = request.sceneName;
+        if (!sceneExists(destName)) {
+            std::cerr << "[VDE] transitionToScene: unknown scene '" << destName
+                      << "'; request ignored\n";
+            return;
+        }
+
+        // Source: the active scene whose viewport is exactly the region, else the
+        // topmost one containing the region's center.
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            const Scene* scene = getScene(sceneName);
+            if (scene && scene->getViewportRect() == request.region) {
+                sourceScene = sceneName;
+            }
+        }
+        if (sourceScene.empty()) {
+            const float cx = request.region.x + (request.region.width * 0.5f);
+            const float cy = request.region.y + (request.region.height * 0.5f);
+            for (auto it = m_activeSceneGroup.sceneNames.rbegin();
+                 it != m_activeSceneGroup.sceneNames.rend(); ++it) {
+                const Scene* scene = getScene(*it);
+                if (scene && scene->getViewportRect().contains(cx, cy)) {
+                    sourceScene = *it;
+                    break;
+                }
+            }
+        }
+        if (destName == sourceScene) {
+            return;  // Already showing the destination in that region
+        }
+    }
+
+    // Cancel an in-progress transition before validating against the reverted state.
+    applyCancelTransition();
+
+    if (request.hasRegion) {
+        const std::string& destName = request.sceneName;
+        if (m_activeSceneNames.contains(destName)) {
+            std::cerr << "[VDE] transitionToScene(region): scene '" << destName
+                      << "' is already active or paused; request ignored\n";
+            return;
+        }
+        destGroup.name = m_activeSceneGroup.name;
+        bool replaced = false;
+        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            if (sceneName == sourceScene) {
+                destGroup.entries.push_back({.sceneName = destName, .viewport = request.region});
+                replaced = true;
+            } else {
+                const Scene* scene = getScene(sceneName);
+                destGroup.entries.push_back(
+                    {.sceneName = sceneName,
+                     .viewport = scene ? scene->getViewportRect() : ViewportRect::fullWindow()});
+            }
+        }
+        if (!replaced) {
+            destGroup.entries.push_back({.sceneName = destName, .viewport = request.region});
+        }
+        for (const auto& entry : destGroup.entries) {
+            destGroup.sceneNames.push_back(entry.sceneName);
+        }
+    } else {
+        for (const auto& sceneName : request.group.sceneNames) {
+            if (!sceneExists(sceneName)) {
+                std::cerr << "[VDE] transitionToSceneGroup: unknown scene '" << sceneName
+                          << "'; request ignored\n";
+                return;
+            }
+        }
+        destGroup = request.group;
+    }
+
+    const bool animated = m_transitionManager && request.transition && request.duration > 0.0f;
+    if (!animated) {
+        if (request.transition) {
+            request.transition->onStart();
+            request.transition->onComplete();
+        }
+        applySceneGroup(destGroup, /*keepStack=*/request.hasRegion);
         return;
     }
 
-    // Exit the destination scene since we're reverting to source
-    if (!m_transitionDestScene.empty() && m_transitionDestScene != m_transitionSourceScene) {
-        deactivateScene(m_transitionDestScene);
+    m_transitionActive = true;
+    m_transitionCompletionPending = false;
+    m_transitionDestGroup = destGroup;
+    m_viewportTransition = request.hasRegion;
+    m_transitionViewport = request.hasRegion ? request.region : ViewportRect::fullWindow();
+    m_transitionSourceScene = request.hasRegion ? sourceScene : std::string{};
+    m_transitionDestScene = request.hasRegion ? request.sceneName : std::string{};
+    m_transitionEnteredScenes.clear();
+    m_transitionResumedScenes.clear();
+    const uint64_t transitionId = ++m_transitionGeneration;
+
+    // Destination scenes start updating now: enter new ones, resume paused ones.
+    for (const auto& sceneName : destGroup.sceneNames) {
+        if (m_pausedSceneNames.erase(sceneName) > 0) {
+            Scene* scene = getScene(sceneName);
+            scene->m_diagnostics.resumeCount++;
+            scene->onResume();
+            m_transitionResumedScenes.push_back(sceneName);
+        } else if (!m_activeSceneNames.contains(sceneName)) {
+            activateScene(sceneName);
+            m_transitionEnteredScenes.push_back(sceneName);
+        }
     }
 
-    m_transitionManager->cancel();
+    m_transitionManager->start(std::move(request.transition), request.duration,
+                               [this, transitionId]() {
+                                   // Effect finished (mid-frame): keep drawing the destination
+                                   // and swap groups at the next frame boundary.
+                                   m_transitionCompletionPending = true;
+                                   SceneFlowRequest complete;
+                                   complete.kind = SceneFlowRequest::Kind::CompleteTransition;
+                                   complete.transitionId = transitionId;
+                                   requestSceneFlow(std::move(complete));
+                               });
+    m_schedulerRebuildPending = true;
+}
+
+void Game::applyCancelTransition() {
+    if (!m_transitionActive) {
+        return;
+    }
+
+    if (m_transitionManager) {
+        m_transitionManager->cancel();
+    }
+
+    // Undo the transition start: exit what it entered, re-pause what it resumed.
+    const std::vector<std::string> entered = m_transitionEnteredScenes;
+    const std::vector<std::string> resumed = m_transitionResumedScenes;
+    clearTransitionState();
+
+    for (auto it = entered.rbegin(); it != entered.rend(); ++it) {
+        deactivateScene(*it);
+    }
+    for (const auto& sceneName : resumed) {
+        Scene* scene = getScene(sceneName);
+        if (scene && m_activeSceneNames.contains(sceneName) &&
+            m_pausedSceneNames.insert(sceneName).second) {
+            scene->m_diagnostics.pauseCount++;
+            scene->onPause();
+        }
+    }
+
+    refreshFocusDiagnostics();
+    m_schedulerRebuildPending = true;
+}
+
+void Game::applyCompleteTransition() {
+    if (!m_transitionActive) {
+        return;
+    }
+
+    const SceneGroup destGroup = m_transitionDestGroup;
+    const bool keepStack = m_viewportTransition;
+    if (m_transitionManager) {
+        m_transitionManager->cancel();  // No-op when the effect already finished
+    }
+    clearTransitionState();
+    applySceneGroup(destGroup, keepStack);
+}
+
+void Game::clearTransitionState() {
+    m_transitionActive = false;
+    m_transitionCompletionPending = false;
+    m_transitionDestGroup = SceneGroup{};
     m_transitionSourceScene.clear();
     m_transitionDestScene.clear();
+    m_transitionEnteredScenes.clear();
+    m_transitionResumedScenes.clear();
     m_viewportTransition = false;
     m_transitionViewport = ViewportRect::fullWindow();
 }
 
+bool Game::isTransitioning() const {
+    if (m_transitionActive) {
+        return true;
+    }
+    return m_transitionManager &&
+           std::ranges::any_of(m_sceneFlowRequests, [](const SceneFlowRequest& request) {
+               return request.kind == SceneFlowRequest::Kind::StartTransition &&
+                      request.transition && request.duration > 0.0f;
+           });
+}
+
+void Game::cancelTransition() {
+    if (!isTransitioning()) {
+        return;
+    }
+    SceneFlowRequest request;
+    request.kind = SceneFlowRequest::Kind::CancelTransition;
+    requestSceneFlow(std::move(request));
+}
+
 float Game::getTransitionProgress() const {
+    if (m_transitionCompletionPending) {
+        return 1.0f;
+    }
     if (m_transitionManager) {
         return m_transitionManager->getProgress();
     }
@@ -876,44 +1341,6 @@ void Game::updateTiming() {
         m_fpsAccumulator = 0.0;
         m_fpsFrameCount = 0;
     }
-}
-
-void Game::processPendingSceneChange() {
-    if (!m_sceneSwitchPending) {
-        return;
-    }
-
-    m_sceneSwitchPending = false;
-
-    auto it = m_scenes.find(m_pendingScene);
-    if (it == m_scenes.end()) {
-        return;
-    }
-
-    // Exit currently active scenes that are NOT the pending scene
-    std::vector<std::string> activeScenes(m_activeSceneNames.begin(), m_activeSceneNames.end());
-    for (const auto& sceneName : activeScenes) {
-        if (sceneName == m_pendingScene) {
-            continue;  // Will stay active — don't exit
-        }
-        deactivateScene(sceneName);
-    }
-
-    // Clear scene stack (setActiveScene resets the stack)
-    m_sceneStack.clear();
-
-    // Create a single-scene group
-    m_activeSceneGroup = SceneGroup::create(m_pendingScene, {m_pendingScene});
-
-    // Enter new scene (activateScene is a no-op if already active)
-    m_activeScene = it->second.get();
-    activateScene(m_pendingScene);
-
-    // Update focus tracking
-    m_activeScene->m_diagnostics.isFocused = true;
-
-    // Rebuild the scheduler graph for the new scene
-    rebuildSchedulerGraph();
 }
 
 void Game::executePendingWindowOperations() {
@@ -1840,6 +2267,8 @@ void Game::createLightingResources() {
 
     VkDevice device = m_vulkanContext->getDevice();
     constexpr uint32_t framesInFlight = 2;  // MAX_FRAMES_IN_FLIGHT
+    constexpr uint32_t slotsPerFrame = kMaxLightingSlotsPerFrame;
+    constexpr uint32_t setCount = framesInFlight * slotsPerFrame;
 
     // Create lighting descriptor set layout (Set 1: Lighting UBO)
     VkDescriptorSetLayoutBinding lightingBinding{};
@@ -1858,24 +2287,31 @@ void Game::createLightingResources() {
         throw std::runtime_error("Failed to create lighting descriptor set layout");
     }
 
-    // Create descriptor pool for lighting UBO
+    // One descriptor set per (frame-in-flight, lighting slot)
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = framesInFlight;
+    poolSize.descriptorCount = setCount;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = framesInFlight;
+    poolInfo.maxSets = setCount;
 
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_lightingDescriptorPool) !=
         VK_SUCCESS) {
         throw std::runtime_error("Failed to create lighting descriptor pool");
     }
 
-    // Create lighting UBO buffers (one per frame)
-    VkDeviceSize bufferSize = sizeof(LightingUBO);
+    // Each frame's buffer holds slotsPerFrame LightingUBOs at aligned offsets so that
+    // scenes drawn in the same frame keep independent lighting.
+    VkPhysicalDeviceProperties deviceProperties{};
+    vkGetPhysicalDeviceProperties(m_vulkanContext->getPhysicalDevice(), &deviceProperties);
+    const VkDeviceSize alignment =
+        std::max<VkDeviceSize>(deviceProperties.limits.minUniformBufferOffsetAlignment, 1);
+    m_lightingSlotStride = ((sizeof(LightingUBO) + alignment - 1) / alignment) * alignment;
+    const VkDeviceSize bufferSize = m_lightingSlotStride * slotsPerFrame;
+
     m_lightingUBOBuffers.resize(framesInFlight);
     m_lightingUBOMemory.resize(framesInFlight);
     m_lightingUBOMapped.resize(framesInFlight);
@@ -1893,48 +2329,57 @@ void Game::createLightingResources() {
     // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     // Allocate descriptor sets
-    std::vector<VkDescriptorSetLayout> layouts(framesInFlight, m_lightingDescriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(setCount, m_lightingDescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = m_lightingDescriptorPool;
-    allocInfo.descriptorSetCount = framesInFlight;
+    allocInfo.descriptorSetCount = setCount;
     allocInfo.pSetLayouts = layouts.data();
 
-    m_lightingDescriptorSets.resize(framesInFlight);
+    m_lightingDescriptorSets.resize(setCount);
     if (vkAllocateDescriptorSets(device, &allocInfo, m_lightingDescriptorSets.data()) !=
         VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate lighting descriptor sets");
     }
 
-    // Update descriptor sets to point to UBO buffers
+    // Point each descriptor set at its frame buffer + slot offset
     // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_lightingUBOBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = bufferSize;
+    for (uint32_t frame = 0; frame < framesInFlight; frame++) {
+        for (uint32_t slot = 0; slot < slotsPerFrame; slot++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = m_lightingUBOBuffers[frame];
+            bufferInfo.offset = m_lightingSlotStride * slot;
+            bufferInfo.range = sizeof(LightingUBO);
 
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = m_lightingDescriptorSets[i];
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_lightingDescriptorSets[(frame * slotsPerFrame) + slot];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
 
-        vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+        }
     }
 
-    // Initialize with default lighting (white ambient)
+    // Initialize every slot with default lighting (white ambient)
     LightingUBO defaultLighting{};
     defaultLighting.ambientColorAndIntensity = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
     defaultLighting.lightCounts = glm::ivec4(0, 0, 0, 0);
 
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-        memcpy(m_lightingUBOMapped[i], &defaultLighting, sizeof(LightingUBO));
+    for (uint32_t frame = 0; frame < framesInFlight; frame++) {
+        auto* base = static_cast<unsigned char*>(m_lightingUBOMapped[frame]);
+        for (uint32_t slot = 0; slot < slotsPerFrame; slot++) {
+            memcpy(base + (m_lightingSlotStride * slot), &defaultLighting, sizeof(LightingUBO));
+        }
     }
     // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+
+    m_lightingSlotScenes.clear();
+    m_lightingSlotScenes.reserve(slotsPerFrame);
+    m_currentLightingSlot = 0;
 
     std::cout << "Lighting resources created successfully" << '\n';
 }
@@ -1963,6 +2408,8 @@ void Game::destroyLightingResources() {
     m_lightingUBOBuffers.clear();
     m_lightingUBOMemory.clear();
     m_lightingUBOMapped.clear();
+    m_lightingSlotScenes.clear();
+    m_lightingSlotStride = 0;
 
     // Descriptor sets are freed when pool is destroyed
     m_lightingDescriptorSets.clear();
@@ -1978,22 +2425,58 @@ void Game::destroyLightingResources() {
     }
 }
 
+void Game::beginLightingFrame() {
+    m_lightingSlotScenes.clear();
+    m_currentLightingSlot = 0;
+}
+
 VkDescriptorSet Game::getCurrentLightingDescriptorSet() const {
     if (m_lightingDescriptorSets.empty() || !m_vulkanContext) {
         return VK_NULL_HANDLE;
     }
-    uint32_t currentFrame = m_vulkanContext->getCurrentFrame();
-    if (currentFrame >= m_lightingDescriptorSets.size()) {
+    const size_t framesInFlight = m_lightingDescriptorSets.size() / kMaxLightingSlotsPerFrame;
+    size_t currentFrame = m_vulkanContext->getCurrentFrame();
+    if (currentFrame >= framesInFlight) {
         currentFrame = 0;
     }
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    return m_lightingDescriptorSets[currentFrame];
+    return m_lightingDescriptorSets[(currentFrame * kMaxLightingSlotsPerFrame) +
+                                    m_currentLightingSlot];
+}
+
+VkDescriptorSet Game::getLightingDescriptorSet(const Scene* scene) {
+    updateLightingUBO(scene);
+    return getCurrentLightingDescriptorSet();
 }
 
 void Game::updateLightingUBO(const Scene* scene) {
     if (!m_vulkanContext || m_lightingUBOMapped.empty()) {
         return;
     }
+
+    // Reuse the scene's slot if it already uploaded this frame
+    auto existing = std::ranges::find(m_lightingSlotScenes, scene);
+    if (existing != m_lightingSlotScenes.end()) {
+        m_currentLightingSlot =
+            static_cast<uint32_t>(std::distance(m_lightingSlotScenes.begin(), existing));
+        return;
+    }
+
+    uint32_t slot = 0;
+    if (m_lightingSlotScenes.size() < kMaxLightingSlotsPerFrame) {
+        slot = static_cast<uint32_t>(m_lightingSlotScenes.size());
+        m_lightingSlotScenes.push_back(scene);
+    } else {
+        // Out of slots: the last slot is shared, so earlier users of it see this scene's lighting.
+        if (!m_lightingSlotOverflowWarned) {
+            std::cerr << "[VDE] More than " << kMaxLightingSlotsPerFrame
+                      << " lit scenes drawn in one frame; extra scenes share a lighting slot\n";
+            m_lightingSlotOverflowWarned = true;
+        }
+        slot = kMaxLightingSlotsPerFrame - 1;
+        m_lightingSlotScenes.back() = scene;
+    }
+    m_currentLightingSlot = slot;
 
     uint32_t currentFrame = m_vulkanContext->getCurrentFrame();
     if (currentFrame >= m_lightingUBOMapped.size()) {
@@ -2052,35 +2535,18 @@ void Game::updateLightingUBO(const Scene* scene) {
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    memcpy(m_lightingUBOMapped[currentFrame], &ubo, sizeof(LightingUBO));
+    memcpy(static_cast<unsigned char*>(m_lightingUBOMapped[currentFrame]) +
+               (m_lightingSlotStride * slot),
+           &ubo, sizeof(LightingUBO));
 }
 
 void Game::setFocusedScene(const std::string& sceneName) {
-    // Clear isFocused on the previously focused scene
-    if (!m_focusedSceneName.empty()) {
-        auto prevIt = m_scenes.find(m_focusedSceneName);
-        if (prevIt != m_scenes.end()) {
-            prevIt->second->m_diagnostics.isFocused = false;
-        }
-    } else if (m_activeScene) {
-        m_activeScene->m_diagnostics.isFocused = false;
-    }
-
     m_focusedSceneName = sceneName;
-
-    // Set isFocused on the new focused scene
-    if (!sceneName.empty()) {
-        auto it = m_scenes.find(sceneName);
-        if (it != m_scenes.end()) {
-            it->second->m_diagnostics.isFocused = true;
-        }
-    } else if (m_activeScene) {
-        m_activeScene->m_diagnostics.isFocused = true;
-    }
+    refreshFocusDiagnostics();
 }
 
 Scene* Game::getFocusedScene() {
-    if (!m_focusedSceneName.empty()) {
+    if (!m_focusedSceneName.empty() && groupContains(m_activeSceneGroup, m_focusedSceneName)) {
         auto it = m_scenes.find(m_focusedSceneName);
         if (it != m_scenes.end()) {
             return it->second.get();
@@ -2090,13 +2556,15 @@ Scene* Game::getFocusedScene() {
 }
 
 const Scene* Game::getFocusedScene() const {
-    if (!m_focusedSceneName.empty()) {
+    // The explicit focus only applies while its scene is in the active (top) group, so a
+    // pushed scene receives input and focus returns to the explicit scene after popScene().
+    if (!m_focusedSceneName.empty() && groupContains(m_activeSceneGroup, m_focusedSceneName)) {
         auto it = m_scenes.find(m_focusedSceneName);
         if (it != m_scenes.end()) {
             return it->second.get();
         }
     }
-    return m_activeScene;
+    return m_activeScene;  // Default to primary scene
 }
 
 Scene* Game::getSceneAtScreenPosition(double mouseX, double mouseY) {
@@ -2128,20 +2596,69 @@ Scene* Game::getSceneAtScreenPosition(double mouseX, double mouseY) {
     return nullptr;
 }
 
-void Game::renderSingleViewport() {
-    // Apply primary scene's camera to VulkanContext (backwards compatible path)
-    if (m_activeScene && m_activeScene->getCamera()) {
-        m_activeScene->getCamera()->applyTo(*m_vulkanContext);
+std::vector<Game::RenderLayer> Game::collectStackLayers() const {
+    std::vector<RenderLayer> layers;
+    for (const auto& stacked : m_sceneStack) {
+        for (const auto& sceneName : stacked.sceneNames) {
+            auto it = m_scenes.find(sceneName);
+            if (it != m_scenes.end() && it->second) {
+                layers.push_back(
+                    {.scene = it->second.get(), .viewport = it->second->getViewportRect()});
+            }
+        }
+    }
+    return layers;
+}
+
+std::vector<Game::RenderLayer> Game::collectVisibleLayers() const {
+    std::vector<RenderLayer> layers = collectStackLayers();
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end() && it->second) {
+            layers.push_back(
+                {.scene = it->second.get(), .viewport = it->second->getViewportRect()});
+        }
+    }
+    return layers;
+}
+
+std::vector<Game::RenderLayer> Game::collectGroupLayers(const SceneGroup& group) const {
+    std::vector<RenderLayer> layers;
+    for (const auto& sceneName : group.sceneNames) {
+        auto it = m_scenes.find(sceneName);
+        if (it != m_scenes.end() && it->second) {
+            layers.push_back({.scene = it->second.get(),
+                              .viewport = resolveGroupViewport(group, sceneName, *it->second)});
+        }
+    }
+    return layers;
+}
+
+std::vector<Game::RenderLayer> Game::collectFrameLayers() const {
+    if (m_transitionActive && m_transitionCompletionPending) {
+        // The effect finished this frame; draw what becomes active at the next frame boundary.
+        std::vector<RenderLayer> layers =
+            m_viewportTransition ? collectStackLayers() : std::vector<RenderLayer>{};
+        std::vector<RenderLayer> dest = collectGroupLayers(m_transitionDestGroup);
+        layers.insert(layers.end(), dest.begin(), dest.end());
+        return layers;
+    }
+    return collectVisibleLayers();
+}
+
+void Game::renderSingleViewport(Scene* scene) {
+    if (scene && scene->getCamera()) {
+        // Match the full-window aspect: the scene may have just left a sub-viewport
+        // (split screen, region transition) whose aspect its camera still carries.
+        const VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+        scene->getCamera()->setAspectRatio(
+            ViewportRect::fullWindow().getAspectRatio(extent.width, extent.height));
+        scene->getCamera()->applyTo(*m_vulkanContext);
     }
 
-    m_vulkanContext->setRenderCallback([this](VkCommandBuffer cmd) {
-        (void)cmd;
-        // Render all scenes in the active group
-        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-            auto it = m_scenes.find(sceneName);
-            if (it != m_scenes.end()) {
-                it->second->render();
-            }
+    m_vulkanContext->setRenderCallback([this, scene](VkCommandBuffer /*cmd*/) {
+        if (scene) {
+            scene->render();
         }
         onRender();
     });
@@ -2149,62 +2666,16 @@ void Game::renderSingleViewport() {
     m_vulkanContext->drawFrame();
 }
 
-void Game::renderMultiViewport() {
-    VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+void Game::renderLayers(const std::vector<RenderLayer>& layers) {
+    std::vector<VulkanContext::SceneRenderInfo> renderInfos =
+        buildSceneRenderInfos(*m_vulkanContext, layers);
 
-    std::vector<VulkanContext::SceneRenderInfo> renderInfos;
-
-    for (size_t i = 0; i < m_activeSceneGroup.sceneNames.size(); ++i) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-        const auto& sceneName = m_activeSceneGroup.sceneNames[i];
-        auto it = m_scenes.find(sceneName);
-        if (it == m_scenes.end()) {
-            continue;
-        }
-
-        Scene* scene = it->second.get();
-
-        VulkanContext::SceneRenderInfo info{};
-        info.clearPass = (i == 0);
-
-        // Compute viewport and scissor from the scene's ViewportRect
-        const ViewportRect& vpRect = scene->getViewportRect();
-        info.viewport = vpRect.toVkViewport(extent.width, extent.height);
-        info.scissor = vpRect.toVkScissor(extent.width, extent.height);
-
-        // Get the scene's camera matrices
-        if (scene->getCamera()) {
-            // Set aspect ratio BEFORE applying camera so projection is correct
-            float vpAspect = vpRect.getAspectRatio(extent.width, extent.height);
-            scene->getCamera()->setAspectRatio(vpAspect);
-
-            // Apply camera to get internal state updated (positions etc.)
-            scene->getCamera()->applyTo(*m_vulkanContext);
-            info.viewMatrix = m_vulkanContext->getCamera().getViewMatrix();
-            info.projMatrix = m_vulkanContext->getCamera().getProjectionMatrix();
-        } else {
-            info.viewMatrix = glm::mat4(1.0f);
-            info.projMatrix = glm::mat4(1.0f);
-        }
-
-        // Update lighting for this scene
-        updateLightingUBO(scene);
-
-        // Capture scene pointer for the lambda
-        info.renderCallback = [scene](VkCommandBuffer cmd) {
-            (void)cmd;
-            scene->render();
-        };
-
-        renderInfos.push_back(std::move(info));
-    }
-
-    // Add the onRender callback to the last scene's render
+    // Run the onRender hook (ImGui etc.) after the topmost scene
     if (!renderInfos.empty()) {
-        auto originalCallback = renderInfos.back().renderCallback;
-        renderInfos.back().renderCallback = [this, originalCallback](VkCommandBuffer cmd) {
-            if (originalCallback) {
-                originalCallback(cmd);
+        auto topCallback = std::move(renderInfos.back().renderCallback);
+        renderInfos.back().renderCallback = [this, topCallback](VkCommandBuffer cmd) {
+            if (topCallback) {
+                topCallback(cmd);
             }
             onRender();
         };
@@ -2214,208 +2685,96 @@ void Game::renderMultiViewport() {
 }
 
 void Game::renderTransition() {
-    m_vulkanContext->drawFrameCustom([this](VkCommandBuffer cmd, VkFramebuffer swapchainFB,
-                                            VkImage swapchainImage) {
-        VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+    // Source = what was visible before the transition; dest = what will be visible after.
+    // Region transitions only render the replaced scene into the offscreen targets and draw
+    // every other visible scene directly to the swapchain beneath the scissored composite.
+    std::vector<RenderLayer> sourceLayers;
+    std::vector<RenderLayer> destLayers;
+    std::vector<RenderLayer> baseLayers;
 
-        // Helper: render a scene into an offscreen framebuffer
-        auto renderSceneOffscreen = [&](const std::string& sceneName, VkFramebuffer framebuffer) {
-            auto it = m_scenes.find(sceneName);
-            if (it == m_scenes.end()) {
-                return;
+    if (m_viewportTransition) {
+        for (const auto& layer : collectVisibleLayers()) {
+            if (layer.scene->getName() == m_transitionSourceScene) {
+                sourceLayers.push_back(layer);
+            } else {
+                baseLayers.push_back(layer);
             }
-            Scene* scene = it->second.get();
-
-            // Apply camera so UBO is correct
-            if (scene->getCamera()) {
-                scene->getCamera()->applyTo(*m_vulkanContext);
-            }
-
-            // Update UBO via vkCmdUpdateBuffer (outside render pass)
-            UniformBufferObject ubo{};
-            ubo.model = glm::mat4(1.0f);
-            ubo.view = m_vulkanContext->getCamera().getViewMatrix();
-            ubo.proj = m_vulkanContext->getCamera().getProjectionMatrix();
-
-            // NOTE: getCurrentUniformBuffer() returns the same shared UBO buffer for both the
-            // source and destination offscreen passes. The second call (dest scene) overwrites the
-            // buffer, but by that point the source render pass has already ended, so correctness is
-            // maintained for this sequential single-command-buffer design. If rendering is ever
-            // parallelised across command buffers, this shared UBO would become a data race.
-            VkBuffer uboBuffer = m_vulkanContext->getCurrentUniformBuffer();
-            vkCmdUpdateBuffer(cmd, uboBuffer, 0, sizeof(UniformBufferObject), &ubo);
-
-            // Barrier: transfer write → uniform read
-            VkBufferMemoryBarrier barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
-            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.buffer = uboBuffer;
-            barrier.offset = 0;
-            barrier.size = sizeof(UniformBufferObject);
-
-            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                 VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1, &barrier, 0,
-                                 nullptr);
-
-            // Begin offscreen render pass
-            VkRenderPassBeginInfo rpInfo{};
-            rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            rpInfo.renderPass = m_vulkanContext->getOffscreenRenderPass();
-            rpInfo.framebuffer = framebuffer;
-            rpInfo.renderArea.offset = {.x = 0, .y = 0};
-            rpInfo.renderArea.extent = extent;
-
-            std::array<VkClearValue, 2> clearValues{};
-            const Color& bg = scene->getBackgroundColor();
-            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-            clearValues[0].color = {{bg.r, bg.g, bg.b, bg.a}};
-            clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
-            // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-            rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            rpInfo.pClearValues = clearValues.data();
-
-            vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            // Full viewport
-            VkViewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(extent.width);
-            viewport.height = static_cast<float>(extent.height);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-            VkRect2D scissor{};
-            scissor.offset = {.x = 0, .y = 0};
-            scissor.extent = extent;
-            vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-            // Update lighting for this scene
-            updateLightingUBO(scene);
-
-            // Render the scene
-            scene->render();
-
-            vkCmdEndRenderPass(cmd);
-        };
-
-        // Pass 1: Render source scene to offscreen target A
-        renderSceneOffscreen(m_transitionSourceScene, m_transitionManager->getSourceFramebuffer());
-
-        // Pass 2: Render dest scene to offscreen target B
-        renderSceneOffscreen(m_transitionDestScene, m_transitionManager->getDestFramebuffer());
-
-        // Pass 3: Composite to swapchain framebuffer
-        VkRenderPassBeginInfo rpInfo{};
-        rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        rpInfo.renderPass = m_vulkanContext->getRenderPass();
-        rpInfo.framebuffer = swapchainFB;
-        rpInfo.renderArea.offset = {.x = 0, .y = 0};
-        rpInfo.renderArea.extent = extent;
-
-        std::array<VkClearValue, 2> clearValues{};
-        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
-        // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-        rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        rpInfo.pClearValues = clearValues.data();
-
-        vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        // If viewport-scoped transition, render non-transitioning scenes first
-        if (m_viewportTransition) {
-            for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-                // Skip the source and dest scenes of the transition
-                if (sceneName == m_transitionSourceScene || sceneName == m_transitionDestScene) {
-                    continue;
-                }
-
-                auto sceneIt = m_scenes.find(sceneName);
-                if (sceneIt == m_scenes.end()) {
-                    continue;
-                }
-
-                Scene* scene = sceneIt->second.get();
-
-                // Apply camera
-                if (scene->getCamera()) {
-                    scene->getCamera()->applyTo(*m_vulkanContext);
-                }
-
-                // Update UBO for this scene
-                UniformBufferObject sceneUbo{};
-                sceneUbo.model = glm::mat4(1.0f);
-                sceneUbo.view = m_vulkanContext->getCamera().getViewMatrix();
-                sceneUbo.proj = m_vulkanContext->getCamera().getProjectionMatrix();
-
-                VkBuffer sceneUboBuffer = m_vulkanContext->getCurrentUniformBuffer();
-                vkCmdUpdateBuffer(cmd, sceneUboBuffer, 0, sizeof(UniformBufferObject), &sceneUbo);
-
-                VkBufferMemoryBarrier sceneBarrier{};
-                sceneBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-                sceneBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                sceneBarrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
-                sceneBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                sceneBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                sceneBarrier.buffer = sceneUboBuffer;
-                sceneBarrier.offset = 0;
-                sceneBarrier.size = sizeof(UniformBufferObject);
-
-                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1,
-                                     &sceneBarrier, 0, nullptr);
-
-                // Set viewport/scissor for this scene
-                const ViewportRect& vpRect = scene->getViewportRect();
-                VkViewport sceneVp = vpRect.toVkViewport(extent.width, extent.height);
-                VkRect2D sceneSc = vpRect.toVkScissor(extent.width, extent.height);
-                vkCmdSetViewport(cmd, 0, 1, &sceneVp);
-                vkCmdSetScissor(cmd, 0, 1, &sceneSc);
-
-                updateLightingUBO(scene);
-                scene->render();
-            }
-
-            // Set scissor to the transition viewport region for composite
-            VkViewport transVp = m_transitionViewport.toVkViewport(extent.width, extent.height);
-            VkRect2D transSc = m_transitionViewport.toVkScissor(extent.width, extent.height);
-            vkCmdSetViewport(cmd, 0, 1, &transVp);
-            vkCmdSetScissor(cmd, 0, 1, &transSc);
         }
+        if (Scene* dest = getScene(m_transitionDestScene)) {
+            destLayers.push_back({.scene = dest, .viewport = m_transitionViewport});
+        }
+    } else {
+        sourceLayers = collectVisibleLayers();
+        destLayers = collectGroupLayers(m_transitionDestGroup);
+    }
 
-        // Render the composite (pipeline bind, descriptor set, push constants, draw)
-        m_transitionManager->renderComposite(cmd);
+    std::vector<VulkanContext::SceneRenderInfo> sourceInfos =
+        buildSceneRenderInfos(*m_vulkanContext, sourceLayers);
+    std::vector<VulkanContext::SceneRenderInfo> destInfos =
+        buildSceneRenderInfos(*m_vulkanContext, destLayers);
+    std::vector<VulkanContext::SceneRenderInfo> swapchainInfos =
+        buildSceneRenderInfos(*m_vulkanContext, baseLayers);
 
-        // Call onRender() hook (ImGui overlays etc.)
+    // Final swapchain pass: the composite (scissored to the region), then the onRender hook.
+    const VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
+    VulkanContext::SceneRenderInfo compositeInfo{};
+    compositeInfo.viewMatrix = glm::mat4(1.0f);
+    compositeInfo.projMatrix = glm::mat4(1.0f);
+    compositeInfo.viewport = ViewportRect::fullWindow().toVkViewport(extent.width, extent.height);
+    compositeInfo.scissor = ViewportRect::fullWindow().toVkScissor(extent.width, extent.height);
+    compositeInfo.renderCallback = [this](VkCommandBuffer cmd) {
+        m_transitionManager->renderComposite(cmd, m_transitionViewport);
         onRender();
+    };
+    swapchainInfos.push_back(std::move(compositeInfo));
 
-        vkCmdEndRenderPass(cmd);
+    const glm::vec4 black(0.0f, 0.0f, 0.0f, 1.0f);
+    const glm::vec4 sourceClear = bottomLayerClearColor(sourceLayers, black);
+    const glm::vec4 destClear = bottomLayerClearColor(destLayers, black);
+    const glm::vec4 swapchainClear = bottomLayerClearColor(baseLayers, black);
 
-        // Transition swapchain image layout to PRESENT_SRC_KHR
-        VkImageMemoryBarrier presentBarrier{};
-        presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        presentBarrier.dstAccessMask = 0;
-        presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        presentBarrier.image = swapchainImage;
-        presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        presentBarrier.subresourceRange.baseMipLevel = 0;
-        presentBarrier.subresourceRange.levelCount = 1;
-        presentBarrier.subresourceRange.baseArrayLayer = 0;
-        presentBarrier.subresourceRange.layerCount = 1;
+    m_vulkanContext->drawFrameCustom(
+        [&](VkCommandBuffer cmd, VkFramebuffer swapchainFB, VkImage swapchainImage) {
+            VkRenderPass offscreenClearPass = m_vulkanContext->getOffscreenRenderPass();
+            VkRenderPass offscreenLoadPass = m_vulkanContext->getOffscreenRenderPassLoad();
 
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &presentBarrier);
-    });
+            // Pass 1/2: source and destination scenes into the offscreen targets
+            if (VkFramebuffer sourceFB = m_transitionManager->getSourceFramebuffer();
+                sourceFB != VK_NULL_HANDLE) {
+                m_vulkanContext->recordScenePasses(cmd, sourceFB, offscreenClearPass,
+                                                   offscreenLoadPass, sourceInfos, sourceClear);
+            }
+            if (VkFramebuffer destFB = m_transitionManager->getDestFramebuffer();
+                destFB != VK_NULL_HANDLE) {
+                m_vulkanContext->recordScenePasses(cmd, destFB, offscreenClearPass,
+                                                   offscreenLoadPass, destInfos, destClear);
+            }
+
+            // Pass 3: untouched scenes (region transitions) + composite to the swapchain
+            m_vulkanContext->recordScenePasses(cmd, swapchainFB, m_vulkanContext->getRenderPass(),
+                                               m_vulkanContext->getRenderPassLoad(), swapchainInfos,
+                                               swapchainClear);
+
+            // Transition swapchain image layout to PRESENT_SRC_KHR
+            VkImageMemoryBarrier presentBarrier{};
+            presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            presentBarrier.dstAccessMask = 0;
+            presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            presentBarrier.image = swapchainImage;
+            presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            presentBarrier.subresourceRange.baseMipLevel = 0;
+            presentBarrier.subresourceRange.levelCount = 1;
+            presentBarrier.subresourceRange.baseArrayLayer = 0;
+            presentBarrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                                 &presentBarrier);
+        });
 }
 
 void Game::activateScene(const std::string& name) {
@@ -2448,11 +2807,14 @@ void Game::deactivateScene(const std::string& name) {
 
 void Game::rebuildSchedulerGraph() {
     m_scheduler.clear();
+    m_schedulerRebuildPending = false;
 
     // ---------------------------------------------------------------
     // Collect scenes that need updating this frame:
-    //   1. All scenes in the active group
-    //   2. Any scene outside the group with continueInBackground==true
+    //   1. All scenes in the active group (paused stack scenes are excluded)
+    //   2. During a transition, the destination group's scenes
+    //   3. Any other scene with continueInBackground==true
+    // A transition that freezes its source excludes the scenes being replaced.
     // ---------------------------------------------------------------
     struct SceneEntry {
         Scene* scene = nullptr;
@@ -2461,61 +2823,46 @@ void Game::rebuildSchedulerGraph() {
     };
 
     std::vector<SceneEntry> updateScenes;
+    std::unordered_set<std::string> listedScenes;
 
-    // Check whether the active transition wants the source scene frozen.
-    bool freezeSource = m_transitionManager && m_transitionManager->isActive() &&
-                        m_transitionManager->getActiveTransition() &&
-                        m_transitionManager->getActiveTransition()->freezesSourceScene();
+    std::unordered_set<std::string> frozenScenes;
+    const Transition* activeTransition =
+        m_transitionManager ? m_transitionManager->getActiveTransition() : nullptr;
+    if (m_transitionActive && activeTransition && activeTransition->freezesSourceScene()) {
+        if (m_viewportTransition) {
+            frozenScenes.insert(m_transitionSourceScene);
+        } else {
+            for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+                if (!groupContains(m_transitionDestGroup, sceneName)) {
+                    frozenScenes.insert(sceneName);
+                }
+            }
+        }
+    }
 
-    // Active group scenes
-    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-        // Skip updating the source scene when the transition freezes it.
-        if (freezeSource && sceneName == m_transitionSourceScene) {
-            continue;
+    auto addUpdateScene = [&](const std::string& sceneName) {
+        if (frozenScenes.contains(sceneName) || !listedScenes.insert(sceneName).second) {
+            return;
         }
         auto it = m_scenes.find(sceneName);
-        if (it != m_scenes.end()) {
+        if (it != m_scenes.end() && it->second) {
             updateScenes.push_back({.scene = it->second.get(),
                                     .name = sceneName,
                                     .priority = it->second->getUpdatePriority()});
         }
-    }
+    };
 
-    // Background scenes (not already in the group)
+    for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+        addUpdateScene(sceneName);
+    }
+    if (m_transitionActive) {
+        for (const auto& sceneName : m_transitionDestGroup.sceneNames) {
+            addUpdateScene(sceneName);
+        }
+    }
     for (auto& [name, scenePtr] : m_scenes) {
-        if (!scenePtr->getContinueInBackground()) {
-            continue;
-        }
-        // Skip if already in the active group
-        bool inGroup = false;
-        for (const auto& gn : m_activeSceneGroup.sceneNames) {
-            if (gn == name) {
-                inGroup = true;
-                break;
-            }
-        }
-        if (!inGroup) {
-            updateScenes.push_back(
-                {.scene = scenePtr.get(), .name = name, .priority = scenePtr->getUpdatePriority()});
-        }
-    }
-
-    // During transitions, ensure the destination scene is also updated
-    if (m_transitionManager && m_transitionManager->isActive() && !m_transitionDestScene.empty()) {
-        bool destAlreadyListed = false;
-        for (const auto& entry : updateScenes) {
-            if (entry.name == m_transitionDestScene) {
-                destAlreadyListed = true;
-                break;
-            }
-        }
-        if (!destAlreadyListed) {
-            auto it = m_scenes.find(m_transitionDestScene);
-            if (it != m_scenes.end()) {
-                updateScenes.push_back({.scene = it->second.get(),
-                                        .name = m_transitionDestScene,
-                                        .priority = it->second->getUpdatePriority()});
-            }
+        if (scenePtr && scenePtr->getContinueInBackground()) {
+            addUpdateScene(name);
         }
     }
 
@@ -2750,7 +3097,7 @@ void Game::rebuildSchedulerGraph() {
                              .mainThreadOnly = true});
 
     // ---------------------------------------------------------------
-    // Task 3: PreRender — apply clear color from primary scene.
+    // Task 3: PreRender — advance the active transition effect.
     //         Depends on audio.global AND all final per-scene visual tasks.
     // ---------------------------------------------------------------
     std::vector<TaskId> preRenderDeps = {audioTask};
@@ -2763,68 +3110,60 @@ void Game::rebuildSchedulerGraph() {
         }
     }
 
-    TaskId preRenderTask = m_scheduler.addTask(
-        {.name = "scene.preRender",
-         .phase = TaskPhase::PreRender,
-         .work =
-             [this]() {
-                 if (m_activeScene && m_vulkanContext) {
-                     // Apply scene background color to Vulkan context
-                     const Color& bg = m_activeScene->getBackgroundColor();
-                     m_vulkanContext->setClearColor(glm::vec4(bg.r, bg.g, bg.b, bg.a));
-                 }
-
-                 if (m_transitionManager && m_transitionManager->isActive()) {
-                     m_transitionManager->update(m_deltaTime);
-                 }
-             },
-         .dependsOn = preRenderDeps,
-         .mainThreadOnly = true});
+    TaskId preRenderTask =
+        m_scheduler.addTask({.name = "scene.preRender",
+                             .phase = TaskPhase::PreRender,
+                             .work =
+                                 [this]() {
+                                     if (m_transitionManager && m_transitionManager->isActive()) {
+                                         m_transitionManager->update(m_deltaTime);
+                                     }
+                                 },
+                             .dependsOn = preRenderDeps,
+                             .mainThreadOnly = true});
 
     TaskId renderDep = preRenderTask;
 
     // ---------------------------------------------------------------
-    // Task 4: Render — draw frame.  When transitioning, render both
-    //         scenes to offscreen targets and composite.  Otherwise,
-    //         use the normal single/multi-viewport path.
+    // Task 4: Render — draw frame.  When transitioning, render the source
+    //         and destination to offscreen targets and composite.
+    //         Otherwise draw every visible layer (paused stack scenes,
+    //         then the active group) with its own camera and lighting.
     // ---------------------------------------------------------------
-    m_scheduler.addTask({.name = "scene.render",
-                         .phase = TaskPhase::Render,
-                         .work =
-                             [this]() {
-                                 if (!m_vulkanContext) {
-                                     return;
-                                 }
+    m_scheduler.addTask(
+        {.name = "scene.render",
+         .phase = TaskPhase::Render,
+         .work =
+             [this]() {
+                 if (!m_vulkanContext) {
+                     return;
+                 }
 
-                                 // Transition rendering path
-                                 if (m_transitionManager && m_transitionManager->isActive()) {
-                                     renderTransition();
-                                     return;
-                                 }
+                 beginLightingFrame();
 
-                                 // Check if we need multi-viewport rendering
-                                 bool needsMultiViewport = false;
-                                 for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-                                     auto it = m_scenes.find(sceneName);
-                                     if (it != m_scenes.end()) {
-                                         if (it->second->getViewportRect() !=
-                                             ViewportRect::fullWindow()) {
-                                             needsMultiViewport = true;
-                                             break;
-                                         }
-                                     }
-                                 }
+                 if (m_transitionActive && m_transitionManager && m_transitionManager->isActive()) {
+                     renderTransition();
+                     return;
+                 }
 
-                                 if (needsMultiViewport) {
-                                     // Multi-pass per-scene rendering
-                                     renderMultiViewport();
-                                 } else {
-                                     // Original single-pass rendering (backwards compatible)
-                                     renderSingleViewport();
-                                 }
-                             },
-                         .dependsOn = {renderDep},
-                         .mainThreadOnly = true});
+                 const std::vector<RenderLayer> layers = collectFrameLayers();
+                 if (!layers.empty()) {
+                     // Clear with the bottom (primary) layer's background color
+                     m_vulkanContext->setClearColor(
+                         bottomLayerClearColor(layers, m_vulkanContext->getClearColor()));
+                 }
+
+                 // A lone full-window scene uses the single-pass path; anything else
+                 // (several scenes, or a sub-window viewport) renders one pass per scene.
+                 if (layers.empty() || (layers.size() == 1 &&
+                                        layers.front().viewport == ViewportRect::fullWindow())) {
+                     renderSingleViewport(layers.empty() ? nullptr : layers.front().scene);
+                 } else {
+                     renderLayers(layers);
+                 }
+             },
+         .dependsOn = {renderDep},
+         .mainThreadOnly = true});
 }
 
 }  // namespace vde

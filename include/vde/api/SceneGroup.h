@@ -32,9 +32,12 @@ struct SceneGroupEntry {
  * @brief Describes a group of scenes that are active simultaneously.
  *
  * When a SceneGroup is set as active, the scheduler builds a task
- * graph that updates every scene in the group each frame.  The first
- * scene in the list is the "primary" scene and is the one whose
- * background color is used for the initial clear.
+ * graph that updates every scene in the group each frame, and every
+ * scene is drawn in group order with its own camera, lighting, and
+ * viewport (later scenes draw on top with a fresh depth buffer).  The
+ * first scene in the list is the "primary" scene: its background color
+ * is used for the initial clear, and scenes without their own camera
+ * reuse its camera.
  *
  * @example
  * @code
@@ -55,14 +58,14 @@ struct SceneGroup {
     /// Human-readable name for the group.
     std::string name;
 
-    /// Ordered list of scene names.  The first entry is the primary
-    /// (rendered) scene; the rest receive update() calls but do not
-    /// control the camera or clear color.
+    /// Ordered list of scene names (draw order, bottom to top).  The first
+    /// entry is the primary scene (background color, fallback camera).
     std::vector<std::string> sceneNames;
 
     /// Optional per-scene viewport entries.  When non-empty, each
     /// entry's viewport is applied to the corresponding scene.
-    /// When empty, all scenes use fullWindow().
+    /// Scenes without an entry use fullWindow(), unless the scene set
+    /// its own viewport (which is then left unchanged).
     std::vector<SceneGroupEntry> entries;
 
     /**

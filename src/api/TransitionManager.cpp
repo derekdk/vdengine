@@ -537,7 +537,7 @@ void TransitionManager::ensurePipeline() {
 // Compositing
 // =========================================================================
 
-void TransitionManager::renderComposite(VkCommandBuffer cmd) {
+void TransitionManager::renderComposite(VkCommandBuffer cmd, const ViewportRect& region) {
     if (!m_activeTransition || !m_source.isValid() || !m_dest.isValid()) {
         return;
     }
@@ -548,6 +548,23 @@ void TransitionManager::renderComposite(VkCommandBuffer cmd) {
     if (m_pipeline == VK_NULL_HANDLE || m_pipelineLayout == VK_NULL_HANDLE) {
         return;
     }
+
+    // Full-swapchain viewport (texture UVs map 1:1 to the screen); the scissor limits
+    // output to the transition region.
+    VkExtent2D extent = m_context->getSwapChainExtent();
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor = region.toVkScissor(extent.width, extent.height);
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Check for custom geometry transitions
     if (m_activeTransition->usesCustomGeometry()) {
@@ -561,24 +578,6 @@ void TransitionManager::renderComposite(VkCommandBuffer cmd) {
         m_activeTransition->renderCustomGeometry(cmd, ctx);
         return;
     }
-
-    // Set viewport and scissor to full swapchain extent
-    VkExtent2D extent = m_context->getSwapChainExtent();
-
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(extent.width);
-    viewport.height = static_cast<float>(extent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = extent;
-
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Bind pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);

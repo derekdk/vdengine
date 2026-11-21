@@ -465,20 +465,28 @@ game.run();
 |--------|-------------|
 | `void addScene(const std::string& name, Scene*)` | Add a scene (Game takes ownership) |
 | `void addScene(const std::string& name, std::unique_ptr<Scene>)` | Add a scene (unique_ptr) |
-| `void removeScene(const std::string& name)` | Remove a scene by name |
+| `void removeScene(const std::string& name)` | Remove a scene by name; calls made from a lifecycle callback during a scene-flow operation are queued until that operation finishes |
 | `Scene* getScene(const std::string& name)` | Get a scene by name |
-| `void setActiveScene(const std::string& name)` | Set the active scene |
+| `void setActiveScene(const std::string& name)` | Set the active scene (clears the scene stack) |
 | `Scene* getActiveScene()` | Get the currently active scene |
-| `void setActiveSceneGroup(const SceneGroup&)` | Activate multiple scenes simultaneously |
+| `void setActiveSceneGroup(const SceneGroup&)` | Activate multiple scenes simultaneously (clears the scene stack) |
 | `const SceneGroup& getActiveSceneGroup() const` | Get current active scene group |
-| `void pushScene(const std::string& name)` | Push a scene onto the stack |
-| `void popScene()` | Pop scene and return to previous |
+| `void pushScene(const std::string& name)` | Push a scene; the current scene/group is paused and stays visible beneath it |
+| `void popScene()` | Pop scene and resume the previous one |
+| `size_t getSceneStackDepth() const` | Number of paused groups beneath the active group |
+| `std::vector<std::string> getVisibleSceneNames() const` | Scenes drawn each frame, bottom to top |
+| `bool hasPendingSceneChanges() const` | Scene-flow requests queued for the next frame |
+| `void applyPendingSceneChanges()` | Apply queued requests now (frame-boundary step; for manual frame stepping) |
+
+While the loop is running, scene-flow calls (`setActiveScene`, `setActiveSceneGroup`, `pushScene`,
+`popScene`, transitions, `cancelTransition`) take effect at the start of the next frame, in call
+order. Before `run()` they apply immediately.
 
 ### Input Focus (Split-Screen)
 
 | Method | Description |
 |--------|-------------|
-| `void setFocusedScene(const std::string& name)` | Set which scene receives keyboard input |
+| `void setFocusedScene(const std::string& name)` | Set which scene receives keyboard input (applies while it is in the active group) |
 | `Scene* getFocusedScene()` | Get the focused scene |
 | `Scene* getSceneAtScreenPosition(double x, double y)` | Get scene under mouse cursor |
 
@@ -1826,7 +1834,7 @@ struct TransitionUniforms {
 
 **Header**: `<vde/api/TransitionManager.h>` (engine-internal)
 
-Manages transition lifecycle, offscreen render targets, and compositing. Owned by `Game`; users interact via `Game::transitionToScene()`.
+Manages transition lifecycle, offscreen render targets, and compositing. Owned by `Game`; users interact via `Game::transitionToScene()` / `Game::transitionToSceneGroup()`.
 
 ### Methods
 

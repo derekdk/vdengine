@@ -113,6 +113,14 @@ class Scheduler {
     void execute();
 
     /**
+     * @brief Check whether execute() is currently running on this scheduler.
+     *
+     * Used to detect calls made from inside a frame (e.g. from a task's work
+     * function) so callers can defer graph-mutating operations.
+     */
+    [[nodiscard]] bool isExecuting() const { return m_executing; }
+
+    /**
      * @brief Get the number of registered tasks.
      */
     [[nodiscard]] size_t getTaskCount() const;
@@ -182,6 +190,7 @@ class Scheduler {
     std::unordered_map<TaskId, TaskEntry> m_tasks;
     std::vector<TaskId> m_lastExecutionOrder;
     size_t m_workerThreadCount = 0;
+    bool m_executing = false;
 
     // Forward-declared thread pool (only created when m_workerThreadCount > 0)
     class ThreadPoolImpl;
@@ -193,6 +202,9 @@ class Scheduler {
      * @throws std::runtime_error if a cycle is detected
      */
     [[nodiscard]] std::vector<TaskId> topologicalSort() const;
+
+    /// Run the work functions of @p sorted (already topologically ordered).
+    void executeSorted(const std::vector<TaskId>& sorted);
 };
 
 }  // namespace vde
