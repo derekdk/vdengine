@@ -1016,12 +1016,11 @@ void Game::applyStartTransition(SceneFlowRequest& request) {
         }
     }
 
-    // Cancel an in-progress transition before validating against the reverted state.
-    applyCancelTransition();
-
     if (request.hasRegion) {
         const std::string& destName = request.sceneName;
-        if (m_activeSceneNames.contains(destName)) {
+        const bool enteredOnlyByTransition =
+            std::ranges::find(m_transitionEnteredScenes, destName) != m_transitionEnteredScenes.end();
+        if (m_activeSceneNames.contains(destName) && !enteredOnlyByTransition) {
             std::cerr << "[VDE] transitionToScene(region): scene '" << destName
                       << "' is already active or paused; request ignored\n";
             return;
@@ -1047,6 +1046,8 @@ void Game::applyStartTransition(SceneFlowRequest& request) {
         }
         destGroup = request.group;
     }
+
+    applyCancelTransition();
 
     const bool animated = m_transitionManager && request.transition && request.duration > 0.0f;
     if (!animated) {

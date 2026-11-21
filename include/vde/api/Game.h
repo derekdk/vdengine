@@ -322,7 +322,8 @@ class Game : private ScriptEnvironment {
      * group with @p region as its viewport. Other scenes retain their current
      * viewports, and the scene stack is preserved.
      *
-     * The destination must not already be active or paused.
+     * The destination must not already be active or paused in the source group or stack.
+     * A rejected request leaves any running transition unchanged.
      *
      * @param name       Name of the scene to transition to
      * @param transition The visual transition effect (Game takes ownership)
