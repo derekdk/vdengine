@@ -2743,9 +2743,13 @@ void Game::renderTransition() {
     std::vector<RenderLayer> destLayers;
     std::vector<RenderLayer> baseLayers;
     std::ptrdiff_t compositeIndex = 0;
+    const glm::vec4 black(0.0f, 0.0f, 0.0f, 1.0f);
+    glm::vec4 swapchainClear = black;
 
     if (m_viewportTransition) {
-        for (const auto& layer : collectVisibleLayers()) {
+        const auto visibleLayers = collectVisibleLayers();
+        swapchainClear = bottomLayerClearColor(visibleLayers, black);
+        for (const auto& layer : visibleLayers) {
             if (layer.scene->getName() == m_transitionSourceScene) {
                 compositeIndex = std::ssize(baseLayers);
                 sourceLayers.push_back(layer);
@@ -2809,10 +2813,8 @@ void Game::renderTransition() {
         onRender();
     };
 
-    const glm::vec4 black(0.0f, 0.0f, 0.0f, 1.0f);
     const glm::vec4 sourceClear = bottomLayerClearColor(sourceLayers, black);
     const glm::vec4 destClear = bottomLayerClearColor(destLayers, black);
-    const glm::vec4 swapchainClear = bottomLayerClearColor(baseLayers, black);
 
     m_vulkanContext->drawFrameCustom(
         [&](VkCommandBuffer cmd, VkFramebuffer swapchainFB, VkImage swapchainImage) {
