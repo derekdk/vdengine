@@ -108,6 +108,9 @@ class Scheduler {
      * Tasks are sorted by dependency order, with phase as a tiebreaker
      * for tasks that have no ordering constraint between them.
      *
+     * If a task throws, all workers submitted by this invocation finish before
+     * the original exception is rethrown and the prior execution state is restored.
+     *
      * @throws std::runtime_error if the task graph contains a cycle
      */
     void execute();

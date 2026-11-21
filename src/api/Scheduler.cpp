@@ -192,23 +192,33 @@ void Scheduler::executeSorted(const std::vector<TaskId>& sorted) {
             // Submit pool tasks
             std::vector<std::future<void>> futures;
             futures.reserve(poolTasks.size());
-            for (TaskId id : poolTasks) {
-                auto it = m_tasks.find(id);
-                futures.push_back(m_threadPool->submit(it->second.descriptor.work));
-            }
-
-            // Execute main-thread tasks sequentially
-            for (TaskId id : mainTasks) {
-                auto it = m_tasks.find(id);
-                it->second.descriptor.work();
-                completed.insert(id);
-            }
-
-            // Wait for pool tasks to finish
-            for (auto& f : futures) {
-                if (f.valid()) {
-                    f.get();
+            try {
+                for (TaskId id : poolTasks) {
+                    auto it = m_tasks.find(id);
+                    futures.push_back(m_threadPool->submit(it->second.descriptor.work));
                 }
+
+                // Execute main-thread tasks sequentially
+                for (TaskId id : mainTasks) {
+                    auto it = m_tasks.find(id);
+                    it->second.descriptor.work();
+                    completed.insert(id);
+                }
+
+                // Wait for pool tasks to finish
+                for (auto& f : futures) {
+                    if (f.valid()) {
+                        f.get();
+                    }
+                }
+            } catch (...) {
+                // Drain only this invocation's work, not workers blocked on an outer execute().
+                for (auto& f : futures) {
+                    if (f.valid()) {
+                        f.wait();
+                    }
+                }
+                throw;
             }
             for (TaskId id : poolTasks) {
                 completed.insert(id);
