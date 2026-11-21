@@ -2738,6 +2738,15 @@ void Game::renderTransition() {
         if (Scene* dest = getScene(m_transitionDestScene)) {
             destLayers.push_back({.scene = dest, .viewport = m_transitionViewport});
         }
+        if (sourceLayers.empty()) {
+            compositeIndex = std::ssize(baseLayers);
+        }
+
+        // The composite replaces pixels in its scissor. Include the layers underneath it
+        // in both inputs so uncovered pixels match normal layer rendering.
+        const auto underlayEnd = baseLayers.begin() + compositeIndex;
+        sourceLayers.insert(sourceLayers.begin(), baseLayers.begin(), underlayEnd);
+        destLayers.insert(destLayers.begin(), baseLayers.begin(), underlayEnd);
     } else {
         sourceLayers = collectVisibleLayers();
         destLayers = collectGroupLayers(m_transitionDestGroup);
@@ -2760,8 +2769,7 @@ void Game::renderTransition() {
         m_transitionManager->renderComposite(cmd, m_transitionViewport);
     };
     // Without a replaced layer, the destination is appended to the active group.
-    const auto compositePos =
-        sourceLayers.empty() ? swapchainInfos.end() : swapchainInfos.begin() + compositeIndex;
+    const auto compositePos = swapchainInfos.begin() + compositeIndex;
     swapchainInfos.insert(compositePos, std::move(compositeInfo));
 
     auto topCallback = std::move(swapchainInfos.back().renderCallback);

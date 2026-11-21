@@ -576,7 +576,37 @@ TEST_F(SceneFlowTest, TransitionToScene_RegionCompositeDrawsBelowOverlappingHud)
     game.setTransitionSpeed(0.0f);
     frame();
 
-    EXPECT_EQ(draws, (Names{"source", "destination", "background", "composite", "hud"}));
+    EXPECT_EQ(draws, (Names{"background", "source", "background", "destination", "background",
+                            "composite", "hud"}));
+}
+
+TEST_F(SceneFlowTest, TransitionToScene_RegionCompositePreservesUnderlay) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    add("world")->setBackgroundColor(Color(0.0f, 1.0f, 0.0f, 1.0f));
+    add("source")->setBackgroundColor(Color(1.0f, 0.0f, 0.0f, 1.0f));
+    add("destination")->setBackgroundColor(Color(1.0f, 0.0f, 0.0f, 1.0f));
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "layered", {{.sceneName = "world", .viewport = ViewportRect::fullWindow()},
+                    {.sceneName = "source", .viewport = ViewportRect::leftHalf()}}));
+    game.transitionToScene("destination", std::make_unique<FadeTransition>(), 1.0f,
+                           ViewportRect::leftHalf());
+    game.setTransitionPaused(true);
+
+    frame();
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    const auto pixels = game.getVulkanContext()->captureFramebuffer(width, height);
+    ASSERT_GT(width, 0u);
+    ASSERT_GT(height, 0u);
+    ASSERT_EQ(pixels.size(), static_cast<size_t>(width) * height * 4);
+    const size_t offset = (static_cast<size_t>(height / 2) * width + width / 4) * 4;
+    EXPECT_EQ(pixels.at(offset), 0u);
+    EXPECT_EQ(pixels.at(offset + 1), 255u);
 }
 
 TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {
