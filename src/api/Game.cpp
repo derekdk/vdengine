@@ -23,9 +23,11 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 #include <stdexcept>
 #include <thread>
 
@@ -2704,15 +2706,17 @@ void Game::renderLayers(const std::vector<RenderLayer>& layers) {
 
 void Game::renderTransition() {
     // Source = what was visible before the transition; dest = what will be visible after.
-    // Region transitions only render the replaced scene into the offscreen targets and draw
-    // every other visible scene directly to the swapchain beneath the scissored composite.
+    // Region transitions replace the source layer with the scissored composite and draw
+    // all unaffected layers directly to the swapchain in their original order.
     std::vector<RenderLayer> sourceLayers;
     std::vector<RenderLayer> destLayers;
     std::vector<RenderLayer> baseLayers;
+    std::ptrdiff_t compositeIndex = 0;
 
     if (m_viewportTransition) {
         for (const auto& layer : collectVisibleLayers()) {
             if (layer.scene->getName() == m_transitionSourceScene) {
+                compositeIndex = std::ssize(baseLayers);
                 sourceLayers.push_back(layer);
             } else {
                 baseLayers.push_back(layer);
@@ -2733,7 +2737,6 @@ void Game::renderTransition() {
     std::vector<VulkanContext::SceneRenderInfo> swapchainInfos =
         buildSceneRenderInfos(*m_vulkanContext, baseLayers);
 
-    // Final swapchain pass: the composite (scissored to the region), then the onRender hook.
     const VkExtent2D extent = m_vulkanContext->getSwapChainExtent();
     VulkanContext::SceneRenderInfo compositeInfo{};
     compositeInfo.viewMatrix = glm::mat4(1.0f);
@@ -2742,9 +2745,18 @@ void Game::renderTransition() {
     compositeInfo.scissor = ViewportRect::fullWindow().toVkScissor(extent.width, extent.height);
     compositeInfo.renderCallback = [this](VkCommandBuffer cmd) {
         m_transitionManager->renderComposite(cmd, m_transitionViewport);
+    };
+    // Without a replaced layer, the destination is appended to the active group.
+    const auto compositePos =
+        sourceLayers.empty() ? swapchainInfos.end() : swapchainInfos.begin() + compositeIndex;
+    swapchainInfos.insert(compositePos, std::move(compositeInfo));
+
+    auto topCallback = std::move(swapchainInfos.back().renderCallback);
+    swapchainInfos.back().renderCallback = [this, topCallback =
+                                                      std::move(topCallback)](VkCommandBuffer cmd) {
+        topCallback(cmd);
         onRender();
     };
-    swapchainInfos.push_back(std::move(compositeInfo));
 
     const glm::vec4 black(0.0f, 0.0f, 0.0f, 1.0f);
     const glm::vec4 sourceClear = bottomLayerClearColor(sourceLayers, black);

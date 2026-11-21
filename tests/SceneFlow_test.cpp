@@ -64,11 +64,34 @@ class FlowScene : public Scene {
         }
     }
 
+    void render() override {
+        if (onRenderHook) {
+            onRenderHook(*this);
+        }
+        Scene::render();
+    }
+
     int updates = 0;
     std::function<void(FlowScene&)> onUpdateHook;
     std::function<void(FlowScene&)> onPauseHook;
     std::function<void(FlowScene&)> onExitHook;
+    std::function<void(FlowScene&)> onRenderHook;
     bool* destroyedFlag = nullptr;
+};
+
+class RecordingFade : public FadeTransition {
+  public:
+    explicit RecordingFade(Names& draws) : m_draws(draws) {}
+
+    [[nodiscard]] bool usesCustomGeometry() const override { return true; }
+
+    void renderCustomGeometry(VkCommandBuffer /*cmd*/,
+                              const TransitionUpdateContext& /*ctx*/) override {
+        m_draws.get().emplace_back("composite");
+    }
+
+  private:
+    std::reference_wrapper<Names> m_draws;
 };
 
 }  // namespace
@@ -511,6 +534,31 @@ TEST_F(SceneFlowTest, TransitionToScene_RegionPreservesSceneStack) {
     EXPECT_EQ(map->getDiagnostics().exitCount, 1u);
     EXPECT_EQ(gameplay->getDiagnostics().exitCount, 0u);
     EXPECT_EQ(game.getVisibleSceneNames(), (Names{"gameplay", "journal"}));
+}
+
+TEST_F(SceneFlowTest, TransitionToScene_RegionCompositeDrawsBelowOverlappingHud) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    Names draws;
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    const auto recordDraw = [&draws](FlowScene& scene) { draws.push_back(scene.getName()); };
+    add("background")->onRenderHook = recordDraw;
+    add("source")->onRenderHook = recordDraw;
+    add("hud")->onRenderHook = recordDraw;
+    add("destination")->onRenderHook = recordDraw;
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "layered", {{.sceneName = "background", .viewport = ViewportRect::fullWindow()},
+                    {.sceneName = "source", .viewport = ViewportRect::leftHalf()},
+                    {.sceneName = "hud", .viewport = ViewportRect::fullWindow()}}));
+
+    game.transitionToScene("destination", std::make_unique<RecordingFade>(draws), 1.0f,
+                           ViewportRect::leftHalf());
+    game.setTransitionSpeed(0.0f);
+    frame();
+
+    EXPECT_EQ(draws, (Names{"source", "destination", "background", "composite", "hud"}));
 }
 
 TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {
