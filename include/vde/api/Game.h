@@ -318,8 +318,8 @@ class Game : private ScriptEnvironment {
      * The active-group scene occupying @p region (exact viewport match, or the
      * topmost scene containing the region's center) is the source; when the
      * transition completes, the destination scene replaces it in the active
-     * group with @p region as its viewport.  Other viewports keep rendering
-     * and updating normally, and the scene stack is preserved.
+     * group with @p region as its viewport. Other scenes retain their current
+     * viewports, and the scene stack is preserved.
      *
      * The destination must not already be active or paused.
      *
@@ -910,7 +910,7 @@ class Game : private ScriptEnvironment {
     // Scene flow (see setActiveScene() for timing rules)
     void requestSceneFlow(SceneFlowRequest request);
     void applySceneFlowRequest(SceneFlowRequest& request);
-    void applySceneGroup(const SceneGroup& group, bool keepStack);
+    void applySceneGroup(const SceneGroup& group, const std::string* regionDestination = nullptr);
     void applyPushScene(const std::string& name);
     void applyPopScene();
     void applyRemoveScene(const std::string& name);
@@ -919,6 +919,7 @@ class Game : private ScriptEnvironment {
     void applyCompleteTransition();
     void clearTransitionState();
     void applyGroupViewports(const SceneGroup& group);
+    void applyGroupViewport(const SceneGroup& group, const std::string& sceneName);
     [[nodiscard]] ViewportRect resolveGroupViewport(const SceneGroup& group,
                                                     const std::string& sceneName,
                                                     const Scene& scene) const;
@@ -929,7 +930,8 @@ class Game : private ScriptEnvironment {
 
     // Render layer collection
     [[nodiscard]] std::vector<RenderLayer> collectVisibleLayers() const;
-    [[nodiscard]] std::vector<RenderLayer> collectGroupLayers(const SceneGroup& group) const;
+    [[nodiscard]] std::vector<RenderLayer> collectGroupLayers(
+        const SceneGroup& group, const std::string* regionDestination = nullptr) const;
     [[nodiscard]] std::vector<RenderLayer> collectFrameLayers() const;
     [[nodiscard]] std::vector<RenderLayer> collectStackLayers() const;
 

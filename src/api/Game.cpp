@@ -701,7 +701,7 @@ void Game::applySceneFlowRequest(SceneFlowRequest& request) {
             }
             clearTransitionState();
         }
-        applySceneGroup(request.group, /*keepStack=*/false);
+        applySceneGroup(request.group);
         break;
     }
     case Kind::Push: {
@@ -742,9 +742,9 @@ void Game::applySceneFlowRequest(SceneFlowRequest& request) {
     }
 }
 
-void Game::applySceneGroup(const SceneGroup& group, bool keepStack) {
+void Game::applySceneGroup(const SceneGroup& group, const std::string* regionDestination) {
     std::unordered_set<std::string> keep(group.sceneNames.begin(), group.sceneNames.end());
-    if (keepStack) {
+    if (regionDestination) {
         for (const auto& stacked : m_sceneStack) {
             keep.insert(stacked.sceneNames.begin(), stacked.sceneNames.end());
         }
@@ -774,13 +774,17 @@ void Game::applySceneGroup(const SceneGroup& group, bool keepStack) {
         deactivateScene(sceneName);
     }
 
-    if (!keepStack) {
+    if (!regionDestination) {
         m_sceneStack.clear();
     }
 
     m_activeSceneGroup = group;
     m_activeScene = group.empty() ? nullptr : getScene(group.sceneNames.front());
-    applyGroupViewports(group);
+    if (regionDestination) {
+        applyGroupViewport(group, *regionDestination);
+    } else {
+        applyGroupViewports(group);
+    }
 
     for (const auto& sceneName : group.sceneNames) {
         if (m_pausedSceneNames.erase(sceneName) > 0) {
@@ -869,23 +873,27 @@ void Game::applyPopScene() {
 
 void Game::applyGroupViewports(const SceneGroup& group) {
     for (const auto& sceneName : group.sceneNames) {
-        Scene* scene = getScene(sceneName);
-        if (!scene) {
-            continue;
-        }
-        const ViewportRect viewport = resolveGroupViewport(group, sceneName, *scene);
-        const bool hasEntry = std::ranges::any_of(group.entries, [&](const SceneGroupEntry& entry) {
-            return entry.sceneName == sceneName;
-        });
-        if (hasEntry) {
-            if (scene->getViewportRect() != viewport) {
-                scene->setViewportRect(viewport);
-                m_groupAssignedViewports[sceneName] = viewport;
-            }
-        } else {
+        applyGroupViewport(group, sceneName);
+    }
+}
+
+void Game::applyGroupViewport(const SceneGroup& group, const std::string& sceneName) {
+    Scene* scene = getScene(sceneName);
+    if (!scene) {
+        return;
+    }
+    const ViewportRect viewport = resolveGroupViewport(group, sceneName, *scene);
+    const bool hasEntry = std::ranges::any_of(group.entries, [&](const SceneGroupEntry& entry) {
+        return entry.sceneName == sceneName;
+    });
+    if (hasEntry) {
+        if (scene->getViewportRect() != viewport) {
             scene->setViewportRect(viewport);
-            m_groupAssignedViewports.erase(sceneName);
+            m_groupAssignedViewports[sceneName] = viewport;
         }
+    } else {
+        scene->setViewportRect(viewport);
+        m_groupAssignedViewports.erase(sceneName);
     }
 }
 
@@ -1010,25 +1018,17 @@ void Game::applyStartTransition(SceneFlowRequest& request) {
                       << "' is already active or paused; request ignored\n";
             return;
         }
-        destGroup.name = m_activeSceneGroup.name;
-        bool replaced = false;
-        for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
-            if (sceneName == sourceScene) {
-                destGroup.entries.push_back({.sceneName = destName, .viewport = request.region});
-                replaced = true;
-            } else {
-                const Scene* scene = getScene(sceneName);
-                destGroup.entries.push_back(
-                    {.sceneName = sceneName,
-                     .viewport = scene ? scene->getViewportRect() : ViewportRect::fullWindow()});
-            }
+        destGroup = m_activeSceneGroup;
+        const auto source = std::ranges::find(destGroup.sceneNames, sourceScene);
+        if (source != destGroup.sceneNames.end()) {
+            *source = destName;
+            std::erase_if(destGroup.entries, [&](const SceneGroupEntry& entry) {
+                return entry.sceneName == sourceScene;
+            });
+        } else {
+            destGroup.sceneNames.push_back(destName);
         }
-        if (!replaced) {
-            destGroup.entries.push_back({.sceneName = destName, .viewport = request.region});
-        }
-        for (const auto& entry : destGroup.entries) {
-            destGroup.sceneNames.push_back(entry.sceneName);
-        }
+        destGroup.entries.push_back({.sceneName = destName, .viewport = request.region});
     } else {
         for (const auto& sceneName : request.group.sceneNames) {
             if (!sceneExists(sceneName)) {
@@ -1046,7 +1046,7 @@ void Game::applyStartTransition(SceneFlowRequest& request) {
             request.transition->onStart();
             request.transition->onComplete();
         }
-        applySceneGroup(destGroup, /*keepStack=*/request.hasRegion);
+        applySceneGroup(destGroup, request.hasRegion ? &request.sceneName : nullptr);
         return;
     }
 
@@ -1123,12 +1123,13 @@ void Game::applyCompleteTransition() {
     }
 
     const SceneGroup destGroup = m_transitionDestGroup;
-    const bool keepStack = m_viewportTransition;
+    const std::optional<std::string> regionDestination =
+        m_viewportTransition ? std::make_optional(m_transitionDestScene) : std::nullopt;
     if (m_transitionManager) {
         m_transitionManager->cancel();  // No-op when the effect already finished
     }
     clearTransitionState();
-    applySceneGroup(destGroup, keepStack);
+    applySceneGroup(destGroup, regionDestination ? &*regionDestination : nullptr);
 }
 
 void Game::clearTransitionState() {
@@ -2662,13 +2663,16 @@ std::vector<Game::RenderLayer> Game::collectVisibleLayers() const {
     return layers;
 }
 
-std::vector<Game::RenderLayer> Game::collectGroupLayers(const SceneGroup& group) const {
+std::vector<Game::RenderLayer> Game::collectGroupLayers(
+    const SceneGroup& group, const std::string* regionDestination) const {
     std::vector<RenderLayer> layers;
     for (const auto& sceneName : group.sceneNames) {
         auto it = m_scenes.find(sceneName);
         if (it != m_scenes.end() && it->second) {
-            layers.push_back({.scene = it->second.get(),
-                              .viewport = resolveGroupViewport(group, sceneName, *it->second)});
+            const auto viewport = regionDestination && sceneName != *regionDestination
+                                      ? it->second->getViewportRect()
+                                      : resolveGroupViewport(group, sceneName, *it->second);
+            layers.push_back({.scene = it->second.get(), .viewport = viewport});
         }
     }
     return layers;
@@ -2690,7 +2694,8 @@ std::vector<Game::RenderLayer> Game::collectFrameLayers() const {
         // The effect finished this frame; draw what becomes active at the next frame boundary.
         std::vector<RenderLayer> layers =
             m_viewportTransition ? collectStackLayers() : std::vector<RenderLayer>{};
-        std::vector<RenderLayer> dest = collectGroupLayers(m_transitionDestGroup);
+        auto dest = collectGroupLayers(m_transitionDestGroup,
+                                       m_viewportTransition ? &m_transitionDestScene : nullptr);
         layers.insert(layers.end(), dest.begin(), dest.end());
         return layers;
     }
