@@ -1190,9 +1190,9 @@ void Game::stepTransitionOneFrame() {
         // Treat manual stepping like a scene-flow operation: the effect must survive its
         // callbacks, even when there is no scheduler frame to defer requests for us.
         struct RestoreProcessingFlag {
-            bool& flag;
-            bool previous;
-            ~RestoreProcessingFlag() { flag = previous; }
+            std::reference_wrapper<bool> flag;
+            bool previous = false;
+            ~RestoreProcessingFlag() { flag.get() = previous; }
         } restore{m_processingSceneFlow, std::exchange(m_processingSceneFlow, true)};
         m_transitionManager->stepOneFrame(m_deltaTime);
     }
