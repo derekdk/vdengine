@@ -801,6 +801,19 @@ TEST_F(SceneFlowTest, RemoveScene_PurgesSceneFromStack) {
     EXPECT_EQ(game.getActiveScene(), pause);
 }
 
+TEST_F(SceneFlowTest, RemoveScene_AcceptsNameFromActiveGroup) {
+    add("first");
+    FlowScene* second = add("second");
+    game.setActiveSceneGroup(SceneGroup::create("pair", {"first", "second"}));
+
+    game.removeScene(game.getActiveSceneGroup().sceneNames.front());
+
+    EXPECT_EQ(game.getScene("first"), nullptr);
+    EXPECT_EQ(game.getScene("second"), second);
+    EXPECT_EQ(activeNames(), Names{"second"});
+    EXPECT_EQ(game.getActiveScene(), second);
+}
+
 TEST_F(SceneFlowTest, RemoveScene_DuringFrameKeepsSceneAliveUntilFrameBoundary) {
     FlowScene* a = add("a");
     FlowScene* b = add("b");

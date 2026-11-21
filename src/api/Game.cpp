@@ -503,10 +503,14 @@ void Game::removeScene(const std::string& name) {
     }
 }
 
-void Game::applyRemoveScene(const std::string& name) {
-    if (!sceneExists(name)) {
+void Game::applyRemoveScene(const std::string& requestedName) {
+    if (!sceneExists(requestedName)) {
         return;
     }
+
+    // The caller may pass a reference into the active group that we erase below.
+    // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
+    const std::string name = requestedName;
 
     // A transition that can no longer complete as requested is cancelled with the normal undo
     // (exits scenes it entered, re-pauses scenes it resumed).

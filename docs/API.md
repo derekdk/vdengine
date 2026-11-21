@@ -465,7 +465,7 @@ game.run();
 |--------|-------------|
 | `void addScene(const std::string& name, Scene*)` | Add a scene (Game takes ownership) |
 | `void addScene(const std::string& name, std::unique_ptr<Scene>)` | Add a scene (unique_ptr) |
-| `void removeScene(const std::string& name)` | Remove a scene by name. Removal during a scene-flow operation or manual transition step waits until that operation finishes; during a scheduler frame with an active transition, it waits until the next frame boundary. The removed scene stays alive until scheduler tasks and in-flight frames that may reference it have completed. |
+| `void removeScene(const std::string& name)` | Remove a scene by name. The name can be passed directly from `getActiveSceneGroup().sceneNames`. Removal during a scene-flow operation or manual transition step waits until that operation finishes; during a scheduler frame with an active transition, it waits until the next frame boundary. The removed scene stays alive until scheduler tasks and in-flight frames that may reference it have completed. |
 | `Scene* getScene(const std::string& name)` | Get a scene by name |
 | `void setActiveScene(const std::string& name)` | Set the active scene (clears the scene stack) |
 | `Scene* getActiveScene()` | Get the currently active scene |
