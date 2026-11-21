@@ -320,6 +320,26 @@ TEST_F(SchedulerTest, IsExecutingResetsWhenTaskThrows) {
     EXPECT_FALSE(scheduler.isExecuting());
 }
 
+TEST_F(SchedulerTest, NestedExecuteKeepsOuterExecutionMarkedActive) {
+    bool nested = false;
+    scheduler.addTask({.name = "nested execution",
+                       .phase = TaskPhase::GameLogic,
+                       .work = [&]() {
+                           EXPECT_TRUE(scheduler.isExecuting());
+                           if (!nested) {
+                               nested = true;
+                               scheduler.execute();
+                               EXPECT_TRUE(scheduler.isExecuting());
+                           }
+                       },
+                       .dependsOn = {}});
+
+    scheduler.execute();
+
+    EXPECT_TRUE(nested);
+    EXPECT_FALSE(scheduler.isExecuting());
+}
+
 // ============================================================================
 // Complex Graph Ordering
 // ============================================================================

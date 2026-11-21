@@ -822,6 +822,64 @@ TEST_F(SceneFlowTest, RemoveTransitionDestination_FromManualStepWaitsForCallback
     EXPECT_FALSE(game.isTransitioning());
 }
 
+TEST_F(SceneFlowTest, RemoveTransitionDestination_QueuedOnFinalFrameKeepsSourceVisible) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    Names draws;
+    bool completed = false;
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    FlowScene* source = add("source");
+    FlowScene* destination = add("destination");
+    const auto recordDraw = [&draws](FlowScene& scene) { draws.push_back(scene.getName()); };
+    source->onRenderHook = recordDraw;
+    destination->onRenderHook = recordDraw;
+    game.setActiveScene("source");
+    constexpr float duration = 1.0f;
+    game.transitionToScene("destination", std::make_unique<CompletionTrackingFade>(completed),
+                           duration);
+    source->onUpdateHook = [](FlowScene& self) {
+        auto* game = self.getGame();
+        game->removeScene("destination");
+        game->quit();
+        const float deltaTime = game->getDeltaTime();
+        ASSERT_GT(deltaTime, 0.0f);
+        game->setTransitionSpeed(2.0f * duration / deltaTime);
+    };
+
+    game.run();
+
+    EXPECT_EQ(draws, Names{"source"});
+    EXPECT_FALSE(completed);
+    game.applyPendingSceneChanges();
+    EXPECT_EQ(activeNames(), Names{"source"});
+    EXPECT_EQ(game.getScene("destination"), nullptr);
+}
+
+TEST_F(SceneFlowTest, TransitionToScene_RejectedRegionRequestKeepsRunningTransition) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    add("left");
+    add("right");
+    FlowScene* destination = add("destination");
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "split", {{.sceneName = "left", .viewport = ViewportRect::leftHalf()},
+                  {.sceneName = "right", .viewport = ViewportRect::rightHalf()}}));
+    game.transitionToScene("destination", std::make_unique<FadeTransition>(), 1.0f,
+                           ViewportRect::leftHalf());
+    ASSERT_TRUE(game.isTransitioning());
+
+    game.transitionToScene("right", std::make_unique<FadeTransition>(), 1.0f,
+                           ViewportRect::leftHalf());
+
+    EXPECT_TRUE(game.isTransitioning());
+    EXPECT_EQ(destination->getDiagnostics().exitCount, 0u);
+}
+
 TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSource) {
     if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
         GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
