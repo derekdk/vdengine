@@ -761,9 +761,11 @@ TEST_F(SceneFlowTest, Lighting_DoesNotAliasEarlierScenesWithinOneFrame) {
     }
     game.setActiveSceneGroup(SceneGroup::create("layered", layers));
 
-    frame();
-
-    EXPECT_EQ(lightingSets.size(), layerCount);
+    for (int i = 0; i < 3; ++i) {
+        lightingSets.clear();
+        frame();
+        EXPECT_EQ(lightingSets.size(), layerCount) << "frame " << i;
+    }
 }
 
 TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {

@@ -12,6 +12,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -654,8 +655,9 @@ class Game : private ScriptEnvironment {
      * @brief Upload a scene's lighting into its per-frame lighting slot.
      *
      * Each scene drawn in a frame gets its own lighting slot, so scenes with
-     * different LightBoxes can be drawn in the same frame.  The upload happens
-     * once per scene per frame; later calls just select the scene's slot.
+     * independent lighting never overwrite one another's data. Capacity grows
+     * as needed for each frame in flight. The upload happens once per scene per
+     * frame; later calls just select the scene's slot.
      *
      * @param scene Scene containing LightBox to upload (nullptr = default lighting)
      */
@@ -667,9 +669,6 @@ class Game : private ScriptEnvironment {
      * Uploads the scene's lighting on first use this frame (see updateLightingUBO()).
      */
     [[nodiscard]] VkDescriptorSet getLightingDescriptorSet(const Scene* scene);
-
-    /// Maximum number of distinct scenes with independent lighting per frame.
-    static constexpr uint32_t kMaxLightingSlotsPerFrame = 16;
 
     // =========================================================================
     // Exit Code Management (B6 minimal — needed by Track A assertions)
@@ -816,18 +815,29 @@ class Game : private ScriptEnvironment {
     size_t m_scenesRemoved = 0;
 
     // Lighting infrastructure (Phase 4)
-    // Each frame-in-flight owns one buffer split into kMaxLightingSlotsPerFrame
+    // Each frame-in-flight owns a separate set of lighting batches.
     // aligned slots; each scene drawn in a frame is assigned its own slot.
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorPool m_lightingDescriptorPool = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSet> m_lightingDescriptorSets;  // [frame * slots + slot]
-    std::vector<VkBuffer> m_lightingUBOBuffers;             // One per frame-in-flight
-    std::vector<VkDeviceMemory> m_lightingUBOMemory;        // One per frame-in-flight
-    std::vector<void*> m_lightingUBOMapped;                 // Persistently mapped pointers
+    static constexpr uint32_t kLightingSlotsPerBatch = 16;
+    struct LightingBatch {
+        LightingBatch() = default;
+        ~LightingBatch();
+        LightingBatch(const LightingBatch&) = delete;
+        LightingBatch& operator=(const LightingBatch&) = delete;
+        LightingBatch(LightingBatch&&) = delete;
+        LightingBatch& operator=(LightingBatch&&) = delete;
+        VkDevice device = VK_NULL_HANDLE;
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        void* mapped = nullptr;
+        std::array<VkDescriptorSet, kLightingSlotsPerBatch> sets{};
+    };
+    std::vector<std::vector<std::unique_ptr<LightingBatch>>> m_frameLightingBatches;
     VkDeviceSize m_lightingSlotStride = 0;
     std::vector<const Scene*> m_lightingSlotScenes;  ///< Scenes assigned a slot this frame
-    uint32_t m_currentLightingSlot = 0;
-    bool m_lightingSlotOverflowWarned = false;
+    size_t m_currentLightingSlot = 0;
+    uint32_t m_lightingFrame = 0;
 
     // Transition system
     std::unique_ptr<TransitionManager> m_transitionManager;
@@ -903,6 +913,7 @@ class Game : private ScriptEnvironment {
     void createSpriteRenderingPipeline();
     void destroySpriteRenderingPipeline();
     void createLightingResources();
+    [[nodiscard]] std::unique_ptr<LightingBatch> createLightingBatch() const;
     void destroyLightingResources();
     void beginLightingFrame();
     void rebuildSchedulerGraph();
@@ -930,8 +941,9 @@ class Game : private ScriptEnvironment {
 
     // Render layer collection
     [[nodiscard]] std::vector<RenderLayer> collectVisibleLayers() const;
-    [[nodiscard]] std::vector<RenderLayer> collectGroupLayers(
-        const SceneGroup& group, const std::string* regionDestination = nullptr) const;
+    [[nodiscard]] std::vector<RenderLayer>
+    collectGroupLayers(const SceneGroup& group,
+                       const std::string* regionDestination = nullptr) const;
     [[nodiscard]] std::vector<RenderLayer> collectFrameLayers() const;
     [[nodiscard]] std::vector<RenderLayer> collectStackLayers() const;
 

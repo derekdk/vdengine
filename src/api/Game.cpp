@@ -221,6 +221,7 @@ bool Game::initialize(const GameSettings& settings) {
     } catch (const std::exception& e) {
         // Clean up on failure
         std::cerr << "Game initialization failed: " << e.what() << '\n';
+        destroyLightingResources();
         m_vulkanContext.reset();
         m_window.reset();
         throw;
@@ -891,9 +892,8 @@ void Game::applyGroupViewport(const SceneGroup& group, const std::string& sceneN
         return;
     }
     const ViewportRect viewport = resolveGroupViewport(group, sceneName, *scene);
-    const bool hasEntry = std::ranges::any_of(group.entries, [&](const SceneGroupEntry& entry) {
-        return entry.sceneName == sceneName;
-    });
+    const bool hasEntry = std::ranges::any_of(
+        group.entries, [&](const SceneGroupEntry& entry) { return entry.sceneName == sceneName; });
     if (hasEntry) {
         if (scene->getViewportRect() != viewport) {
             scene->setViewportRect(viewport);
@@ -2316,8 +2316,6 @@ void Game::createLightingResources() {
 
     VkDevice device = m_vulkanContext->getDevice();
     constexpr uint32_t framesInFlight = 2;  // MAX_FRAMES_IN_FLIGHT
-    constexpr uint32_t slotsPerFrame = kMaxLightingSlotsPerFrame;
-    constexpr uint32_t setCount = framesInFlight * slotsPerFrame;
 
     // Create lighting descriptor set layout (Set 1: Lighting UBO)
     VkDescriptorSetLayoutBinding lightingBinding{};
@@ -2336,101 +2334,94 @@ void Game::createLightingResources() {
         throw std::runtime_error("Failed to create lighting descriptor set layout");
     }
 
-    // One descriptor set per (frame-in-flight, lighting slot)
-    VkDescriptorPoolSize poolSize{};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = setCount;
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = setCount;
-
-    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_lightingDescriptorPool) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to create lighting descriptor pool");
-    }
-
-    // Each frame's buffer holds slotsPerFrame LightingUBOs at aligned offsets so that
-    // scenes drawn in the same frame keep independent lighting.
     VkPhysicalDeviceProperties deviceProperties{};
     vkGetPhysicalDeviceProperties(m_vulkanContext->getPhysicalDevice(), &deviceProperties);
     const VkDeviceSize alignment =
         std::max<VkDeviceSize>(deviceProperties.limits.minUniformBufferOffsetAlignment, 1);
     m_lightingSlotStride = ((sizeof(LightingUBO) + alignment - 1) / alignment) * alignment;
-    const VkDeviceSize bufferSize = m_lightingSlotStride * slotsPerFrame;
 
-    m_lightingUBOBuffers.resize(framesInFlight);
-    m_lightingUBOMemory.resize(framesInFlight);
-    m_lightingUBOMapped.resize(framesInFlight);
-
-    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-        BufferUtils::createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                  m_lightingUBOBuffers[i], m_lightingUBOMemory[i]);
-
-        // Persistently map the buffer
-        vkMapMemory(device, m_lightingUBOMemory[i], 0, bufferSize, 0, &m_lightingUBOMapped[i]);
+    m_frameLightingBatches.resize(framesInFlight);
+    for (auto& batches : m_frameLightingBatches) {
+        batches.push_back(createLightingBatch());
     }
-    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+    m_lightingSlotScenes.reserve(kLightingSlotsPerBatch);
+    beginLightingFrame();
 
-    // Allocate descriptor sets
-    std::vector<VkDescriptorSetLayout> layouts(setCount, m_lightingDescriptorSetLayout);
+    std::cout << "Lighting resources created successfully" << '\n';
+}
+
+Game::LightingBatch::~LightingBatch() {
+    if (pool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, pool, nullptr);
+    }
+    if (mapped) {
+        vkUnmapMemory(device, memory);
+    }
+    if (buffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device, buffer, nullptr);
+    }
+    if (memory != VK_NULL_HANDLE) {
+        vkFreeMemory(device, memory, nullptr);
+    }
+}
+
+std::unique_ptr<Game::LightingBatch> Game::createLightingBatch() const {
+    auto batch = std::make_unique<LightingBatch>();
+    batch->device = m_vulkanContext->getDevice();
+
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = kLightingSlotsPerBatch;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = kLightingSlotsPerBatch;
+
+    if (vkCreateDescriptorPool(batch->device, &poolInfo, nullptr, &batch->pool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create lighting descriptor pool");
+    }
+
+    BufferUtils::createMappedBuffer(m_lightingSlotStride * kLightingSlotsPerBatch,
+                                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, batch->buffer,
+                                    batch->memory, &batch->mapped);
+    std::array<VkDescriptorSetLayout, kLightingSlotsPerBatch> layouts{};
+    layouts.fill(m_lightingDescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = m_lightingDescriptorPool;
-    allocInfo.descriptorSetCount = setCount;
+    allocInfo.descriptorPool = batch->pool;
+    allocInfo.descriptorSetCount = kLightingSlotsPerBatch;
     allocInfo.pSetLayouts = layouts.data();
 
-    m_lightingDescriptorSets.resize(setCount);
-    if (vkAllocateDescriptorSets(device, &allocInfo, m_lightingDescriptorSets.data()) !=
-        VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(batch->device, &allocInfo, batch->sets.data()) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate lighting descriptor sets");
     }
 
-    // Point each descriptor set at its frame buffer + slot offset
-    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    for (uint32_t frame = 0; frame < framesInFlight; frame++) {
-        for (uint32_t slot = 0; slot < slotsPerFrame; slot++) {
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = m_lightingUBOBuffers[frame];
-            bufferInfo.offset = m_lightingSlotStride * slot;
-            bufferInfo.range = sizeof(LightingUBO);
-
-            VkWriteDescriptorSet descriptorWrite{};
-            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrite.dstSet = m_lightingDescriptorSets[(frame * slotsPerFrame) + slot];
-            descriptorWrite.dstBinding = 0;
-            descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrite.descriptorCount = 1;
-            descriptorWrite.pBufferInfo = &bufferInfo;
-
-            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-        }
-    }
-
-    // Initialize every slot with default lighting (white ambient)
     LightingUBO defaultLighting{};
     defaultLighting.ambientColorAndIntensity = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
-    defaultLighting.lightCounts = glm::ivec4(0, 0, 0, 0);
 
-    for (uint32_t frame = 0; frame < framesInFlight; frame++) {
-        auto* base = static_cast<unsigned char*>(m_lightingUBOMapped[frame]);
-        for (uint32_t slot = 0; slot < slotsPerFrame; slot++) {
-            memcpy(base + (m_lightingSlotStride * slot), &defaultLighting, sizeof(LightingUBO));
-        }
+    VkDeviceSize offset = 0;
+    for (const auto set : batch->sets) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = batch->buffer;
+        bufferInfo.offset = offset;
+        bufferInfo.range = sizeof(LightingUBO);
+
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = set;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+        vkUpdateDescriptorSets(batch->device, 1, &descriptorWrite, 0, nullptr);
+
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        memcpy(static_cast<unsigned char*>(batch->mapped) + offset, &defaultLighting,
+               sizeof(LightingUBO));
+        offset += m_lightingSlotStride;
     }
-    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-
-    m_lightingSlotScenes.clear();
-    m_lightingSlotScenes.reserve(slotsPerFrame);
-    m_currentLightingSlot = 0;
-
-    std::cout << "Lighting resources created successfully" << '\n';
+    return batch;
 }
 
 void Game::destroyLightingResources() {
@@ -2440,33 +2431,9 @@ void Game::destroyLightingResources() {
 
     VkDevice device = m_vulkanContext->getDevice();
 
-    // Unmap and destroy UBO buffers
-    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    for (size_t i = 0; i < m_lightingUBOBuffers.size(); i++) {
-        if (m_lightingUBOMapped[i]) {
-            vkUnmapMemory(device, m_lightingUBOMemory[i]);
-        }
-        if (m_lightingUBOBuffers[i] != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, m_lightingUBOBuffers[i], nullptr);
-        }
-        if (m_lightingUBOMemory[i] != VK_NULL_HANDLE) {
-            vkFreeMemory(device, m_lightingUBOMemory[i], nullptr);
-        }
-    }
-    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    m_lightingUBOBuffers.clear();
-    m_lightingUBOMemory.clear();
-    m_lightingUBOMapped.clear();
-    m_lightingSlotScenes.clear();
+    m_frameLightingBatches.clear();
+    beginLightingFrame();
     m_lightingSlotStride = 0;
-
-    // Descriptor sets are freed when pool is destroyed
-    m_lightingDescriptorSets.clear();
-
-    if (m_lightingDescriptorPool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(device, m_lightingDescriptorPool, nullptr);
-        m_lightingDescriptorPool = VK_NULL_HANDLE;
-    }
 
     if (m_lightingDescriptorSetLayout != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device, m_lightingDescriptorSetLayout, nullptr);
@@ -2477,20 +2444,18 @@ void Game::destroyLightingResources() {
 void Game::beginLightingFrame() {
     m_lightingSlotScenes.clear();
     m_currentLightingSlot = 0;
+    m_lightingFrame = m_vulkanContext->getCurrentFrame();
 }
 
 VkDescriptorSet Game::getCurrentLightingDescriptorSet() const {
-    if (m_lightingDescriptorSets.empty() || !m_vulkanContext) {
+    if (m_frameLightingBatches.empty() || !m_vulkanContext) {
         return VK_NULL_HANDLE;
     }
-    const size_t framesInFlight = m_lightingDescriptorSets.size() / kMaxLightingSlotsPerFrame;
-    size_t currentFrame = m_vulkanContext->getCurrentFrame();
-    if (currentFrame >= framesInFlight) {
-        currentFrame = 0;
-    }
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    return m_lightingDescriptorSets[(currentFrame * kMaxLightingSlotsPerFrame) +
-                                    m_currentLightingSlot];
+    const auto frame = m_vulkanContext->getCurrentFrame();
+    const size_t slot = frame == m_lightingFrame ? m_currentLightingSlot : 0;
+    return m_frameLightingBatches.at(frame)
+        .at(slot / kLightingSlotsPerBatch)
+        ->sets.at(slot % kLightingSlotsPerBatch);
 }
 
 VkDescriptorSet Game::getLightingDescriptorSet(const Scene* scene) {
@@ -2499,38 +2464,30 @@ VkDescriptorSet Game::getLightingDescriptorSet(const Scene* scene) {
 }
 
 void Game::updateLightingUBO(const Scene* scene) {
-    if (!m_vulkanContext || m_lightingUBOMapped.empty()) {
+    if (!m_vulkanContext || m_frameLightingBatches.empty()) {
         return;
+    }
+    if (m_lightingFrame != m_vulkanContext->getCurrentFrame()) {
+        beginLightingFrame();
     }
 
     // Reuse the scene's slot if it already uploaded this frame
     auto existing = std::ranges::find(m_lightingSlotScenes, scene);
     if (existing != m_lightingSlotScenes.end()) {
         m_currentLightingSlot =
-            static_cast<uint32_t>(std::distance(m_lightingSlotScenes.begin(), existing));
+            static_cast<size_t>(std::distance(m_lightingSlotScenes.begin(), existing));
         return;
     }
 
-    uint32_t slot = 0;
-    if (m_lightingSlotScenes.size() < kMaxLightingSlotsPerFrame) {
-        slot = static_cast<uint32_t>(m_lightingSlotScenes.size());
-        m_lightingSlotScenes.push_back(scene);
-    } else {
-        // Out of slots: the last slot is shared, so earlier users of it see this scene's lighting.
-        if (!m_lightingSlotOverflowWarned) {
-            std::cerr << "[VDE] More than " << kMaxLightingSlotsPerFrame
-                      << " lit scenes drawn in one frame; extra scenes share a lighting slot\n";
-            m_lightingSlotOverflowWarned = true;
-        }
-        slot = kMaxLightingSlotsPerFrame - 1;
-        m_lightingSlotScenes.back() = scene;
+    const size_t slot = m_lightingSlotScenes.size();
+    const size_t batchIndex = slot / kLightingSlotsPerBatch;
+    auto& batches = m_frameLightingBatches.at(m_vulkanContext->getCurrentFrame());
+    if (batchIndex == batches.size()) {
+        // Keep descriptors and buffers already referenced by recorded draws intact.
+        batches.push_back(createLightingBatch());
     }
+    m_lightingSlotScenes.push_back(scene);
     m_currentLightingSlot = slot;
-
-    uint32_t currentFrame = m_vulkanContext->getCurrentFrame();
-    if (currentFrame >= m_lightingUBOMapped.size()) {
-        currentFrame = 0;
-    }
 
     LightingUBO ubo{};
 
@@ -2583,9 +2540,9 @@ void Game::updateLightingUBO(const Scene* scene) {
         ubo.lightCounts = glm::ivec4(0, 0, 0, 0);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    memcpy(static_cast<unsigned char*>(m_lightingUBOMapped[currentFrame]) +
-               (m_lightingSlotStride * slot),
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    memcpy(static_cast<unsigned char*>(batches.at(batchIndex)->mapped) +
+               (m_lightingSlotStride * (slot % kLightingSlotsPerBatch)),
            &ubo, sizeof(LightingUBO));
 }
 
@@ -2671,8 +2628,8 @@ std::vector<Game::RenderLayer> Game::collectVisibleLayers() const {
     return layers;
 }
 
-std::vector<Game::RenderLayer> Game::collectGroupLayers(
-    const SceneGroup& group, const std::string* regionDestination) const {
+std::vector<Game::RenderLayer>
+Game::collectGroupLayers(const SceneGroup& group, const std::string* regionDestination) const {
     std::vector<RenderLayer> layers;
     for (const auto& sceneName : group.sceneNames) {
         auto it = m_scenes.find(sceneName);
@@ -3213,10 +3170,9 @@ void Game::rebuildSchedulerGraph() {
                                  [this]() {
                                      if (m_transitionManager && m_transitionManager->isActive() &&
                                          !hasEarlierTransitionCancellation()) {
-                                         m_transitionManager->update(
-                                             m_deltaTime, [this]() {
-                                                 return !hasEarlierTransitionCancellation();
-                                             });
+                                         m_transitionManager->update(m_deltaTime, [this]() {
+                                             return !hasEarlierTransitionCancellation();
+                                         });
                                      }
                                  },
                              .dependsOn = preRenderDeps,
