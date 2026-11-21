@@ -379,7 +379,8 @@ void SpriteEntity::render() {
     std::shared_ptr<Texture> textureOwner = m_texture;
     Texture* texture = textureOwner.get();
     if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
-        texture = m_scene->getResource<Texture>(m_textureId);
+        textureOwner = m_scene->getResourceOwner<Texture>(m_textureId);
+        texture = textureOwner.get();
         if (!texture) {
             return;
         }

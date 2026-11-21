@@ -772,6 +772,36 @@ TEST_F(SceneFlowTest, RemovedSpriteKeepsDrawnTextureUntilFrameSlotIsReused) {
     EXPECT_TRUE(drawnTexture.expired());
 }
 
+TEST_F(SceneFlowTest, RemovedResourceSpriteKeepsDrawnTextureUntilFrameSlotIsReused) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    auto* scene = add("sprites");
+    game.setActiveScene("sprites");
+    auto texture = std::make_shared<Texture>();
+    constexpr std::array<uint8_t, 4> pixel{255, 255, 255, 255};
+    ASSERT_TRUE(texture->loadFromData(pixel.data(), 1, 1));
+    ASSERT_TRUE(texture->uploadToGPU(game.getVulkanContext()));
+    const std::weak_ptr<Texture> drawnTexture = texture;
+    const ResourceId textureId = scene->addResource<Texture>(texture);
+    texture.reset();
+    auto sprite = scene->addEntity<SpriteEntity>(textureId);
+
+    frame();
+    ASSERT_GT(game.getVulkanContext()->getLastFrameSubmission(), 0u);
+    scene->removeResource(textureId);
+    scene->removeEntity(sprite->getId());
+    sprite.reset();
+
+    EXPECT_FALSE(drawnTexture.expired());
+    frame();
+    EXPECT_FALSE(drawnTexture.expired());
+    frame();
+    EXPECT_TRUE(drawnTexture.expired());
+}
+
 TEST_F(SceneFlowTest, Lighting_DoesNotAliasEarlierScenesWithinOneFrame) {
     if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
         GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";

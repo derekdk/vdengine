@@ -739,6 +739,9 @@ Entity that renders a 3D mesh with optional material and texture.
 
 Entity that renders a 2D sprite with texture, color tint, UV rect, and anchor point.
 
+Drawn textures, whether assigned directly or by scene resource ID, remain alive until
+their frame slot is reused after its GPU fence completes (or the device is idle at cleanup).
+
 ### Methods
 
 | Method | Description |
