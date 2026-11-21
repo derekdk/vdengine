@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <functional>
 #include <memory>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -119,6 +120,24 @@ class CompletionTrackingFade : public FadeTransition {
     void onComplete() override { m_completed.get() = true; }
 
   private:
+    std::reference_wrapper<bool> m_completed;
+};
+
+class SelfCancellingFade : public FadeTransition {
+  public:
+    SelfCancellingFade(Game& game, bool& completed) : m_game(game), m_completed(completed) {}
+
+    void update(const TransitionUpdateContext& ctx, TransitionUniforms& uniforms) override {
+        FadeTransition::update(ctx, uniforms);
+        if (ctx.progress >= 1.0f) {
+            m_game.get().cancelTransition();
+        }
+    }
+
+    void onComplete() override { m_completed.get() = true; }
+
+  private:
+    std::reference_wrapper<Game> m_game;
     std::reference_wrapper<bool> m_completed;
 };
 
@@ -564,6 +583,20 @@ TEST_F(SceneFlowTest, TransitionToScene_RegionPreservesSceneStack) {
     EXPECT_EQ(game.getVisibleSceneNames(), (Names{"gameplay", "journal"}));
 }
 
+TEST_F(SceneFlowTest, TransitionToScene_RegionDoesNotResetAnotherScenesViewportOnExit) {
+    FlowScene* source = add("source");
+    FlowScene* hud = add("hud");
+    add("destination");
+    source->setViewportRect(ViewportRect::leftHalf());
+    game.setActiveSceneGroup(SceneGroup::create("split", {"source", "hud"}));
+    source->onExitHook = [hud](FlowScene&) { hud->setViewportRect(ViewportRect::rightHalf()); };
+
+    game.transitionToScene("destination", nullptr, 0.0f, ViewportRect::leftHalf());
+
+    ASSERT_EQ(activeNames(), (Names{"destination", "hud"}));
+    EXPECT_EQ(hud->getViewportRect(), ViewportRect::rightHalf());
+}
+
 TEST_F(SceneFlowTest, TransitionToScene_RegionCompositeDrawsBelowOverlappingHud) {
     if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
         GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
@@ -649,6 +682,88 @@ TEST_F(SceneFlowTest, TransitionToScene_RegionCompositePreservesSourceOutsideSci
     ASSERT_EQ(pixels.size(), static_cast<size_t>(width) * height * 4);
     const size_t offset = (static_cast<size_t>(height / 2) * width + width / 2 + width / 4) * 4;
     EXPECT_EQ(pixels.at(offset + 2), 255u);
+}
+
+TEST_F(SceneFlowTest, TransitionToScene_RegionPreservesBackgroundOutsideScissor) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    add("source")->setBackgroundColor(Color(0.0f, 1.0f, 0.0f, 1.0f));
+    add("hud")->setBackgroundColor(Color(0.0f, 0.0f, 1.0f, 1.0f));
+    add("destination");
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "split", {{.sceneName = "source", .viewport = ViewportRect::leftHalf()},
+                  {.sceneName = "hud", .viewport = ViewportRect::fullWindow()}}));
+    game.transitionToScene("destination", std::make_unique<FadeTransition>(), 1.0f,
+                           ViewportRect::leftHalf());
+    game.setTransitionPaused(true);
+
+    frame();
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    const auto pixels = game.getVulkanContext()->captureFramebuffer(width, height);
+    ASSERT_GT(width, 0u);
+    ASSERT_GT(height, 0u);
+    ASSERT_EQ(pixels.size(), static_cast<size_t>(width) * height * 4);
+    const size_t offset = (static_cast<size_t>(height / 2) * width + width / 2 + width / 4) * 4;
+    EXPECT_EQ(pixels.at(offset + 1), 255u);
+    EXPECT_EQ(pixels.at(offset + 2), 0u);
+}
+
+TEST_F(SceneFlowTest, TransitionToScene_VisibleSceneNamesIncludesDestinationCapture) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    bool destinationRendered = false;
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    FlowScene* source = add("source");
+    add("destination")->onRenderHook = [&destinationRendered](FlowScene&) {
+        destinationRendered = true;
+    };
+    game.setActiveScene("source");
+    constexpr float duration = 1.0f;
+    game.transitionToScene("destination", std::make_unique<FadeTransition>(), duration);
+    source->onUpdateHook = [](FlowScene& self) {
+        auto* game = self.getGame();
+        game->quit();
+        const float deltaTime = game->getDeltaTime();
+        ASSERT_GT(deltaTime, 0.0f);
+        game->setTransitionSpeed(0.5f * duration / deltaTime);
+    };
+
+    game.run();
+
+    ASSERT_NEAR(game.getTransitionProgress(), 0.5f, 0.001f);
+    ASSERT_TRUE(destinationRendered);
+    EXPECT_EQ(game.getVisibleSceneNames(), (Names{"source", "destination"}));
+}
+
+TEST_F(SceneFlowTest, Lighting_DoesNotAliasEarlierScenesWithinOneFrame) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    std::set<VkDescriptorSet> lightingSets;
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    Names layers;
+    constexpr size_t layerCount = 17;
+    for (size_t i = 0; i < layerCount; ++i) {
+        layers.push_back("layer" + std::to_string(i));
+        add(layers.back())->onRenderHook = [&lightingSets](FlowScene& scene) {
+            const auto lighting = scene.getGame()->getLightingDescriptorSet(&scene);
+            EXPECT_NE(lighting, VK_NULL_HANDLE);
+            EXPECT_TRUE(lightingSets.insert(lighting).second) << scene.getName();
+        };
+    }
+    game.setActiveSceneGroup(SceneGroup::create("layered", layers));
+
+    frame();
+
+    EXPECT_EQ(lightingSets.size(), layerCount);
 }
 
 TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {
@@ -745,6 +860,35 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
     EXPECT_EQ(destination->getDiagnostics().exitCount, 1u);
     EXPECT_FALSE(completed);
     EXPECT_FALSE(game.isTransitioning());
+}
+
+TEST_F(SceneFlowTest, CancelTransition_FromEffectUpdateDoesNotCallCompletionHook) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    bool completed = false;
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    FlowScene* source = add("source");
+    add("destination");
+    game.setActiveScene("source");
+    constexpr float duration = 1.0f;
+    game.transitionToScene("destination", std::make_unique<SelfCancellingFade>(game, completed),
+                           duration);
+    source->onUpdateHook = [](FlowScene& self) {
+        auto* game = self.getGame();
+        game->quit();
+        const float deltaTime = game->getDeltaTime();
+        ASSERT_GT(deltaTime, 0.0f);
+        game->setTransitionSpeed(2.0f * duration / deltaTime);
+    };
+
+    game.run();
+    game.applyPendingSceneChanges();
+
+    EXPECT_EQ(activeNames(), Names{"source"});
+    EXPECT_FALSE(game.isTransitioning());
+    EXPECT_FALSE(completed);
 }
 
 // ============================================================================
