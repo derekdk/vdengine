@@ -608,6 +608,14 @@ std::vector<std::string> Game::getVisibleSceneNames() const {
     for (const auto& layer : collectFrameLayers()) {
         names.push_back(layer.scene->getName());
     }
+    if (m_transitionActive && m_transitionManager && m_transitionManager->isActive() &&
+        !hasEarlierTransitionCancellation()) {
+        for (const auto& name : m_transitionDestGroup.sceneNames) {
+            if (std::ranges::find(names, name) == names.end()) {
+                names.push_back(name);
+            }
+        }
+    }
     return names;
 }
 

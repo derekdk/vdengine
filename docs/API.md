@@ -474,7 +474,7 @@ game.run();
 | `void pushScene(const std::string& name)` | Push a scene; the current scene/group is paused and stays visible beneath it |
 | `void popScene()` | Pop scene and resume the previous one |
 | `size_t getSceneStackDepth() const` | Number of paused groups beneath the active group |
-| `std::vector<std::string> getVisibleSceneNames() const` | Scenes drawn each frame, bottom to top |
+| `std::vector<std::string> getVisibleSceneNames() const` | Scenes drawn each frame, bottom to top; during an active effect, destination capture scenes not already listed follow the source scenes |
 | `bool hasPendingSceneChanges() const` | Scene-flow requests queued for the next frame |
 | `void applyPendingSceneChanges()` | Apply queued requests now (frame-boundary step; for manual frame stepping) |
 
