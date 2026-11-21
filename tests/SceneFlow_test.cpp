@@ -523,6 +523,39 @@ TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {
     EXPECT_FALSE(game.isTransitioning());
 }
 
+TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSource) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    FlowScene* source = add("source");
+    FlowScene* destination = add("destination");
+    game.setActiveScene("source");
+    constexpr float duration = 1.0f;
+    game.transitionToScene("destination", std::make_unique<FadeTransition>(), duration);
+
+    source->onUpdateHook = [](FlowScene& self) {
+        auto* game = self.getGame();
+        game->cancelTransition();
+        game->quit();  // Finish this frame but leave both requests queued.
+        const float deltaTime = game->getDeltaTime();
+        ASSERT_GT(deltaTime, 0.0f);
+        game->setTransitionSpeed(2.0f * duration / deltaTime);
+    };
+
+    game.run();
+
+    ASSERT_FLOAT_EQ(game.getTransitionProgress(), 1.0f);
+    ASSERT_EQ(activeNames(), Names{"source"});
+    game.applyPendingSceneChanges();
+
+    EXPECT_EQ(activeNames(), Names{"source"});
+    EXPECT_EQ(source->getDiagnostics().exitCount, 0u);
+    EXPECT_EQ(destination->getDiagnostics().exitCount, 1u);
+    EXPECT_FALSE(game.isTransitioning());
+}
+
 // ============================================================================
 // removeScene interaction
 // ============================================================================

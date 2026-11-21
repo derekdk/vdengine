@@ -679,11 +679,6 @@ void Game::processPendingSceneChange() {
 void Game::applySceneFlowRequest(SceneFlowRequest& request) {
     using Kind = SceneFlowRequest::Kind;
 
-    // A transition whose effect already finished counts as complete before any later request.
-    if (m_transitionCompletionPending && request.kind != Kind::CompleteTransition) {
-        applyCompleteTransition();
-    }
-
     switch (request.kind) {
     case Kind::SetGroup: {
         for (const auto& sceneName : request.group.sceneNames) {
