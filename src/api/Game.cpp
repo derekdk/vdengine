@@ -474,7 +474,7 @@ void Game::addScene(const std::string& name, std::unique_ptr<Scene> scene) {
 }
 
 void Game::removeScene(const std::string& name) {
-    if (m_processingSceneFlow) {
+    if (m_processingSceneFlow || (m_transitionActive && m_scheduler.isExecuting())) {
         SceneFlowRequest request;
         request.kind = SceneFlowRequest::Kind::Remove;
         request.sceneName = name;
@@ -1183,8 +1183,21 @@ bool Game::isTransitionPaused() const {
 }
 
 void Game::stepTransitionOneFrame() {
-    if (m_transitionManager) {
+    if (!m_transitionManager) {
+        return;
+    }
+    {
+        // Treat manual stepping like a scene-flow operation: the effect must survive its
+        // callbacks, even when there is no scheduler frame to defer requests for us.
+        struct RestoreProcessingFlag {
+            bool& flag;
+            bool previous;
+            ~RestoreProcessingFlag() { flag = previous; }
+        } restore{m_processingSceneFlow, std::exchange(m_processingSceneFlow, true)};
         m_transitionManager->stepOneFrame(m_deltaTime);
+    }
+    if (!shouldDeferSceneFlow()) {
+        processPendingSceneChange();
     }
 }
 

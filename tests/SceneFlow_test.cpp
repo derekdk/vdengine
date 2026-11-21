@@ -94,6 +94,24 @@ class RecordingFade : public FadeTransition {
     std::reference_wrapper<Names> m_draws;
 };
 
+class RemovingFade : public FadeTransition {
+  public:
+    RemovingFade(Game& game, bool& destroyed) : m_game(game), m_destroyed(destroyed) {}
+    ~RemovingFade() override { m_destroyed.get() = true; }
+
+    void update(const TransitionUpdateContext& /*ctx*/, TransitionUniforms& /*uniforms*/) override {
+        Game& game = m_game.get();
+        bool& destroyed = m_destroyed.get();
+        game.removeScene("destination");
+        EXPECT_FALSE(destroyed);
+        EXPECT_NE(game.getScene("destination"), nullptr);
+    }
+
+  private:
+    std::reference_wrapper<Game> m_game;
+    std::reference_wrapper<bool> m_destroyed;
+};
+
 }  // namespace
 
 class SceneFlowTest : public ::testing::Test {
@@ -568,6 +586,50 @@ TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {
     game.cancelTransition();
 
     EXPECT_FALSE(game.hasPendingSceneChanges());
+    EXPECT_FALSE(game.isTransitioning());
+}
+
+TEST_F(SceneFlowTest, RemoveTransitionDestination_FromUpdateWaitsForFrameBoundary) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    add("source");
+    add("destination");
+    game.setActiveScene("source");
+    game.transitionToScene("destination", std::make_unique<RemovingFade>(game, sceneDestroyed),
+                           1.0f);
+
+    frame();
+
+    EXPECT_FALSE(sceneDestroyed);
+    EXPECT_TRUE(game.isTransitioning());
+    game.applyPendingSceneChanges();
+    EXPECT_TRUE(sceneDestroyed);
+    EXPECT_EQ(game.getScene("destination"), nullptr);
+    EXPECT_EQ(activeNames(), Names{"source"});
+    EXPECT_FALSE(game.isTransitioning());
+}
+
+TEST_F(SceneFlowTest, RemoveTransitionDestination_FromManualStepWaitsForCallback) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    add("source");
+    add("destination");
+    game.setActiveScene("source");
+    game.transitionToScene("destination", std::make_unique<RemovingFade>(game, sceneDestroyed),
+                           1.0f);
+    game.setTransitionPaused(true);
+
+    game.stepTransitionOneFrame();
+
+    EXPECT_TRUE(sceneDestroyed);
+    EXPECT_EQ(game.getScene("destination"), nullptr);
+    EXPECT_EQ(activeNames(), Names{"source"});
     EXPECT_FALSE(game.isTransitioning());
 }
 

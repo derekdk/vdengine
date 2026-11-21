@@ -152,8 +152,9 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Remove a scene by name.
      * Removal requested during a scene-flow operation (for example, from onPause()
-     * or onExit()) is queued until that operation finishes. Otherwise removal is immediate,
-     * but scene destruction may be deferred until scheduler tasks and GPU work are complete.
+     * or onExit()), during manual transition stepping, or during a scheduler frame with
+     * an active transition is queued. Otherwise removal is immediate, but scene destruction
+     * may be deferred until scheduler tasks and GPU work are complete.
      * @param name Name of the scene to remove
      */
     void removeScene(const std::string& name);
