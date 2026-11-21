@@ -365,7 +365,8 @@ class Game : private ScriptEnvironment {
      *
      * Snaps back to the source; destination scenes that the transition
      * entered receive onExit() (scenes it resumed are paused again).
-     * The completion callback does NOT fire.
+     * A cancellation queued before the scheduler advances the transition skips
+     * that frame's effect update and completion hook.
      * Follows the scene-flow timing described on setActiveScene().
      */
     void cancelTransition();
@@ -923,6 +924,7 @@ class Game : private ScriptEnvironment {
     void refreshFocusDiagnostics();
     [[nodiscard]] bool sceneExists(const std::string& name) const;
     [[nodiscard]] bool shouldDeferSceneFlow() const;
+    [[nodiscard]] bool hasEarlierTransitionCancellation() const;
 
     // Render layer collection
     [[nodiscard]] std::vector<RenderLayer> collectVisibleLayers() const;

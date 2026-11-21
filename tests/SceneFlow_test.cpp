@@ -112,6 +112,16 @@ class RemovingFade : public FadeTransition {
     std::reference_wrapper<bool> m_destroyed;
 };
 
+class CompletionTrackingFade : public FadeTransition {
+  public:
+    explicit CompletionTrackingFade(bool& completed) : m_completed(completed) {}
+
+    void onComplete() override { m_completed.get() = true; }
+
+  private:
+    std::reference_wrapper<bool> m_completed;
+};
+
 }  // namespace
 
 class SceneFlowTest : public ::testing::Test {
@@ -701,6 +711,7 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
     }
 
     Names draws;
+    bool completed = false;
     ASSERT_TRUE(game.initialize(GameSettings{}));
     FlowScene* source = add("source");
     FlowScene* destination = add("destination");
@@ -709,12 +720,13 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
     destination->onRenderHook = recordDraw;
     game.setActiveScene("source");
     constexpr float duration = 1.0f;
-    game.transitionToScene("destination", std::make_unique<FadeTransition>(), duration);
+    game.transitionToScene("destination", std::make_unique<CompletionTrackingFade>(completed),
+                           duration);
 
     source->onUpdateHook = [](FlowScene& self) {
         auto* game = self.getGame();
         game->cancelTransition();
-        game->quit();  // Finish this frame but leave both requests queued.
+        game->quit();  // Finish this frame but leave cancellation queued.
         const float deltaTime = game->getDeltaTime();
         ASSERT_GT(deltaTime, 0.0f);
         game->setTransitionSpeed(2.0f * duration / deltaTime);
@@ -722,7 +734,8 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
 
     game.run();
 
-    ASSERT_FLOAT_EQ(game.getTransitionProgress(), 1.0f);
+    EXPECT_FALSE(completed);
+    EXPECT_FLOAT_EQ(game.getTransitionProgress(), 0.0f);
     ASSERT_EQ(activeNames(), Names{"source"});
     EXPECT_EQ(draws, Names{"source"});
     game.applyPendingSceneChanges();
@@ -730,6 +743,7 @@ TEST_F(SceneFlowTest, CancelTransition_QueuedBeforeSameFrameCompletionKeepsSourc
     EXPECT_EQ(activeNames(), Names{"source"});
     EXPECT_EQ(source->getDiagnostics().exitCount, 0u);
     EXPECT_EQ(destination->getDiagnostics().exitCount, 1u);
+    EXPECT_FALSE(completed);
     EXPECT_FALSE(game.isTransitioning());
 }
 

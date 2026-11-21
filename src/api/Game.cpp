@@ -2671,18 +2671,19 @@ std::vector<Game::RenderLayer> Game::collectGroupLayers(const SceneGroup& group)
     return layers;
 }
 
+bool Game::hasEarlierTransitionCancellation() const {
+    using Kind = SceneFlowRequest::Kind;
+    const auto first = std::ranges::find_if(m_sceneFlowRequests, [this](const auto& request) {
+        return request.kind == Kind::CancelTransition ||
+               (request.kind == Kind::CompleteTransition &&
+                request.transitionId == m_transitionGeneration);
+    });
+    return first != m_sceneFlowRequests.end() && first->kind == Kind::CancelTransition;
+}
+
 std::vector<Game::RenderLayer> Game::collectFrameLayers() const {
-    if (m_transitionActive && m_transitionCompletionPending) {
-        // Honor an earlier cancellation without applying lifecycle changes mid-frame.
-        using Kind = SceneFlowRequest::Kind;
-        const auto first = std::ranges::find_if(m_sceneFlowRequests, [this](const auto& request) {
-            return request.kind == Kind::CancelTransition ||
-                   (request.kind == Kind::CompleteTransition &&
-                    request.transitionId == m_transitionGeneration);
-        });
-        if (first != m_sceneFlowRequests.end() && first->kind == Kind::CancelTransition) {
-            return collectVisibleLayers();
-        }
+    if (m_transitionActive && m_transitionCompletionPending &&
+        !hasEarlierTransitionCancellation()) {
         // The effect finished this frame; draw what becomes active at the next frame boundary.
         std::vector<RenderLayer> layers =
             m_viewportTransition ? collectStackLayers() : std::vector<RenderLayer>{};
@@ -3192,7 +3193,8 @@ void Game::rebuildSchedulerGraph() {
                              .phase = TaskPhase::PreRender,
                              .work =
                                  [this]() {
-                                     if (m_transitionManager && m_transitionManager->isActive()) {
+                                     if (m_transitionManager && m_transitionManager->isActive() &&
+                                         !hasEarlierTransitionCancellation()) {
                                          m_transitionManager->update(m_deltaTime);
                                      }
                                  },
@@ -3218,7 +3220,8 @@ void Game::rebuildSchedulerGraph() {
 
                  beginLightingFrame();
 
-                 if (m_transitionActive && m_transitionManager && m_transitionManager->isActive()) {
+                 if (m_transitionActive && m_transitionManager && m_transitionManager->isActive() &&
+                     !hasEarlierTransitionCancellation()) {
                      renderTransition();
                      return;
                  }
