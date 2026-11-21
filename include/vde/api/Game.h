@@ -13,9 +13,11 @@
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -150,7 +152,8 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Remove a scene by name.
      * Removal requested during a scene-flow operation (for example, from onPause()
-     * or onExit()) is queued until that operation finishes. Otherwise removal is immediate.
+     * or onExit()) is queued until that operation finishes. Otherwise removal is immediate,
+     * but scene destruction may be deferred until scheduler tasks and GPU work are complete.
      * @param name Name of the scene to remove
      */
     void removeScene(const std::string& name);
@@ -796,8 +799,11 @@ class Game : private ScriptEnvironment {
         ViewportRect viewport = ViewportRect::fullWindow();
     };
 
-    /// Scenes removed while a frame was executing; destroyed at the next frame boundary.
-    std::vector<std::unique_ptr<Scene>> m_retiredScenes;
+    struct RetiredScene {
+        std::unique_ptr<Scene> scene;
+        std::optional<uint64_t> lastSubmission;  ///< Set after the frame that removed it.
+    };
+    std::deque<RetiredScene> m_retiredScenes;
 
     // Input focus for split-screen
     std::string m_focusedSceneName;

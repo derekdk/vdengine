@@ -2,18 +2,20 @@
  * @file SceneFlow_test.cpp
  * @brief Unit tests for Game scene flow: push/pop, group switches, transitions, and timing.
  *
- * These tests drive an uninitialized Game (no window or GPU).  Frames are stepped
+ * Unless explicitly opted into Vulkan, these tests drive an uninitialized Game. Frames are stepped
  * manually: applyPendingSceneChanges() is the frame boundary and
  * getScheduler().execute() runs one frame's update tasks.  Without a transition
  * manager, transitions complete instantly, which exercises their lifecycle bookkeeping.
  */
 
+#include <vde/VulkanContext.h>
 #include <vde/api/FadeTransition.h>
 #include <vde/api/Game.h>
 #include <vde/api/Scene.h>
 #include <vde/api/SceneGroup.h>
 #include <vde/api/ViewportRect.h>
 
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -73,6 +75,7 @@ class FlowScene : public Scene {
 
 class SceneFlowTest : public ::testing::Test {
   protected:
+    bool sceneDestroyed = false;
     Game game;
 
     FlowScene* add(const std::string& name) {
@@ -591,8 +594,7 @@ TEST_F(SceneFlowTest, RemoveScene_PurgesSceneFromStack) {
 TEST_F(SceneFlowTest, RemoveScene_DuringFrameKeepsSceneAliveUntilFrameBoundary) {
     FlowScene* a = add("a");
     FlowScene* b = add("b");
-    bool bDestroyed = false;
-    b->destroyedFlag = &bDestroyed;
+    b->destroyedFlag = &sceneDestroyed;
     game.setActiveSceneGroup(SceneGroup::create("ab", {"a", "b"}));
     a->onUpdateHook = [](FlowScene& self) {
         self.onUpdateHook = nullptr;
@@ -602,14 +604,50 @@ TEST_F(SceneFlowTest, RemoveScene_DuringFrameKeepsSceneAliveUntilFrameBoundary) 
     game.getScheduler().execute();
 
     EXPECT_EQ(game.getScene("b"), nullptr);
-    EXPECT_FALSE(bDestroyed) << "scene removed mid-frame must outlive the frame's tasks";
+    EXPECT_FALSE(sceneDestroyed) << "scene removed mid-frame must outlive the frame's tasks";
     EXPECT_EQ(activeNames(), Names{"a"});
 
     game.applyPendingSceneChanges();
-    EXPECT_TRUE(bDestroyed);
+    EXPECT_TRUE(sceneDestroyed);
 
     frame();
     EXPECT_EQ(a->updates, 2);
+}
+
+TEST_F(SceneFlowTest, RemovePausedScene_WaitsForLastRenderFence) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    add("gameplay")->destroyedFlag = &sceneDestroyed;
+    add("overlay");
+    game.setActiveScene("gameplay");
+    game.pushScene("overlay");
+    ASSERT_EQ(game.getVisibleSceneNames(), (Names{"gameplay", "overlay"}));
+
+    auto* context = game.getVulkanContext();
+    const VkDevice device = context->getDevice();
+    const auto frameSlot = context->getCurrentFrame();
+    game.getScheduler().execute();
+    ASSERT_NE(context->getCurrentFrame(), frameSlot);
+    const VkFence fence = context->getInFlightFences()[frameSlot];
+
+    // Simulate a still-pending submission without relying on GPU execution timing.
+    ASSERT_EQ(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX), VK_SUCCESS);
+    ASSERT_EQ(vkResetFences(device, 1, &fence), VK_SUCCESS);
+    game.removeScene("gameplay");
+    EXPECT_EQ(game.getScene("gameplay"), nullptr);
+    EXPECT_EQ(game.getVisibleSceneNames(), Names{"overlay"});
+    game.applyPendingSceneChanges();
+    EXPECT_FALSE(sceneDestroyed);
+
+    VkSubmitInfo submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    ASSERT_EQ(vkQueueSubmit(context->getGraphicsQueue(), 1, &submit, fence), VK_SUCCESS);
+    ASSERT_EQ(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX), VK_SUCCESS);
+    game.applyPendingSceneChanges();
+    EXPECT_TRUE(sceneDestroyed);
 }
 
 }  // namespace vde::test

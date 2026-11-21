@@ -89,6 +89,9 @@ void VulkanContext::cleanup() {
         }
     }
     m_inFlightFences.clear();
+    m_frameSubmissions.fill(0);
+    m_lastFrameSubmission = 0;
+    m_completedFrameSubmission = 0;
 
     // Destroy command pool
     if (m_commandPool != VK_NULL_HANDLE) {
@@ -1227,9 +1230,42 @@ void VulkanContext::createSyncObjects() {
 // Drawing
 // =========================================================================
 
+uint64_t VulkanContext::getCompletedFrameSubmission() {
+    for (size_t slot = 0; slot < m_frameSubmissions.size(); ++slot) {
+        if (m_frameSubmissions[slot] <= m_completedFrameSubmission) {
+            continue;
+        }
+        const VkResult status = vkGetFenceStatus(m_device, m_inFlightFences[slot]);
+        if (status == VK_SUCCESS) {
+            // A fence covers earlier submissions to the same graphics queue.
+            m_completedFrameSubmission = m_frameSubmissions[slot];
+        } else if (status != VK_NOT_READY) {
+            throw std::runtime_error("Failed to query draw frame fence!");
+        }
+    }
+    return m_completedFrameSubmission;
+}
+
+void VulkanContext::waitForCurrentFrame() {
+    if (vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to wait for draw frame fence!");
+    }
+    // Record completion before this fence can be reset and used for another submission.
+    m_completedFrameSubmission =
+        std::max(m_completedFrameSubmission, m_frameSubmissions[m_currentFrame]);
+}
+
+void VulkanContext::submitCurrentFrame(const VkSubmitInfo& submitInfo) {
+    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+    m_frameSubmissions[m_currentFrame] = ++m_lastFrameSubmission;
+}
+
 void VulkanContext::drawFrame() {
-    // Wait for previous frame using this frame index
-    vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+    waitForCurrentFrame();
 
     // Acquire next image
     uint32_t imageIndex;
@@ -1278,10 +1314,7 @@ void VulkanContext::drawFrame() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
+    submitCurrentFrame(submitInfo);
 
     // Present
     VkPresentInfoKHR presentInfo{};
@@ -1311,7 +1344,7 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
     }
 
     // Wait for previous frame using this frame index
-    vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+    waitForCurrentFrame();
 
     // Acquire next image
     uint32_t imageIndex;
@@ -1390,10 +1423,7 @@ void VulkanContext::drawFrameMultiScene(const std::vector<SceneRenderInfo>& scen
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
+    submitCurrentFrame(submitInfo);
 
     // Present
     VkPresentInfoKHR presentInfo{};
@@ -1514,8 +1544,7 @@ void VulkanContext::recordScenePasses(VkCommandBuffer commandBuffer, VkFramebuff
 }
 
 void VulkanContext::drawFrameCustom(const CustomFrameRecorder& recorder) {
-    // Wait for previous frame using this frame index
-    vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+    waitForCurrentFrame();
 
     // Acquire next image
     uint32_t imageIndex;
@@ -1571,10 +1600,7 @@ void VulkanContext::drawFrameCustom(const CustomFrameRecorder& recorder) {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
+    submitCurrentFrame(submitInfo);
 
     // Present
     VkPresentInfoKHR presentInfo{};

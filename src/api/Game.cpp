@@ -230,6 +230,11 @@ void Game::shutdown() {
         return;
     }
 
+    // Shutdown can also follow an interrupted frame, without run() having waited.
+    if (m_vulkanContext && vkDeviceWaitIdle(m_vulkanContext->getDevice()) != VK_SUCCESS) {
+        std::cerr << "[VDE] Failed to wait for the GPU during shutdown\n";
+    }
+
     // Call shutdown hook
     // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
     onShutdown();
@@ -533,15 +538,18 @@ void Game::applyRemoveScene(const std::string& name) {
         m_focusedSceneName.clear();
     }
 
+    // The executing graph or a submitted frame may still reference the scene.
+    const bool deferDestruction = m_scheduler.isExecuting() || m_vulkanContext;
+    if (deferDestruction) {
+        m_retiredScenes.emplace_back();
+    }
     auto removed = m_scenes.extract(name);
+    if (deferDestruction) {
+        m_retiredScenes.back().scene = std::move(removed.mapped());
+    }
     m_scenesRemoved++;
     refreshFocusDiagnostics();
 
-    // Scheduler tasks hold raw Scene pointers: when called mid-frame, keep the scene alive
-    // until the frame boundary, where the task graph is rebuilt without it.
-    if (m_scheduler.isExecuting()) {
-        m_retiredScenes.push_back(std::move(removed.mapped()));
-    }
     m_schedulerRebuildPending = true;
 }
 
@@ -649,8 +657,23 @@ void Game::processPendingSceneChange() {
     if (m_schedulerRebuildPending) {
         rebuildSchedulerGraph();
     }
-    // Safe now: the rebuilt graph no longer references scenes removed mid-frame.
-    m_retiredScenes.clear();
+    if (m_retiredScenes.empty()) {
+        return;
+    }
+
+    // The graph no longer references these scenes. Snapshot the submission serial here,
+    // not in removeScene(): a render callback may remove a scene before its frame submits.
+    const uint64_t lastSubmission = m_vulkanContext ? m_vulkanContext->getLastFrameSubmission() : 0;
+    const uint64_t completed = m_vulkanContext ? m_vulkanContext->getCompletedFrameSubmission() : 0;
+    for (auto it = m_retiredScenes.rbegin(); it != m_retiredScenes.rend() && !it->lastSubmission;
+         ++it) {
+        it->lastSubmission = lastSubmission;
+    }
+    while (!m_retiredScenes.empty() && m_retiredScenes.front().lastSubmission &&
+           *m_retiredScenes.front().lastSubmission <= completed) {
+        auto scene = std::move(m_retiredScenes.front().scene);
+        m_retiredScenes.pop_front();
+    }
 }
 
 void Game::applySceneFlowRequest(SceneFlowRequest& request) {

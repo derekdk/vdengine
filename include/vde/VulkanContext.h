@@ -25,6 +25,8 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include <array>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -139,6 +141,19 @@ class VulkanContext {
         return m_renderFinishedSemaphores;
     }
     [[nodiscard]] const std::vector<VkFence>& getInFlightFences() const { return m_inFlightFences; }
+
+    /**
+     * @brief Get the serial of the last submitted graphics frame (zero before any submission).
+     * @return Latest frame submission serial.
+     */
+    [[nodiscard]] uint64_t getLastFrameSubmission() const { return m_lastFrameSubmission; }
+
+    /**
+     * @brief Poll frame fences without blocking.
+     * @return The latest completed frame serial; all earlier frame submissions are also complete.
+     * @throws std::runtime_error if a fence status query fails.
+     */
+    [[nodiscard]] uint64_t getCompletedFrameSubmission();
 
     Camera& getCamera() { return m_camera; }
     [[nodiscard]] const Camera& getCamera() const { return m_camera; }
@@ -412,6 +427,11 @@ class VulkanContext {
     uint32_t m_currentFrame = 0;
 
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+    std::array<uint64_t, MAX_FRAMES_IN_FLIGHT> m_frameSubmissions{};
+    uint64_t m_lastFrameSubmission = 0;
+    uint64_t m_completedFrameSubmission = 0;
+    void waitForCurrentFrame();
+    void submitCurrentFrame(const VkSubmitInfo& submitInfo);
 
     // Timing
     double m_startTime = 0.0;
