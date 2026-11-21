@@ -467,7 +467,9 @@ deferCommand([this]() {
 ```
 
 When removing or replacing entities/meshes, use `retireResource()` to keep the
-GPU buffers alive until the in-flight command buffer has finished:
+GPU buffers alive until the in-flight command buffer has finished. Textures
+assigned directly to sprites (including text textures) are retained automatically
+for every in-flight frame that draws them:
 
 ```cpp
 // Inside a deferred command — remove entity safely

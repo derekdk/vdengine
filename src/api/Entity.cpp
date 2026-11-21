@@ -478,6 +478,9 @@ void SpriteEntity::render() {
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Bind combined sprite descriptor set (contains both UBO and texture)
+    if (textureOwner) {
+        context->retainSpriteTexture(textureOwner);
+    }
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
                             &spriteDescSet, 0, nullptr);
 

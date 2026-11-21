@@ -8,6 +8,7 @@
  * manager, transitions complete instantly, which exercises their lifecycle bookkeeping.
  */
 
+#include <vde/Texture.h>
 #include <vde/VulkanContext.h>
 #include <vde/api/FadeTransition.h>
 #include <vde/api/Game.h>
@@ -15,6 +16,7 @@
 #include <vde/api/SceneGroup.h>
 #include <vde/api/ViewportRect.h>
 
+#include <array>
 #include <cstdlib>
 #include <functional>
 #include <memory>
@@ -740,6 +742,34 @@ TEST_F(SceneFlowTest, TransitionToScene_VisibleSceneNamesIncludesDestinationCapt
     ASSERT_NEAR(game.getTransitionProgress(), 0.5f, 0.001f);
     ASSERT_TRUE(destinationRendered);
     EXPECT_EQ(game.getVisibleSceneNames(), (Names{"source", "destination"}));
+}
+
+TEST_F(SceneFlowTest, RemovedSpriteKeepsDrawnTextureUntilFrameSlotIsReused) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    auto* scene = add("sprites");
+    game.setActiveScene("sprites");
+    auto sprite = scene->addEntity<SpriteEntity>();
+    auto texture = std::make_shared<Texture>();
+    constexpr std::array<uint8_t, 4> pixel{255, 255, 255, 255};
+    ASSERT_TRUE(texture->loadFromData(pixel.data(), 1, 1));
+    ASSERT_TRUE(texture->uploadToGPU(game.getVulkanContext()));
+    const std::weak_ptr<Texture> drawnTexture = texture;
+    sprite->setTexture(std::move(texture));
+
+    frame();
+    ASSERT_GT(game.getVulkanContext()->getLastFrameSubmission(), 0u);
+    scene->removeEntity(sprite->getId());
+    sprite.reset();
+
+    EXPECT_FALSE(drawnTexture.expired());
+    frame();
+    EXPECT_FALSE(drawnTexture.expired());
+    frame();
+    EXPECT_TRUE(drawnTexture.expired());
 }
 
 TEST_F(SceneFlowTest, Lighting_DoesNotAliasEarlierScenesWithinOneFrame) {

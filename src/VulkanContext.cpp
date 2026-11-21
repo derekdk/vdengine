@@ -68,6 +68,10 @@ void VulkanContext::cleanup() {
 
     vkDeviceWaitIdle(m_device);
 
+    for (auto& textures : m_frameSpriteTextures) {
+        textures.clear();
+    }
+
     // Destroy synchronization objects
     for (auto& semaphore : m_renderFinishedSemaphores) {
         if (semaphore != VK_NULL_HANDLE) {
@@ -1246,6 +1250,10 @@ uint64_t VulkanContext::getCompletedFrameSubmission() {
     return m_completedFrameSubmission;
 }
 
+void VulkanContext::retainSpriteTexture(const std::shared_ptr<Texture>& texture) {
+    m_frameSpriteTextures.at(m_currentFrame).insert(texture);
+}
+
 void VulkanContext::waitForCurrentFrame() {
     if (vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX) !=
         VK_SUCCESS) {
@@ -1254,6 +1262,7 @@ void VulkanContext::waitForCurrentFrame() {
     // Record completion before this fence can be reset and used for another submission.
     m_completedFrameSubmission =
         std::max(m_completedFrameSubmission, m_frameSubmissions[m_currentFrame]);
+    m_frameSpriteTextures.at(m_currentFrame).clear();
 }
 
 void VulkanContext::submitCurrentFrame(const VkSubmitInfo& submitInfo) {

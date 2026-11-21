@@ -28,11 +28,15 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace vde {
 
+class SpriteEntity;
+class Texture;
 class Window;
 
 /**
@@ -362,6 +366,11 @@ class VulkanContext {
      */
     std::vector<uint8_t> captureFramebuffer(uint32_t& outWidth, uint32_t& outHeight);
 
+  private:
+    friend class SpriteEntity;
+
+    void retainSpriteTexture(const std::shared_ptr<Texture>& texture);
+
   protected:
     // Protected for testing subclasses
     struct MockTag {};  ///< Tag for test constructor
@@ -428,6 +437,8 @@ class VulkanContext {
 
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
     std::array<uint64_t, MAX_FRAMES_IN_FLIGHT> m_frameSubmissions{};
+    std::array<std::unordered_set<std::shared_ptr<Texture>>, MAX_FRAMES_IN_FLIGHT>
+        m_frameSpriteTextures;
     uint64_t m_lastFrameSubmission = 0;
     uint64_t m_completedFrameSubmission = 0;
     void waitForCurrentFrame();
