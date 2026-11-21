@@ -81,14 +81,15 @@ void Scheduler::execute() {
     auto sorted = topologicalSort();
     m_lastExecutionOrder = sorted;
 
+    const bool wasExecuting = m_executing;
     m_executing = true;
     try {
         executeSorted(sorted);
     } catch (...) {
-        m_executing = false;
+        m_executing = wasExecuting;
         throw;
     }
-    m_executing = false;
+    m_executing = wasExecuting;
 }
 
 void Scheduler::executeSorted(const std::vector<TaskId>& sorted) {
