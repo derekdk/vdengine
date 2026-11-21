@@ -609,6 +609,38 @@ TEST_F(SceneFlowTest, TransitionToScene_RegionCompositePreservesUnderlay) {
     EXPECT_EQ(pixels.at(offset + 1), 255u);
 }
 
+TEST_F(SceneFlowTest, TransitionToScene_RegionCompositePreservesSourceOutsideScissor) {
+    if (std::getenv("VDE_TEST_VULKAN") == nullptr) {
+        GTEST_SKIP() << "Set VDE_TEST_VULKAN=1 to run with a Vulkan-capable display";
+    }
+
+    ASSERT_TRUE(game.initialize(GameSettings{}));
+    auto* context = game.getVulkanContext();
+    add("source")->onRenderHook = [context](FlowScene&) {
+        VkClearAttachment color{};
+        color.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        color.clearValue.color = {{0.0f, 0.0f, 1.0f, 1.0f}};
+        const VkClearRect rect{context->getEffectiveScissor(), 0, 1};
+        vkCmdClearAttachments(context->getCurrentCommandBuffer(), 1, &color, 1, &rect);
+    };
+    add("destination");
+    game.setActiveScene("source");
+    game.transitionToScene("destination", std::make_unique<FadeTransition>(), 1.0f,
+                           ViewportRect::leftHalf());
+    game.setTransitionPaused(true);
+
+    frame();
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    const auto pixels = context->captureFramebuffer(width, height);
+    ASSERT_GT(width, 0u);
+    ASSERT_GT(height, 0u);
+    ASSERT_EQ(pixels.size(), static_cast<size_t>(width) * height * 4);
+    const size_t offset = (static_cast<size_t>(height / 2) * width + width / 2 + width / 4) * 4;
+    EXPECT_EQ(pixels.at(offset + 2), 255u);
+}
+
 TEST_F(SceneFlowTest, CancelTransition_WithoutTransitionIsNoOp) {
     add("a");
     game.setActiveScene("a");

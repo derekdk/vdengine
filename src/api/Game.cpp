@@ -2745,8 +2745,20 @@ void Game::renderTransition() {
         // The composite replaces pixels in its scissor. Include the layers underneath it
         // in both inputs so uncovered pixels match normal layer rendering.
         const auto underlayEnd = baseLayers.begin() + compositeIndex;
+        const bool hasSource = !sourceLayers.empty();
         sourceLayers.insert(sourceLayers.begin(), baseLayers.begin(), underlayEnd);
         destLayers.insert(destLayers.begin(), baseLayers.begin(), underlayEnd);
+        if (hasSource) {
+            const RenderLayer& source = sourceLayers.back();
+            const auto& region = m_transitionViewport;
+            const auto& viewport = source.viewport;
+            if (!region.contains(viewport.x, viewport.y) ||
+                !region.contains(viewport.x + viewport.width, viewport.y + viewport.height)) {
+                // The composite overwrites only the scissor; preserve the rest of the source.
+                baseLayers.insert(underlayEnd, source);
+                ++compositeIndex;
+            }
+        }
     } else {
         sourceLayers = collectVisibleLayers();
         destLayers = collectGroupLayers(m_transitionDestGroup);

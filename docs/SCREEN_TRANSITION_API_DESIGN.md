@@ -447,6 +447,7 @@ void transitionToScene(const std::string& sceneName,
 The `TransitionManager` renders the composited effect only within the specified scissor region. Source/destination textures still capture the full framebuffer, but the fragment shader only executes within the viewport scissor.
 The composite is drawn at the replaced scene's layer position, so overlapping HUD layers above it remain visible throughout the transition.
 The source and destination captures both include the layers below the replacement, so transparent areas still show the backdrop.
+If the source viewport extends beyond the transition region, its content outside the region stays visible until the replacement takes effect.
 
 ## Scene Lifecycle During Transitions
 
