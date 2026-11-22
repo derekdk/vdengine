@@ -364,6 +364,7 @@ TEST_P(SchedulerExceptionTest, WaitsForSubmittedWorkersBeforeRethrowing) {
                                                      failureReached.set_value();
                                                      throw std::runtime_error("original failure");
                                                  },
+                                             .dependsOn = {},
                                              .mainThreadOnly = mainThreadFailure});
     scheduler.addTask({.name = "blocked worker",
                        .work =
@@ -372,6 +373,7 @@ TEST_P(SchedulerExceptionTest, WaitsForSubmittedWorkersBeforeRethrowing) {
                                workerFinished = true;
                                throw std::logic_error("later worker failure");
                            },
+                       .dependsOn = {},
                        .mainThreadOnly = false});
     bool dependentRan = false;
     scheduler.addTask(
@@ -421,18 +423,22 @@ TEST_F(SchedulerTest, NestedExceptionWaitsOnlyForItsOwnWorkers) {
                                    innerWorkerFinished = true;
                                }
                            },
+                       .dependsOn = {},
                        .mainThreadOnly = false});
-    scheduler.addTask({.name = "nested execution", .work = [&]() {
-                           if (nested) {
-                               throw std::runtime_error("nested failure");
-                           }
-                           EXPECT_EQ(started.wait_for(5s), std::future_status::ready);
-                           nested = true;
-                           EXPECT_THROW(scheduler.execute(), std::runtime_error);
-                           EXPECT_TRUE(innerWorkerFinished.load());
-                           EXPECT_TRUE(scheduler.isExecuting());
-                           releaseOuterWorker.set_value();
-                       }});
+    scheduler.addTask({.name = "nested execution",
+                       .work =
+                           [&]() {
+                               if (nested) {
+                                   throw std::runtime_error("nested failure");
+                               }
+                               EXPECT_EQ(started.wait_for(5s), std::future_status::ready);
+                               nested = true;
+                               EXPECT_THROW(scheduler.execute(), std::runtime_error);
+                               EXPECT_TRUE(innerWorkerFinished.load());
+                               EXPECT_TRUE(scheduler.isExecuting());
+                               releaseOuterWorker.set_value();
+                           },
+                       .dependsOn = {}});
 
     scheduler.execute();
     EXPECT_FALSE(outerWorkerTimedOut.load());
