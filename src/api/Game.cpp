@@ -790,11 +790,6 @@ void Game::applySceneGroup(const SceneGroup& group, const std::string* regionDes
 
     m_activeSceneGroup = group;
     m_activeScene = group.empty() ? nullptr : getScene(group.sceneNames.front());
-    if (regionDestination) {
-        applyGroupViewport(group, *regionDestination);
-    } else {
-        applyGroupViewports(group);
-    }
 
     for (const auto& sceneName : group.sceneNames) {
         if (m_pausedSceneNames.erase(sceneName) > 0) {
@@ -803,6 +798,12 @@ void Game::applySceneGroup(const SceneGroup& group, const std::string* regionDes
             scene->onResume();
         }
         activateScene(sceneName);
+    }
+
+    if (regionDestination) {
+        applyGroupViewport(group, *regionDestination);
+    } else {
+        applyGroupViewports(group);
     }
 
     refreshFocusDiagnostics();
@@ -2912,7 +2913,8 @@ void Game::rebuildSchedulerGraph() {
         if (m_viewportTransition) {
             frozenScenes.insert(m_transitionSourceScene);
         } else {
-            for (const auto& sceneName : m_activeSceneGroup.sceneNames) {
+            for (const auto& layer : collectVisibleLayers()) {
+                const std::string& sceneName = layer.scene->getName();
                 if (!groupContains(m_transitionDestGroup, sceneName)) {
                     frozenScenes.insert(sceneName);
                 }

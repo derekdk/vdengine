@@ -55,6 +55,18 @@ class FlowScene : public Scene {
         }
     }
 
+    void onEnter() override {
+        if (onEnterHook) {
+            onEnterHook(*this);
+        }
+    }
+
+    void onResume() override {
+        if (onResumeHook) {
+            onResumeHook(*this);
+        }
+    }
+
     void onPause() override {
         if (onPauseHook) {
             onPauseHook(*this);
@@ -76,6 +88,8 @@ class FlowScene : public Scene {
 
     int updates = 0;
     std::function<void(FlowScene&)> onUpdateHook;
+    std::function<void(FlowScene&)> onEnterHook;
+    std::function<void(FlowScene&)> onResumeHook;
     std::function<void(FlowScene&)> onPauseHook;
     std::function<void(FlowScene&)> onExitHook;
     std::function<void(FlowScene&)> onRenderHook;
@@ -500,6 +514,48 @@ TEST_F(SceneFlowTest, SceneGroupWithoutViewports_KeepsViewportChosenByScene) {
     EXPECT_EQ(minimap->getViewportRect(), corner);
 }
 
+TEST_F(SceneFlowTest, SceneGroupViewports_OverrideViewportChosenOnEnter) {
+    FlowScene* left = add("left");
+    FlowScene* right = add("right");
+    left->onEnterHook = [](FlowScene& scene) { scene.setViewportRect(ViewportRect::fullWindow()); };
+    right->onEnterHook = [](FlowScene& scene) {
+        scene.setViewportRect(ViewportRect::fullWindow());
+    };
+
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "split", {{.sceneName = "left", .viewport = ViewportRect::leftHalf()},
+                  {.sceneName = "right", .viewport = ViewportRect::rightHalf()}}));
+
+    EXPECT_EQ(left->getViewportRect(), ViewportRect::leftHalf());
+    EXPECT_EQ(right->getViewportRect(), ViewportRect::rightHalf());
+}
+
+TEST_F(SceneFlowTest, SceneGroupViewports_OverrideViewportChosenOnResume) {
+    FlowScene* gameplay = add("gameplay");
+    add("pause");
+    game.setActiveScene("gameplay");
+    game.pushScene("pause");
+    gameplay->onResumeHook = [](FlowScene& scene) {
+        scene.setViewportRect(ViewportRect::fullWindow());
+    };
+
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "back", {{.sceneName = "gameplay", .viewport = ViewportRect::leftHalf()}}));
+
+    EXPECT_EQ(gameplay->getDiagnostics().resumeCount, 1u);
+    EXPECT_EQ(gameplay->getViewportRect(), ViewportRect::leftHalf());
+}
+
+TEST_F(SceneFlowTest, SceneGroupWithoutViewports_KeepsViewportChosenOnEnter) {
+    FlowScene* minimap = add("minimap");
+    const ViewportRect corner{0.75f, 0.0f, 0.25f, 0.25f};
+    minimap->onEnterHook = [corner](FlowScene& scene) { scene.setViewportRect(corner); };
+
+    game.setActiveSceneGroup(SceneGroup::create("gameplay", {"minimap"}));
+
+    EXPECT_EQ(minimap->getViewportRect(), corner);
+}
+
 // ============================================================================
 // Transitions (instant without a GPU-backed transition manager)
 // ============================================================================
@@ -597,6 +653,24 @@ TEST_F(SceneFlowTest, TransitionToScene_RegionDoesNotResetAnotherScenesViewportO
 
     ASSERT_EQ(activeNames(), (Names{"destination", "hud"}));
     EXPECT_EQ(hud->getViewportRect(), ViewportRect::rightHalf());
+}
+
+TEST_F(SceneFlowTest, TransitionToScene_RegionOverridesOnlyDestinationViewportAfterEnter) {
+    add("source");
+    FlowScene* hud = add("hud");
+    FlowScene* destination = add("destination");
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "split", {{.sceneName = "source", .viewport = ViewportRect::leftHalf()},
+                  {.sceneName = "hud", .viewport = ViewportRect::rightHalf()}}));
+    destination->onEnterHook = [hud](FlowScene& scene) {
+        scene.setViewportRect(ViewportRect::fullWindow());
+        hud->setViewportRect(ViewportRect::topHalf());
+    };
+
+    game.transitionToScene("destination", nullptr, 0.0f, ViewportRect::leftHalf());
+
+    EXPECT_EQ(destination->getViewportRect(), ViewportRect::leftHalf());
+    EXPECT_EQ(hud->getViewportRect(), ViewportRect::topHalf());
 }
 
 TEST_F(SceneFlowTest, TransitionToScene_RegionCompositeDrawsBelowOverlappingHud) {

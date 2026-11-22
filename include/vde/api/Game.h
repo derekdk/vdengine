@@ -196,6 +196,11 @@ class Game : private ScriptEnvironment {
      * Scenes outside the group that have continueInBackground==true are
      * also updated.  Clears the scene stack.
      *
+     * Explicit group viewport entries are applied after onEnter()/onResume(),
+     * overriding viewports chosen by those hooks. Scenes without an entry
+     * retain scene-chosen viewports; unchanged assignments from earlier groups
+     * revert to full window.
+     *
      * Follows the scene-flow timing described on setActiveScene().
      *
      * @param group The SceneGroup describing the scenes to activate
