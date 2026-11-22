@@ -25,12 +25,18 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include <array>
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace vde {
 
+class SpriteEntity;
+class Texture;
 class Window;
 
 /**
@@ -116,7 +122,13 @@ class VulkanContext {
     [[nodiscard]] VkQueue getPresentQueue() const { return m_presentQueue; }
     [[nodiscard]] uint32_t getGraphicsQueueFamily() const { return m_graphicsQueueFamilyIndex; }
     [[nodiscard]] VkRenderPass getRenderPass() const { return m_renderPass; }
+    /// Swapchain render pass that loads existing color/depth (for layering scenes).
+    [[nodiscard]] VkRenderPass getRenderPassLoad() const { return m_renderPassLoad; }
     [[nodiscard]] VkRenderPass getOffscreenRenderPass() const { return m_offscreenRenderPass; }
+    /// Offscreen render pass that loads existing color/depth (for layering scenes).
+    [[nodiscard]] VkRenderPass getOffscreenRenderPassLoad() const {
+        return m_offscreenRenderPassLoad;
+    }
     [[nodiscard]] VkCommandPool getCommandPool() const { return m_commandPool; }
     [[nodiscard]] VkExtent2D getSwapChainExtent() const { return m_swapChainExtent; }
     [[nodiscard]] VkFormat getSwapChainImageFormat() const { return m_swapChainImageFormat; }
@@ -133,6 +145,19 @@ class VulkanContext {
         return m_renderFinishedSemaphores;
     }
     [[nodiscard]] const std::vector<VkFence>& getInFlightFences() const { return m_inFlightFences; }
+
+    /**
+     * @brief Get the serial of the last submitted graphics frame (zero before any submission).
+     * @return Latest frame submission serial.
+     */
+    [[nodiscard]] uint64_t getLastFrameSubmission() const { return m_lastFrameSubmission; }
+
+    /**
+     * @brief Poll frame fences without blocking.
+     * @return The latest completed frame serial; all earlier frame submissions are also complete.
+     * @throws std::runtime_error if a fence status query fails.
+     */
+    [[nodiscard]] uint64_t getCompletedFrameSubmission();
 
     Camera& getCamera() { return m_camera; }
     [[nodiscard]] const Camera& getCamera() const { return m_camera; }
@@ -211,6 +236,23 @@ class VulkanContext {
         bool clearPass = false;
     };
     void drawFrameMultiScene(const std::vector<SceneRenderInfo>& sceneRenderInfos);
+
+    /**
+     * @brief Record one render pass per scene into @p framebuffer.
+     *
+     * For each entry: updates the camera UBO (outside the render pass, with
+     * the required barriers), begins a render pass, sets the per-scene
+     * viewport/scissor and viewport override, clears depth inside the scissor,
+     * and invokes the render callback.  The first pass uses @p clearPass and
+     * clears color to @p clearColor; later passes use @p loadPass.  When
+     * @p sceneRenderInfos is empty a single clear-only pass is recorded.
+     *
+     * Does not transition the framebuffer image for presentation.
+     */
+    void recordScenePasses(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer,
+                           VkRenderPass clearPass, VkRenderPass loadPass,
+                           const std::vector<SceneRenderInfo>& sceneRenderInfos,
+                           const glm::vec4& clearColor);
 
     /**
      * @brief Draw a frame with fully custom command buffer recording.
@@ -324,6 +366,11 @@ class VulkanContext {
      */
     std::vector<uint8_t> captureFramebuffer(uint32_t& outWidth, uint32_t& outHeight);
 
+  private:
+    friend class SpriteEntity;
+
+    void retainSpriteTexture(const std::shared_ptr<Texture>& texture);
+
   protected:
     // Protected for testing subclasses
     struct MockTag {};  ///< Tag for test constructor
@@ -355,6 +402,7 @@ class VulkanContext {
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     VkRenderPass m_renderPassLoad = VK_NULL_HANDLE;       // LOAD variant for multi-scene
     VkRenderPass m_offscreenRenderPass = VK_NULL_HANDLE;  // Offscreen: color → SHADER_READ_OPTIMAL
+    VkRenderPass m_offscreenRenderPassLoad = VK_NULL_HANDLE;  // Offscreen LOAD variant
     std::vector<VkFramebuffer> m_swapChainFramebuffers;
 
     // Depth resources
@@ -388,6 +436,13 @@ class VulkanContext {
     uint32_t m_currentFrame = 0;
 
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+    std::array<uint64_t, MAX_FRAMES_IN_FLIGHT> m_frameSubmissions{};
+    std::array<std::unordered_set<std::shared_ptr<Texture>>, MAX_FRAMES_IN_FLIGHT>
+        m_frameSpriteTextures;
+    uint64_t m_lastFrameSubmission = 0;
+    uint64_t m_completedFrameSubmission = 0;
+    void waitForCurrentFrame();
+    void submitCurrentFrame(const VkSubmitInfo& submitInfo);
 
     // Timing
     double m_startTime = 0.0;
@@ -468,6 +523,7 @@ class VulkanContext {
     void createMainRenderPass();
     void createLoadRenderPass();
     void createOffscreenRenderPass();
+    void createOffscreenLoadRenderPass();
     void createDepthResources();
     void createFramebuffers();
 

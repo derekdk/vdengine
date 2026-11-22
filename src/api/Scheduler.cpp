@@ -81,6 +81,18 @@ void Scheduler::execute() {
     auto sorted = topologicalSort();
     m_lastExecutionOrder = sorted;
 
+    const bool wasExecuting = m_executing;
+    m_executing = true;
+    try {
+        executeSorted(sorted);
+    } catch (...) {
+        m_executing = wasExecuting;
+        throw;
+    }
+    m_executing = wasExecuting;
+}
+
+void Scheduler::executeSorted(const std::vector<TaskId>& sorted) {
     if (m_workerThreadCount == 0 || !m_threadPool) {
         // ---------------------------------------------------------------
         // Single-threaded path (unchanged from Phase 1)
@@ -180,23 +192,33 @@ void Scheduler::execute() {
             // Submit pool tasks
             std::vector<std::future<void>> futures;
             futures.reserve(poolTasks.size());
-            for (TaskId id : poolTasks) {
-                auto it = m_tasks.find(id);
-                futures.push_back(m_threadPool->submit(it->second.descriptor.work));
-            }
-
-            // Execute main-thread tasks sequentially
-            for (TaskId id : mainTasks) {
-                auto it = m_tasks.find(id);
-                it->second.descriptor.work();
-                completed.insert(id);
-            }
-
-            // Wait for pool tasks to finish
-            for (auto& f : futures) {
-                if (f.valid()) {
-                    f.get();
+            try {
+                for (TaskId id : poolTasks) {
+                    auto it = m_tasks.find(id);
+                    futures.push_back(m_threadPool->submit(it->second.descriptor.work));
                 }
+
+                // Execute main-thread tasks sequentially
+                for (TaskId id : mainTasks) {
+                    auto it = m_tasks.find(id);
+                    it->second.descriptor.work();
+                    completed.insert(id);
+                }
+
+                // Wait for pool tasks to finish
+                for (auto& f : futures) {
+                    if (f.valid()) {
+                        f.get();
+                    }
+                }
+            } catch (...) {
+                // Drain only this invocation's work, not workers blocked on an outer execute().
+                for (auto& f : futures) {
+                    if (f.valid()) {
+                        f.wait();
+                    }
+                }
+                throw;
             }
             for (TaskId id : poolTasks) {
                 completed.insert(id);

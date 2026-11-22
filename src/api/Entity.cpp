@@ -210,9 +210,6 @@ void MeshEntity::render() {
         mesh->uploadToGPU(context);
     }
 
-    // Update lighting UBO with scene lighting data
-    game->updateLightingUBO(m_scene);
-
     // Get current command buffer
     VkCommandBuffer cmd = context->getCurrentCommandBuffer();
     if (cmd == VK_NULL_HANDLE) {
@@ -243,8 +240,9 @@ void MeshEntity::render() {
                                 &uboDescriptorSet, 0, nullptr);
     }
 
-    // Bind lighting descriptor set (set 1)
-    VkDescriptorSet lightingDescriptorSet = game->getCurrentLightingDescriptorSet();
+    // Bind this scene's lighting descriptor set (set 1); each scene drawn in a frame
+    // has its own lighting slot.
+    VkDescriptorSet lightingDescriptorSet = game->getLightingDescriptorSet(m_scene);
     if (lightingDescriptorSet != VK_NULL_HANDLE) {
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1,
                                 &lightingDescriptorSet, 0, nullptr);
@@ -381,7 +379,8 @@ void SpriteEntity::render() {
     std::shared_ptr<Texture> textureOwner = m_texture;
     Texture* texture = textureOwner.get();
     if (!texture && m_scene && m_textureId != INVALID_RESOURCE_ID) {
-        texture = m_scene->getResource<Texture>(m_textureId);
+        textureOwner = m_scene->getResourceOwner<Texture>(m_textureId);
+        texture = textureOwner.get();
         if (!texture) {
             return;
         }
@@ -480,6 +479,9 @@ void SpriteEntity::render() {
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Bind combined sprite descriptor set (contains both UBO and texture)
+    if (textureOwner) {
+        context->retainSpriteTexture(textureOwner);
+    }
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1,
                             &spriteDescSet, 0, nullptr);
 

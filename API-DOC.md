@@ -245,7 +245,7 @@ game.run();
 
 #### Scene Stack
 
-The game supports a scene stack for overlays:
+The game supports a scene stack for overlays such as pause menus:
 
 ```cpp
 // Push pause menu over gameplay
@@ -254,6 +254,23 @@ game.pushScene("pause");
 // Return to gameplay
 game.popScene();
 ```
+
+`pushScene()` pauses the current active scene (or whole scene group): each scene receives
+`onPause()` and stops updating unless it has `setContinueInBackground(true)`. The paused
+scenes stay visible, frozen, underneath. The pushed scene is entered, updated, receives input
+focus, and is drawn on top with its own camera. Only the bottom-most visible scene's background
+color clears the screen, so a pushed scene that should fully cover the game must draw its own
+backdrop. `popScene()` exits the pushed scene and calls `onResume()` on the scenes beneath it.
+`setActiveScene()`, `setActiveSceneGroup()`, and completed full-screen transitions clear the
+stack (paused scenes that are not part of the new scene/group receive `onExit()`).
+
+#### Scene-Flow Timing
+
+While the game loop is running, scene-flow calls take effect at the start of the next frame,
+in the order they were made. This applies to `setActiveScene()`, `setActiveSceneGroup()`,
+`pushScene()`, `popScene()`, `transitionToScene()`, `transitionToSceneGroup()`, and
+`cancelTransition()`. A frame never changes its active scenes partway through. Calls made
+before `run()` apply immediately. `hasPendingSceneChanges()` reports queued requests.
 
 #### Key Methods
 
@@ -264,8 +281,11 @@ game.popScene();
 | `quit()` | Request game exit |
 | `addScene(name, scene)` | Register a scene |
 | `setActiveScene(name)` | Switch to a scene |
-| `pushScene(name)` | Push scene onto stack |
-| `popScene()` | Pop current scene |
+| `setActiveSceneGroup(group)` | Switch to a group of simultaneously active scenes |
+| `pushScene(name)` | Push scene onto stack (pauses the current scene/group beneath it) |
+| `popScene()` | Pop current scene and resume the previous one |
+| `transitionToSceneGroup(group, transition, duration)` | Animated switch to a scene group |
+| `getVisibleSceneNames()` | Scenes drawn this frame, bottom to top |
 | `getDeltaTime()` | Get frame delta time |
 | `getFPS()` | Get current FPS |
 | `getResourceManager()` | Access the global resource cache |
@@ -378,7 +398,7 @@ private:
 |--------|-------------|
 | `onEnter()` | Scene becomes active |
 | `onExit()` | Scene is deactivated |
-| `onPause()` | Another scene pushed on top |
+| `onPause()` | Another scene pushed on top (scene stops updating, stays visible) |
 | `onResume()` | Returned to top of stack |
 | `update(dt)` | Every frame |
 | `render()` | Every frame after update |
@@ -447,7 +467,9 @@ deferCommand([this]() {
 ```
 
 When removing or replacing entities/meshes, use `retireResource()` to keep the
-GPU buffers alive until the in-flight command buffer has finished:
+GPU buffers alive until the in-flight command buffer has finished. Textures
+assigned directly to sprites (including text textures) are retained automatically
+for every in-flight frame that draws them:
 
 ```cpp
 // Inside a deferred command — remove entity safely
@@ -1600,9 +1622,13 @@ When a `SceneGroup` is active:
 
 1. All scenes in the group receive `onEnter()` when the group becomes active
 2. Each scene's `update(deltaTime)` is called every frame
-3. Each scene can have its own camera and viewport
-4. The first scene in the group is the "primary" scene (controls background color)
+3. Each scene is drawn with its own camera, lighting (`LightBox`), and viewport, in group order;
+   later scenes draw on top with a fresh depth buffer (e.g. a 2D HUD over a 3D world)
+4. The first scene in the group is the "primary" scene: it controls the background color, and
+   scenes without their own camera reuse its camera
 5. All scenes receive `onExit()` when the group is deactivated
+6. Group viewport entries are applied when the group activates; scenes without an entry use the
+   full window unless they chose their own viewport (see below)
 
 ### Setting Viewports Per Scene
 
@@ -1757,17 +1783,31 @@ void onUpdate(float deltaTime) override {
 ### Transition Controls
 
 ```cpp
-// Check if a transition is in progress
+// Check if a transition is in progress (or queued to start next frame)
 if (isTransitioning()) {
     float progress = getTransitionProgress();  // 0.0 to 1.0
 }
 
-// Cancel a transition (snaps back to source scene)
+// Cancel a transition (snaps back to the source)
 cancelTransition();
 
 // Instant switch (duration <= 0 bypasses transition rendering)
 transitionToScene("menu", std::make_unique<vde::FadeTransition>(), 0.0f);
 ```
+
+### Transitioning to a Scene Group
+
+`transitionToSceneGroup()` animates from everything currently visible to a whole scene group.
+Scenes that appear in both the current and destination groups stay entered (no `onExit()` /
+`onEnter()`) and keep updating:
+
+```cpp
+// Gameplay (world + HUD) fades to the menu while the HUD stays alive
+transitionToSceneGroup(vde::SceneGroup::create("menu", {"menu", "hud"}),
+                       std::make_unique<vde::FadeTransition>(), 1.0f);
+```
+
+`transitionToScene(name, ...)` is shorthand for a single-scene group.
 
 ### Viewport-Scoped Transitions
 
@@ -1781,15 +1821,20 @@ transitionToScene("game",
                   vde::ViewportRect::leftHalf());
 ```
 
-Other viewports in the active scene group continue rendering normally during the transition.
+The active-group scene occupying that region is replaced by the destination scene. The
+destination takes the region as its viewport. Other viewports keep rendering and updating
+normally, and the scene stack is preserved. The destination must not already be active.
 
 ### Lifecycle
 
 During a transition:
-- Both source and destination scenes receive `update()` calls
-- `onEnter()` is called on the destination scene when the transition starts
-- `onExit()` is called on the source scene when the transition completes
-- If cancelled, `onExit()` is called on the destination scene instead
+- Source and destination scenes both receive `update()` calls (a transition whose
+  `freezesSourceScene()` returns true stops the outgoing scenes' updates)
+- `onEnter()` is called on destination scenes when the transition starts (paused destination
+  scenes receive `onResume()` instead)
+- When the transition completes, the destination group becomes active at the next frame
+  boundary and outgoing scenes receive `onExit()`; scenes shared by both groups are untouched
+- If cancelled, scenes the transition entered receive `onExit()` (resumed scenes are paused again)
 
 ### WipeTransition Directions
 
@@ -2002,7 +2047,7 @@ VDE's scripted input system drives automation, smoke testing, and render verific
 
 | Command | Description |
 |---------|-------------|
-| `assert rendered_scene_count == N` | Verify number of active scenes |
+| `assert rendered_scene_count == N` | Verify number of scenes drawn (paused stack scenes + active group) |
 | `assert scene "name" was_rendered == true` | Verify a named scene rendered |
 | `assert scene "name" not_blank` | Verify scene is not a blank frame |
 | `assert scene "name" state.<key> <op> <value>` | Compare game-defined state from `Scene::getScriptStateValue(key)`; unknown keys fail the script |

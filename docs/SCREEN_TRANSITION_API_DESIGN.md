@@ -445,16 +445,19 @@ void transitionToScene(const std::string& sceneName,
 ```
 
 The `TransitionManager` renders the composited effect only within the specified scissor region. Source/destination textures still capture the full framebuffer, but the fragment shader only executes within the viewport scissor.
+The composite is drawn at the replaced scene's layer position, so overlapping HUD layers above it remain visible throughout the transition.
+The source and destination captures both include the layers below the replacement, so transparent areas still show the backdrop.
+The original background and any source content outside the transition region stay visible until the replacement takes effect.
 
 ## Scene Lifecycle During Transitions
 
 | Phase      | Source Scene              | Destination Scene          |
 |------------|---------------------------|----------------------------|
-| Start      | `update()` continues      | `onEnter()` called         |
+| Start      | `update()` continues      | `onEnter()` called (`onResume()` if paused) |
 | In-progress| `update()` + `render()`   | `update()` + `render()`    |
-| Complete   | `onExit()` called         | Becomes active sole scene  |
+| Complete   | `onExit()` called (unless also in the destination group) | Destination group becomes active at the next frame boundary |
 
-Both scenes are alive and updating during the transition so that gameplay, animations, and physics remain smooth.
+Both scenes are alive and updating during the transition so that gameplay, animations, and physics remain smooth. Transitions target a `SceneGroup` (`transitionToSceneGroup`); scenes present in both the source and destination groups are never exited.
 
 ## Configuration via TransitionConfig (Optional)
 

@@ -108,9 +108,20 @@ class Scheduler {
      * Tasks are sorted by dependency order, with phase as a tiebreaker
      * for tasks that have no ordering constraint between them.
      *
+     * If a task throws, all workers submitted by this invocation finish before
+     * the original exception is rethrown and the prior execution state is restored.
+     *
      * @throws std::runtime_error if the task graph contains a cycle
      */
     void execute();
+
+    /**
+     * @brief Check whether execute() is currently running on this scheduler.
+     *
+     * Used to detect calls made from inside a frame (e.g. from a task's work
+     * function) so callers can defer graph-mutating operations.
+     */
+    [[nodiscard]] bool isExecuting() const { return m_executing; }
 
     /**
      * @brief Get the number of registered tasks.
@@ -182,6 +193,7 @@ class Scheduler {
     std::unordered_map<TaskId, TaskEntry> m_tasks;
     std::vector<TaskId> m_lastExecutionOrder;
     size_t m_workerThreadCount = 0;
+    bool m_executing = false;
 
     // Forward-declared thread pool (only created when m_workerThreadCount > 0)
     class ThreadPoolImpl;
@@ -193,6 +205,9 @@ class Scheduler {
      * @throws std::runtime_error if a cycle is detected
      */
     [[nodiscard]] std::vector<TaskId> topologicalSort() const;
+
+    /// Run the work functions of @p sorted (already topologically ordered).
+    void executeSorted(const std::vector<TaskId>& sorted);
 };
 
 }  // namespace vde

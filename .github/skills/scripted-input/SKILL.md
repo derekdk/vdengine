@@ -113,7 +113,7 @@ exit                  # Quit the application
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `assert rendered_scene_count <op> <value>` | Compare the number of active scenes | `assert rendered_scene_count == 2` |
+| `assert rendered_scene_count <op> <value>` | Compare the number of scenes drawn (paused stack scenes + active group) | `assert rendered_scene_count == 2` |
 | `assert scene "name" <field> <op> <value>` | Compare a built-in scene diagnostic such as `entity_count` or `was_rendered` | `assert scene "main" entity_count > 0` |
 | `assert scene "name" state.<key> <op> <value>` | Compare game-defined state returned by an override of `Scene::getScriptStateValue(key)` | `assert scene "main" state.layer_count == 3` |
 

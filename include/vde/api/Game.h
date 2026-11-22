@@ -12,9 +12,13 @@
 
 #include <vulkan/vulkan.h>
 
+#include <array>
+#include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -148,6 +152,11 @@ class Game : private ScriptEnvironment {
 
     /**
      * @brief Remove a scene by name.
+     * Removal requested during a scene-flow operation (for example, from onPause()
+     * or onExit()), during manual transition stepping, or during a scheduler frame with
+     * an active transition is queued. Otherwise removal is immediate, but scene destruction
+     * may be deferred until scheduler tasks and GPU work are complete.
+     * Queued removals that invalidate a transition suppress its effect before completion.
      * @param name Name of the scene to remove
      */
     void removeScene(const std::string& name);
@@ -165,17 +174,34 @@ class Game : private ScriptEnvironment {
      *
      * Internally creates a single-scene group so that
      * setActiveSceneGroup-based scheduling works identically.
+     * Clears the scene stack: paused scenes that are not the new scene
+     * receive onExit().
+     *
+     * @note Scene-flow timing: while the game loop is running, scene-flow
+     * requests (setActiveScene, setActiveSceneGroup, pushScene, popScene,
+     * transitionToScene, transitionToSceneGroup, cancelTransition) are queued
+     * and applied in call order at the start of the next frame.  Calls made
+     * while the loop is not running (e.g. before run()) apply immediately.
      */
     void setActiveScene(const std::string& name);
 
     /**
      * @brief Set a group of scenes to be active simultaneously.
      *
-     * The first scene in the group is the primary scene (its camera
-     * and background color are used for rendering).  All scenes in
-     * the group receive update() calls each frame.  Scenes outside
-     * the group that have continueInBackground==true also receive
-     * update() calls.
+     * The first scene in the group is the primary scene (its background
+     * color is used for the initial clear, and scenes without their own
+     * camera reuse its camera).  Every scene in the group is updated and
+     * drawn each frame with its own camera, lighting, and viewport, in
+     * group order (later scenes draw on top with a fresh depth buffer).
+     * Scenes outside the group that have continueInBackground==true are
+     * also updated.  Clears the scene stack.
+     *
+     * Explicit group viewport entries are applied after onEnter()/onResume(),
+     * overriding viewports chosen by those hooks. Scenes without an entry
+     * retain scene-chosen viewports; unchanged assignments from earlier groups
+     * revert to full window.
+     *
+     * Follows the scene-flow timing described on setActiveScene().
      *
      * @param group The SceneGroup describing the scenes to activate
      */
@@ -224,17 +250,55 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Push a scene onto the scene stack.
      *
-     * The current scene is paused and the new scene becomes active.
-     * Use popScene() to return to the previous scene.
+     * The current active group is paused (each scene receives onPause() and
+     * stops updating unless it has continueInBackground) and stays visible,
+     * frozen, underneath.  The pushed scene becomes the active group: it is
+     * entered, updated, focused, and drawn on top with its own camera.
+     * Use popScene() to return to the previous group.
+     *
+     * Pushing a scene that is already active or paused is ignored.
+     * Follows the scene-flow timing described on setActiveScene().
      *
      * @param name Name of the scene to push
      */
     void pushScene(const std::string& name);
 
     /**
-     * @brief Pop the current scene and return to the previous one.
+     * @brief Pop the current scene and return to the previous group.
+     *
+     * The current active group's scenes receive onExit(); the previous
+     * group's scenes receive onResume() and start updating again.
+     * Does nothing if the stack is empty.
+     * Follows the scene-flow timing described on setActiveScene().
      */
     void popScene();
+
+    /**
+     * @brief Get the number of paused groups beneath the active group.
+     */
+    [[nodiscard]] size_t getSceneStackDepth() const { return m_sceneStack.size(); }
+
+    /**
+     * @brief Get the scenes drawn each frame, in draw order (bottom to top).
+     *
+     * Includes paused scenes from the scene stack (beneath) followed by the
+     * active group.  During a transition this reports the source side.
+     */
+    [[nodiscard]] std::vector<std::string> getVisibleSceneNames() const override;
+
+    /**
+     * @brief Check whether scene-flow requests are queued for the next frame.
+     */
+    [[nodiscard]] bool hasPendingSceneChanges() const { return !m_sceneFlowRequests.empty(); }
+
+    /**
+     * @brief Apply queued scene-flow requests now (the frame-boundary step).
+     *
+     * run() calls this automatically at the start of every frame.  It is only
+     * needed by code that steps frames manually through getScheduler().execute()
+     * (headless drivers, tests).  Ignored while a frame is executing.
+     */
+    void applyPendingSceneChanges();
 
     // =========================================================================
     // Transitions
@@ -243,12 +307,13 @@ class Game : private ScriptEnvironment {
     /**
      * @brief Transition to a scene with a visual effect.
      *
-     * Both the source and destination scenes update during the transition.
+     * Equivalent to transitionToSceneGroup() with a single-scene group.
      * If duration <= 0, performs an instant scene switch (equivalent to setActiveScene).
      *
      * @param name       Name of the scene to transition to
      * @param transition The visual transition effect (Game takes ownership)
      * @param duration   Duration in seconds
+     * @throws std::runtime_error if the scene is not registered
      */
     void transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
                            float duration);
@@ -257,26 +322,61 @@ class Game : private ScriptEnvironment {
      * @brief Transition a specific viewport region with a visual effect.
      *
      * Only the specified viewport region participates in the transition.
-     * Other viewports in the active scene group continue rendering normally.
+     * The active-group scene occupying @p region (exact viewport match, or the
+     * topmost scene containing the region's center) is the source; when the
+     * transition completes, the destination scene replaces it in the active
+     * group with @p region as its viewport. Other scenes retain their current
+     * viewports, and the scene stack is preserved.
+     *
+     * The destination must not already be active or paused in the source group or stack.
+     * A rejected request leaves any running transition unchanged.
      *
      * @param name       Name of the scene to transition to
      * @param transition The visual transition effect (Game takes ownership)
      * @param duration   Duration in seconds
      * @param region     Normalized viewport region for the transition
+     * @throws std::runtime_error if the scene is not registered
      */
     void transitionToScene(const std::string& name, std::unique_ptr<Transition> transition,
                            float duration, const ViewportRect& region);
 
     /**
-     * @brief Returns true while a scene transition is in progress.
+     * @brief Transition to a scene group with a visual effect.
+     *
+     * Everything currently visible (paused stack scenes plus the active
+     * group) is the source; the destination group is rendered with its own
+     * viewports and cameras.  Destination scenes are entered (or resumed)
+     * when the transition starts and update alongside the source.  When it
+     * completes the destination group becomes active, the scene stack is
+     * cleared, and source scenes not in the destination receive onExit().
+     * Scenes present in both groups (e.g. a HUD) stay entered throughout.
+     *
+     * If duration <= 0, performs an instant switch (equivalent to
+     * setActiveSceneGroup).  Follows the scene-flow timing described on
+     * setActiveScene().
+     *
+     * @param group      Destination scene group (must be non-empty)
+     * @param transition The visual transition effect (Game takes ownership)
+     * @param duration   Duration in seconds
+     * @throws std::runtime_error if the group is empty or names an unregistered scene
+     */
+    void transitionToSceneGroup(const SceneGroup& group, std::unique_ptr<Transition> transition,
+                                float duration);
+
+    /**
+     * @brief Returns true while a scene transition is in progress or queued to start.
      */
     [[nodiscard]] bool isTransitioning() const;
 
     /**
-     * @brief Cancel the current transition immediately.
+     * @brief Cancel the current transition.
      *
-     * Snaps back to the source scene; the destination scene receives onExit().
-     * The completion callback does NOT fire.
+     * Snaps back to the source; destination scenes that the transition
+     * entered receive onExit() (scenes it resumed are paused again).
+     * A cancellation queued before the scheduler advances the transition skips
+     * that frame's effect update and completion hook. A cancellation requested
+     * from the effect's update callback also skips the completion hook.
+     * Follows the scene-flow timing described on setActiveScene().
      */
     void cancelTransition();
 
@@ -552,15 +652,30 @@ class Game : private ScriptEnvironment {
     }
 
     /**
-     * @brief Get the current frame's lighting descriptor set.
+     * @brief Get the lighting descriptor set selected by the last updateLightingUBO() call.
+     *
+     * Prefer getLightingDescriptorSet(scene), which uploads and selects in one step.
      */
     [[nodiscard]] VkDescriptorSet getCurrentLightingDescriptorSet() const;
 
     /**
-     * @brief Update the lighting UBO with scene lighting data.
-     * @param scene Scene containing LightBox to upload
+     * @brief Upload a scene's lighting into its per-frame lighting slot.
+     *
+     * Each scene drawn in a frame gets its own lighting slot, so scenes with
+     * independent lighting never overwrite one another's data. Capacity grows
+     * as needed for each frame in flight. The upload happens once per scene per
+     * frame; later calls just select the scene's slot.
+     *
+     * @param scene Scene containing LightBox to upload (nullptr = default lighting)
      */
     void updateLightingUBO(const Scene* scene);
+
+    /**
+     * @brief Get the lighting descriptor set for @p scene in the current frame.
+     *
+     * Uploads the scene's lighting on first use this frame (see updateLightingUBO()).
+     */
+    [[nodiscard]] VkDescriptorSet getLightingDescriptorSet(const Scene* scene);
 
     // =========================================================================
     // Exit Code Management (B6 minimal — needed by Track A assertions)
@@ -652,12 +767,52 @@ class Game : private ScriptEnvironment {
     // Scene management
     std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
     Scene* m_activeScene = nullptr;
-    std::vector<std::string> m_sceneStack;
-    std::string m_pendingScene;
-    bool m_sceneSwitchPending = false;
     SceneGroup m_activeSceneGroup;
     std::unordered_set<std::string>
         m_activeSceneNames;  ///< Scenes that have been entered and not exited
+
+    /// Paused groups beneath the active group (bottom → top).
+    std::vector<SceneGroup> m_sceneStack;
+    /// Entered scenes that have received onPause() and not yet onResume().
+    std::unordered_set<std::string> m_pausedSceneNames;
+    /// Viewports assigned by a group's entries (released when a later group has no entry).
+    std::unordered_map<std::string, ViewportRect> m_groupAssignedViewports;
+
+    /// A queued scene-flow change (see setActiveScene() for timing rules).
+    struct SceneFlowRequest {
+        enum class Kind : uint8_t {
+            SetGroup,
+            Push,
+            Pop,
+            Remove,
+            StartTransition,
+            CancelTransition,
+            CompleteTransition,
+        };
+        Kind kind = Kind::SetGroup;
+        SceneGroup group;       ///< SetGroup / StartTransition destination
+        std::string sceneName;  ///< Push / Remove / region transition destination
+        std::unique_ptr<Transition> transition;
+        float duration = 0.0f;
+        bool hasRegion = false;
+        ViewportRect region = ViewportRect::fullWindow();
+        uint64_t transitionId = 0;  ///< CompleteTransition: which transition finished
+    };
+    std::vector<SceneFlowRequest> m_sceneFlowRequests;
+    bool m_processingSceneFlow = false;
+    bool m_schedulerRebuildPending = false;
+
+    /// A scene drawn this frame and the viewport it is drawn into.
+    struct RenderLayer {
+        Scene* scene = nullptr;
+        ViewportRect viewport = ViewportRect::fullWindow();
+    };
+
+    struct RetiredScene {
+        std::unique_ptr<Scene> scene;
+        std::optional<uint64_t> lastSubmission;  ///< Set after the frame that removed it.
+    };
+    std::deque<RetiredScene> m_retiredScenes;
 
     // Input focus for split-screen
     std::string m_focusedSceneName;
@@ -667,17 +822,40 @@ class Game : private ScriptEnvironment {
     size_t m_scenesRemoved = 0;
 
     // Lighting infrastructure (Phase 4)
+    // Each frame-in-flight owns a separate set of lighting batches.
+    // aligned slots; each scene drawn in a frame is assigned its own slot.
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorPool m_lightingDescriptorPool = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSet> m_lightingDescriptorSets;  // One per frame-in-flight
-    std::vector<VkBuffer> m_lightingUBOBuffers;             // One per frame-in-flight
-    std::vector<VkDeviceMemory> m_lightingUBOMemory;        // One per frame-in-flight
-    std::vector<void*> m_lightingUBOMapped;                 // Persistently mapped pointers
+    static constexpr uint32_t kLightingSlotsPerBatch = 16;
+    struct LightingBatch {
+        LightingBatch() = default;
+        ~LightingBatch();
+        LightingBatch(const LightingBatch&) = delete;
+        LightingBatch& operator=(const LightingBatch&) = delete;
+        LightingBatch(LightingBatch&&) = delete;
+        LightingBatch& operator=(LightingBatch&&) = delete;
+        VkDevice device = VK_NULL_HANDLE;
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        void* mapped = nullptr;
+        std::array<VkDescriptorSet, kLightingSlotsPerBatch> sets{};
+    };
+    std::vector<std::vector<std::unique_ptr<LightingBatch>>> m_frameLightingBatches;
+    VkDeviceSize m_lightingSlotStride = 0;
+    std::vector<const Scene*> m_lightingSlotScenes;  ///< Scenes assigned a slot this frame
+    size_t m_currentLightingSlot = 0;
+    uint32_t m_lightingFrame = 0;
 
     // Transition system
     std::unique_ptr<TransitionManager> m_transitionManager;
-    std::string m_transitionDestScene;    ///< Destination scene name during transition
-    std::string m_transitionSourceScene;  ///< Source scene name during transition
+    bool m_transitionActive = false;             ///< Started and not yet completed/cancelled
+    bool m_transitionCompletionPending = false;  ///< Effect finished; applied next frame
+    SceneGroup m_transitionDestGroup;            ///< Active group once the transition completes
+    std::string m_transitionSourceScene;         ///< Region transitions: scene being replaced
+    std::string m_transitionDestScene;           ///< Region transitions: incoming scene
+    std::vector<std::string> m_transitionEnteredScenes;  ///< Entered by the transition start
+    std::vector<std::string> m_transitionResumedScenes;  ///< Resumed by the transition start
+    uint64_t m_transitionGeneration = 0;                 ///< Incremented per started transition
     ViewportRect m_transitionViewport = ViewportRect::fullWindow();  ///< Viewport for transition
     bool m_viewportTransition = false;  ///< True when transition is viewport-scoped
 
@@ -742,10 +920,43 @@ class Game : private ScriptEnvironment {
     void createSpriteRenderingPipeline();
     void destroySpriteRenderingPipeline();
     void createLightingResources();
+    [[nodiscard]] std::unique_ptr<LightingBatch> createLightingBatch() const;
     void destroyLightingResources();
+    void beginLightingFrame();
     void rebuildSchedulerGraph();
-    void renderSingleViewport();
-    void renderMultiViewport();
+
+    // Scene flow (see setActiveScene() for timing rules)
+    void requestSceneFlow(SceneFlowRequest request);
+    void applySceneFlowRequest(SceneFlowRequest& request);
+    void applySceneGroup(const SceneGroup& group, const std::string* regionDestination = nullptr);
+    void applyPushScene(const std::string& name);
+    void applyPopScene();
+    void applyRemoveScene(const std::string& name);
+    void applyStartTransition(SceneFlowRequest& request);
+    void applyCancelTransition();
+    void applyCompleteTransition();
+    void clearTransitionState();
+    void applyGroupViewports(const SceneGroup& group);
+    void applyGroupViewport(const SceneGroup& group, const std::string& sceneName);
+    [[nodiscard]] ViewportRect resolveGroupViewport(const SceneGroup& group,
+                                                    const std::string& sceneName,
+                                                    const Scene& scene) const;
+    void refreshFocusDiagnostics();
+    [[nodiscard]] bool sceneExists(const std::string& name) const;
+    [[nodiscard]] bool shouldDeferSceneFlow() const;
+    [[nodiscard]] bool isRegionTransitionScene(const std::string& name) const;
+    [[nodiscard]] bool hasEarlierTransitionCancellation() const;
+
+    // Render layer collection
+    [[nodiscard]] std::vector<RenderLayer> collectVisibleLayers() const;
+    [[nodiscard]] std::vector<RenderLayer>
+    collectGroupLayers(const SceneGroup& group,
+                       const std::string* regionDestination = nullptr) const;
+    [[nodiscard]] std::vector<RenderLayer> collectFrameLayers() const;
+    [[nodiscard]] std::vector<RenderLayer> collectStackLayers() const;
+
+    void renderSingleViewport(Scene* scene);
+    void renderLayers(const std::vector<RenderLayer>& layers);
     void renderTransition();
 
     // Centralized scene lifecycle helpers.

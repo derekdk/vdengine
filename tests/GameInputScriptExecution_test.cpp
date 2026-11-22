@@ -44,6 +44,9 @@ class MockScriptEnv : public ScriptEnvironment {
     bool captureScreenshot(const std::string&) override { return true; }
     Scene* getScene(const std::string&) override { return scene; }
     [[nodiscard]] const SceneGroup& getActiveSceneGroup() const override { return activeGroup; }
+    [[nodiscard]] std::vector<std::string> getVisibleSceneNames() const override {
+        return activeGroup.sceneNames;
+    }
     [[nodiscard]] std::pair<uint32_t, uint32_t> getSwapChainExtent() const override {
         return {1280, 720};
     }

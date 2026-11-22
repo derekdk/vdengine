@@ -811,6 +811,11 @@ class Scene {
     void classifyAndDecrementEntity(Entity* e);
 
     friend class Game;
+    friend class SpriteEntity;
+
+  private:
+    template <typename T>
+    std::shared_ptr<T> getResourceOwner(ResourceId id);
 };
 
 // Template implementations
@@ -850,9 +855,14 @@ ResourceId Scene::addResource(const ResourcePtr<T>& resource) {
 
 template <typename T>
 T* Scene::getResource(ResourceId id) {
+    return getResourceOwner<T>(id).get();
+}
+
+template <typename T>
+std::shared_ptr<T> Scene::getResourceOwner(ResourceId id) {
     auto it = m_resources.find(id);
     if (it != m_resources.end() && it->second.type == typeid(T)) {
-        return static_cast<T*>(it->second.resource.get());
+        return std::static_pointer_cast<T>(it->second.resource);
     }
     return nullptr;
 }

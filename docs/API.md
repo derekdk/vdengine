@@ -465,20 +465,31 @@ game.run();
 |--------|-------------|
 | `void addScene(const std::string& name, Scene*)` | Add a scene (Game takes ownership) |
 | `void addScene(const std::string& name, std::unique_ptr<Scene>)` | Add a scene (unique_ptr) |
-| `void removeScene(const std::string& name)` | Remove a scene by name |
+| `void removeScene(const std::string& name)` | Remove a scene by name. The name can be passed directly from `getActiveSceneGroup().sceneNames`. Removal during a scene-flow operation or manual transition step waits until that operation finishes; during a scheduler frame with an active transition, it waits until the next frame boundary. The removed scene stays alive until scheduler tasks and in-flight frames that may reference it have completed. |
 | `Scene* getScene(const std::string& name)` | Get a scene by name |
-| `void setActiveScene(const std::string& name)` | Set the active scene |
+| `void setActiveScene(const std::string& name)` | Set the active scene (clears the scene stack) |
 | `Scene* getActiveScene()` | Get the currently active scene |
-| `void setActiveSceneGroup(const SceneGroup&)` | Activate multiple scenes simultaneously |
+| `void setActiveSceneGroup(const SceneGroup&)` | Activate multiple scenes simultaneously (clears the scene stack) |
 | `const SceneGroup& getActiveSceneGroup() const` | Get current active scene group |
-| `void pushScene(const std::string& name)` | Push a scene onto the stack |
-| `void popScene()` | Pop scene and return to previous |
+| `void pushScene(const std::string& name)` | Push a scene; the current scene/group is paused and stays visible beneath it |
+| `void popScene()` | Pop scene and resume the previous one |
+| `size_t getSceneStackDepth() const` | Number of paused groups beneath the active group |
+| `std::vector<std::string> getVisibleSceneNames() const` | Scenes drawn each frame, bottom to top; during an active effect, destination capture scenes not already listed follow the source scenes |
+| `bool hasPendingSceneChanges() const` | Scene-flow requests queued for the next frame |
+| `void applyPendingSceneChanges()` | Apply queued requests now (frame-boundary step; for manual frame stepping) |
+
+While the loop is running, scene-flow calls (`setActiveScene`, `setActiveSceneGroup`, `pushScene`,
+`popScene`, transitions, `cancelTransition`) take effect at the start of the next frame, in call
+order. Animated transition completion goes through the same queue: a cancellation queued before
+completion keeps the source group visible without drawing a destination frame, even if the
+effect finishes later in that frame. Before `run()`,
+scene-flow calls apply immediately.
 
 ### Input Focus (Split-Screen)
 
 | Method | Description |
 |--------|-------------|
-| `void setFocusedScene(const std::string& name)` | Set which scene receives keyboard input |
+| `void setFocusedScene(const std::string& name)` | Set which scene receives keyboard input (applies while it is in the active group) |
 | `Scene* getFocusedScene()` | Get the focused scene |
 | `Scene* getSceneAtScreenPosition(double x, double y)` | Get scene under mouse cursor |
 
@@ -727,6 +738,9 @@ Entity that renders a 3D mesh with optional material and texture.
 **Header**: `<vde/api/Entity.h>`
 
 Entity that renders a 2D sprite with texture, color tint, UV rect, and anchor point.
+
+Drawn textures, whether assigned directly or by scene resource ID, remain alive until
+their frame slot is reused after its GPU fence completes (or the device is idle at cleanup).
 
 ### Methods
 
@@ -1826,7 +1840,7 @@ struct TransitionUniforms {
 
 **Header**: `<vde/api/TransitionManager.h>` (engine-internal)
 
-Manages transition lifecycle, offscreen render targets, and compositing. Owned by `Game`; users interact via `Game::transitionToScene()`.
+Manages transition lifecycle, offscreen render targets, and compositing. Owned by `Game`; users interact via `Game::transitionToScene()` / `Game::transitionToSceneGroup()`.
 
 ### Methods
 

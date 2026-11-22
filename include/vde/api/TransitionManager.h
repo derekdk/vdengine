@@ -17,6 +17,7 @@
 
 #include <vde/OffscreenRenderTarget.h>
 #include <vde/api/Transition.h>
+#include <vde/api/ViewportRect.h>
 
 #include <vulkan/vulkan.h>
 
@@ -77,7 +78,8 @@ class TransitionManager {
      *
      * @param deltaTime Frame delta in seconds
      */
-    void update(float deltaTime);
+    /// `canComplete`, when supplied, is checked after the effect's update callback.
+    void update(float deltaTime, const std::function<bool()>& canComplete = {});
 
     /**
      * @brief Returns true while a transition is in progress.
@@ -120,7 +122,7 @@ class TransitionManager {
      *
      * @param deltaTime The frame delta to advance by (in seconds)
      */
-    void stepOneFrame(float deltaTime);
+    void stepOneFrame(float deltaTime, const std::function<bool()>& canComplete = {});
 
     /**
      * @brief Set the playback speed multiplier for transitions.
@@ -183,14 +185,18 @@ class TransitionManager {
      * @brief Render the composited transition frame.
      *
      * Binds source + dest textures, sets push constants, and draws the
-     * fullscreen triangle (or delegates to custom geometry).
+     * fullscreen triangle (or delegates to custom geometry).  Output is
+     * scissored to @p region so viewport-scoped transitions leave the rest
+     * of the framebuffer untouched.
      *
      * This must be called within an active render pass targeting the
      * swapchain framebuffer.
      *
-     * @param cmd Active command buffer
+     * @param cmd    Active command buffer
+     * @param region Normalized region that receives the composite (default: full window)
      */
-    void renderComposite(VkCommandBuffer cmd);
+    void renderComposite(VkCommandBuffer cmd,
+                         const ViewportRect& region = ViewportRect::fullWindow());
 
   private:
     VulkanContext* m_context = nullptr;

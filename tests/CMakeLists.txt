@@ -91,6 +91,7 @@ set(VDE_TEST_SOURCES
     SpriteAnimation_test.cpp
     # Phase 6 — Audit coverage expansion
     Game_test.cpp
+    SceneFlow_test.cpp
     AudioManager_test.cpp
     BitmapFont_test.cpp
     # FLIP image comparison tests
