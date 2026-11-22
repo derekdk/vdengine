@@ -502,6 +502,19 @@ TEST_F(SceneFlowTest, SceneGroupWithoutViewports_ResetsScenesToFullWindow) {
     EXPECT_EQ(a->getViewportRect(), ViewportRect::fullWindow());
 }
 
+TEST_F(SceneFlowTest, SceneGroupWithoutViewports_ResetsMatchingExplicitAssignmentToFullWindow) {
+    FlowScene* a = add("a");
+    a->setViewportRect(ViewportRect::leftHalf());
+
+    game.setActiveSceneGroup(SceneGroup::createWithViewports(
+        "split", {{.sceneName = "a", .viewport = ViewportRect::leftHalf()}}));
+    EXPECT_EQ(a->getViewportRect(), ViewportRect::leftHalf());
+
+    game.setActiveSceneGroup(SceneGroup::create("full", {"a"}));
+
+    EXPECT_EQ(a->getViewportRect(), ViewportRect::fullWindow());
+}
+
 TEST_F(SceneFlowTest, SceneGroupWithoutViewports_KeepsViewportChosenByScene) {
     FlowScene* minimap = add("minimap");
     add("world");

@@ -899,8 +899,8 @@ void Game::applyGroupViewport(const SceneGroup& group, const std::string& sceneN
     if (hasEntry) {
         if (scene->getViewportRect() != viewport) {
             scene->setViewportRect(viewport);
-            m_groupAssignedViewports[sceneName] = viewport;
         }
+        m_groupAssignedViewports[sceneName] = viewport;
     } else {
         scene->setViewportRect(viewport);
         m_groupAssignedViewports.erase(sceneName);
