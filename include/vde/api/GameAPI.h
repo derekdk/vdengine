@@ -25,6 +25,7 @@
 #include "FadeTransition.h"
 #include "Game.h"
 #include "GameSettings.h"
+#include "GameState.h"
 #include "GameTypes.h"
 #include "Scheduler.h"
 #include "ThreadPool.h"

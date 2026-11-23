@@ -3,6 +3,11 @@
 # No render comparison — that is handled by verify_input_script_demo.vdescript.
 
 wait startup
+assert game state.scene_frames >= 1
+assert game state.typed_frames >= 1
+wait_frames 3
+assert game state.scene_frames >= 3
+assert game state.typed_frames >= 3
 
 print === Input Script Demo: Smoke Test ===
 

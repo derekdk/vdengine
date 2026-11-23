@@ -23,6 +23,7 @@
 #include "CameraBounds.h"
 #include "Entity.h"
 #include "GameCamera.h"
+#include "GameState.h"
 #include "GameTypes.h"
 #include "InputHandler.h"
 #include "LightBox.h"
@@ -461,7 +462,8 @@ class Scene {
      * @param key Lowercase key following the `state.` prefix.
      * @return The value, or std::nullopt when the scene does not expose @p key.
      */
-    virtual std::optional<double> getScriptStateValue(const std::string& /*key*/) const {
+    [[nodiscard]] virtual std::optional<double>
+    getScriptStateValue(const std::string& /*key*/) const {
         return std::nullopt;
     }
 
@@ -612,6 +614,16 @@ class Scene {
      */
     Game* getGame() { return m_game; }
     [[nodiscard]] const Game* getGame() const { return m_game; }
+
+    /// @brief Access Game-owned shared state; throws if this scene is not attached to a Game.
+    GameState& getSharedState();
+    [[nodiscard]] const GameState& getSharedState() const;
+
+    /// @brief Read the committed typed game state without casting the Game.
+    template <typename T>
+    [[nodiscard]] const T& state() const {
+        return getSharedState().state<T>();
+    }
 
     // Background color
 

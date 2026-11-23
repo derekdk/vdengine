@@ -9,6 +9,7 @@
  * Pure CPU / file-system tests — no window or Vulkan context required.
  */
 
+#include <vde/api/Game.h>
 #include <vde/api/StorageManager.h>
 
 #include <cstdint>
@@ -100,6 +101,142 @@ class StorageManagerTest : public ::testing::Test {
         std::filesystem::remove(path.parent_path(), ec);
     }
 };
+
+struct SavedProgress {
+    std::string player;
+    int score = 0;
+};
+
+static void configureStateSerializer(GameState& shared) {
+    shared.setSerializer<SavedProgress>(
+        "progress-v1",
+        [](const SavedProgress& value) { return std::to_string(value.score) + ":" + value.player; },
+        [](const std::string& text) {
+            const auto separator = text.find(':');
+            if (separator == std::string::npos) {
+                throw std::runtime_error("invalid progress");
+            }
+            return SavedProgress{text.substr(separator + 1), std::stoi(text.substr(0, separator))};
+        });
+}
+
+TEST_F(StorageManagerTest, GameStateSaveSlotsRoundTripCommittedTypedAndLooseState) {
+    Game game;
+    auto& shared = game.getSharedState();
+    shared.initialize(SavedProgress{"Alice", 7});
+    configureStateSerializer(shared);
+    shared.setValue("coins", int64_t{9007199254740993LL});
+    shared.setValue("ready", true);
+    shared.setValue("ratio", 0.25);
+    shared.setValue("label", std::string("hello"));
+    game.commitSharedState();
+    shared.update<SavedProgress>([](auto& value) { value.score = 99; });
+    shared.setValue("coins", int64_t{2});
+    shared.save("one");
+    game.commitSharedState();
+    shared.save("two");
+    shared.setValue("extra", true);
+    game.commitSharedState();
+    shared.load("one");
+    EXPECT_EQ(game.state<SavedProgress>().score, 99);
+    EXPECT_TRUE(shared.getValue("extra"));
+    game.commitSharedState();
+    EXPECT_EQ(game.state<SavedProgress>().score, 7);
+    EXPECT_EQ(game.state<SavedProgress>().player, "Alice");
+    EXPECT_EQ(std::get<int64_t>(*shared.getValue("coins")), 9007199254740993LL);
+    EXPECT_EQ(std::get<bool>(*shared.getValue("ready")), true);
+    EXPECT_EQ(std::get<double>(*shared.getValue("ratio")), 0.25);
+    EXPECT_EQ(std::get<std::string>(*shared.getValue("label")), "hello");
+    EXPECT_FALSE(shared.getValue("extra"));
+    shared.load("two");
+    game.commitSharedState();
+    EXPECT_EQ(game.state<SavedProgress>().score, 99);
+}
+
+TEST_F(StorageManagerTest, GameStateLoadFailuresPreserveCommittedAndPendingState) {
+    Game game;
+    auto& shared = game.getSharedState();
+    shared.initialize(SavedProgress{"Alice", 7});
+    configureStateSerializer(shared);
+    shared.save("valid");
+    shared.update<SavedProgress>([](auto& value) { value.score = 8; });
+    shared.setValue("pending", true);
+    ASSERT_TRUE(storage().setStringData("vde.game_state.slot.corrupt", "{"));
+    EXPECT_THROW(shared.load("corrupt"), std::runtime_error);
+    EXPECT_THROW(shared.load("missing"), std::runtime_error);
+    ASSERT_TRUE(storage().setStringData(
+        "vde.game_state.slot.bad",
+        R"({"version":1,"schema":"progress-v1","typed":"bad","values":{}})"));
+    EXPECT_THROW(shared.load("bad"), std::runtime_error);
+    shared.setSerializer<SavedProgress>(
+        "progress-v2", [](const SavedProgress&) { return ""; },
+        [](const std::string&) { return SavedProgress{}; });
+    EXPECT_THROW(shared.load("valid"), std::runtime_error);
+    EXPECT_EQ(game.state<SavedProgress>().score, 7);
+    game.commitSharedState();
+    EXPECT_EQ(game.state<SavedProgress>().score, 8);
+    EXPECT_EQ(shared.getScriptStateValue("pending"), 1.0);
+}
+
+TEST_F(StorageManagerTest, GameStateLooseOnlySlotsAndSerializerRequirements) {
+    Game game;
+    auto& shared = game.getSharedState();
+    shared.setValue("score", int64_t{4});
+    game.commitSharedState();
+    shared.save("loose");
+    shared.eraseValue("score");
+    game.commitSharedState();
+    shared.load("loose");
+    game.commitSharedState();
+    EXPECT_EQ(shared.getScriptStateValue("score"), 4.0);
+    EXPECT_THROW(shared.save(""), std::invalid_argument);
+    shared.initialize(SavedProgress{});
+    EXPECT_THROW(shared.save("typed"), std::logic_error);
+    EXPECT_THROW(shared.load("loose"), std::runtime_error);
+}
+
+TEST_F(StorageManagerTest, GameStateRejectsMalformedLooseSaveTypesWithoutMutation) {
+    Game game;
+    auto& shared = game.getSharedState();
+    shared.setValue("pending", true);
+    for (
+        const auto* payload :
+        {R"({"version":2,"schema":"","typed":null,"values":{}})",
+         R"({"version":1,"schema":"","typed":null,"values":{"x":{"type":0.5,"value":true}}})",
+         R"({"version":1,"schema":"","typed":null,"values":{"x":{"type":4294967296,"value":true}}})",
+         R"({"version":1,"schema":"","typed":null,"values":{"x":{"type":1,"value":9223372036854775808}}})",
+         R"({"version":1,"schema":"","typed":null,"values":{"x":{"type":0,"value":1}}})",
+         R"({"version":1,"schema":"","typed":null,"values":{"X":{"type":0,"value":true}}})"}) {
+        ASSERT_TRUE(storage().setStringData("vde.game_state.slot.invalid", payload));
+        EXPECT_THROW(shared.load("invalid"), std::runtime_error) << payload;
+        EXPECT_FALSE(shared.getValue("pending"));
+    }
+    game.commitSharedState();
+    EXPECT_EQ(shared.getScriptStateValue("pending"), 1.0);
+}
+
+TEST_F(StorageManagerTest, GameStateLoadPublishesReplacementWithChangeNotifications) {
+    Game game;
+    auto& shared = game.getSharedState();
+    shared.setValue("x", int64_t{1});
+    game.commitSharedState();
+    shared.save("original");
+    shared.setValue("x", int64_t{2});
+    shared.setValue("y", true);
+    game.commitSharedState();
+    int changes = 0;
+    shared.subscribe([&](const auto&, const auto&, const auto&) {
+        ++changes;
+        EXPECT_EQ(shared.getScriptStateValue("x"), 1.0);
+        EXPECT_FALSE(shared.getValue("y"));
+    });
+    shared.setValue("discarded", true);
+    shared.load("original");
+    EXPECT_EQ(changes, 0);
+    game.commitSharedState();
+    EXPECT_EQ(changes, 2);
+    EXPECT_FALSE(shared.getValue("discarded"));
+}
 
 // ===========================================================================
 // Lifecycle tests

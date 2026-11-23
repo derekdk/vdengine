@@ -79,6 +79,7 @@ class InputScriptExecutor {
     bool handleCompare(InputScriptState& state, const ScriptCommand& cmd);
     bool handleSet(InputScriptState& state, const ScriptCommand& cmd);
     bool handleHoldKey(InputScriptState& state, const ScriptCommand& cmd);
+    bool handleAssertGameState(InputScriptState& state, const ScriptCommand& cmd);
 
     // Executor is bound to one environment for its lifetime.
     ScriptEnvironment& m_env;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)

@@ -54,7 +54,8 @@ enum class InputCommandType : uint8_t {
     AssertScene,       ///< assert scene "name" <field> <op> <value>
     Compare,           ///< compare actual.png golden.png 0.02 — image comparison
     Set,               ///< set VAR value — define a script variable
-    HoldKey  ///< hold W 500 / hold W 0.5s — keydown, wait duration (ms or s-suffix seconds), keyup
+    HoldKey,  ///< hold W 500 / hold W 0.5s — keydown, wait duration (ms or s-suffix seconds), keyup
+    AssertGameState  ///< assert game state.<key> <op> <value>
 };
 
 /**

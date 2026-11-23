@@ -42,6 +42,10 @@ constexpr float WORLD_H = 10.0f;
 constexpr int WIN_W = 1280;
 constexpr int WIN_H = 720;
 
+struct InputScriptSharedState {
+    int64_t sceneFrames = 0;
+};
+
 // Pixels per world unit
 constexpr float PX_PER_UNIT_X = WIN_W / WORLD_W;  // 80
 constexpr float PX_PER_UNIT_Y = WIN_H / WORLD_H;  // 72
@@ -270,6 +274,8 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
 
     void update(float deltaTime) override {
         BaseExampleScene::update(deltaTime);
+        getSharedState().setValue("scene_frames", state<InputScriptSharedState>().sceneFrames + 1);
+        getSharedState().update<InputScriptSharedState>([](auto& next) { ++next.sceneFrames; });
 
         auto* input = dynamic_cast<InputScriptDemoHandler*>(getInputHandler());
         if (!input) {
@@ -398,7 +404,20 @@ class InputScriptDemoScene : public vde::examples::BaseExampleScene {
 // ============================================================================
 
 class InputScriptDemoGame
-    : public vde::examples::BaseExampleGame<InputScriptDemoHandler, InputScriptDemoScene> {};
+    : public vde::examples::BaseExampleGame<InputScriptDemoHandler, InputScriptDemoScene> {
+  public:
+    InputScriptDemoGame() {
+        getSharedState().initialize(InputScriptSharedState{});
+        getSharedState().setValue("scene_frames", int64_t{0});
+    }
+
+    [[nodiscard]] std::optional<double> getScriptStateValue(const std::string& key) const override {
+        if (key == "typed_frames") {
+            return static_cast<double>(state<InputScriptSharedState>().sceneFrames);
+        }
+        return Game::getScriptStateValue(key);
+    }
+};
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
