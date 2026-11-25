@@ -344,7 +344,7 @@ Run smoke tests against examples, games, and tools, with changed-source selectio
 **Parameters:**
 - `-Category` - `All` (default), `Examples`, `Games`, or `Tools`
 - `-Filter <pattern>` - Wildcard pattern for executable names (for example `"*physics*"`)
-- `-Since <revision>` - Explicit Git revision or range for changed-only selection; when omitted, the script resolves a merge base from the GitHub PR base, mainline refs, or a different upstream branch, then falls back to the repository root commit
+- `-Since <revision>` - Explicit Git revision or range for changed-only selection; when omitted and local source/header changes exist, only the working tree, index, and untracked files are considered. Otherwise the script resolves a merge base from the GitHub PR base, mainline refs, or a different upstream branch, then falls back to the repository root commit
 - `-Generator` - Build system: `Ninja` (default) or `MSBuild`
 - `-Config` - Configuration: `Debug` (default) or `Release`
 - `-Build` - Build before running smoke tests

@@ -660,20 +660,34 @@ if ($ChangedOnly) {
         return ""
     }
 
-    $effectiveSince = Resolve-SmokeChangeBase -RepoRoot $vdeRoot -RequestedSince $Since
-    $changedFileArguments = @{
-        RepoRoot = $vdeRoot
-        IncludeDeleted = $true
-    }
-    if (-not [string]::IsNullOrWhiteSpace($effectiveSince)) {
-        $changedFileArguments.Since = $effectiveSince
-        Write-Info "Changed-file base: $effectiveSince"
-    } else {
-        Write-Info "Changed-file base: working tree and index"
-    }
-
+    $effectiveSince = $Since
     try {
-        $changedFiles = @(Get-VdeChangedFiles @changedFileArguments)
+        $workingTreeFiles = @()
+        $workingTreeCodeFiles = @()
+        if ([string]::IsNullOrWhiteSpace($Since)) {
+            $workingTreeFiles = @(Get-VdeChangedFiles -RepoRoot $vdeRoot -IncludeDeleted)
+            $workingTreeCodeFiles = @($workingTreeFiles | Where-Object {
+                [System.IO.Path]::GetExtension($_) -in $sourceExtensions
+            })
+        }
+
+        if ($workingTreeCodeFiles.Count -gt 0) {
+            $changedFiles = $workingTreeFiles
+            Write-Info "Changed-file base: current working tree, index, and untracked files"
+        } else {
+            $effectiveSince = Resolve-SmokeChangeBase -RepoRoot $vdeRoot -RequestedSince $Since
+            $changedFileArguments = @{
+                RepoRoot = $vdeRoot
+                IncludeDeleted = $true
+            }
+            if (-not [string]::IsNullOrWhiteSpace($effectiveSince)) {
+                $changedFileArguments.Since = $effectiveSince
+                Write-Info "Changed-file base: $effectiveSince"
+            } else {
+                Write-Info "Changed-file base: working tree and index"
+            }
+            $changedFiles = @(Get-VdeChangedFiles @changedFileArguments)
+        }
     }
     catch {
         Write-Err "Unable to determine changed files: $($_.Exception.Message)"
@@ -765,6 +779,8 @@ if ($ChangedOnly) {
 
     Write-Info "Changed source/header files considered: $($changedCodeFiles.Count)"
     Write-Info "Changed-only selection: $($allExes.Count) applicable executable(s); $notApplicableCount skipped"
+    $selectedNames = @($allExes | ForEach-Object { $_.Name })
+    Write-Pass "Changed-only smoke selection: $($selectedNames -join ', ')"
 }
 
 if ($allExes.Count -eq 0) {

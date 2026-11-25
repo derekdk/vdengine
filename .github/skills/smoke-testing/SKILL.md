@@ -92,7 +92,7 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 |-----------|--------|---------|-------------|
 | `-Category` | `All`, `Examples`, `Games`, `Tools` | `All` | Which category of executables to test |
 | `-Filter` | Wildcard pattern | (none) | Filter executable names (e.g. `"*physics*"`, `"vde_vlauncher*"`) |
-| `-Since` | Git revision or range | (auto) | Base for changed-only selection; automatically resolves a GitHub PR base, mainline ref, or different upstream branch, then falls back to the repository root commit |
+| `-Since` | Git revision or range | (auto) | Explicit base for changed-only selection; without it, local source/header changes take priority, otherwise the script automatically resolves a GitHub PR base, mainline ref, or different upstream branch |
 | `-Extended` | switch | `$false` | Legacy full-suite mode including priority 2 examples and games |
 | `-Generator` | `MSBuild`, `Ninja` | `Ninja` | Which build system output to test |
 | `-Config` | `Debug`, `Release` | `Debug` | Build configuration |
@@ -103,7 +103,7 @@ Smoke tests verify that every VDE example, game, and tool can launch, render, an
 
 ### Changed-only Git base resolution
 
-When `-ChangedOnly` is active without `-Since`, the script resolves a comparison base in this order: `GITHUB_BASE_REF`, `origin/HEAD` and common mainline refs, a different upstream branch, and finally the repository root commit. This keeps clean committed checkouts covered without treating a feature branch's own upstream as its base. If Git cannot provide a committed base, the existing working-tree, index, and untracked-file detection remains the fallback.
+When `-ChangedOnly` is active without `-Since`, the script first checks for local source/header or shader changes in the working tree, index, and untracked files. If any are present, it selects smoke owners from only those local changes, avoiding unrelated projects changed earlier on the branch. If there are no local code changes, it resolves a comparison base in this order: `GITHUB_BASE_REF`, `origin/HEAD` and common mainline refs, a different upstream branch, and finally the repository root commit. Pass `-Since` to explicitly compare against a chosen revision or range.
 
 ## Smoke Priority Model
 

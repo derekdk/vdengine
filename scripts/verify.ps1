@@ -7,7 +7,7 @@
 # No need to redirect to temp files or handle terminal truncation.
 #
 # Usage:
-#   .\scripts\verify.ps1                                           # Full verification with targeted lint
+#   .\scripts\verify.ps1                                           # Full verification with changed-only smoke and targeted lint
 #   .\scripts\verify.ps1 -FullLint                                # Full verification with full-repo lint
 #   .\scripts\verify.ps1 -SkipBuild                               # Tests + smoke only
 #   .\scripts\verify.ps1 -SkipSmoke                               # Build + unit tests + lint only
@@ -211,7 +211,7 @@ if (-not $SkipSmoke) {
     if ($SmokeExtended) { $smokeArgs += "-Extended" }
     if ($SmokeFull) {
         $smokeArgs += "-Full"
-    } elseif ($SmokeChangedOnly) {
+    } elseif ($SmokeChangedOnly -or -not $SmokeExtended) {
         $smokeArgs += "-ChangedOnly"
     }
     $smokePass = Invoke-Stage "SMOKE TESTS" "smoke-test.ps1" $smokeArgs
