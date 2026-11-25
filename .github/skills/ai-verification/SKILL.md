@@ -87,6 +87,15 @@ If the log is long, read the tail first (last ~80 lines) to see the summary, the
 .\scripts\verify.ps1
 ```
 
+`verify.ps1` explicitly passes `-ChangedOnly` to the smoke runner unless
+`-SmokeFull` or `-SmokeExtended` is requested. When local source/header changes
+exist, selection is based only on the working tree, index, and untracked files,
+so older commits on the branch do not launch unrelated projects. With no local
+code changes, the runner resolves a branch/PR comparison base. It runs only
+executables whose `vde.toml` `source_paths` own the changed files; changes under
+shared engine directories select all affected executables. A `-SmokeFilter`
+further narrows that selection.
+
 Then:
 ```
 read_file("logs/verify-latest.log", startLine=1, endLine=60)   # summary at top
@@ -134,7 +143,7 @@ read_file("logs/verify-latest.log", endLine=-1, startLine=-80) # last 80 lines
 .\scripts\verify.ps1 -SmokeChangedOnly
 ```
 
-This selects every-priority executable whose `vde.toml` `[smoke]` metadata owns changed source/header or shader paths. Shared changes under `src`, `include`, `third_party`, or `shaders` select all executables; deleted source/header files are included. With no applicable source/header changes, the smoke stage exits successfully without launching a test process.
+This selects every-priority executable whose `vde.toml` `[smoke]` metadata owns changed source/header or shader paths. Local code changes are considered without unrelated committed branch changes; shared changes under `src`, `include`, `third_party`, or `shaders` select all executables. Deleted source/header files are included. With no applicable source/header changes, the smoke stage exits successfully without launching a test process.
 
 ### Release configuration
 
